@@ -309,6 +309,36 @@ export const TANKS = [
   },
 ];
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
+// ---- v3 ammunition balance & loadouts ----
+// Each tank carries a fixed number of rounds (its real stowage capacity = sum of the historical default load).
+// Shell strength is balanced: damage scales with (standard pen / pen)^0.5, so the high-penetration round does
+// less damage per hit (and APCR/APDS also lose penetration faster with range); HE/HESH have little penetration
+// but the highest damage, splash and module/crew damage. HEAT is countered by ERA, composite and spaced armour.
+for (const t of TANKS) {
+  const s0 = t.shells[0]; const D0 = s0.damage;
+  t.ammoCap = t.shells.reduce((a, s) => a + s.count, 0); t.defaultLoadout = t.shells.map((s) => s.count);
+  for (let i = 0; i < t.shells.length; i++) {
+    const s = t.shells[i]; s.baseDamage ??= s.damage;
+    if (s.type === 'HE') { s.damage = Math.round(D0 * 1.4 / 5) * 5; s.role = 'High damage + splash, wrecks modules, low penetration'; }
+    else if (s.type === 'HESH') { s.damage = Math.round(D0 * 1.3 / 5) * 5; s.role = 'High damage, spalls crew/modules, stopped by spaced armour'; }
+    else if (i === 0) s.role = 'Standard: balanced penetration and damage';
+    else { const k = Math.max(0.75, Math.min(1.25, Math.sqrt(s0.pen / s.pen))); s.damage = Math.round(D0 * k / 5) * 5; s.role = s.pen > s0.pen ? `Premium: +${Math.round((s.pen / s0.pen - 1) * 100)}% penetration, −${Math.round((1 - k) * 100)}% damage` : `+${Math.round((k - 1) * 100)}% damage, lower penetration`; }
+  }
+}
+// clamp a requested loadout to non-negative integers whose sum is exactly the tank's capacity
+export function sanitizeLoadout(spec, arr) {
+  const cap = spec.ammoCap; let a = (Array.isArray(arr) && arr.length === spec.shells.length ? arr : spec.defaultLoadout).map((n) => Math.max(0, Math.floor(+n || 0)));
+  let sum = a.reduce((x, y) => x + y, 0);
+  if (sum > cap) { for (let i = a.length - 1; i >= 0 && sum > cap; i--) { const d = Math.min(a[i], sum - cap); a[i] -= d; sum -= d; } }
+  if (sum < cap) a[0] += cap - sum;
+  return a;
+}
+// NPC loadouts: mostly the standard round, some premium, some HE, with a little variation
+export function npcLoadout(spec, rng) {
+  const cap = spec.ammoCap; const f = [0.62 + rng.range(-0.08, 0.08), 0.16 + rng.range(-0.05, 0.05)];
+  const a = [Math.round(cap * f[0]), Math.round(cap * f[1])]; a.push(Math.max(0, cap - a[0] - a[1]));
+  return sanitizeLoadout(spec, a);
+}
 export const TANK_BY_ID = Object.fromEntries(TANKS.map((t) => [t.id, t]));
 
 // Ballistic behaviour per projectile family

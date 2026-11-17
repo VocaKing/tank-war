@@ -15,14 +15,14 @@ export function ballisticAngle(v, R, dy) {
 }
 
 export class Tank {
-  constructor(game, spec, team, name, isPlayer = false) {
+  constructor(game, spec, team, name, isPlayer = false, loadout = null) {
     this.id = NEXT_ID++; this.game = game; this.spec = spec; this.team = team; this.name = name; this.isPlayer = isPlayer;
     this.model = createTankModel(spec); game.scene.add(this.model.root);
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0; this.rock = 0; this.rockV = 0;
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.bloom = 3; this.yawRate = 0; this.recoil = 0;
-    this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = spec.shells.map((s) => s.count);
+    this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
     this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
     this.input = { throttle: 0, steer: 0, aim: new THREE.Vector3(0, 0, 0) };

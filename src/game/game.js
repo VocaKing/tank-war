@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { setWindTime } from '../world/vegetation.js';
-import { TANKS, TANK_BY_ID } from './tankData.js';
+import { TANKS, TANK_BY_ID, sanitizeLoadout, npcLoadout } from './tankData.js';
 import { Tank } from './tank.js';
 import { Ballistics } from './ballistics.js';
 import { Spotting } from './spotting.js';
@@ -64,7 +64,7 @@ export class Game {
       const list = team ? team1 : team0; const names = (team ? ENEMY_NAMES : ALLY_NAMES).slice().sort(() => r.next() - 0.5);
       list.forEach((id, i) => {
         const isPlayer = team === 0 && i === 0;
-        const spec = TANK_BY_ID[id]; const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer);
+        const spec = TANK_BY_ID[id]; const lo = isPlayer ? sanitizeLoadout(spec, this.opts.loadout) : npcLoadout(spec, r); const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer, lo);
         let x = base.x + fx * 22 + px * (i - 3) * 13 + r.range(-2, 2), z = base.z + fz * 22 + pz * (i - 3) * 13 + r.range(-2, 2);
         const [ci, cj] = this.nav.nearestWalkable(...this.nav.toCell(x, z)); [x, z] = this.nav.center(ci, cj);
         t.placeAt(x, z, Math.atan2(fx, fz)); t.input.aim.set(x + fx * 300, t.pos.y + 2, z + fz * 300);
