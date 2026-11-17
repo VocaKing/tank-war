@@ -40,6 +40,13 @@ function terrainMaterial(def) {
         vec3 col = cA * w.x + cB * w.y + cC * w.z + cD * w.w;
         col *= 0.82 + 0.36 * texture2D(tB, vWP.xz / 97.0).g;
         col *= mix(0.92, 1.06, smoothstep(0.2, 0.8, texture2D(tA, vWP.xz / 260.0).r));
+        // v4 patchwork: large irregular parcels (fields / meadows / dry patches) tint the ground layer differently
+        {
+          vec2 pc = mat2(0.94, -0.34, 0.34, 0.94) * vWP.xz + (vec2(br, br2) - 0.5) * 30.0;
+          vec2 cell = floor(pc / vec2(86.0, 64.0)); float hs = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+          vec3 pt = hs < 0.33 ? vec3(1.07, 1.02, 0.80) : hs < 0.66 ? vec3(0.90, 1.0, 0.88) : vec3(1.0, 0.95, 0.9);
+          col *= mix(vec3(1.0), pt, w.x * 0.85);
+        }
         diffuseColor.rgb *= col;`)
       .replace('#include <normal_fragment_maps>', `
         {
@@ -50,7 +57,7 @@ function terrainMaterial(def) {
           normal = normalize(T * nm.x + Bt * nm.y + normal * nm.z);
         }`);
   };
-  m.customProgramCacheKey = () => 'terrain';
+  m.customProgramCacheKey = () => 'terrain4';
   return m;
 }
 
