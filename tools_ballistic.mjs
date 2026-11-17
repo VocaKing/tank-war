@@ -28,10 +28,10 @@ for (const tank of tanks) {
       const [x, z, h, tx, tz] = best; D.teleport(x, z, h); e.placeAt(tx, tz, h + Math.PI / 2); e.spotted[0] = true; e.noDamageTest = true;
       const aim = e.pos.clone(); aim.y += e.spec.dims.hullH * 0.6; // centre of the target's side
       D.aim(aim.x, aim.y, aim.z); D.pause(false); D.simulate(8); D.aim(aim.x, aim.y, aim.z); D.simulate(0.1);
-      const spottedAtAim = e.spotted[0]; const ret = g.reticleWorld ? g.reticleWorld.clone() : null;
+      const spottedAtAim = e.spotted[0]; e.spotted[0] = true; g.updateReticle(); const ret = g.reticleWorld ? g.reticleWorld.clone() : null;
       g.lastImpact = null; const fired = D.fire(); let t = 0; while (!g.lastImpact && t < 4) { D.simulate(0.05, 1 / 120); t += 0.05; }
       D.pause(true); const li = g.lastImpact; const mz = p.model.muzzle.getWorldPosition(aim.clone()); const dir = aim.clone().sub(mz).normalize(); const perp = (q) => { const d = q.clone().sub(aim); return +d.sub(dir.clone().multiplyScalar(d.dot(dir))).length().toFixed(3); };
-      out.push({ R: Math.round(p.pos.distanceTo(aim)), fired, reticleMiss_m: ret ? perp(ret) : null, impactMiss_m: li ? perp(li.p) : null, reticleToImpact_m: ret && li ? +ret.distanceTo(li.p).toFixed(3) : null, hit: li ? li.kind + (li.tank ? ':' + li.tank.spec.id : '') : 'none', tof: +t.toFixed(2), spottedAtAim });
+      out.push({ R: Math.round(p.pos.distanceTo(aim)), fired, reticleMiss_m: ret ? perp(ret) : null, impactMiss_m: li ? perp(li.p) : null, reticleToImpact_m: ret && li ? +ret.distanceTo(li.p).toFixed(3) : null, hit: li ? li.kind + (li.tank ? ':' + li.tank.spec.id : '') : 'none', tof: +t.toFixed(2), spottedAtAim, gunPitchDeg: +(p.gunPitch*57.3||0).toFixed(2), terrainDrop: +(T.height(x,z)-T.height(tx,tz)).toFixed(1) });
     }
     return out;
   });

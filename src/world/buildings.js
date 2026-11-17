@@ -70,11 +70,11 @@ export function buildStructures(mb, scene, terrain) {
       const off = (axis === 'x' ? b.w / 2 : b.d / 2) + 0.03;
       const put = (gg, dx, dy, dz, mat) => { if (axis === 'x') place(gg, b, sign * (off + dz), y + dy, t + dx, Math.PI / 2); else place(gg, b, t + dx, y + dy, sign * (off + dz), 0); B.add(mat, gg); };
       const broken = b.damage && r.next() < 0.3;
-      put(boxUV(ww, wh, 0.06, 1), 0, 0, -0.06, broken ? 'dark' : 'window'); // recessed glazing
-      const fm = b.style === 'desert' ? 'wood' : 'paintwood'; const fw = 0.07;
+      put(boxUV(ww, wh, 0.06, 1), 0, 0, 0, broken ? 'dark' : 'window'); // recessed glazing
+      const fm = b.style === 'desert' ? 'wood' : wallMat(b) === 'wood' ? 'paintwhite' : 'paintwood'; const fw = 0.07;
       put(boxUV(ww + fw * 2, fw, 0.1, 1), 0, wh / 2 + fw / 2, 0, fm); put(boxUV(ww + fw * 2, fw, 0.1, 1), 0, -wh / 2 - fw / 2, 0, fm);
       put(boxUV(fw, wh, 0.1, 1), -ww / 2 - fw / 2, 0, 0, fm); put(boxUV(fw, wh, 0.1, 1), ww / 2 + fw / 2, 0, 0, fm);
-      if (!small && !broken) { put(boxUV(0.04, wh, 0.05, 1), 0, 0, -0.02, fm); put(boxUV(ww, 0.04, 0.05, 1), 0, wh * 0.18, -0.02, fm); }
+      if (!small && !broken) { put(boxUV(0.04, wh, 0.05, 1), 0, 0, 0.03, fm); put(boxUV(ww, 0.04, 0.05, 1), 0, wh * 0.18, 0.03, fm); }
       const sm = b.style === 'brick' ? 'stone' : wallMat(b) === 'wood' ? 'wood' : b.style === 'desert' ? 'plaster' : 'castle';
       put(boxUV(ww + 0.3, 0.08, 0.22, 1), 0, -wh / 2 - fw - 0.04, 0.06, sm); // sill
       if (b.style !== 'desert') put(boxUV(ww + 0.36, 0.18, 0.1, 1), 0, wh / 2 + fw + 0.09, 0.0, sm); // lintel
