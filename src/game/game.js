@@ -202,8 +202,9 @@ export class Game {
       a.copy(pos); v.y -= 9.81 * h; b.copy(pos).addScaledVector(v, h);
       let best = 2; const tt = W.terrain.segmentHit(a.x, a.y, a.z, b.x, b.y, b.z, 2); if (tt >= 0) best = tt;
       const ts = W.structureHit(a.x, a.y, a.z, b.x, b.y, b.z); if (ts >= 0 && ts < best) best = ts;
-      for (const t of this.tanks) { if (t === p) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; if (t.pos.distanceTo(b) > 40) continue; const hh = t.rayTest(a, b); if (hh && hh.t < best) { best = hh.t; hitTank = t; hitInfo = hh; } }
-      if (best <= 1) { hitP = a.clone().lerp(b, best); dist += a.distanceTo(hitP); if (!hitInfo || best !== hitInfo.t) { hitTank = hitInfo && best === hitInfo.t ? hitTank : hitTank; } }
+      let stepTank = null, stepInfo = null;
+      for (const t of this.tanks) { if (t === p) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; if (t.pos.distanceTo(b) > 40) continue; const hh = t.rayTest(a, b); if (hh && hh.t < best) { best = hh.t; stepTank = t; stepInfo = hh; } }
+      if (best <= 1) { hitP = a.clone().lerp(b, best); dist += a.distanceTo(hitP); hitTank = stepTank; hitInfo = stepInfo; }
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
     if (!hitP) hitP = pos;
@@ -211,8 +212,8 @@ export class Game {
     // dispersion circle in pixels
     // aim circle: shells deviate at most ±dispersion (clipped 2σ gaussian) → project that cone
     const radPx = Math.tan(p.dispersion()) / Math.tan(this.camera.fov * DEG / 2) * (innerHeight / 2);
-    if (sp.z > 1) { hud.setReticle(-100, -100, 0, '', ''); return; }
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
+    if (sp.z > 1) { hud.setReticle(-100, -100, 0, '', ''); return; }
     let state = 'neutral', text = `${Math.round(dist)} m`;
     if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
       const ev = this.ballistics.evaluate(hitTank, hitInfo, p.shell, dist);
