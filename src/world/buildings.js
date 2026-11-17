@@ -62,12 +62,13 @@ class Buckets {
   constructor() { this.b = {}; this.tint = null; }
   add(k, g) {
     const n = clean(g); const c = new Float32Array(n.attributes.position.count * 3); const t = (this.tint && this.tint[TINTABLE[k]]) || null;
-    c.fill(1); if (!t && k === 'paintwood') for (let i = 0; i < c.length; i += 3) { c[i] = 0.31; c[i + 1] = 0.42; c[i + 2] = 0.35; } if (t) for (let i = 0; i < c.length; i += 3) { c[i] = t[0]; c[i + 1] = t[1]; c[i + 2] = t[2]; }
+    c.fill(1); if (!t && k === 'paintwood') for (let i = 0; i < c.length; i += 3) { c[i] = 0.076; c[i + 1] = 0.148; c[i + 2] = 0.099; } if (t) for (let i = 0; i < c.length; i += 3) { c[i] = t[0]; c[i + 1] = t[1]; c[i + 2] = t[2]; }
     n.setAttribute('color', new THREE.BufferAttribute(c, 3)); (this.b[k] ||= []).push(n);
   }
 }
 const WALL_TINTS = [[1.05, 1.05, 1.02], [1.3, 1.24, 1.1], [1.28, 1.1, 0.82], [1.12, 1.12, 1.16], [1.25, 1.02, 0.96], [0.95, 0.9, 0.84], [1.35, 1.3, 1.2]];
-const TRIM_TINTS = [[0.31, 0.42, 0.35], [0.2, 0.3, 0.22], [0.5, 0.2, 0.16], [0.26, 0.36, 0.52], [0.36, 0.26, 0.18], [0.78, 0.74, 0.64], [0.22, 0.22, 0.24]];
+// trim colours are authored in sRGB; vertex colours are linear, so convert
+const TRIM_TINTS = [[0.31, 0.42, 0.35], [0.2, 0.3, 0.22], [0.5, 0.2, 0.16], [0.26, 0.36, 0.52], [0.36, 0.26, 0.18], [0.78, 0.74, 0.64], [0.22, 0.22, 0.24]].map((c) => c.map((v) => Math.pow(v, 2.2)));
 function pickTint(r, style) {
   const w = WALL_TINTS[Math.floor(r.next() * WALL_TINTS.length)]; const j = 0.94 + r.next() * 0.1; const rf = 0.82 + r.next() * 0.3;
   return { wall: style === 'desert' ? [(1 + (w[0] - 1) * 0.35) * j, (1 + (w[1] - 1) * 0.35) * j * 0.98, (1 + (w[2] - 1) * 0.35) * j * 0.95] : w.map((v) => v * j), brick: [j, j * (0.95 + r.next() * 0.08), j], trim: TRIM_TINTS[Math.floor(r.next() * TRIM_TINTS.length)], roof: [rf, rf * (0.92 + r.next() * 0.1), rf * (0.9 + r.next() * 0.1)], stoneT: [j, j, j * 0.98] };

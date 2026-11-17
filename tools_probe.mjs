@@ -1,7 +1,10 @@
 import { chromium } from 'playwright';
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
-await page.goto('http://localhost:4173/?autostart=1&q=low&map=village&tank=t34&seed=3');
+const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
+await page.goto('http://localhost:4173/?autostart=1&q=low&map=village&tank=t34&seed=11');
 await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 200000 });
-console.log(await page.evaluate(() => { const g = window.__game; const grp = g.scene.getObjectByName('structures'); const out = []; grp.children.forEach((m) => { const c = m.geometry.attributes.color; const set = new Set(); if (c) for (let i = 0; i < c.count; i += 97) set.add(c.getX(i).toFixed(2) + ',' + c.getY(i).toFixed(2) + ',' + c.getZ(i).toFixed(2)); out.push([m.material.vertexColors, !!c, set.size, [...set].slice(0, 4).join(' ')]); }); return JSON.stringify(out); }));
+const setup = () => page.evaluate(() => { const g = window.__game, D = g.debug, T = g.world.terrain; D.freeze(true); const bb = g.world.mb.buildings.find((b) => b.x > 90 && b.x < 110 && b.z < -50 && b.z > -75) || g.world.mb.buildings[0]; D.camAt([bb.x + 20, T.height(bb.x, bb.z) + 4, bb.z + 20, bb.x, T.height(bb.x, bb.z) + 3, bb.z, 50]); D.simulate(0.05); });
+await page.evaluate(() => { const h = document.querySelector('.hud'); if (h) h.style.display = 'none'; }); await setup(); await page.waitForTimeout(1500); await page.screenshot({ path: '/tmp/vc_on.png', timeout: 120000 });
+await page.evaluate(() => { const grp = window.__game.scene.getObjectByName('structures'); grp.children.forEach((m) => { m.material.vertexColors = false; m.material.needsUpdate = true; }); });
+await page.waitForTimeout(1500); await page.screenshot({ path: '/tmp/vc_off.png', timeout: 120000 });
 await browser.close();
