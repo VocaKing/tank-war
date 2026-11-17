@@ -10,17 +10,17 @@ const game = async (q) => { const page = await newPage(); await page.goto(base +
 const HELP = `const g = window.__game, D = g.debug, p = g.player, W = g.world, T = W.terrain;
   const findLine = (R) => { for (let k = 0; k < 3000; k++) { const x = -420 + (k % 40) * 21, z = -420 + Math.floor(k / 40) * 21, h = (k * 0.9) % 6.28; const tx = x + Math.sin(h) * R, tz = z + Math.cos(h) * R;
     if (!g.nav.walkable(...g.nav.toCell(x, z)) || !g.nav.walkable(...g.nav.toCell(tx, tz)) || W.veg.bushAt(x, z, 3) || W.veg.bushAt(tx, tz, 3)) continue;
-    if (W.losBlocked(x, T.height(x, z) + 3, z, tx, T.height(tx, tz) + 1.2, tz) || W.colGrid.query(tx, tz, 8).length || W.colGrid.query(x, z, 8).length) continue; return [x, z, h, tx, tz]; } return null; };`;
+    if (W.losBlocked(x, T.height(x, z) + 3, z, tx, T.height(tx, tz) + 1.2, tz) || W.colGrid.query(tx, tz, 8).length || W.colGrid.query(x, z, 8).length) continue; let tr = false; for (let u = 0.08; u < 1; u += 0.06) { const qx = x + (tx - x) * u, qz = z + (tz - z) * u; if (W.veg.treeGrid.query(qx, qz, 7).length || W.veg.bushAt(qx, qz, 3)) { tr = true; break; } } if (tr) continue; return [x, z, h, tx, tz]; } return null; };`;
 if (only.includes('disp')) {
   const page = await game('map=village&tank=t34');
   const r = await page.evaluate(`(() => { ${HELP} D.freeze(true); const L = findLine(230); if (!L) return 'no line'; const [x, z, h, tx, tz] = L; D.teleport(x, z, h);
     const e = g.tanks.find((t) => t.team === 1); e.placeAt(tx, tz, h + Math.PI + 0.6); window.__e = e;
     for (const t of g.tanks) if (t !== p && t !== e) t.placeAt(t.team ? 560 : -560, t.team ? 560 - t.id * 9 : -560 + t.id * 9, 0);
     e.visibleUntil[0] = 1e9; e.spotted[0] = true; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0));
-    D.cam(h + 0.25, -0.1, 13); D.aim(P.x, P.y, P.z); D.simulate(3); p.reloadLeft = 0; p.tryFire(g.time); D.simulate(0.15); D.pause(true);
-    return { dist: Math.round(e.pos.distanceTo(p.pos)), bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; })()`);
+    D.cam(h + 0.2, -0.08, 13); D.aim(P.x, P.y, P.z); D.simulate(3); g.keys.KeyW = true; D.simulate(1.6); g.keys.KeyW = false; D.pause(true);
+    return { speed_kmh: Math.round(Math.abs(p.speed) * 3.6), dist: Math.round(e.pos.distanceTo(p.pos)), bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; })()`);
   console.log('third', JSON.stringify(r)); await shot(page, 'dispersion_thirdperson');
-  const r2 = await page.evaluate(() => { const g = window.__game, D = g.debug, e = window.__e, p = g.player; D.pause(false); g.cam.sniper = true; g.cam.zoom = 8; g._camInit = false; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0)); g.alignCamTo(P); D.simulate(0.1); g.alignCamTo(P); D.aim(P.x, P.y, P.z); D.simulate(4); g.alignCamTo(P); D.simulate(0.05); D.pause(true); return { bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2), dist: Math.round(g.reticleDist) }; });
+  const r2 = await page.evaluate(() => { const g = window.__game, D = g.debug, e = window.__e, p = g.player; D.pause(false); g.cam.sniper = true; g.cam.zoom = 8; g._camInit = false; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0)); g.alignCamTo(P); D.simulate(0.1); g.alignCamTo(P); p.speed = 0; D.aim(P.x, P.y, P.z); D.simulate(4); g.alignCamTo(P); D.simulate(0.05); D.pause(true); return { bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2), dist: Math.round(g.reticleDist) }; });
   console.log('scoped', JSON.stringify(r2)); await shot(page, 'dispersion_scoped');
   const r3 = await page.evaluate(() => { const g = window.__game, D = g.debug, p = g.player; D.pause(false); p.reloadLeft = 0; p.tryFire(g.time); D.simulate(0.12); D.pause(true); return { bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; });
   console.log('scoped after shot', JSON.stringify(r3)); await shot(page, 'dispersion_scoped_after_shot');
