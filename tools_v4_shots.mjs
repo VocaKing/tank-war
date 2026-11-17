@@ -12,12 +12,12 @@ const HELP = `const g = window.__game, D = g.debug, p = g.player, W = g.world, T
     if (!g.nav.walkable(...g.nav.toCell(x, z)) || !g.nav.walkable(...g.nav.toCell(tx, tz)) || W.veg.bushAt(x, z, 3) || W.veg.bushAt(tx, tz, 3)) continue;
     if (W.losBlocked(x, T.height(x, z) + 3, z, tx, T.height(tx, tz) + 1.2, tz) || W.colGrid.query(tx, tz, 8).length || W.colGrid.query(x, z, 8).length) continue; return [x, z, h, tx, tz]; } return null; };`;
 if (only.includes('disp')) {
-  const page = await game('map=desert&tank=t34');
+  const page = await game('map=village&tank=t34');
   const r = await page.evaluate(`(() => { ${HELP} D.freeze(true); const L = findLine(230); if (!L) return 'no line'; const [x, z, h, tx, tz] = L; D.teleport(x, z, h);
     const e = g.tanks.find((t) => t.team === 1); e.placeAt(tx, tz, h + Math.PI + 0.6); window.__e = e;
     for (const t of g.tanks) if (t !== p && t !== e) t.placeAt(t.team ? 560 : -560, t.team ? 560 - t.id * 9 : -560 + t.id * 9, 0);
     e.visibleUntil[0] = 1e9; e.spotted[0] = true; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0));
-    D.cam(h, -0.04, 12); D.aim(P.x, P.y, P.z); D.simulate(3); p.reloadLeft = 0; p.tryFire(g.time); D.simulate(0.15); D.pause(true);
+    D.cam(h + 0.25, -0.1, 13); D.aim(P.x, P.y, P.z); D.simulate(3); p.reloadLeft = 0; p.tryFire(g.time); D.simulate(0.15); D.pause(true);
     return { dist: Math.round(e.pos.distanceTo(p.pos)), bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; })()`);
   console.log('third', JSON.stringify(r)); await shot(page, 'dispersion_thirdperson');
   const r2 = await page.evaluate(() => { const g = window.__game, D = g.debug, e = window.__e, p = g.player; D.pause(false); g.cam.sniper = true; g.cam.zoom = 8; g._camInit = false; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0)); g.alignCamTo(P); D.simulate(0.1); g.alignCamTo(P); D.aim(P.x, P.y, P.z); D.simulate(4); g.alignCamTo(P); D.simulate(0.05); D.pause(true); return { bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2), dist: Math.round(g.reticleDist) }; });

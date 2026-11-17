@@ -310,7 +310,7 @@ export class Game {
       else { state = 'red'; text = `NO PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
       text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(dist)} m`;
     }
-    if (p.reloadLeft > 0) state += ' loading';
+    if (p.reloadLeft > 0) state += ' reloading';
     if (this.lock) state += ' locked';
     hud.setReticle(sx, sy, radPx, state, text);
   }
