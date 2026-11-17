@@ -113,9 +113,34 @@ export class Game {
     on(window, 'resize', () => this.resize());
   }
   toggleSniper() {
+    const P = this.aimPoint.clone(); const valid = this.player.alive && Number.isFinite(P.x) && this.aimDist > 0;
     this.cam.sniper = !this.cam.sniper;
-    if (this.cam.sniper) { this.cam.zoom = Game.ZOOMS[1]; this.cam.pitch = clamp(this.cam.pitch, -0.3, 0.4); }
+    if (this.cam.sniper) this.cam.zoom = Game.ZOOMS[1];
     else if (this.armorView) this.armorView.update();
+    // keep the crosshair on the same world point: re-aim the new camera (scope or third-person) through P
+    if (valid) this.alignCamTo(P); else this.cam.pitch = clamp(this.cam.pitch, this.cam.sniper ? -0.35 : -0.9, this.cam.sniper ? 0.45 : 0.35);
+    this._camInit = false;
+  }
+  camDir(yaw = this.cam.yaw, pitch = this.cam.pitch) { return new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)); }
+  // camera position for a view direction (no smoothing): scope at the gunner's sight, or chase camera with collision
+  camPosFor(dir, sniper, m = this.player.model) {
+    const T = this.world.terrain;
+    if (sniper) { const gp = m.gun.getWorldPosition(new THREE.Vector3()); gp.y += 0.55; gp.addScaledVector(dir, 0.6); return gp; }
+    const c = this.cam; const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2;
+    let pos = focus.clone().addScaledVector(dir, -c.dist);
+    const W = this.world; let tHit = 1;
+    const tt = T.segmentHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z, 1); if (tt >= 0) tHit = Math.min(tHit, tt);
+    const ts = W.structureHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z); if (ts >= 0) tHit = Math.min(tHit, ts);
+    if (tHit < 1) pos = focus.clone().addScaledVector(dir, -Math.max(2.5, c.dist * tHit - 0.6));
+    const gh = T.height(pos.x, pos.z) + 1.2; if (pos.y < gh) pos.y = gh;
+    return pos;
+  }
+  alignCamTo(P) {
+    const c = this.cam; const lo = c.sniper ? -0.35 : -0.9, hi = c.sniper ? 0.45 : 0.35;
+    for (let i = 0; i < 6; i++) {
+      const pos = this.camPosFor(this.camDir(), c.sniper); const d = P.clone().sub(pos); if (d.lengthSq() < 1e-6) break; d.normalize();
+      c.yaw = Math.atan2(d.x, d.z); c.pitch = clamp(Math.asin(clamp(d.y, -1, 1)), lo, hi);
+    }
   }
   // gun lock: keep the gun laid on the centre of mass of the enemy under the crosshair (with lead)
   toggleLock() {
@@ -292,17 +317,9 @@ export class Game {
     const sn = c.sniper && f === this.player && f.alive;
     m.root.visible = !sn;
     if (sn) {
-      const gp = m.gun.getWorldPosition(new THREE.Vector3()); gp.y += 0.55; gp.addScaledVector(dir, 0.6);
-      this.camera.position.copy(gp); c.fov += (50 / c.zoom - c.fov) * Math.min(1, dt * 12); if (!this._wasSn) c.fov = 50 / c.zoom; this.camera.fov = c.fov;
+      this.camera.position.copy(this.camPosFor(dir, true, m)); c.fov += (50 / c.zoom - c.fov) * Math.min(1, dt * 12); if (!this._wasSn) c.fov = 50 / c.zoom; this.camera.fov = c.fov;
     } else {
-      const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2;
-      let pos = focus.clone().addScaledVector(dir, -c.dist);
-      // camera collision: pull in towards the turret if terrain or a building is between them
-      const W = this.world; let tHit = 1;
-      const tt = T.segmentHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z, 1); if (tt >= 0) tHit = Math.min(tHit, tt);
-      const ts = W.structureHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z); if (ts >= 0) tHit = Math.min(tHit, ts);
-      if (tHit < 1) pos = focus.clone().addScaledVector(dir, -Math.max(2.5, c.dist * tHit - 0.6));
-      const gh = T.height(pos.x, pos.z) + 1.2; if (pos.y < gh) pos.y = gh;
+      const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2; const pos = this.camPosFor(dir, false, m);
       const pullIn = pos.distanceTo(focus) < this.camera.position.distanceTo(focus);
       this.camera.position.lerp(pos, Math.min(1, dt * (pullIn ? 30 : 10) + (this._camInit ? 0 : 1))); this._camInit = true; c.fov = 60; this.camera.fov = 60;
     }

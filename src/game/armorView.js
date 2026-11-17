@@ -77,26 +77,33 @@ vec4 armorColor(vec3 W) {
 }
 `;
 
+// v3: the armour view is a semi-transparent OVERLAY drawn on top of the tank's own paint (not a replacement material):
+// ~45 % tint on plate faces, stronger at grazing angles (rim) and an almost opaque outline where the colour class or
+// the armour zone changes, so plate boundaries stay readable while the camouflage remains visible underneath.
 function makeMaterial(uniforms) {
-  const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, uniforms);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vAvW;')
-      .replace('#include <project_vertex>', `#include <project_vertex>
-        vec4 avw = vec4(transformed, 1.0);
+  return new THREE.ShaderMaterial({
+    uniforms, transparent: true, depthWrite: false, depthTest: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
+    vertexShader: /* glsl */`
+      varying vec3 vAvW; varying vec3 vN; varying vec3 vV;
+      void main() {
+        vec4 p = vec4(position, 1.0); vec3 nn = normal;
         #ifdef USE_INSTANCING
-          avw = instanceMatrix * avw;
+          p = instanceMatrix * p; nn = mat3(instanceMatrix) * nn;
         #endif
-        vAvW = (modelMatrix * avw).xyz;`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + GLSL)
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        vec4 avc = armorColor(vAvW);
-        diffuseColor.rgb = avc.x < 0.0 ? vec3(0.42) : avc.rgb;`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += diffuseColor.rgb * 0.35;`);
-  };
-  m.customProgramCacheKey = () => 'armorview';
-  return m;
+        vec4 w = modelMatrix * p; vAvW = w.xyz; vN = normalize(mat3(modelMatrix) * nn); vV = cameraPosition - w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: GLSL.replace('varying vec3 vAvW;', '') + /* glsl */`
+      varying vec3 vAvW; varying vec3 vN; varying vec3 vV;
+      void main() {
+        vec4 c = armorColor(vAvW); bool none = c.x < 0.0; vec3 col = none ? vec3(0.55) : c.rgb;
+        float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.0);
+        float edge = clamp(step(0.01, fwidth(none ? -1.0 : c.w)) + length(fwidth(col)) * 5.0, 0.0, 1.0);
+        float a = none ? 0.1 : 0.42 + 0.25 * rim; a = max(a, edge * 0.9);
+        gl_FragColor = vec4(col * (1.0 + edge * 0.25), a);
+        #include <colorspace_fragment>
+      }`,
+  });
 }
 
 export class ArmorView {
@@ -122,11 +129,20 @@ export class ArmorView {
     d = { u, mat: makeMaterial(u), on: false }; this.data.set(t, d); return d;
   }
   setOn(t, on) {
-    const d = this.ensure(t); if (d.on === on) return; d.on = on;
-    for (const m of t.model.meshes) {
-      if (on) { m.userData.avOrig = m.material; if (m.userData.decal) m.visible = false; else m.material = d.mat; }
-      else { if (m.userData.avOrig) m.material = m.userData.avOrig; if (m.userData.decal) m.visible = true; }
+    const d = this.ensure(t);
+    if (!d.ov) { // one overlay mesh per model mesh, sharing geometry / instance matrices; paint stays untouched underneath
+      d.ov = [];
+      for (const m of t.model.meshes) {
+        if (m.userData.decal) continue;
+        const ov = m.isInstancedMesh ? new THREE.InstancedMesh(m.geometry, d.mat, m.count) : new THREE.Mesh(m.geometry, d.mat);
+        if (m.isInstancedMesh) ov.instanceMatrix = m.instanceMatrix;
+        ov.frustumCulled = false; ov.castShadow = false; ov.receiveShadow = false; ov.renderOrder = 5; ov.visible = false; ov.userData.avOverlay = true; ov.userData.src = m;
+        m.add(ov); d.ov.push(ov);
+      }
     }
+    if (on) for (const ov of d.ov) { const m = ov.userData.src; ov.geometry = m.geometry; if (m.isInstancedMesh) ov.count = m.count; }
+    if (d.on === on) return; d.on = on;
+    for (const ov of d.ov) ov.visible = on;
   }
   update() {
     const g = this.game, p = g.player;
@@ -153,4 +169,5 @@ export class ArmorView {
     return { cls, eff: Math.round(ev.eff), pen: Math.round(ev.pen), part: hit.part, face: hit.face, zone: ev.zone, angle: Math.round(ev.angle), ricochet: ev.ricochet };
   }
   dispose() { for (const t of this.data.keys()) this.setOn(t, false); }
+  overlayCount(t) { const d = this.data.get(t); return d && d.ov ? d.ov.filter((o) => o.visible).length : 0; }
 }
