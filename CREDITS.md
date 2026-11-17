@@ -1,4 +1,4 @@
-# Credits & Licenses — Steel Front (tank-war) v1
+# Credits & Licenses — Steel Front (tank-war) v2
 
 ## Code
 - All game code (src/) — written for this project.
