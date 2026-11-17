@@ -4,7 +4,8 @@ import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { MapBuilder } from './mapgen.js';
 import { MAP_BY_ID } from './maps.js';
 import { buildStructures } from './buildings.js';
-import { Vegetation } from './vegetation.js';
+import { Vegetation, windUniform } from './vegetation.js';
+import { Grass } from './grass.js';
 import { pbrTex, waterNormalTexture } from './textures.js';
 import { Grid2D } from './terrain.js';
 import { DEG, ridged, smoothstep } from '../util.js';
@@ -28,11 +29,17 @@ function terrainMaterial(def) {
         float camD = length(vWP - cameraPosition); float far = smoothstep(25.0, 140.0, camD);
         vec2 uv = vWP.xz / 3.2; vec2 uvr = vWP.xz / 6.0; vec2 uvd = vWP.xz / 3.5;
         vec4 w = vSplat; w = max(w, 0.0);
-        // height-ish breakup between layers
-        float br = texture2D(tC, vWP.xz / 41.0).r;
-        w.y *= 0.6 + br * 0.8; w /= (w.x + w.y + w.z + w.w + 1e-4);
-        vec3 col = sampleL(tA, uv, far) * tintA * w.x + sampleL(tB, uv * 1.1, far) * tintB * w.y + sampleL(tC, uvr, far) * w.z + sampleL(tD, uvd, far) * w.w;
-        col *= 0.85 + 0.3 * texture2D(tB, vWP.xz / 97.0).g;
+        // macro breakup so layer borders are not smooth gradients
+        float br = texture2D(tC, vWP.xz / 41.0).r; float br2 = texture2D(tA, vWP.xz / 133.0).g;
+        w.y *= 0.55 + br * 0.9; w.x *= 0.8 + br2 * 0.4;
+        vec3 cA = sampleL(tA, uv, far) * tintA, cB = sampleL(tB, uv * 1.1, far) * tintB, cC = sampleL(tC, uvr, far), cD = sampleL(tD, uvd, far);
+        // height blending: each texture's luminance acts as its height map, giving natural interlocking transitions
+        vec4 hgt = vec4(dot(cA, vec3(0.33)), dot(cB, vec3(0.33)), dot(cC, vec3(0.33)), dot(cD, vec3(0.33))) * 0.6 + w * 1.4;
+        float hmax = max(max(hgt.x, hgt.y), max(hgt.z, hgt.w)) - 0.18;
+        vec4 hb = max(hgt - hmax, 0.0) * step(0.001, w); w = hb / (hb.x + hb.y + hb.z + hb.w + 1e-4);
+        vec3 col = cA * w.x + cB * w.y + cC * w.z + cD * w.w;
+        col *= 0.82 + 0.36 * texture2D(tB, vWP.xz / 97.0).g;
+        col *= mix(0.92, 1.06, smoothstep(0.2, 0.8, texture2D(tA, vWP.xz / 260.0).r));
         diffuseColor.rgb *= col;`)
       .replace('#include <normal_fragment_maps>', `
         {
@@ -126,14 +133,14 @@ export class World {
     const pm = new THREE.PMREMGenerator(renderer); const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(1000); envScene.add(sky2);
     Object.assign(sky2.material.uniforms.turbidity, { value: def.turbidity }); sky2.material.uniforms.rayleigh.value = def.rayleigh; sky2.material.uniforms.sunPosition.value.copy(this.sunDir);
     sky2.material.uniforms.mieCoefficient.value = 0.006;
-    this.envRT = pm.fromScene(envScene, 0, 0.1, 2000); scene.environment = this.envRT.texture; scene.environmentIntensity = 0.55;
+    this.envRT = pm.fromScene(envScene, 0, 0.1, 2000); scene.environment = this.envRT.texture; scene.environmentIntensity = 0.7;
     scene.fog = new THREE.FogExp2(def.fog.color, def.fog.density);
     const sunCol = new THREE.Color().setHSL(0.1, 0.5, def.sun.elevation < 25 ? 0.78 : 0.92);
     const sun = new THREE.DirectionalLight(sunCol, def.sun.elevation < 25 ? 2.8 : 3.3); sun.castShadow = true;
     const sm = quality === 'low' ? 1024 : 2048; sun.shadow.mapSize.set(sm, sm);
     const S = 110; Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 700 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
     scene.add(sun); scene.add(sun.target); this.sun = sun;
-    const hemi = new THREE.HemisphereLight(0xbfd4ff, new THREE.Color(...def.farColor).multiplyScalar(1.2), 0.55); scene.add(hemi);
+    const hemi = new THREE.HemisphereLight(0xbfd4ff, new THREE.Color(...def.farColor).multiplyScalar(1.2), 0.7); scene.add(hemi);
     // terrain
     const tmat = terrainMaterial(def); this.terrainMat = tmat;
     this.terrainGroup = buildTerrainMeshes(mb, tmat, quality === 'low' ? 2 : 1); scene.add(this.terrainGroup);
@@ -143,6 +150,7 @@ export class World {
     const st = buildStructures(mb, scene, mb.t); this.colliders = st.colliders;
     this.colGrid = new Grid2D(mb.t.half, 24); for (const c of this.colliders) this.colGrid.insert(c, c.x, c.z, c.r);
     this.veg = new Vegetation(scene, mb, quality);
+    this.grass = new Grass(scene, mb, quality, windUniform);
     this.bases = mb.bases; this.lanes = mb.lanes; this.playHalf = mb.play;
     this.stats = { trees: mb.trees.length, bushes: mb.bushes.length, buildings: mb.buildings.length, rocks: mb.rocks.length, walls: mb.walls.length, bridges: mb.bridges.length };
     // base flags
@@ -163,7 +171,7 @@ export class World {
     s.target.position.set(tx, ty, tz); s.position.set(tx + this.sunDir.x * 350, ty + this.sunDir.y * 350, tz + this.sunDir.z * 350); s.target.updateMatrixWorld();
   }
   update(dt, time, camPos) {
-    this.veg.updateLOD(camPos); this.veg.update(dt);
+    this.veg.updateLOD(camPos); this.veg.update(dt); this.grass.update(camPos);
     const nm = this.waterMat.normalMap; nm.offset.x = time * 0.02; nm.offset.y = time * 0.013;
     for (const b of this.baseMarkers) { const p = b.flag.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i) + 1.3; p.setZ(i, Math.sin(time * 4 + x * 2.2) * 0.12 * x); } p.needsUpdate = true; }
   }
@@ -178,5 +186,5 @@ export class World {
     let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz); if (t >= 0 && (best < 0 || t < best)) best = t; }
     return best;
   }
-  dispose() { this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
+  dispose() { this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
 }

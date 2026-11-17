@@ -12,9 +12,9 @@ export class HUD {
         <div class="caps"><div class="cap ally"><span>Allied base</span><div class="bar"><i id="h-cap0"></i></div></div><div class="cap enemy"><span>Enemy base</span><div class="bar"><i id="h-cap1"></i></div></div></div></div>
       <div class="killfeed" id="h-feed"></div>
       <div class="markers" id="h-markers"></div>
-      <div class="scope" id="h-scope"><div class="scope-ring"></div><div class="mil"></div><div class="zoom" id="h-zoom">x4</div></div>
+      <div class="scope" id="h-scope"><div class="scope-ring"></div><div class="mil"></div><div class="ticks"></div><div class="zoom" id="h-zoom">x4</div><div class="avhint" id="h-av"></div></div>
       <div class="cross" id="h-cross"></div>
-      <div class="reticle" id="h-ret"><div class="ring"></div><div class="pen" id="h-pen"></div></div>
+      <div class="reticle" id="h-ret"><div class="ring"></div><div class="dot"></div><div class="lockbr"></div><div class="pen" id="h-pen"></div></div>
       <div class="msgs" id="h-msgs"></div>
       <div class="dmgdir" id="h-dmgdir"></div>
       <div class="status" id="h-status"></div>
@@ -22,7 +22,7 @@ export class HUD {
       <div class="panel left" id="h-veh"></div>
       <div class="panel ammo" id="h-ammo"></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper zoom · Wheel zoom · 1/2/3 ammo<br>R repair kit · F extinguisher · Tab scores · Esc menu<br><i>Hide in bushes – you stay invisible until you fire.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock<br>R repair kit · F extinguisher · Tab scores · Esc menu<br><i>Hide in bushes – you stay invisible until you fire.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
@@ -135,7 +135,10 @@ export class HUD {
     const dd = this.$('h-dmgdir'); if (this.dmgT > 0 && this.dmgSrc) { this.dmgT -= dt; const ang = Math.atan2(this.dmgSrc.x - p.pos.x, this.dmgSrc.z - p.pos.z) - G.cam.yaw; dd.style.display = 'block'; dd.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`; dd.style.opacity = Math.min(1, this.dmgT); } else dd.style.display = 'none';
     this.miniT -= dt; if (this.miniT <= 0) { this.miniT = 0.15; this.drawMini(); }
     this.updateMarkers(camera);
-    this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; this.$('h-zoom').textContent = 'x' + G.cam.zoom;
+    this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; this.$('h-zoom').textContent = '×' + G.cam.zoom + '  ·  ' + (50 / G.cam.zoom).toFixed(1) + '°';
+    const av = G.armorView; const avh = this.$('h-av');
+    const avTxt = G.cam.sniper ? (av.enabled ? `<b>ARMOR VIEW ON</b> [X]<br><small>${G.player.shell.name}</small> <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen / ricochet</span><span class="lg n">no armor</span>` : '<b>ARMOR VIEW OFF</b><br>press [X] to show penetration zones') : '';
+    if (avh._t !== avTxt) { avh.innerHTML = avTxt; avh._t = avTxt; }
   }
   setReticle(sx, sy, radius, state, text) {
     const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; const ring = r.firstChild; const R = Math.max(6, Math.min(200, radius));

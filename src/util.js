@@ -101,3 +101,23 @@ export class MinHeap {
     return top;
   }
 }
+
+// seamless (tileable) fbm field N×N: blends four offset copies so opposite edges match, no torus-mapping streaks.
+// scale = noise features across one tile
+export function tileField(noise, N, scale, oct = 4, ox = 0, oy = 0) {
+  const f = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const u = x / N, v = y / N; const a = u * scale + ox, b = v * scale + oy;
+    const n00 = fbm(noise, a, b, oct), n10 = fbm(noise, a - scale, b, oct), n01 = fbm(noise, a, b - scale, oct), n11 = fbm(noise, a - scale, b - scale, oct);
+    const su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+    f[y * N + x] = (n00 * (1 - su) + n10 * su) * (1 - sv) + (n01 * (1 - su) + n11 * su) * sv;
+  }
+  // blending flattens contrast at the centre; renormalise to the original spread
+  let m = 0, q = 0; for (const v of f) { m += v; q += v * v; } m /= f.length; const sd = Math.sqrt(q / f.length - m * m) || 1; for (let i = 0; i < f.length; i++) f[i] = (f[i] - m) / sd * 0.3;
+  return f;
+}
+export function sampleField(f, N, u, v) { // bilinear, wrapping, u,v in [0,1)
+  const x = u * N - 0.5, y = v * N - 0.5; const x0 = Math.floor(x), y0 = Math.floor(y); const tx = x - x0, ty = y - y0;
+  const g = (i, j) => f[(((j % N) + N) % N) * N + (((i % N) + N) % N)];
+  return (g(x0, y0) * (1 - tx) + g(x0 + 1, y0) * tx) * (1 - ty) + (g(x0, y0 + 1) * (1 - tx) + g(x0 + 1, y0 + 1) * tx) * ty;
+}

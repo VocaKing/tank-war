@@ -1,7 +1,7 @@
 // Projectile simulation: gravity ballistics, terrain/structure/water/tank intersection,
 // armour penetration with slope, normalisation, ricochet, overmatch, HEAT/ERA and HE blast.
 import * as THREE from 'three';
-import { SHELL_TYPES, penAtRange } from './tankData.js';
+import { SHELL_TYPES, penAtRange, PEN_RNG } from './tankData.js';
 import { GRAVITY } from './tank.js';
 import { clamp } from '../util.js';
 
@@ -74,7 +74,7 @@ export class Ballistics {
       if (fromPlayer) g.hud.hitMarker('ricochet'); if (toPlayer) g.hud.damageFrom(shooter, 0, 'Ricochet');
       return false;
     }
-    const roll = ev.pen * g.rng.range(0.92, 1.08);
+    const roll = ev.pen * g.rng.range(1 - PEN_RNG, 1 + PEN_RNG);
     if (roll >= ev.eff) {
       const mult = s.type.he ? 1.0 : 1.0; const dmg = s.spec.damage * mult * g.rng.range(0.85, 1.15);
       g.effects.penetration(p); g.audio.impact(p, 'metal');

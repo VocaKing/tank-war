@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RNG, makeNoise2D, fbm } from '../util.js';
+import { RNG, makeNoise2D, fbm, tileField, sampleField } from '../util.js';
 
 const loader = new THREE.TextureLoader();
 const cache = new Map();
@@ -120,22 +120,22 @@ export function trackTexture() {
   });
 }
 export function camoTexture(paint, seed = 1) {
+  return once('camo_' + seed + JSON.stringify(paint), () => {
   const S = 512; const [c, g] = canvas(S, S); const r = new RNG(seed); const noise = makeNoise2D(seed);
   g.fillStyle = paint.base; g.fillRect(0, 0, S, S);
   const img = g.getImageData(0, 0, S, S); const d = img.data;
   const camo = (paint.camo || []).map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  const dig = paint.pattern === 'digital'; const N = 128;
+  const f1 = tileField(noise, N, dig ? 5 : 3.2, 4, 0, 0), f2 = tileField(noise, N, dig ? 5 : 3.2, 4, 31.7, 17.3), fg = tileField(noise, N, 9, 3, 71, 5);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    const i = (y * S + x) * 4; const u = x / S, v = y / S;
-    // seamless-ish: use periodic sampling via torus mapping
-    const a = u * Math.PI * 2, b = v * Math.PI * 2;
-    const nx = Math.cos(a) * 1.2, ny = Math.sin(a) * 1.2, nz = Math.cos(b) * 1.2, nw = Math.sin(b) * 1.2;
-    const n1 = fbm(noise, nx * 1.3 + nz * 0.7, ny * 1.3 + nw * 0.7, 4);
-    const n2 = fbm(noise, nx * 0.9 - nw + 5, nz * 0.9 + ny + 9, 4);
+    const i = (y * S + x) * 4; const q = dig ? 8 : 1; const u = (Math.floor(x / q) * q + q / 2) / S, v = (Math.floor(y / q) * q + q / 2) / S;
+    const n1 = sampleField(f1, N, u, v), n2 = sampleField(f2, N, u, v);
     if (camo.length) {
-      if (n1 > 0.18) { d[i] = camo[0][0]; d[i + 1] = camo[0][1]; d[i + 2] = camo[0][2]; }
-      else if (camo[1] && n2 > 0.22) { d[i] = camo[1][0]; d[i + 1] = camo[1][1]; d[i + 2] = camo[1][2]; }
+      if (n1 > 0.12) { d[i] = camo[0][0]; d[i + 1] = camo[0][1]; d[i + 2] = camo[0][2]; }
+      else if (camo[1] && n2 > 0.16) { d[i] = camo[1][0]; d[i + 1] = camo[1][1]; d[i + 2] = camo[1][2]; }
+      else if (camo[2] && n2 < -0.2) { d[i] = camo[2][0]; d[i + 1] = camo[2][1]; d[i + 2] = camo[2][2]; }
     }
-    const grime = fbm(noise, nx * 2.5 + 3, nw * 2.5 - 2, 3) * 9 + (r.next() - 0.5) * 6;
+    const grime = sampleField(fg, N, x / S, y / S) * 22 + (r.next() - 0.5) * 6;
     d[i] = Math.max(0, Math.min(255, d[i] + grime - 4)); d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + grime - 4)); d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + grime * 0.8 - 4));
   }
   g.putImageData(img, 0, 0);
@@ -145,6 +145,7 @@ export function camoTexture(paint, seed = 1) {
     g.beginPath(); g.arc(r.range(0, S), r.range(0, S), r.range(1, 5), 0, Math.PI * 2); g.fill();
   }
   return toTex(c);
+  });
 }
 export function decalTexture(kind, text = '') {
   return once('decal_' + kind + text, () => {

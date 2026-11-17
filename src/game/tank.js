@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
 import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
+import { armorZone, zoneLowerSideY } from './tankData.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
@@ -29,7 +30,7 @@ export class Tank {
     this.stats = { damage: 0, kills: 0, shots: 0, hits: 0, pens: 0, received: 0 };
     this.lastAttacker = null; this.lastDamagedAt = -100; this.inWater = false; this.groundY = 0; this.moved = 0;
     this.hullBox = { x: spec.dims.W / 2, y0: 0.3, y1: spec.dims.hullH, z: spec.dims.L / 2 };
-    const d = spec.dims; const tc = spec.id === 'm1a2' ? -0.15 : spec.id === 'tiger' ? -0.15 : 0;
+    const d = spec.dims; const tc = d.turretBoxZ || 0;
     this.turBox = { x: d.turretW / 2, y0: 0, y1: d.turretH, z0: tc - d.turretL / 2, z1: tc + d.turretL / 2 };
     this.inv = new THREE.Matrix4();
   }
@@ -169,7 +170,7 @@ export class Tank {
   }
   // effective armour for a hit (from rayTest) and a shell; dist = shell travel
   armorAt(hit, shellSpec, typeInfo) {
-    const arm = this.spec.armor[hit.part][hit.face] || this.spec.armor.hull.top; const tmm = arm[0], slope = arm[1] * DEG;
+    const A = this.spec.armor; const [arm, zone] = armorZone(this.spec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
     let n;
     if (hit.face === 'front') n = new THREE.Vector3(0, Math.sin(slope), Math.cos(slope));
     else if (hit.face === 'rear') n = new THREE.Vector3(0, Math.sin(slope), -Math.cos(slope));
@@ -178,14 +179,16 @@ export class Tank {
     const cosA = -hit.ldir.dot(n); let angle = Math.acos(clamp(cosA, -1, 1)) / DEG; if (cosA <= 0) angle = 89.5;
     const normAngle = Math.max(0, angle - (typeInfo.normalize || 0));
     let eff = tmm / Math.max(0.05, Math.cos(normAngle * DEG));
-    if (typeInfo.heat) { eff *= this.spec.armor.heatMult || 1; if (this.spec.armor.era && hit.face === 'front') eff += this.spec.armor.era; }
+    const front = hit.face === 'front', hullSide = hit.part === 'hull' && hit.face === 'side';
+    if (typeInfo.heat) { eff *= A.heatMult || 1; if (A.era && front) eff += A.era; if (A.skirt && hullSide) eff += A.skirt; }
+    else if (!typeInfo.he && A.eraKE && front) eff += A.eraKE;
     let tracks = false;
-    if (hit.part === 'hull' && hit.face === 'side' && hit.local.y < this.spec.dims.clearance + 0.6) { tracks = true; eff += 20; }
+    if (hullSide && hit.local.y < zoneLowerSideY(this.spec.dims)) { tracks = true; eff += 20; }
     const overmatch = shellSpec.caliber > tmm * 3;
     const ricochet = !typeInfo.he && angle > typeInfo.ricochet && !overmatch;
     // world normal (for ricochet reflection)
     const nw = n.clone(); if (hit.part === 'turret') nw.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.turretYaw); nw.applyQuaternion(this.quat);
-    return { eff, angle, ricochet, tracks, nominal: tmm, normalW: nw };
+    return { eff, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
   }
   // ----- damage -----
   damage(amount, attacker, cause) {
@@ -215,7 +218,7 @@ export class Tank {
     const g = this.game; const r = g.rng; const msgs = [];
     const L = this.spec.dims.L; const lz = hit.local.z;
     if (hit.part === 'hull') {
-      if ((this.spec.engineZone === 'rear' && lz < -L * 0.22) || hit.face === 'rear') { if (this.modules.engine === 1) msgs.push('Engine damaged'); this.modules.engine = 0.5; if (r.next() < 0.22) { this.burning = 7; msgs.push('Fire!'); } }
+      if ((this.spec.engineZone === 'rear' && (lz < -L * 0.22 || hit.face === 'rear')) || (this.spec.engineZone === 'front' && (lz > L * 0.22 || hit.face === 'front'))) { if (this.modules.engine === 1) msgs.push('Engine damaged'); this.modules.engine = 0.5; if (r.next() < 0.22) { this.burning = 7; msgs.push('Fire!'); } }
       const ar = this.spec.ammoRack;
       if (!ar.turretBustle && lz > ar.zMin && lz < ar.zMax && hit.local.y < ar.yMax && r.next() < ar.chance * (shellSpec.type === 'HEAT' ? 1.3 : 1)) { this.damage(this.hp + 1, attacker, 'ammo'); return ['AMMO RACK DETONATED']; }
       if (hit.tracks || hit.local.y < this.spec.dims.clearance + 0.5) { this.breakTracks(); msgs.push('Tracks destroyed'); }

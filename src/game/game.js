@@ -10,15 +10,18 @@ import { NavGrid } from './nav.js';
 import { AIController } from './ai.js';
 import { Effects } from './effects.js';
 import { HUD } from '../ui/hud.js';
+import { ArmorView } from './armorView.js';
+import { setTrackLOD } from '../models/tankModel.js';
 import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 
 const ALLY_NAMES = ['Sgt. Miller', 'Cpl. Novak', 'Lt. Hayes', 'Sgt. Dubois', 'Pvt. Kowalski', 'Cpt. Reyes', 'Sgt. Okafor', 'Lt. Varga'];
 const ENEMY_NAMES = ['Lt. Weber', 'Sgt. Volkov', 'Cpt. Brandt', 'Sgt. Petrov', 'Uffz. Krüger', 'Lt. Orlov', 'Sgt. Haas', 'Cpl. Zaitsev'];
 
 export class Game {
+  static ZOOMS = [2, 4, 8, 16];
   constructor(renderer, uiRoot, audio, opts) {
     this.renderer = renderer; this.audio = audio; this.opts = opts; this.rng = new RNG(opts.seed || ((Math.random() * 1e9) | 0));
-    this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
+    this.quality = opts.quality || 'high'; this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
     this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 6000);
     this.time = 0; this.timeLimit = 15 * 60; this.paused = false; this.ended = false; this.flying = [];
     this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46]);
@@ -27,17 +30,30 @@ export class Game {
     this.tanks = []; this.ai = [];
     this.spawnTeams(opts.tankId);
     this.player = this.tanks[0];
-    this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, follow: this.player };
+    this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, fov: 60, follow: this.player };
+    this.armorView = new ArmorView(this); this.lock = null;
     this.keys = {}; this.mouseDown = false; this.aimPoint = new THREE.Vector3();
     this.hud = new HUD(uiRoot, this);
     this.bindInput();
     this.resize();
     this.debug = this.makeDebug();
   }
+  // tier matchmaking: the player's tier weighs 3, adjacent tiers 1; max 2 copies of a tank per team
+  static matchmake(playerTankId, r) {
+    const me = TANK_BY_ID[playerTankId]; const team = [playerTankId]; const count = { [playerTankId]: 1 };
+    const pool = TANKS.filter((t) => Math.abs(t.tier - me.tier) <= 1).map((t) => ({ id: t.id, w: t.tier === me.tier ? 3 : 1 }));
+    while (team.length < 7) {
+      const cand = pool.filter((p) => (count[p.id] || 0) < 2); const tot = cand.reduce((a, p) => a + p.w, 0); let x = r.next() * tot; let pick = cand[0];
+      for (const p of cand) { x -= p.w; if (x <= 0) { pick = p; break; } }
+      team.push(pick.id); count[pick.id] = (count[pick.id] || 0) + 1;
+    }
+    return team;
+  }
   spawnTeams(playerTankId) {
-    const ids = TANKS.map((t) => t.id); const pool = []; const r = this.rng;
-    const others = []; for (let i = 0; i < 6; i++) others.push(ids[(ids.indexOf(playerTankId) + 1 + i) % ids.length]);
-    const team0 = [playerTankId, ...others]; const team1 = team0.slice().sort(() => r.next() - 0.5); void pool;
+    const team0 = Game.matchmake(playerTankId, this.rng); const r = this.rng;
+    // mirrored matchmaking: the enemy gets the same multiset of tanks (shuffled), so both teams are equal on paper
+    const team1 = team0.slice().sort(() => r.next() - 0.5);
+    this.lineup = { team0, team1 };
     const roles = ['assault', 'sniper', 'assault', 'defender', 'assault', 'sniper', 'assault'];
     const lanes = [1, 0, 2, 1, 0, 2, 1];
     for (let team = 0; team < 2; team++) {
@@ -65,6 +81,8 @@ export class Game {
       const p = this.player; if (!p.alive || this.paused) return;
       if (e.code === 'Digit1') p.selectShell(0); if (e.code === 'Digit2') p.selectShell(1); if (e.code === 'Digit3') p.selectShell(2);
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
+      if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
+      if (e.code === 'KeyE') this.toggleLock();
       if (e.code === 'KeyR' && this.kits.repair) { this.kits.repair = 0; p.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; p.trackRepair = 0; this.hud.message('Modules repaired', '#9fd39f'); }
       if (e.code === 'KeyF' && this.kits.ext && p.burning > 0) { this.kits.ext = 0; p.burning = 0; this.hud.message('Fire extinguished', '#9fd39f'); }
     });
@@ -84,13 +102,22 @@ export class Game {
     });
     on(c, 'wheel', (e) => {
       e.preventDefault(); const up = e.deltaY < 0;
-      if (this.cam.sniper) { const Z = [4, 8, 12]; let i = Z.indexOf(this.cam.zoom); i = clamp(i + (up ? 1 : -1), -1, 2); if (i < 0) this.toggleSniper(); else this.cam.zoom = Z[i]; }
+      if (this.cam.sniper) { const Z = Game.ZOOMS; let i = Z.indexOf(this.cam.zoom); i = clamp(i + (up ? 1 : -1), -1, Z.length - 1); if (i < 0) this.toggleSniper(); else this.cam.zoom = Z[i]; }
       else { this.cam.dist = clamp(this.cam.dist * (up ? 0.88 : 1.14), 7, 40); if (up && this.cam.dist <= 7.1) this.toggleSniper(); }
     }, { passive: false });
     on(document, 'pointerlockchange', () => { if (!document.pointerLockElement && !this.ended && this._wasLocked) this.setPaused(true); this._wasLocked = !!document.pointerLockElement; });
     on(window, 'resize', () => this.resize());
   }
-  toggleSniper() { this.cam.sniper = !this.cam.sniper; if (this.cam.sniper) { this.cam.zoom = 4; this.cam.pitch = clamp(this.cam.pitch, -0.3, 0.4); } }
+  toggleSniper() {
+    this.cam.sniper = !this.cam.sniper;
+    if (this.cam.sniper) { this.cam.zoom = Game.ZOOMS[1]; this.cam.pitch = clamp(this.cam.pitch, -0.3, 0.4); }
+    else if (this.armorView) this.armorView.update();
+  }
+  // gun lock: keep the gun laid on the centre of mass of the enemy under the crosshair (with lead)
+  toggleLock() {
+    if (this.lock) { this.lock = null; this.hud.message('Target lock released', '#c8c8c8'); return; }
+    const t = this.aimTank; if (t && t.alive && t.team !== this.player.team && t.spotted[this.player.team]) { this.lock = t; this.hud.message('Target locked: ' + t.spec.short, '#ffd84a'); }
+  }
   setPaused(v) { if (this.ended) return; this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
   exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); }
@@ -147,6 +174,14 @@ export class Game {
   }
   computeAim() {
     if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; return; }
+    if (this.lock) {
+      const t = this.lock; if (!t.alive || !t.spotted[this.player.team] || !this.player.alive) { this.lock = null; }
+      else {
+        const c = t.model.root.localToWorld(new THREE.Vector3(0, t.spec.dims.hullH * 0.62, 0)); const mz = this.player.model.muzzle.getWorldPosition(new THREE.Vector3());
+        const tof = c.distanceTo(mz) / this.player.shell.velocity; c.addScaledVector(t.vel, tof);
+        this.aimPoint.copy(c); this.aimTank = t; this.aimDist = c.distanceTo(mz); return;
+      }
+    }
     // ray from camera centre: terrain, structures, visible tanks
     const cam = this.camera; const o = cam.position; const dir = new THREE.Vector3(); cam.getWorldDirection(dir);
     const far = 2000; const e = o.clone().addScaledVector(dir, far); let best = 1;
@@ -174,7 +209,10 @@ export class Game {
     if (!hitP) hitP = pos;
     const sp = hitP.clone().project(this.camera); const sx = (sp.x * 0.5 + 0.5) * innerWidth, sy = (-sp.y * 0.5 + 0.5) * innerHeight;
     // dispersion circle in pixels
-    const fovR = this.camera.fov * DEG; const radPx = (p.dispersion() * 2) / fovR * innerHeight;
+    // aim circle: shells deviate at most ±dispersion (clipped 2σ gaussian) → project that cone
+    const radPx = Math.tan(p.dispersion()) / Math.tan(this.camera.fov * DEG / 2) * (innerHeight / 2);
+    if (sp.z > 1) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    this.reticleWorld = hitP.clone(); this.reticleDist = dist;
     let state = 'neutral', text = `${Math.round(dist)} m`;
     if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
       const ev = this.ballistics.evaluate(hitTank, hitInfo, p.shell, dist);
@@ -185,10 +223,11 @@ export class Game {
       text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(dist)} m`;
     }
     if (p.reloadLeft > 0) state += ' loading';
+    if (this.lock) state += ' locked';
     hud.setReticle(sx, sy, radPx, state, text);
   }
   updateCamera(dt) {
-    if (this.camOverride) { const o = this.camOverride; this.camera.position.set(o[0], o[1], o[2]); this.camera.fov = o[6] || 60; this.camera.updateProjectionMatrix(); this.camera.lookAt(o[3], o[4], o[5]); this.camera.updateMatrixWorld(); this.effects.setScale(innerHeight, this.camera.fov); for (const t of this.tanks) t.model.root.visible = t.team === 0 || !t.alive || t.spotted[0]; return; }
+    if (this.camOverride) { const o = this.camOverride; this.camera.position.set(o[0], o[1], o[2]); this.camera.fov = o[6] || 60; this.camera.updateProjectionMatrix(); this.camera.lookAt(o[3], o[4], o[5]); this.camera.updateMatrixWorld(); this.effects.setScale(innerHeight, this.camera.fov); for (const t of this.tanks) t.model.root.visible = t.team === 0 || !t.alive || t.spotted[0]; this.updateLOD(); return; }
     const c = this.cam; const f = c.follow && c.follow.alive ? c.follow : this.player.alive ? this.player : (this.tanks.find((t) => t.team === 0 && t.alive) || this.player); c.follow = f;
     const m = f.model; const T = this.world.terrain;
     const dir = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch));
@@ -196,16 +235,30 @@ export class Game {
     m.root.visible = !sn;
     if (sn) {
       const gp = m.gun.getWorldPosition(new THREE.Vector3()); gp.y += 0.55; gp.addScaledVector(dir, 0.6);
-      this.camera.position.copy(gp); this.camera.fov = 50 / c.zoom;
+      this.camera.position.copy(gp); c.fov += (50 / c.zoom - c.fov) * Math.min(1, dt * 12); if (!this._wasSn) c.fov = 50 / c.zoom; this.camera.fov = c.fov;
     } else {
       const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2;
-      const pos = focus.clone().addScaledVector(dir, -c.dist); const gh = T.height(pos.x, pos.z) + 1.2; if (pos.y < gh) pos.y = gh;
-      this.camera.position.lerp(pos, Math.min(1, dt * 18 + (this._camInit ? 0 : 1))); this._camInit = true; this.camera.fov = 60;
+      let pos = focus.clone().addScaledVector(dir, -c.dist);
+      // camera collision: pull in towards the turret if terrain or a building is between them
+      const W = this.world; let tHit = 1;
+      const tt = T.segmentHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z, 1); if (tt >= 0) tHit = Math.min(tHit, tt);
+      const ts = W.structureHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z); if (ts >= 0) tHit = Math.min(tHit, ts);
+      if (tHit < 1) pos = focus.clone().addScaledVector(dir, -Math.max(2.5, c.dist * tHit - 0.6));
+      const gh = T.height(pos.x, pos.z) + 1.2; if (pos.y < gh) pos.y = gh;
+      const pullIn = pos.distanceTo(focus) < this.camera.position.distanceTo(focus);
+      this.camera.position.lerp(pos, Math.min(1, dt * (pullIn ? 30 : 10) + (this._camInit ? 0 : 1))); this._camInit = true; c.fov = 60; this.camera.fov = 60;
     }
+    this._wasSn = sn;
     this.camera.updateProjectionMatrix();
     this.camera.lookAt(this.camera.position.clone().add(dir));
     this.camera.updateMatrixWorld();
     this.effects.setScale(innerHeight, this.camera.fov);
+    this.updateLOD();
+  }
+  // running-gear LOD: individual track links + detailed wheels only when the tank covers enough screen
+  updateLOD() {
+    const cp = this.camera.position; const k = this.camera.fov / 60; const near = this.quality === 'low' ? 22 : this.quality === 'high' ? 60 : 40;
+    for (const t of this.tanks) { if (!t.model.links) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
   }
   update(dt) {
     if (this.paused) return;
@@ -228,7 +281,8 @@ export class Game {
     this.updateCapture(dt); this.checkEnd();
     this.updateCamera(dt);
     this.computeAim();
-    this._retT = (this._retT || 0) - dt; if (this._retT <= 0) { this._retT = 0.05; this.updateReticle(); }
+    this.updateReticle();
+    this.armorView.update();
     // player bush ghosting
     const pb = this.player.alive ? this.player.inBush : null; this.world.veg.setPlayerBush(pb && !this.cam.sniper ? pb : pb);
     this.world.updateShadowCenter(this.cam.follow.pos); this.world.update(dt, this.time, this.camera.position);
@@ -240,7 +294,7 @@ export class Game {
   render() { this.renderer.render(this.scene, this.camera); }
   dispose() {
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.hud.destroy(); this.audio.stopEngine(); this.world.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
   }
   makeDebug() {

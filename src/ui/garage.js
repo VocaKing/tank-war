@@ -29,7 +29,7 @@ export class Garage {
     const spot = new THREE.SpotLight(0xffe2b8, 40, 30, 0.6, 0.6); spot.position.set(0, 12, 0); spot.target = this.turntable; this.scene.add(spot);
   }
   show(spec) {
-    if (!this.models[spec.id]) this.models[spec.id] = createTankModel(spec);
+    if (!this.models[spec.id]) this.models[spec.id] = createTankModel(spec, { links: true });
     if (this.current) this.turntable.remove(this.current.root);
     this.current = this.models[spec.id]; this.turntable.add(this.current.root);
     this.current.turret.rotation.y = 0.0; this.current.gun.rotation.x = -0.04;
@@ -39,8 +39,8 @@ export class Garage {
   render(dt) {
     if (!this.drag) this.angle += dt * 0.18;
     const L = this.spec ? this.spec.dims.L : 6;
-    const dist = L * 1.65 + 3;
-    this.camera.position.set(Math.sin(this.angle) * dist, 2.6 + L * 0.12, Math.cos(this.angle) * dist);
+    const dist = (L * 1.65 + 3) * (this.distMul || 1);
+    this.camera.position.set(Math.sin(this.angle) * dist, (2.6 + L * 0.12) * (this.hMul || 1), Math.cos(this.angle) * dist);
     this.camera.lookAt(0, 1.1, 0);
     this.renderer.render(this.scene, this.camera);
   }

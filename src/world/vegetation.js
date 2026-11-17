@@ -6,7 +6,7 @@ import { leafTexture, needleTexture, frondTexture, pbrTex } from './textures.js'
 import { Grid2D } from './terrain.js';
 import { RNG } from '../util.js';
 
-const windUniform = { value: 0 };
+export const windUniform = { value: 0 };
 export function setWindTime(t) { windUniform.value = t; }
 
 function foliageMaterial(tex, color = 0xffffff, sway = 1) {
@@ -120,7 +120,7 @@ const TYPES = {
 export class Vegetation {
   constructor(scene, mb, quality = 'high') {
     this.scene = scene; this.group = new THREE.Group(); this.group.name = 'vegetation'; scene.add(this.group);
-    this.chunkSize = 175; this.lodDist = quality === 'low' ? 160 : 260; this.half = mb.t.half;
+    this.chunkSize = 175; this.lodDist = quality === 'low' ? 160 : quality === 'medium' ? 210 : 260; this.half = mb.t.half;
     const r = new RNG(mb.def.seed + 5);
     const barkTex = pbrTex('bark_brown_02', 'diff'); const barkN = pbrTex('bark_brown_02', 'nor');
     this.mats = {};

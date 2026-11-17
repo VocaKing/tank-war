@@ -50,6 +50,8 @@ export function buildingMaterials() {
     canvasB: new THREE.MeshStandardMaterial({ color: 0x3b5b8b, roughness: 1, side: THREE.DoubleSide }),
     sand: new THREE.MeshStandardMaterial({ color: 0xb8a582, roughness: 1 }),
     dome: new THREE.MeshStandardMaterial({ color: 0x3f8a8f, roughness: 0.45, metalness: 0.3 }),
+    burnt: new THREE.MeshStandardMaterial({ color: 0x1a1714, roughness: 1, transparent: true, opacity: 0.75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide }),
+    paintwhite: new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.85 }),
   };
   return M;
 }
@@ -65,9 +67,18 @@ export function buildStructures(mb, scene, terrain) {
     for (let f = 0; f < floors; f++) for (let i = 0; i < n; i++) {
       const t = -len / 2 + (i + 0.5) * (len / n); if (skipDoor && f === 0 && i === Math.floor(n / 2)) continue;
       const small = b.style === 'desert'; const ww = small ? 0.8 : 1.0, wh = small ? 1.0 : 1.3; const y = H0 + f * 3 + 1.6;
-      const g = boxUV(ww, wh, 0.12, 1); const off = (axis === 'x' ? b.w / 2 : b.d / 2) + 0.03;
-      if (axis === 'x') place(g, b, sign * off, y, t, Math.PI / 2); else place(g, b, t, y, sign * off, 0);
-      B.add('window', g);
+      const off = (axis === 'x' ? b.w / 2 : b.d / 2) + 0.03;
+      const put = (gg, dx, dy, dz, mat) => { if (axis === 'x') place(gg, b, sign * (off + dz), y + dy, t + dx, Math.PI / 2); else place(gg, b, t + dx, y + dy, sign * (off + dz), 0); B.add(mat, gg); };
+      const broken = b.damage && r.next() < 0.3;
+      put(boxUV(ww, wh, 0.06, 1), 0, 0, -0.06, broken ? 'dark' : 'window'); // recessed glazing
+      const fm = b.style === 'desert' ? 'wood' : 'paintwood'; const fw = 0.07;
+      put(boxUV(ww + fw * 2, fw, 0.1, 1), 0, wh / 2 + fw / 2, 0, fm); put(boxUV(ww + fw * 2, fw, 0.1, 1), 0, -wh / 2 - fw / 2, 0, fm);
+      put(boxUV(fw, wh, 0.1, 1), -ww / 2 - fw / 2, 0, 0, fm); put(boxUV(fw, wh, 0.1, 1), ww / 2 + fw / 2, 0, 0, fm);
+      if (!small && !broken) { put(boxUV(0.04, wh, 0.05, 1), 0, 0, -0.02, fm); put(boxUV(ww, 0.04, 0.05, 1), 0, wh * 0.18, -0.02, fm); }
+      const sm = b.style === 'brick' ? 'stone' : wallMat(b) === 'wood' ? 'wood' : b.style === 'desert' ? 'plaster' : 'castle';
+      put(boxUV(ww + 0.3, 0.08, 0.22, 1), 0, -wh / 2 - fw - 0.04, 0.06, sm); // sill
+      if (b.style !== 'desert') put(boxUV(ww + 0.36, 0.18, 0.1, 1), 0, wh / 2 + fw + 0.09, 0.0, sm); // lintel
+      else if (r.next() < 0.4) put(boxUV(ww + 0.2, 0.06, 0.4, 1), 0, wh / 2 + 0.25, 0.2, 'wood'); // sun shade
       if (b.style === 'stone' && !b.ruined && r.next() < 0.6) for (const s of [-1, 1]) { const sh = boxUV(0.5, wh + 0.1, 0.05, 1); const so = off + 0.03; if (axis === 'x') place(sh, b, sign * so, y, t + s * (ww / 2 + 0.27), Math.PI / 2); else place(sh, b, t + s * (ww / 2 + 0.27), y, sign * so, 0); B.add('paintwood', sh); }
     }
   };
@@ -121,13 +132,34 @@ export function buildStructures(mb, scene, terrain) {
     }
     // standard house / barn / desert block
     const g = boxUV(b.w, H, b.d, 3, r.range(0, 1)); place(g, b, 0, H / 2, 0); B.add(b.style === 'cabin' ? 'stone' : wm, g);
+    b.damage = b.style !== 'cabin' && r.next() < (b.style === 'desert' ? 0.45 : 0.3);
+    // plinth / base course, corner quoins, string course between floors
+    if (b.style !== 'cabin') { const pg = boxUV(b.w + 0.12, 0.55, b.d + 0.12, 2); place(pg, b, 0, 0.27, 0); B.add(b.style === 'desert' ? 'damaged' : 'castle', pg); }
+    if (b.style === 'stone' || b.style === 'brick') for (const [cx, cz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) for (let k = 0; k < Math.floor(H / 0.5); k++) { const q = boxUV(k % 2 ? 0.5 : 0.3, 0.24, k % 2 ? 0.3 : 0.5, 1); place(q, b, cx * (b.w / 2 - 0.1 + 0.04), 0.6 + k * 0.5, cz * (b.d / 2 - 0.1 + 0.04)); B.add('castle', q); }
+    for (let f = 1; f < fl; f++) { const sc = boxUV(b.w + 0.1, 0.14, b.d + 0.1, 2); place(sc, b, 0, 0.4 + f * 3, 0); B.add(b.style === 'desert' ? 'plaster' : 'castle', sc); }
+    // shell damage: holes punched through walls with scorched rims and rubble below
+    if (b.damage) for (let k = 0; k < 1 + Math.floor(r.next() * 3); k++) {
+      const side = Math.floor(r.next() * 4); const along = side < 2 ? b.d : b.w; const tpos = r.range(-along / 2 + 1.2, along / 2 - 1.2); const hy = r.range(1.0, H - 1.0); const hs = r.range(0.7, 1.5);
+      const hole = new THREE.CircleGeometry(hs * 0.5, 9); const rim = new THREE.RingGeometry(hs * 0.5, hs * 0.95, 9); const off = (side < 2 ? b.w / 2 : b.d / 2) + 0.05; const sg = side % 2 ? -1 : 1;
+      for (const [gg, mat, o] of [[hole, 'dark', 0.02], [rim, 'burnt', 0.01]]) { if (side < 2) place(gg, b, sg * (off + o), hy, tpos, sg * Math.PI / 2); else place(gg, b, tpos, hy, sg * (off + o), sg > 0 ? 0 : Math.PI); B.add(mat, gg); }
+      for (let i = 0; i < 6; i++) { const s2 = r.range(0.2, 0.6); const rb = boxUV(s2, s2 * 0.6, s2, 1); const ox = side < 2 ? sg * (off + r.range(0.2, 1.5)) : tpos + r.range(-1, 1); const oz = side < 2 ? tpos + r.range(-1, 1) : sg * (off + r.range(0.2, 1.5)); place(rb, b, ox, s2 * 0.25, oz, r.range(0, 3), r.range(-0.5, 0.5)); B.add(wm === 'wood' ? 'stone' : wm, rb); }
+    }
+    // downpipe at a corner + gutter line for pitched roofs
+    if (b.roof === 'gable' && b.style !== 'cabin') { const dp = new THREE.CylinderGeometry(0.06, 0.06, H, 6); place(dp, b, b.w / 2 + 0.08, H / 2, b.d / 2 - 0.25); B.add('metal', dp); }
     if (b.style === 'cabin') { const up = boxUV(b.w + 0.1, H - 0.9, b.d + 0.1, 2.5); place(up, b, 0, 0.9 + (H - 0.9) / 2, 0); B.add('wood', up); }
     if (b.roof === 'gable') {
       const ridgeZ = b.d >= b.w; const ww = ridgeZ ? b.w : b.d, dd = ridgeZ ? b.d : b.w; const R = ww * (b.style === 'cabin' ? 0.55 : 0.42);
       const { roof, gables } = gableRoof(ww, dd, H, R, 0.45); const ry = ridgeZ ? 0 : Math.PI / 2;
       place(roof, b, 0, 0, 0, ry); B.add(b.style === 'cabin' || b.barn ? 'slate' : 'roof', roof); place(gables, b, 0, 0, 0, ry); B.add(b.style === 'cabin' ? 'wood' : wm, gables);
       top = H + R;
-      if (!b.barn) { const ch = boxUV(0.7, 2.0, 0.7, 1.5); place(ch, b, ridgeZ ? ww * 0.22 : dd * 0.3, H + R * 0.6 + 0.6, ridgeZ ? dd * 0.3 : ww * 0.22); B.add(wm === 'wood' ? 'stone' : wm, ch); }
+      // ridge cap, eave fascia boards and gutters
+      const rc = boxUV(0.32, 0.18, dd + 0.9, 1); place(rc, b, 0, H + R + 0.05, 0, ry); B.add(b.style === 'cabin' || b.barn ? 'slate' : 'roof', rc);
+      for (const sg of [-1, 1]) { const ex = sg * (ww / 2 + 0.45); const ey = H - 0.45 * R / (ww / 2); const fa = boxUV(0.05, 0.22, dd + 0.9, 1); const gu = new THREE.CylinderGeometry(0.07, 0.07, dd + 0.9, 6); gu.rotateX(Math.PI / 2);
+        if (ridgeZ) { place(fa, b, ex, ey - 0.08, 0); place(gu, b, ex + sg * 0.06, ey - 0.12, 0); } else { place(fa, b, 0, ey - 0.08, ex, Math.PI / 2); place(gu, b, 0, ey - 0.12, ex + sg * 0.06, Math.PI / 2); }
+        B.add('paintwood', fa); if (b.style !== 'cabin') B.add('metal', gu); }
+      if (!b.barn) { const cx = ridgeZ ? ww * 0.22 : dd * 0.3, cz = ridgeZ ? dd * 0.3 : ww * 0.22; const ch = boxUV(0.7, 2.0, 0.7, 1.5); place(ch, b, cx, H + R * 0.6 + 0.6, cz); B.add(wm === 'wood' ? 'stone' : wm, ch);
+        const cap = boxUV(0.86, 0.1, 0.86, 1); place(cap, b, cx, H + R * 0.6 + 1.65, cz); B.add('castle', cap); for (const o of [-0.15, 0.15]) { const pot = new THREE.CylinderGeometry(0.09, 0.11, 0.35, 8); place(pot, b, cx + o, H + R * 0.6 + 1.85, cz); B.add('rust', pot); } }
+      if (b.damage && r.next() < 0.6) { const hole = boxUV(r.range(1.2, 2.5), 0.1, r.range(1.2, 2.2), 1); place(hole, b, ridgeZ ? ww * 0.12 : 0, H + R * 0.55, ridgeZ ? 0 : ww * 0.12, ry, 0, ridgeZ ? Math.atan(R / (ww / 2)) : 0); B.add('dark', hole); }
     } else {
       // flat roof with parapet, rooftop clutter
       for (const [w2, d2, x2, z2] of [[b.w, 0.3, 0, b.d / 2 - 0.15], [b.w, 0.3, 0, -b.d / 2 + 0.15], [0.3, b.d, b.w / 2 - 0.15, 0], [0.3, b.d, -b.w / 2 + 0.15, 0]]) { const pg = boxUV(w2, 0.7, d2, 3); place(pg, b, x2, H + 0.35, z2); B.add(wm, pg); }
@@ -138,7 +170,25 @@ export function buildStructures(mb, scene, terrain) {
     }
     windowsOnWall(b, b.d, 'x', 1, fl, 0.4, b.door === 1); windowsOnWall(b, b.d, 'x', -1, fl, 0.4, b.door === -1);
     windowsOnWall(b, b.w, 'z', 1, fl, 0.4, false); windowsOnWall(b, b.w, 'z', -1, fl, 0.4, false);
-    if (b.door) { const dg = boxUV(b.barn ? 3.4 : 1.1, b.barn ? 3.4 : 2.2, 0.14, 1); place(dg, b, b.door * (b.w / 2 + 0.04), (b.barn ? 1.7 : 1.1) + 0.4, 0, Math.PI / 2); B.add('dark', dg); }
+    if (b.door) { const dw = b.barn ? 3.4 : 1.1, dh = b.barn ? 3.4 : 2.2; const dg = boxUV(dw, dh, 0.14, 1); place(dg, b, b.door * (b.w / 2 + 0.02), dh / 2 + 0.4, 0, Math.PI / 2); B.add(b.barn ? 'wood' : 'paintwood', dg);
+      const fr = (w2, h2, ox, oy) => { const f = boxUV(w2, h2, 0.18, 1); place(f, b, b.door * (b.w / 2 + 0.05), oy, ox, Math.PI / 2); B.add(b.style === 'desert' ? 'wood' : 'castle', f); };
+      fr(dw + 0.3, 0.16, 0, dh + 0.48); fr(0.15, dh, -dw / 2 - 0.07, dh / 2 + 0.4); fr(0.15, dh, dw / 2 + 0.07, dh / 2 + 0.4);
+      if (!b.barn) { const st = boxUV(0.5, 0.2, 1.6, 1); place(st, b, b.door * (b.w / 2 + 0.25), 0.3, 0); B.add('castle', st); }
+      else for (let k = 0; k < 2; k++) { const br2 = boxUV(0.06, 0.12, dw * 1.05, 1); place(br2, b, b.door * (b.w / 2 + 0.1), 0.4 + dh * (0.3 + k * 0.4), 0, 0, 0, k ? 0.6 : -0.6); B.add('dark', br2); } }
+    // garden fences / picket fences around village houses
+    if ((b.style === 'stone' || b.style === 'brick') && !b.barn && r.next() < 0.55) {
+      const fd = b.d / 2 + r.range(3, 6), fw2 = b.w / 2 + r.range(3, 6); const picket = r.next() < 0.5;
+      for (const [x0, z0, x1, z1] of [[-fw2, fd, fw2, fd], [fw2, -fd, fw2, fd], [-fw2, -fd, -fw2, fd]]) {
+        const len = Math.hypot(x1 - x0, z1 - z0); const n = Math.floor(len / (picket ? 0.25 : 2.2)); const ang = Math.atan2(x1 - x0, z1 - z0);
+        for (let k = 0; k <= n; k++) { if (r.next() < 0.07) continue; const tt = k / n; const px = x0 + (x1 - x0) * tt, pz = z0 + (z1 - z0) * tt; const ph = picket ? 0.95 : 1.15; const pg = boxUV(picket ? 0.08 : 0.12, ph, picket ? 0.03 : 0.12, 1); place(pg, b, px, ph / 2 - 0.05, pz, ang); B.add(picket ? 'paintwhite' : 'wood', pg); }
+        for (const ry2 of picket ? [0.3, 0.75] : [0.45, 0.95]) { const rl = boxUV(0.05, 0.08, len, 1); place(rl, b, (x0 + x1) / 2, ry2, (z0 + z1) / 2, ang); B.add(picket ? 'paintwhite' : 'wood', rl); }
+      }
+    }
+    // clutter: barrels and crates against a wall
+    if (r.next() < 0.35) { const sg = r.next() < 0.5 ? -1 : 1; const z0 = r.range(-b.d / 2 + 1, b.d / 2 - 1);
+      for (let k = 0; k < 2 + Math.floor(r.next() * 3); k++) { const x = sg * (b.w / 2 + 0.6 + (k > 2 ? 0.7 : 0)), z = z0 + (k % 3) * 0.75;
+        if (r.next() < 0.5) { const br = new THREE.CylinderGeometry(0.3, 0.3, 0.9, 12); place(br, b, x, 0.45, z); B.add('rust', br); for (const hy of [0.15, 0.75]) { const ring = new THREE.TorusGeometry(0.305, 0.02, 4, 12); ring.rotateX(Math.PI / 2); place(ring, b, x, hy, z); B.add('metal', ring); } }
+        else { const cs = r.range(0.55, 0.8); const cr = boxUV(cs, cs, cs, 0.8); place(cr, b, x, cs / 2, z, r.range(-0.3, 0.3)); B.add('wood', cr); } } }
     colliders.push(new OBB(b.x, b.z, b.w / 2, b.d / 2, b.rot, b.y - 2, b.y + top));
   }
   // walls
