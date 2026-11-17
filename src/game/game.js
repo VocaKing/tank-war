@@ -156,13 +156,44 @@ export class Game {
       } else if (!att.length) cap.points = Math.max(0, cap.points - dt * 6);
     }
   }
+  // tank footprint (oriented rectangle) vs structure OBBs: separating-axis test, minimal push-out
+  static rectPush(px, pz, hx, hz, h, c) {
+    const tax = [Math.cos(h), -Math.sin(h)], taz = [Math.sin(h), Math.cos(h)];
+    const oax = [c.c, -c.s], oaz = [c.s, c.c];
+    const dx = px - c.x, dz = pz - c.z; let best = null;
+    for (const n of [oax, oaz, tax, taz]) {
+      const d = dx * n[0] + dz * n[1];
+      const rA = Math.abs(hx * (tax[0] * n[0] + tax[1] * n[1])) + Math.abs(hz * (taz[0] * n[0] + taz[1] * n[1]));
+      const rB = Math.abs(c.hx * (oax[0] * n[0] + oax[1] * n[1])) + Math.abs(c.hz * (oaz[0] * n[0] + oaz[1] * n[1]));
+      const ov = rA + rB - Math.abs(d); if (ov <= 0) return null;
+      if (!best || ov < best[2]) best = [n[0] * (d < 0 ? -1 : 1), n[1] * (d < 0 ? -1 : 1), ov];
+    }
+    return best;
+  }
+  resolveStructures(t) {
+    const W = this.world; const d = t.spec.dims; const hx = d.W / 2 + 0.05, hz = d.L / 2 + 0.05; let hitAny = false;
+    for (let it = 0; it < 3; it++) {
+      let moved = false;
+      for (const c of W.colGrid.query(t.pos.x, t.pos.z, hz + 2)) {
+        if (c.kind === 'deck') continue;
+        if (c.y1 < t.pos.y + 0.3 || c.y0 > t.pos.y + d.hullH) continue; // e.g. under a bridge deck / below a parapet top
+        const res = Game.rectPush(t.pos.x, t.pos.z, hx, hz, t.heading, c); if (!res) continue;
+        t.pos.x += res[0] * (res[2] + 0.002); t.pos.z += res[1] * (res[2] + 0.002); moved = true; hitAny = true;
+        // kill the velocity component driving into the obstacle
+        const fx = Math.sin(t.heading), fz = Math.cos(t.heading); const into = -(fx * res[0] + fz * res[1]) * Math.sign(t.speed || 1);
+        if (into > 0.3) t.speed *= 0.6; else t.speed *= 0.95;
+      }
+      if (!moved) break;
+    }
+    return hitAny;
+  }
   resolveCollisions() {
     const T = this.tanks; const W = this.world;
     for (const t of T) {
       const d = t.spec.dims; const fx = Math.sin(t.heading), fz = Math.cos(t.heading); const r = d.W * 0.5;
+      this.resolveStructures(t);
       for (const off of [-d.L * 0.3, 0, d.L * 0.3]) {
         const cx = t.pos.x + fx * off, cz = t.pos.z + fz * off;
-        for (const c of W.colGrid.query(cx, cz, r + 2)) { const res = c.circle(cx, cz, r); if (res) { t.pos.x += res[0] * res[2]; t.pos.z += res[1] * res[2]; if (t.alive) t.speed *= 0.93; } }
         for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) { if (rk.s < 1.6) continue; const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.85; if (dd < R && dd > 0.01) { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.95; } }
       }
       const H = W.playHalf - 4; if (Math.abs(t.pos.x) > H) { t.pos.x = Math.sign(t.pos.x) * H; t.speed *= 0.8; } if (Math.abs(t.pos.z) > H) { t.pos.z = Math.sign(t.pos.z) * H; t.speed *= 0.8; }
@@ -172,6 +203,8 @@ export class Game {
       const R = (a.spec.dims.L + b.spec.dims.L) * 0.36; if (d > R || d < 0.01) continue;
       const push = (R - d); const ma = a.alive ? a.spec.mass : 200, mb = b.alive ? b.spec.mass : 200; const wa = mb / (ma + mb), wb = ma / (ma + mb);
       a.pos.x -= dx / d * push * wa; a.pos.z -= dz / d * push * wa; b.pos.x += dx / d * push * wb; b.pos.z += dz / d * push * wb; a.speed *= 0.9; b.speed *= 0.9;
+      // tank-tank pushes must never shove a tank into a building
+      this.resolveStructures(a); this.resolveStructures(b);
     }
   }
   computeAim() {

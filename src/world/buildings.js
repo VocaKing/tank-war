@@ -197,27 +197,49 @@ export function buildStructures(mb, scene, terrain) {
     const g = boxUV(w.thick, w.h + 1, w.len, 2.5); xf(g, w.x, y + (w.h - 1) / 2, w.z, w.rot); B.add(mat, g);
     colliders.push(new OBB(w.x, w.z, w.thick / 2, w.len / 2, w.rot, y - 1, y + w.h, 'wall'));
   }
-  // bridges: stone deck + parapets reaching down to water
+  // bridges: drivable deck that follows a ramp/arch profile between the two banks (so tanks drive ON it),
+  // segmented deck + parapets; the deck surface is exported for World.groundHeight
+  const decks = [];
   for (const br of mb.bridges) {
     const p = br.pts; const a = p[0], b2 = p[p.length - 1];
-    const len = Math.hypot(b2[0] - a[0], b2[1] - a[1]); const rot = Math.atan2(b2[0] - a[0], b2[1] - a[1]);
-    const cx = (a[0] + b2[0]) / 2, cz = (a[1] + b2[1]) / 2; const top = Math.max(...p.map((q) => terrain.height(q[0], q[1])));
-    const deck = boxUV(br.width, 1.0, len, 2.5); xf(deck, cx, top - 0.45, cz, rot); B.add('castle', deck);
-    for (const s of [-1, 1]) { const pg = boxUV(0.5, 4.5, len, 2.5); const ox = s * (br.width / 2 + 0.25); xf(pg, cx + ox * Math.cos(rot), top - 1.3, cz - ox * Math.sin(rot), rot); B.add('castle', pg);
-      colliders.push(new OBB(cx + ox * Math.cos(rot), cz - ox * Math.sin(rot), 0.25, len / 2, rot, top - 4, top + 0.9, 'wall')); }
+    const len = Math.hypot(b2[0] - a[0], b2[1] - a[1]); if (len < 2) continue; const rot = Math.atan2(b2[0] - a[0], b2[1] - a[1]);
+    const ux = (b2[0] - a[0]) / len, uz = (b2[1] - a[1]) / len;
+    const ha = terrain.height(a[0], a[1]), hb = terrain.height(b2[0], b2[1]);
+    // arch height so the deck clears every terrain/road sample under it by 0.15 m
+    let bump = 0;
+    for (const q of p) { const u = ((q[0] - a[0]) * ux + (q[1] - a[1]) * uz) / len; if (u <= 0.03 || u >= 0.97) continue; const need = terrain.height(q[0], q[1]) + 0.15 - (ha + (hb - ha) * u); if (need > 0) bump = Math.max(bump, need / Math.sin(Math.PI * u)); }
+    bump = Math.min(bump, 6);
+    const deckY = (u) => ha + (hb - ha) * u + bump * Math.sin(Math.PI * Math.max(0, Math.min(1, u))) + 0.04;
+    const deck = { x0: a[0], z0: a[1], ux, uz, len, hw: br.width / 2, deckY };
+    decks.push(deck);
+    const N = Math.max(4, Math.ceil(len / 4));
+    for (let i = 0; i < N; i++) {
+      const u0 = i / N, u1 = (i + 1) / N; const y0 = deckY(u0), y1 = deckY(u1); const sl = len / N;
+      const mx = a[0] + ux * len * (u0 + u1) / 2, mz = a[1] + uz * len * (u0 + u1) / 2, my = (y0 + y1) / 2; const tilt = Math.atan2(y1 - y0, sl);
+      const seg = boxUV(br.width, 0.9, Math.hypot(sl, y1 - y0) + 0.04, 2.5); seg.translate(0, -0.45, 0); seg.rotateX(-tilt); xf(seg, mx, my, mz, rot); B.add('castle', seg);
+      colliders.push(new OBB(mx, mz, br.width / 2, sl / 2, rot, Math.min(y0, y1) - 0.9, Math.min(y0, y1) - 0.05, 'deck'));
+      for (const s of [-1, 1]) {
+        const ox = s * (br.width / 2 + 0.25); const px = mx + ox * Math.cos(rot), pz = mz - ox * Math.sin(rot);
+        const pg = boxUV(0.5, 1.0, Math.hypot(sl, y1 - y0) + 0.04, 2.5); pg.translate(0, 0.45, 0); pg.rotateX(-tilt); xf(pg, px, my, pz, rot); B.add('castle', pg);
+        // pier/side wall below the deck edge
+        const lowT = Math.min(terrain.height(px, pz), my - 1);
+        const sw = boxUV(0.5, my - lowT, sl + 0.04, 2.5); xf(sw, px, (my + lowT) / 2 - 0.45, pz, rot); B.add('castle', sw);
+        colliders.push(new OBB(px, pz, 0.25, sl / 2, rot, lowT - 1, Math.max(y0, y1) + 0.95, 'wall'));
+      }
+    }
   }
   // props
   for (const p of mb.props) {
     const y = p.y;
     if (p.kind === 'haybale') { const g = new THREE.CylinderGeometry(0.75, 0.75, 1.2, 16); xf(g, p.x, y + 0.72, p.z, p.rot, 0, Math.PI / 2); B.add('hay', g); }
-    else if (p.kind === 'haystack') { const g = new THREE.SphereGeometry(2.6, 14, 8); g.scale(1, 1.3, 1); xf(g, p.x, y + 1.2, p.z); B.add('hay', g); }
+    else if (p.kind === 'haystack') { const g = new THREE.SphereGeometry(2.6, 14, 8); g.scale(1, 1.3, 1); xf(g, p.x, y + 1.2, p.z); B.add('hay', g); colliders.push(new OBB(p.x, p.z, 2.2, 2.2, 0, y - 1, y + 4, 'prop')); }
     else if (p.kind === 'pole') { const g = new THREE.CylinderGeometry(0.11, 0.15, 8, 7); xf(g, p.x, y + 4, p.z); B.add('wood', g); const c = boxUV(1.8, 0.12, 0.12, 1); xf(c, p.x, y + 7.5, p.z, p.rot + Math.PI / 2); B.add('wood', c); }
-    else if (p.kind === 'cart') { const g = boxUV(1.6, 0.5, 3, 1); xf(g, p.x, y + 1, p.z, p.rot); B.add('wood', g); for (const s of [-1, 1]) { const wg = new THREE.CylinderGeometry(0.6, 0.6, 0.1, 14); wg.rotateZ(Math.PI / 2); xf(wg, p.x + s * 0.85 * Math.cos(p.rot), y + 0.6, p.z - s * 0.85 * Math.sin(p.rot), p.rot); B.add('dark', wg); } }
-    else if (p.kind === 'logs') { for (let i = 0; i < 9; i++) { const row = i < 4 ? 0 : i < 7 ? 1 : 2; const k = i < 4 ? i : i < 7 ? i - 4 : i - 7; const g = new THREE.CylinderGeometry(0.3, 0.3, 6, 10); g.rotateX(Math.PI / 2); xf(g, k * 0.62 - 1 + row * 0.31, 0.3 + row * 0.52, 0); xf(g, p.x, y, p.z, p.rot); B.add('wood', g); } }
-    else if (p.kind === 'stall') { for (const [a, c] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const g = new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5); xf(g, a * 1.3, 1.2, c * 1.0); xf(g, p.x, y, p.z, p.rot); B.add('wood', g); } const aw = new THREE.PlaneGeometry(3, 2.4); aw.rotateX(-Math.PI / 2 + 0.15); xf(aw, p.x, y + 2.45, p.z, p.rot); B.add(r.next() < 0.5 ? 'canvasR' : 'canvasB', aw); const t = boxUV(2.4, 0.8, 1.6, 1); xf(t, p.x, y + 0.4, p.z, p.rot); B.add('wood', t); }
+    else if (p.kind === 'cart') { const g = boxUV(1.6, 0.5, 3, 1); xf(g, p.x, y + 1, p.z, p.rot); B.add('wood', g); for (const s of [-1, 1]) { const wg = new THREE.CylinderGeometry(0.6, 0.6, 0.1, 14); wg.rotateZ(Math.PI / 2); xf(wg, p.x + s * 0.85 * Math.cos(p.rot), y + 0.6, p.z - s * 0.85 * Math.sin(p.rot), p.rot); B.add('dark', wg); } colliders.push(new OBB(p.x, p.z, 0.85, 1.5, p.rot, y - 1, y + 1.4, 'prop')); }
+    else if (p.kind === 'logs') { for (let i = 0; i < 9; i++) { const row = i < 4 ? 0 : i < 7 ? 1 : 2; const k = i < 4 ? i : i < 7 ? i - 4 : i - 7; const g = new THREE.CylinderGeometry(0.3, 0.3, 6, 10); g.rotateX(Math.PI / 2); xf(g, k * 0.62 - 1 + row * 0.31, 0.3 + row * 0.52, 0); xf(g, p.x, y, p.z, p.rot); B.add('wood', g); } colliders.push(new OBB(p.x, p.z, 1.4, 3, p.rot, y - 1, y + 1.4, 'prop')); }
+    else if (p.kind === 'stall') { for (const [a, c] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const g = new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5); xf(g, a * 1.3, 1.2, c * 1.0); xf(g, p.x, y, p.z, p.rot); B.add('wood', g); } const aw = new THREE.PlaneGeometry(3, 2.4); aw.rotateX(-Math.PI / 2 + 0.15); xf(aw, p.x, y + 2.45, p.z, p.rot); B.add(r.next() < 0.5 ? 'canvasR' : 'canvasB', aw); const t = boxUV(2.4, 0.8, 1.6, 1); xf(t, p.x, y + 0.4, p.z, p.rot); B.add('wood', t); colliders.push(new OBB(p.x, p.z, 1.35, 1.05, p.rot, y - 1, y + 2.5, 'prop')); }
     else if (p.kind === 'wreck') { const g = boxUV(1.8, 0.9, 4.4, 1.5); xf(g, p.x, y + 0.75, p.z, p.rot, 0, 0.08); B.add('rust', g); const c = boxUV(1.6, 0.7, 2.0, 1.5); xf(c, 0, 1.5, -0.3); xf(c, p.x, y, p.z, p.rot); B.add('rust', c); colliders.push(new OBB(p.x, p.z, 0.95, 2.25, p.rot, y - 1, y + 1.9, 'prop')); }
-    else if (p.kind === 'hedgehog') { for (let k = 0; k < 3; k++) { const g = boxUV(0.2, 0.2, 2.4, 1); xf(g, 0, 0.7, 0, k * Math.PI / 3, k === 1 ? 0.9 : -0.9, k === 2 ? 0.9 : 0); xf(g, p.x, y, p.z, p.rot); B.add('rust', g); } }
-    else if (p.kind === 'sandbags') { for (let i = 0; i < 10; i++) { const row = i < 6 ? 0 : 1; const k = row ? i - 6 : i; const g = new THREE.SphereGeometry(0.4, 8, 5); g.scale(1.1, 0.4, 0.6); xf(g, -2 + k * 0.8 + row * 0.4, 0.18 + row * 0.3, 0); xf(g, p.x, y, p.z, p.rot); B.add('sand', g); } }
+    else if (p.kind === 'hedgehog') { for (let k = 0; k < 3; k++) { const g = boxUV(0.2, 0.2, 2.4, 1); xf(g, 0, 0.7, 0, k * Math.PI / 3, k === 1 ? 0.9 : -0.9, k === 2 ? 0.9 : 0); xf(g, p.x, y, p.z, p.rot); B.add('rust', g); } colliders.push(new OBB(p.x, p.z, 0.9, 0.9, p.rot, y - 1, y + 1.4, 'prop')); }
+    else if (p.kind === 'sandbags') { for (let i = 0; i < 10; i++) { const row = i < 6 ? 0 : 1; const k = row ? i - 6 : i; const g = new THREE.SphereGeometry(0.4, 8, 5); g.scale(1.1, 0.4, 0.6); xf(g, -2 + k * 0.8 + row * 0.4, 0.18 + row * 0.3, 0); xf(g, p.x, y, p.z, p.rot); B.add('sand', g); } colliders.push(new OBB(p.x, p.z, 2.3, 0.4, p.rot, y - 1, y + 0.75, 'prop')); }
   }
   const group = new THREE.Group(); group.name = 'structures';
   for (const [k, list] of Object.entries(B.b)) {
@@ -225,5 +247,5 @@ export function buildStructures(mb, scene, terrain) {
     const mesh = new THREE.Mesh(geo, M[k]); mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
   }
   scene.add(group);
-  return { group, colliders, materials: M };
+  return { group, colliders, materials: M, decks };
 }

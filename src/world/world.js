@@ -147,7 +147,7 @@ export class World {
     this.far = buildFarTerrain(mb, tmat); scene.add(this.far);
     this.waterMat = waterMaterial(); this.water = buildWater(mb, this.waterMat); scene.add(this.water);
     // structures and vegetation
-    const st = buildStructures(mb, scene, mb.t); this.colliders = st.colliders;
+    const st = buildStructures(mb, scene, mb.t); this.colliders = st.colliders; this.decks = st.decks || [];
     this.colGrid = new Grid2D(mb.t.half, 24); for (const c of this.colliders) this.colGrid.insert(c, c.x, c.z, c.r);
     this.veg = new Vegetation(scene, mb, quality);
     this.grass = new Grass(scene, mb, quality, windUniform);
@@ -165,7 +165,17 @@ export class World {
     }
   }
   // ground height including bridges (terrain already raised under roads)
-  groundHeight(x, z) { return this.terrain.height(x, z); }
+  groundHeight(x, z) { const t = this.terrain.height(x, z); const d = this.deckAt(x, z); return d > t ? d : t; }
+  // bridge deck surface height at (x,z) or -Infinity when not over a deck
+  deckAt(x, z) {
+    let best = -Infinity;
+    for (const d of this.decks) {
+      const dx = x - d.x0, dz = z - d.z0; const along = dx * d.ux + dz * d.uz; if (along < -0.5 || along > d.len + 0.5) continue;
+      const across = Math.abs(dx * d.uz - dz * d.ux); if (across > d.hw + 0.3) continue;
+      const y = d.deckY(along / d.len); if (y > best) best = y;
+    }
+    return best;
+  }
   updateShadowCenter(target) {
     const s = this.sun; const snap = 2; const tx = Math.round(target.x / snap) * snap, tz = Math.round(target.z / snap) * snap; const ty = this.terrain.height(tx, tz);
     s.target.position.set(tx, ty, tz); s.position.set(tx + this.sunDir.x * 350, ty + this.sunDir.y * 350, tz + this.sunDir.z * 350); s.target.updateMatrixWorld();

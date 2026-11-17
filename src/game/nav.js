@@ -11,8 +11,12 @@ export class NavGrid {
       // sample occupancy within cell
       let trees = 0, road = 0;
       for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const o = T.occAt(x + a * cell * 0.4, z + b * cell * 0.4); if (o === OCC.BUILDING) blocked = true; if (o === OCC.TREE) trees++; if (o === OCC.ROAD) road++; }
-      const nm = T.normal(x, z); const slope = Math.sqrt(1 - nm.y * nm.y) / nm.y; if (slope > 0.56) blocked = true;
-      const wl = T.waterLevel(x, z); const depth = wl - T.height(x, z); if (depth > 1.25) blocked = true; else if (depth > 0) c += 4 * depth;
+      const onDeck = world.deckAt && world.deckAt(x, z) > T.height(x, z) - 0.3;
+      let slope; if (onDeck) { blocked = false; const e = 2; slope = Math.max(Math.abs(world.groundHeight(x + e, z) - world.groundHeight(x - e, z)), Math.abs(world.groundHeight(x, z + e) - world.groundHeight(x, z - e))) / (2 * e); }
+      else { const nm = T.normal(x, z); slope = Math.sqrt(1 - nm.y * nm.y) / nm.y; }
+      if (slope > 0.56) blocked = true;
+      const wl = T.waterLevel(x, z); const depth = onDeck ? 0 : wl - T.height(x, z); if (depth > 1.25) blocked = true; else if (depth > 0) c += 4 * depth;
+      if (onDeck) c = Math.min(c, 0.8);
       if (Math.abs(x) > this.half - 12 || Math.abs(z) > this.half - 12) c += 6;
       c += slope * slope * 14 + trees * 0.35 - road * 0.07;
       this.cost[j * n + i] = blocked ? Infinity : Math.max(0.4, c);

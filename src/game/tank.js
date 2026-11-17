@@ -54,7 +54,7 @@ export class Tank {
     const driver = this.crewAlive('Driver') ? 1 : 0.65;
     const thr = clamp(this.input.throttle, -1, 1), steer = clamp(this.input.steer, -1, 1);
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
-    const hf = T.height(this.pos.x + fx * d.L * 0.4, this.pos.z + fz * d.L * 0.4), hb = T.height(this.pos.x - fx * d.L * 0.4, this.pos.z - fz * d.L * 0.4);
+    const hf = W.groundHeight(this.pos.x + fx * d.L * 0.4, this.pos.z + fz * d.L * 0.4), hb = W.groundHeight(this.pos.x - fx * d.L * 0.4, this.pos.z - fz * d.L * 0.4);
     const grade = (hf - hb) / (d.L * 0.8);
     const ptw = s.power / s.mass; const dir = Math.abs(this.speed) > 0.2 ? Math.sign(this.speed) : Math.sign(thr);
     const uphill = grade * dir;
@@ -110,7 +110,7 @@ export class Tank {
     this.bloom = 1 + (this.bloom - 1) * Math.exp((-dt * 2.6) / aimT); this.bloom = Math.min(this.bloom, 7);
   }
   updateGround(dt, snap = false) {
-    const d = this.spec.dims, T = this.game.world.terrain; const fx = Math.sin(this.heading), fz = Math.cos(this.heading), rx = Math.cos(this.heading), rz = -Math.sin(this.heading);
+    const d = this.spec.dims, W = this.game.world; const T = { height: (x, z) => W.groundHeight(x, z) }; const fx = Math.sin(this.heading), fz = Math.cos(this.heading), rx = Math.cos(this.heading), rz = -Math.sin(this.heading);
     const lx = d.L * 0.4, wx = d.W * 0.4;
     const hf = T.height(this.pos.x + fx * lx, this.pos.z + fz * lx), hb = T.height(this.pos.x - fx * lx, this.pos.z - fz * lx);
     const hl = T.height(this.pos.x + rx * wx, this.pos.z + rz * wx), hr = T.height(this.pos.x - rx * wx, this.pos.z - rz * wx);
