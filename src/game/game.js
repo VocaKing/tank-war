@@ -11,6 +11,7 @@ import { AIController } from './ai.js';
 import { Effects } from './effects.js';
 import { HUD } from '../ui/hud.js';
 import { ArmorView } from './armorView.js';
+import { sanitizeItems, DEFAULT_ITEMS } from './items.js';
 import { setTrackLOD } from '../models/tankModel.js';
 import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
@@ -28,7 +29,7 @@ export class Game {
     this.time = 0; this.timeLimit = 15 * 60; this.paused = false; this.ended = false; this.flying = [];
     this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46]);
     this.ballistics = new Ballistics(this); this.spotting = new Spotting(this); this.nav = new NavGrid(this.world);
-    this.capture = [{ points: 0 }, { points: 0 }]; this.kits = { repair: 1, ext: 1 };
+    this.capture = [{ points: 0 }, { points: 0 }]; this.smokes = [];
     this.tanks = []; this.ai = [];
     this.spawnTeams(opts.tankId);
     this.player = this.tanks[0];
@@ -64,7 +65,8 @@ export class Game {
       const list = team ? team1 : team0; const names = (team ? ENEMY_NAMES : ALLY_NAMES).slice().sort(() => r.next() - 0.5);
       list.forEach((id, i) => {
         const isPlayer = team === 0 && i === 0;
-        const spec = TANK_BY_ID[id]; const lo = isPlayer ? sanitizeLoadout(spec, this.opts.loadout) : npcLoadout(spec, r); const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer, lo);
+        const spec = TANK_BY_ID[id]; const lo = isPlayer ? sanitizeLoadout(spec, this.opts.loadout) : npcLoadout(spec, r); const items = isPlayer ? sanitizeItems(this.opts.items || DEFAULT_ITEMS) : (r.next() < 0.5 ? ['repair', 'extinguisher', 'medkit'] : r.next() < 0.5 ? ['repair', 'medkit', 'reload'] : ['repair', 'extinguisher', 'smoke']);
+        const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer, lo, items);
         let x = base.x + fx * 22 + px * (i - 3) * 13 + r.range(-2, 2), z = base.z + fz * 22 + pz * (i - 3) * 13 + r.range(-2, 2);
         const [ci, cj] = this.nav.nearestWalkable(...this.nav.toCell(x, z)); [x, z] = this.nav.center(ci, cj);
         t.placeAt(x, z, Math.atan2(fx, fz)); t.input.aim.set(x + fx * 300, t.pos.y + 2, z + fz * 300);
@@ -85,8 +87,8 @@ export class Game {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
       if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
       if (e.code === 'KeyE') this.toggleLock();
-      if (e.code === 'KeyR' && this.kits.repair) { this.kits.repair = 0; p.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; p.trackRepair = 0; this.hud.message('Modules repaired', '#9fd39f'); }
-      if (e.code === 'KeyF' && this.kits.ext && p.burning > 0) { this.kits.ext = 0; p.burning = 0; this.hud.message('Fire extinguished', '#9fd39f'); }
+      const slot = { Digit4: 0, Digit5: 1, Digit6: 2, KeyR: p.equip.find('repair'), KeyF: p.equip.find('extinguisher') }[e.code];
+      if (slot !== undefined && slot >= 0) this.useItem(slot);
     });
     on(window, 'keyup', (e) => { this.keys[e.code] = false; if (e.code === 'Tab') this.hud.scoreboard(false); });
     on(c, 'mousedown', (e) => {
@@ -119,6 +121,26 @@ export class Game {
   toggleLock() {
     if (this.lock) { this.lock = null; this.hud.message('Target lock released', '#c8c8c8'); return; }
     const t = this.aimTank; if (t && t.alive && t.team !== this.player.team && t.spotted[this.player.team]) { this.lock = t; this.hud.message('Target locked: ' + t.spec.short, '#ffd84a'); }
+  }
+  useItem(i, t = this.player) {
+    const [ok, msg] = t.equip.use(i, this); if (t.isPlayer && msg) this.hud.message(msg, ok ? '#9fd39f' : '#c8c8c8'); return ok;
+  }
+  // smoke screen: 3 clouds in a line ~15 m ahead of the turret; each blocks line of sight while it lasts
+  deploySmoke(t, dur) {
+    const yaw = t.heading + t.turretYaw; const fx = Math.sin(yaw), fz = Math.cos(yaw), px = fz, pz = -fx;
+    for (const k of [-1, 0, 1]) {
+      const x = t.pos.x + fx * 15 + px * k * 8, z = t.pos.z + fz * 15 + pz * k * 8; const y = this.world.groundHeight(x, z) + 2.5;
+      const c = { x, y, z, r: 7, until: this.time + dur }; this.smokes.push(c);
+      for (let i = 0; i < 28; i++) this.effects.smoke.emit({ x: x + (Math.random() - 0.5) * 6, y: y - 1.5 + Math.random() * 3, z: z + (Math.random() - 0.5) * 6, vx: (Math.random() - 0.5) * 0.6, vy: 0.15, vz: (Math.random() - 0.5) * 0.6, life: dur * (0.8 + Math.random() * 0.25), s0: 5, s1: 11, r: 0.78, g: 0.79, b: 0.8, a: 0.9, drag: 0.6, grav: 0 });
+    }
+  }
+  smokeBlocks(ax, ay, az, bx, by, bz) {
+    for (const c of this.smokes) {
+      if (c.until < this.time) continue; const dx = bx - ax, dy = by - ay, dz = bz - az; const l2 = dx * dx + dy * dy + dz * dz;
+      let u = l2 > 0 ? ((c.x - ax) * dx + (c.y - ay) * dy + (c.z - az) * dz) / l2 : 0; u = Math.max(0, Math.min(1, u));
+      const ex = ax + dx * u - c.x, ey = ay + dy * u - c.y, ez = az + dz * u - c.z; if (ex * ex + ey * ey + ez * ez < c.r * c.r) return true;
+    }
+    return false;
   }
   setPaused(v) { if (this.ended) return; this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
   exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
@@ -301,6 +323,8 @@ export class Game {
     dt = Math.min(dt, 0.05); this.time += dt; setWindTime(this.time);
     this.updatePlayerInput();
     for (const ai of this.ai) if (!this.freezeAI) ai.update(dt);
+    this.smokes = this.smokes.filter((c) => c.until > this.time);
+    for (const t of this.tanks) if (!t.isPlayer && t.alive && !this.freezeAI) this.npcItems(t);
     for (const t of this.tanks) t.update(dt, this.time);
     this.resolveCollisions();
     for (const t of this.tanks) { if (t.alive) t.updateGround(dt); t.syncModel(); }
@@ -332,6 +356,15 @@ export class Game {
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
     this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
+  }
+  // NPCs use their consumables sensibly
+  npcItems(t) {
+    const E = t.equip; const tryUse = (id) => { const i = E.find(id); if (i >= 0 && E.slots[i].charges > 0 && E.slots[i].cd <= 0) return this.useItem(i, t); return false; };
+    t._itemT = (t._itemT || 0) - 1 / 30; if (t._itemT > 0) return; t._itemT = 0.8 + Math.random() * 0.8; // human-like reaction delay
+    if (t.burning > 0 && tryUse('extinguisher')) return;
+    if ((t.modules.tracks < 1 || (t.modules.engine < 1 && t.modules.gun < 1) || (t.modules.gun < 1 && this.time - t.lastDamagedAt < 20)) && tryUse('repair')) return;
+    if (t.crew.some((c) => !c.alive) && tryUse('medkit')) return;
+    if (t.hp < t.maxHp * 0.35 && this.time - t.lastDamagedAt < 3 && tryUse('smoke')) return;
   }
   makeDebug() {
     return {

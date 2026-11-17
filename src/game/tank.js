@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
 import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
+import { Equipment } from './items.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
@@ -15,7 +16,7 @@ export function ballisticAngle(v, R, dy) {
 }
 
 export class Tank {
-  constructor(game, spec, team, name, isPlayer = false, loadout = null) {
+  constructor(game, spec, team, name, isPlayer = false, loadout = null, items = null) {
     this.id = NEXT_ID++; this.game = game; this.spec = spec; this.team = team; this.name = name; this.isPlayer = isPlayer;
     this.model = createTankModel(spec); game.scene.add(this.model.root);
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
@@ -32,12 +33,12 @@ export class Tank {
     this.hullBox = { x: spec.dims.W / 2, y0: 0.3, y1: spec.dims.hullH, z: spec.dims.L / 2 };
     const d = spec.dims; const tc = d.turretBoxZ || 0;
     this.turBox = { x: d.turretW / 2, y0: 0, y1: d.turretH, z0: tc - d.turretL / 2, z1: tc + d.turretL / 2 };
-    this.inv = new THREE.Matrix4();
+    this.inv = new THREE.Matrix4(); this.equip = new Equipment(this, items);
   }
   get shell() { return this.spec.shells[this.shellIdx]; }
   crewAlive(role) { const c = this.crew.find((m) => m.role === role); return c ? c.alive : true; }
-  get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8); }
-  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; return r; }
+  get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
+  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
   dispersion() { let d = (this.spec.dispersion * 2) / 1000; if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d * this.bloom; }
   placeAt(x, z, heading) {
@@ -48,6 +49,7 @@ export class Tank {
   update(dt, time) {
     if (!this.alive) return;
     const s = this.spec, d = s.dims, W = this.game.world, T = W.terrain;
+    this.equip.update(dt); if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
     if (this.trackRepair > 0) { this.trackRepair -= dt; if (this.trackRepair <= 0) { this.modules.tracks = 1; if (this.isPlayer) this.game.hud.message('Tracks repaired', '#9fd39f'); } }
     if (this.burning > 0) { this.burning -= dt; this.damage(this.maxHp * 0.012 * dt, this.lastAttacker, 'fire'); if (!this.alive) return; }
     const mobile = this.modules.tracks > 0;
@@ -63,13 +65,14 @@ export class Tank {
     const waterF = depth > 0 ? clamp(1 - depth * 0.38, 0.2, 1) : 1;
     const ri = T.x2i(this.pos.x), rj = T.x2i(this.pos.z); const onRoad = T.inside(ri, rj) ? T.road[T.idx(ri, rj)] : 0;
     const terrF = 0.78 + 0.22 * Math.min(1, onRoad * 1.5);
-    const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver;
+    const od = this.equip.active('overdrive'); const lf = this.equip.factor;
+    const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1);
     let target = mobile ? thr * vmax * slopeF * waterF * terrF : 0;
     if (uphill > 0.75) target = Math.min(target, 0) - 0.5; // too steep: slide back
-    const accel = clamp(ptw * 0.075, 0.6, 2.2) * (this.modules.engine < 1 ? 0.5 : 1);
+    const accel = clamp(ptw * 0.075, 0.6, 2.2) * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
     const braking = Math.sign(target) !== Math.sign(this.speed) || Math.abs(target) < Math.abs(this.speed);
     this.speed = approach(this.speed, target, (braking ? (mobile ? 3.0 : 6) : accel) * dt);
-    const vmaxF = (s.maxSpeed / 3.6);
+    const vmaxF = (s.maxSpeed / 3.6) * lf;
     const turnMax = s.hullTraverse * DEG * driver * (mobile ? 1 : 0) * (1 - 0.45 * Math.min(1, Math.abs(this.speed) / vmaxF)) * (this.inWater ? 0.6 : 1);
     const turnTarget = steer * turnMax * (this.speed < -0.3 ? -1 : 1);
     this.turnRate = approach(this.turnRate, turnTarget, turnMax * 3 * dt + 0.001);
