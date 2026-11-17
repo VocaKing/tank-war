@@ -70,7 +70,7 @@ const WALL_TINTS = [[1.05, 1.05, 1.02], [1.3, 1.24, 1.1], [1.28, 1.1, 0.82], [1.
 const TRIM_TINTS = [[0.31, 0.42, 0.35], [0.2, 0.3, 0.22], [0.5, 0.2, 0.16], [0.26, 0.36, 0.52], [0.36, 0.26, 0.18], [0.78, 0.74, 0.64], [0.22, 0.22, 0.24]];
 function pickTint(r, style) {
   const w = WALL_TINTS[Math.floor(r.next() * WALL_TINTS.length)]; const j = 0.94 + r.next() * 0.1; const rf = 0.82 + r.next() * 0.3;
-  return { wall: style === 'desert' ? [w[0] * j, w[1] * j * 0.98, w[2] * j * 0.95] : w.map((v) => v * j), brick: [j, j * (0.95 + r.next() * 0.08), j], trim: TRIM_TINTS[Math.floor(r.next() * TRIM_TINTS.length)], roof: [rf, rf * (0.92 + r.next() * 0.1), rf * (0.9 + r.next() * 0.1)], stoneT: [j, j, j * 0.98] };
+  return { wall: style === 'desert' ? [(1 + (w[0] - 1) * 0.35) * j, (1 + (w[1] - 1) * 0.35) * j * 0.98, (1 + (w[2] - 1) * 0.35) * j * 0.95] : w.map((v) => v * j), brick: [j, j * (0.95 + r.next() * 0.08), j], trim: TRIM_TINTS[Math.floor(r.next() * TRIM_TINTS.length)], roof: [rf, rf * (0.92 + r.next() * 0.1), rf * (0.9 + r.next() * 0.1)], stoneT: [j, j, j * 0.98] };
 }
 
 export function buildStructures(mb, scene, terrain) {
