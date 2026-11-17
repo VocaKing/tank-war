@@ -24,16 +24,19 @@ out.weight = await page.evaluate(() => {
   const run = (items) => { p.equip = new Eq(p, items); D.teleport(...spot); p.speed = 0; g.keys.KeyW = true; let vmax = 0; for (let i = 0; i < 30 * 14; i++) { D.simulate(1 / 30); vmax = Math.max(vmax, Math.abs(p.speed)); } g.keys.KeyW = false; return { items: items.join('+') || 'none', kg: p.equip.kg, factor: +p.equip.factor.toFixed(4), topSpeed_kmh: +(vmax * 3.6).toFixed(2) }; };
   const a = run([]), b = run(['repair', 'camonet', 'overdrive']); return [a, b];
 });
-// 4) scope opens on the same aim point (and leaving the scope too)
+// 4) scope opens on the same aim point (and leaving the scope too): ground points and an enemy tank at ~150 m
 out.scope = await page.evaluate(() => {
-  const g = window.__game, D = g.debug, p = g.player; D.aim(null); const res = [];
-  for (const [yaw, pitch] of [[p.heading + 0.3, -0.12], [p.heading - 0.5, -0.05], [p.heading + 1.2, -0.2]]) {
+  const g = window.__game, D = g.debug, p = g.player; D.aim(null); const res = []; g.keys = {}; p.speed = 0; p.turnRate = 0; D.simulate(2); p.speed = 0;
+  const e = g.tanks.find((t) => t.team === 1); const fx = Math.sin(p.heading), fz = Math.cos(p.heading); e.placeAt(p.pos.x + fx * 70 + fz * 8, p.pos.z + fz * 70 - fx * 8, 1); e.visibleUntil[0] = 1e9; e.spotted[0] = true;
+  const toE = Math.atan2(e.pos.x - p.pos.x, e.pos.z - p.pos.z);
+  for (const [yaw, pitch, label] of [[p.heading + 0.3, -0.12, 'ground'], [p.heading - 0.5, -0.06, 'ground'], [toE, -0.02, 'tank']]) {
     g.cam.sniper = false; g.cam.yaw = yaw; g.cam.pitch = pitch; g._camInit = false; D.simulate(1 / 30); D.simulate(1 / 30);
-    const P0 = g.aimPoint.clone(); const d0 = g.aimDist;
-    g.toggleSniper(); D.simulate(1 / 30); const P1 = g.aimPoint.clone(); const cp = g.camera.position.clone();
-    const ang = (P1.clone().sub(cp).normalize().angleTo(P0.clone().sub(cp).normalize()) * 1000);
-    g.toggleSniper(); D.simulate(1 / 30); D.simulate(1 / 30); const P2 = g.aimPoint.clone();
-    res.push({ aimDist: Math.round(d0), enter_err_m: +P1.distanceTo(P0).toFixed(3), enter_err_mrad: +ang.toFixed(2), exit_err_m: +P2.distanceTo(P0).toFixed(3) });
+    if (label === 'tank') { const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.6, 0)); g.alignCamTo(P); D.simulate(1 / 30); D.simulate(1 / 30); }
+    const P0 = g.aimPoint.clone(); const d0 = g.aimDist; const c0 = g.camera.position.clone();
+    g.toggleSniper(); D.simulate(1 / 30); const P1 = g.aimPoint.clone(); const c1 = g.camera.position.clone();
+    const mrad = (c, A, B) => A.clone().sub(c).normalize().angleTo(B.clone().sub(c).normalize()) * 1000;
+    g.toggleSniper(); D.simulate(1 / 30); const P2 = g.aimPoint.clone(); const c2 = g.camera.position.clone();
+    res.push({ target: label, aimDist: Math.round(d0), enter_err_m: +P1.distanceTo(P0).toFixed(3), enter_err_mrad: +mrad(c1, P1, P0).toFixed(2), exit_err_m: +P2.distanceTo(P1).toFixed(3), exit_err_mrad: +mrad(c2, P2, P1).toFixed(2), scopeHitsTank: g.aimTank === e || P1.distanceTo(e.pos) < 6 });
   }
   return res;
 });

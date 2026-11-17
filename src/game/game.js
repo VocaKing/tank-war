@@ -125,7 +125,9 @@ export class Game {
   // camera position for a view direction (no smoothing): scope at the gunner's sight, or chase camera with collision
   camPosFor(dir, sniper, m = this.player.model) {
     const T = this.world.terrain;
-    if (sniper) { const gp = m.gun.getWorldPosition(new THREE.Vector3()); gp.y += 0.55; gp.addScaledVector(dir, 0.6); return gp; }
+    // scope: gunner's sight above the gun trunnion, placed along the VIEW yaw (not the lagging turret yaw) so the
+    // scope position depends only on the view direction and entering the scope keeps the exact aim point
+    if (sniper) { const gp = m.turret.getWorldPosition(new THREE.Vector3()); const hz = Math.hypot(dir.x, dir.z) || 1; gp.y += m.gun.position.y + 0.55; gp.x += (dir.x / hz) * m.gun.position.z; gp.z += (dir.z / hz) * m.gun.position.z; gp.addScaledVector(dir, 0.6); return gp; }
     const c = this.cam; const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2;
     let pos = focus.clone().addScaledVector(dir, -c.dist);
     const W = this.world; let tHit = 1;
