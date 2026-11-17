@@ -17,7 +17,7 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: -0.6, zMax: 1.4, yMax: 1.0, chance: 0.05 },
     shells: [
-      { name: 'M62 APCBC', type: 'APCBC', caliber: 76, pen: 135, velocity: 792, damage: 230, count: 45 },
+      { name: 'M62 APCBC', type: 'APCBC', caliber: 76, pen: 116, velocity: 792, damage: 230, count: 45 },
       { name: 'M93 HVAP', type: 'APCR', caliber: 76, pen: 208, velocity: 1036, damage: 200, count: 6 },
       { name: 'M42A1 HE', type: 'HE', caliber: 76, pen: 12, velocity: 800, damage: 340, count: 20 },
     ],
