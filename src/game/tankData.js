@@ -8,7 +8,7 @@ export const TANKS = [
     id: 'sherman', tier: 1, cls: 'Medium', name: 'M4A3E8 Sherman "Easy Eight"', short: 'M4A3E8', nation: 'USA', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 33.7, power: 450, maxSpeed: 48, reverseSpeed: 12, hullTraverse: 32, turretTraverse: 24, gunSpeed: 5,
-    gunDepression: 10, gunElevation: 25, hp: 900, viewRange: 380, reload: 6.0, aimTime: 2.3, dispersion: 0.45, stabilizer: 0.6,
+    gunDepression: 10, gunElevation: 25, hp: 900, viewRange: 380, reload: 6.0, aimTime: 2.2, dispersion: 0.44, stabilizer: 0.6,
     dims: { L: 5.9, W: 2.99, hullH: 1.9, clearance: 0.43, trackW: 0.58, turretZ: 0.35, turretL: 2.3, turretW: 2.0, turretH: 0.85, gunLen: 4.2 },
     armor: {
       hull: { front: [63.5, 47], side: [38, 0], rear: [38, 10], top: [19, 0], bottom: [13, 0] },
@@ -28,7 +28,7 @@ export const TANKS = [
     id: 'tiger', tier: 2, cls: 'Heavy', name: 'Panzerkampfwagen VI Tiger I Ausf. E', short: 'Tiger I', nation: 'Germany', era: 'WWII', year: 1943,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
     mass: 57, power: 700, maxSpeed: 40, reverseSpeed: 8, hullTraverse: 22, turretTraverse: 7, gunSpeed: 4,
-    gunDepression: 8, gunElevation: 15, hp: 1300, viewRange: 400, reload: 8.5, aimTime: 2.3, dispersion: 0.35, stabilizer: 1.0,
+    gunDepression: 8, gunElevation: 15, hp: 1300, viewRange: 400, reload: 8.5, aimTime: 2.3, dispersion: 0.4, stabilizer: 1.0,
     dims: { turretBoxZ: -0.15, L: 6.32, W: 3.56, hullH: 1.95, clearance: 0.47, trackW: 0.72, turretZ: 0.15, turretL: 2.95, turretW: 2.5, turretH: 0.85, gunLen: 5.0 },
     armor: {
       hull: { front: [100, 9], side: [80, 0], rear: [80, 9], top: [25, 0], bottom: [25, 0] },
@@ -48,7 +48,7 @@ export const TANKS = [
     id: 't34', tier: 1, cls: 'Medium', name: 'T-34-85 (1944)', short: 'T-34-85', nation: 'USSR', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 32, power: 500, maxSpeed: 54, reverseSpeed: 8, hullTraverse: 30, turretTraverse: 25, gunSpeed: 4,
-    gunDepression: 5, gunElevation: 22, hp: 850, viewRange: 340, reload: 7.5, aimTime: 2.9, dispersion: 0.5, stabilizer: 1.0,
+    gunDepression: 5, gunElevation: 22, hp: 850, viewRange: 340, reload: 7.5, aimTime: 2.5, dispersion: 0.46, stabilizer: 1.0,
     dims: { L: 6.1, W: 3.0, hullH: 1.65, clearance: 0.4, trackW: 0.5, turretZ: 0.6, turretL: 2.45, turretW: 2.15, turretH: 0.85, gunLen: 4.65 },
     armor: {
       hull: { front: [45, 60], side: [45, 40], rear: [45, 45], top: [20, 0], bottom: [20, 0] },
@@ -68,7 +68,7 @@ export const TANKS = [
     id: 't72', tier: 3, cls: 'MBT', name: 'T-72B (1985)', short: 'T-72B', nation: 'USSR', era: 'Cold War', year: 1985,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 44.5, power: 840, maxSpeed: 60, reverseSpeed: 6, hullTraverse: 35, turretTraverse: 24, gunSpeed: 6,
-    gunDepression: 6, gunElevation: 14, hp: 1500, viewRange: 420, reload: 7.1, aimTime: 2.0, dispersion: 0.4, stabilizer: 0.35,
+    gunDepression: 6, gunElevation: 14, hp: 1500, viewRange: 420, reload: 7.1, aimTime: 2, dispersion: 0.35, stabilizer: 0.35,
     dims: { L: 6.86, W: 3.59, hullH: 1.5, clearance: 0.47, trackW: 0.58, turretZ: 0.35, turretL: 2.6, turretW: 2.3, turretH: 0.75, gunLen: 6.0 },
     armor: {
       // RHA-equivalent vs KE. Composite upper glacis (~200 mm LOS-adj @68°), cast turret w/ "super-Dorchester"-style insert.
@@ -89,7 +89,7 @@ export const TANKS = [
     id: 'm1a2', tier: 4, cls: 'MBT', name: 'M1A2 Abrams', short: 'M1A2', nation: 'USA', era: 'Modern', year: 1992,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62, power: 1500, maxSpeed: 67, reverseSpeed: 40, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
-    gunDepression: 10, gunElevation: 20, hp: 1800, viewRange: 500, reload: 6.0, aimTime: 1.4, dispersion: 0.25, stabilizer: 0.2,
+    gunDepression: 10, gunElevation: 20, hp: 1800, viewRange: 500, reload: 6.0, aimTime: 1.5, dispersion: 0.22, stabilizer: 0.2,
     dims: { turretBoxZ: -0.15, L: 7.93, W: 3.66, hullH: 1.55, clearance: 0.48, trackW: 0.64, turretZ: -0.25, turretL: 4.3, turretW: 3.4, turretH: 0.8, gunLen: 5.3 },
     armor: {
       // RHA-equivalent vs KE (DU-reinforced Chobham-type composite on frontal arc)
@@ -111,7 +111,7 @@ export const TANKS = [
     id: 'panther', tier: 2, cls: 'Medium', name: 'Panzerkampfwagen V Panther Ausf. G', short: 'Panther', nation: 'Germany', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
     mass: 44.8, power: 700, maxSpeed: 46, reverseSpeed: 10, hullTraverse: 30, turretTraverse: 18, gunSpeed: 5,
-    gunDepression: 8, gunElevation: 18, hp: 1150, viewRange: 400, reload: 7.0, aimTime: 2.3, dispersion: 0.34, stabilizer: 1.0,
+    gunDepression: 8, gunElevation: 18, hp: 1150, viewRange: 400, reload: 7.0, aimTime: 2.3, dispersion: 0.41, stabilizer: 1.0,
     dims: { L: 6.87, W: 3.42, hullH: 1.98, clearance: 0.56, trackW: 0.66, turretZ: 0.15, turretL: 2.6, turretW: 2.05, turretH: 0.85, gunLen: 5.6, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [80, 55], side: [50, 29], rear: [40, 30], top: [16, 0], bottom: [16, 0] },
@@ -131,7 +131,7 @@ export const TANKS = [
     id: 'is2', tier: 2, cls: 'Heavy', name: 'IS-2 model 1944', short: 'IS-2', nation: 'USSR', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 46, power: 520, maxSpeed: 37, reverseSpeed: 8, hullTraverse: 26, turretTraverse: 12, gunSpeed: 3,
-    gunDepression: 3, gunElevation: 20, hp: 1400, viewRange: 360, reload: 18.0, aimTime: 3.2, dispersion: 0.55, stabilizer: 1.0,
+    gunDepression: 3, gunElevation: 20, hp: 1400, viewRange: 360, reload: 18.0, aimTime: 2.5, dispersion: 0.48, stabilizer: 1.0,
     dims: { L: 6.77, W: 3.07, hullH: 1.85, clearance: 0.42, trackW: 0.65, turretZ: 0.55, turretL: 2.45, turretW: 2.25, turretH: 0.88, gunLen: 5.5, turretBoxZ: 0.05 },
     armor: {
       hull: { front: [120, 60], side: [90, 15], rear: [60, 49], top: [30, 0], bottom: [20, 0] },
@@ -151,7 +151,7 @@ export const TANKS = [
     id: 'pershing', tier: 2, cls: 'Heavy', name: 'M26 Pershing', short: 'M26', nation: 'USA', era: 'WWII', year: 1945,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 41.9, power: 500, maxSpeed: 40, reverseSpeed: 14, hullTraverse: 30, turretTraverse: 22, gunSpeed: 4,
-    gunDepression: 10, gunElevation: 20, hp: 1150, viewRange: 390, reload: 8.0, aimTime: 2.3, dispersion: 0.4, stabilizer: 1.0,
+    gunDepression: 10, gunElevation: 20, hp: 1150, viewRange: 390, reload: 8.0, aimTime: 2.2, dispersion: 0.42, stabilizer: 1.0,
     dims: { L: 6.33, W: 3.51, hullH: 1.9, clearance: 0.44, trackW: 0.61, turretZ: 0.3, turretL: 2.75, turretW: 2.35, turretH: 0.85, gunLen: 5.0, turretBoxZ: -0.05 },
     armor: {
       hull: { front: [102, 46], side: [76, 0], rear: [51, 10], top: [22, 0], bottom: [13, 0] },
@@ -171,7 +171,7 @@ export const TANKS = [
     id: 'centurion', tier: 3, cls: 'Medium', name: 'Centurion Mk 3', short: 'Centurion', nation: 'UK', era: 'Cold War', year: 1948,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 49, power: 650, maxSpeed: 35, reverseSpeed: 9, hullTraverse: 30, turretTraverse: 30, gunSpeed: 5,
-    gunDepression: 10, gunElevation: 20, hp: 1350, viewRange: 410, reload: 6.0, aimTime: 2.0, dispersion: 0.32, stabilizer: 0.5,
+    gunDepression: 10, gunElevation: 20, hp: 1350, viewRange: 410, reload: 6.0, aimTime: 2, dispersion: 0.36, stabilizer: 0.5,
     dims: { L: 7.6, W: 3.39, hullH: 1.95, clearance: 0.51, trackW: 0.61, turretZ: 0.35, turretL: 3.1, turretW: 2.6, turretH: 0.85, gunLen: 5.5, turretBoxZ: -0.2 },
     armor: {
       hull: { front: [76, 57], side: [51, 12], rear: [38, 0], top: [29, 0], bottom: [17, 0] },
@@ -191,7 +191,7 @@ export const TANKS = [
     id: 'leo1', tier: 3, cls: 'MBT', name: 'Leopard 1A5', short: 'Leopard 1A5', nation: 'West Germany', era: 'Cold War', year: 1987,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 42.4, power: 830, maxSpeed: 65, reverseSpeed: 25, hullTraverse: 36, turretTraverse: 30, gunSpeed: 6,
-    gunDepression: 9, gunElevation: 20, hp: 1250, viewRange: 450, reload: 6.5, aimTime: 1.8, dispersion: 0.3, stabilizer: 0.3,
+    gunDepression: 9, gunElevation: 20, hp: 1250, viewRange: 450, reload: 6.5, aimTime: 1.8, dispersion: 0.32, stabilizer: 0.3,
     dims: { L: 7.09, W: 3.37, hullH: 1.62, clearance: 0.44, trackW: 0.55, turretZ: 0.1, turretL: 3.4, turretW: 2.6, turretH: 0.82, gunLen: 5.7, turretBoxZ: -0.25 },
     armor: {
       hull: { front: [70, 60], side: [35, 0], rear: [25, 0], top: [25, 0], bottom: [15, 0] },
@@ -211,7 +211,7 @@ export const TANKS = [
     id: 'leo2a6', tier: 4, cls: 'MBT', name: 'Leopard 2A6', short: 'Leopard 2A6', nation: 'Germany', era: 'Modern', year: 2001,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62.3, power: 1500, maxSpeed: 68, reverseSpeed: 31, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
-    gunDepression: 9, gunElevation: 20, hp: 1850, viewRange: 510, reload: 6.0, aimTime: 1.5, dispersion: 0.22, stabilizer: 0.15,
+    gunDepression: 9, gunElevation: 20, hp: 1850, viewRange: 510, reload: 6.0, aimTime: 1.5, dispersion: 0.2, stabilizer: 0.15,
     dims: { L: 7.72, W: 3.75, hullH: 1.58, clearance: 0.54, trackW: 0.635, turretZ: -0.35, turretL: 4.1, turretW: 3.45, turretH: 0.8, gunLen: 6.6, turretBoxZ: -0.1 },
     armor: {
       hull: { front: [590, 20], side: [100, 0], rear: [40, 0], top: [40, 0], bottom: [25, 0] },
@@ -231,7 +231,7 @@ export const TANKS = [
     id: 't90m', tier: 4, cls: 'MBT', name: 'T-90M Proryv', short: 'T-90M', nation: 'Russia', era: 'Modern', year: 2017,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 46.5, power: 1130, maxSpeed: 60, reverseSpeed: 12, hullTraverse: 38, turretTraverse: 40, gunSpeed: 7,
-    gunDepression: 6, gunElevation: 14, hp: 1650, viewRange: 470, reload: 6.5, aimTime: 1.8, dispersion: 0.3, stabilizer: 0.2,
+    gunDepression: 6, gunElevation: 14, hp: 1650, viewRange: 470, reload: 6.5, aimTime: 1.7, dispersion: 0.25, stabilizer: 0.2,
     dims: { L: 6.86, W: 3.78, hullH: 1.5, clearance: 0.47, trackW: 0.58, turretZ: 0.3, turretL: 3.2, turretW: 3.0, turretH: 0.75, gunLen: 6.0, turretBoxZ: -0.25 },
     armor: {
       hull: { front: [220, 68], side: [80, 0], rear: [40, 0], top: [40, 0], bottom: [20, 0] },
@@ -251,7 +251,7 @@ export const TANKS = [
     id: 'chally2', tier: 4, cls: 'MBT', name: 'Challenger 2', short: 'Challenger 2', nation: 'UK', era: 'Modern', year: 1998,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62.5, power: 1200, maxSpeed: 59, reverseSpeed: 56, hullTraverse: 34, turretTraverse: 36, gunSpeed: 7,
-    gunDepression: 10, gunElevation: 20, hp: 1900, viewRange: 500, reload: 6.5, aimTime: 1.7, dispersion: 0.24, stabilizer: 0.15,
+    gunDepression: 10, gunElevation: 20, hp: 1900, viewRange: 500, reload: 6.5, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
     dims: { L: 8.33, W: 3.52, hullH: 1.62, clearance: 0.5, trackW: 0.635, turretZ: -0.3, turretL: 4.2, turretW: 3.45, turretH: 0.85, gunLen: 6.6, turretBoxZ: -0.25 },
     armor: {
       hull: { front: [560, 20], side: [90, 0], rear: [40, 0], top: [40, 0], bottom: [25, 0] },
@@ -271,7 +271,7 @@ export const TANKS = [
     id: 'type99a', tier: 4, cls: 'MBT', name: 'Type 99A (ZTZ-99A)', short: 'Type 99A', nation: 'China', era: 'Modern', year: 2011,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 55, power: 1500, maxSpeed: 70, reverseSpeed: 32, hullTraverse: 40, turretTraverse: 40, gunSpeed: 7,
-    gunDepression: 6, gunElevation: 16, hp: 1750, viewRange: 490, reload: 6.5, aimTime: 1.6, dispersion: 0.26, stabilizer: 0.15,
+    gunDepression: 6, gunElevation: 16, hp: 1750, viewRange: 490, reload: 6.5, aimTime: 1.6, dispersion: 0.24, stabilizer: 0.15,
     dims: { L: 7.6, W: 3.5, hullH: 1.55, clearance: 0.48, trackW: 0.6, turretZ: -0.1, turretL: 3.6, turretW: 3.3, turretH: 0.75, gunLen: 6.2, turretBoxZ: -0.1 },
     armor: {
       hull: { front: [230, 68], side: [80, 0], rear: [40, 0], top: [40, 0], bottom: [20, 0] },
@@ -291,7 +291,7 @@ export const TANKS = [
     id: 'merkava4', tier: 4, cls: 'MBT', name: 'Merkava Mk.4', short: 'Merkava 4', nation: 'Israel', era: 'Modern', year: 2004,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 65, power: 1500, maxSpeed: 64, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 36, gunSpeed: 7,
-    gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 0.24, stabilizer: 0.15,
+    gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
     dims: { L: 7.6, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 6.0, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [560, 30], side: [100, 0], rear: [80, 0], top: [40, 0], bottom: [30, 0] },

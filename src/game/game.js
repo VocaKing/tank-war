@@ -295,7 +295,10 @@ export class Game {
     const sp = hitP.clone().project(this.camera); const sx = (sp.x * 0.5 + 0.5) * innerWidth, sy = (-sp.y * 0.5 + 0.5) * innerHeight;
     // dispersion circle in pixels
     // aim circle: shells deviate at most ±dispersion (clipped 2σ gaussian) → project that cone
-    const radPx = Math.tan(p.dispersion()) / Math.tan(this.camera.fov * DEG / 2) * (innerHeight / 2);
+    // world radius at the impact point = tan(cone) * muzzle→impact distance, then projected from the camera
+    const rW = Math.tan(p.dispersion()) * Math.max(dist, 1); const dc = Math.max(0.5, this.camera.position.distanceTo(hitP));
+    const radPx = (rW / dc) / Math.tan(this.camera.fov * DEG / 2) * (innerHeight / 2);
+    this.reticleRadiusWorld = rW;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
     if (sp.z > 1) { hud.setReticle(-100, -100, 0, '', ''); return; }
     let state = 'neutral', text = `${Math.round(dist)} m`;

@@ -16,6 +16,7 @@ export function ballisticAngle(v, R, dy) {
 }
 
 export class Tank {
+  static MAX_BLOOM = 4.5;
   constructor(game, spec, team, name, isPlayer = false, loadout = null, items = null) {
     this.id = NEXT_ID++; this.game = game; this.spec = spec; this.team = team; this.name = name; this.isPlayer = isPlayer;
     this.model = createTankModel(spec); game.scene.add(this.model.root);
@@ -40,7 +41,10 @@ export class Tank {
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
-  dispersion() { let d = (this.spec.dispersion * 2) / 1000; if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d * this.bloom; }
+  // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
+  baseDispersion() { let d = this.spec.dispersion / 100; if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
+  // current dispersion-circle radius (radians); every shell lands inside this cone
+  dispersion() { return this.baseDispersion() * this.bloom; }
   placeAt(x, z, heading) {
     this.pos.set(x, this.game.world.groundHeight(x, z), z); this.heading = heading; this.turretYaw = 0; this.updateGround(1, true); this.syncModel();
   }
@@ -109,9 +113,11 @@ export class Tank {
     this.gunPitch = approach(this.gunPitch, clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG), s.gunSpeed * DEG * dt);
     this.aimError = Math.abs(wrapAngle(yawT - this.turretYaw)) + Math.abs(clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG) - this.gunPitch);
     const stab = s.stabilizer; const aimT = this.aimTime();
-    const disturb = 1 + Math.abs(this.speed) * 0.16 * stab + Math.abs(this.turnRate) * 2.2 * stab + this.yawRate * 1.6 * stab;
-    this.bloom = Math.max(this.bloom, disturb);
-    this.bloom = 1 + (this.bloom - 1) * Math.exp((-dt * 2.6) / aimT); this.bloom = Math.min(this.bloom, 7);
+    // aim bloom: hull speed, hull rotation and turret traverse widen the circle (stabilisers damp it); it then
+    // shrinks back exponentially (≈95 % converged after aimTime seconds) while the tank holds still
+    const disturb = 1 + Math.abs(this.speed) * 0.15 * stab + Math.abs(this.turnRate) * 1.5 * stab + this.yawRate * 2.0 * stab;
+    if (disturb > this.bloom) this.bloom += (disturb - this.bloom) * Math.min(1, dt * 8);
+    this.bloom = 1 + (this.bloom - 1) * Math.exp((-dt * 3.0) / aimT); this.bloom = Math.min(this.bloom, Tank.MAX_BLOOM);
   }
   updateGround(dt, snap = false) {
     const d = this.spec.dims, W = this.game.world; const T = { height: (x, z) => W.groundHeight(x, z) }; const fx = Math.sin(this.heading), fz = Math.cos(this.heading), rx = Math.cos(this.heading), rz = -Math.sin(this.heading);
@@ -135,15 +141,16 @@ export class Tank {
     if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
     const g = this.game; const sh = this.shell; const m = this.model;
     const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3()); const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
-    // dispersion (gaussian, clipped at 2 sigma)
+    // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
     const disp = this.dispersion(); const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const a = new THREE.Vector3().crossVectors(dir, up).normalize(), b = new THREE.Vector3().crossVectors(dir, a).normalize();
-    const gx = clamp(g.rng.gauss(), -2, 2) * disp * 0.5, gy = clamp(g.rng.gauss(), -2, 2) * disp * 0.5;
-    dir.addScaledVector(a, gx).addScaledVector(b, gy).normalize();
+    let gx = g.rng.gauss() / 2.2, gy = g.rng.gauss() / 2.2; const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
+    this.lastDeviation = Math.hypot(gx, gy) * disp;
+    dir.addScaledVector(a, Math.tan(gx * disp)).addScaledVector(b, Math.tan(gy * disp)).normalize();
     const vel = dir.clone().multiplyScalar(sh.velocity).add(this.vel);
     g.ballistics.spawn(this, sh, muzzle, vel);
     this.ammo[this.shellIdx]--; this.reloadLeft = this.reloadTime(); this.lastFired = time; this.stats.shots++;
-    this.bloom = Math.min(7, this.bloom + 2.2); this.recoil = 1;
+    this.bloom = Math.min(Tank.MAX_BLOOM, this.bloom + 1.2 + 1.0 * this.spec.stabilizer); this.recoil = 1;
     this.rockV -= (sh.caliber / 100) * 1.4 * (40 / this.spec.mass) * Math.cos(this.turretYaw);
     g.effects.muzzle(muzzle, dir, sh.caliber); g.audio.gun(muzzle, sh.caliber, this.isPlayer);
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }

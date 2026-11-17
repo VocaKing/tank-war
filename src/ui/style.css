@@ -64,6 +64,7 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .reticle .ring{position:absolute;border:2px solid rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.8)}
 .reticle.green .ring{border-color:#5df06a}.reticle.yellow .ring{border-color:#ffd84a}.reticle.red .ring{border-color:#ff4a3a}
 .reticle.loading .ring{border-style:dashed;opacity:.7}
+.reticle .ring{transition:border-width .15s}.reticle.aimed .ring{border-width:2.5px;box-shadow:0 0 4px rgba(0,0,0,.9),inset 0 0 3px rgba(0,0,0,.6)}
 .reticle .pen{position:absolute;left:0;top:22px;transform:translateX(-50%);font-size:11.5px;font-weight:600;white-space:nowrap;background:rgba(0,0,0,.45);padding:1px 6px;border-radius:3px}
 .reticle.green .pen{color:#7dff8a}.reticle.yellow .pen{color:#ffe070}.reticle.red .pen{color:#ff7a6a}
 .scope{display:none;position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 38vh,rgba(0,0,0,.92) 39vh)}

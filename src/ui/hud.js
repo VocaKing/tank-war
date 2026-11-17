@@ -151,8 +151,8 @@ export class HUD {
     if (avh._t !== avTxt) { avh.innerHTML = avTxt; avh._t = avTxt; }
   }
   setReticle(sx, sy, radius, state, text) {
-    const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; const ring = r.firstChild; const R = Math.max(6, Math.min(200, radius));
-    ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; r.className = 'reticle ' + state; this.$('h-pen').textContent = text;
+    const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; const ring = r.firstChild; const R = Math.max(5, Math.min(420, radius));
+    ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; r.className = 'reticle ' + state + (this.g.player && this.g.player.bloom < 1.08 ? ' aimed' : ''); const pen = this.$('h-pen'); pen.textContent = text; pen.style.top = Math.max(22, R + 8) + 'px';
   }
   scoreboard(show) {
     const b = this.$('h-board'); if (!show) { b.style.display = 'none'; return; }
