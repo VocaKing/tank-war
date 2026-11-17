@@ -170,9 +170,12 @@ export class World {
   deckAt(x, z) {
     let best = -Infinity;
     for (const d of this.decks) {
-      const dx = x - d.x0, dz = z - d.z0; const along = dx * d.ux + dz * d.uz; if (along < -0.5 || along > d.len + 0.5) continue;
-      const across = Math.abs(dx * d.uz - dz * d.ux); if (across > d.hw + 0.3) continue;
-      const y = d.deckY(along / d.len); if (y > best) best = y;
+      const bx = d.box; if (x < bx[0] || x > bx[1] || z < bx[2] || z > bx[3]) continue;
+      for (const sg of d.segs) {
+        const dx = x - sg.ax, dz = z - sg.az; const along = dx * sg.ux + dz * sg.uz; if (along < -0.3 || along > sg.l + 0.3) continue;
+        if (Math.abs(dx * sg.uz - dz * sg.ux) > d.hw + 0.3) continue;
+        const y = d.deckY(Math.max(0, Math.min(d.len, sg.s0 + along)) / d.len); if (y > best) best = y;
+      }
     }
     return best;
   }

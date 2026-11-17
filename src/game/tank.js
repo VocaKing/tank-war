@@ -98,6 +98,7 @@ export class Tank {
   updateTurret(dt) {
     const s = this.spec; const aim = this.input.aim; const gunW = this.model.gun.getWorldPosition(_v);
     const dx = aim.x - gunW.x, dy = aim.y - gunW.y, dz = aim.z - gunW.z; const R = Math.hypot(dx, dz);
+    if (!Number.isFinite(dx + dy + dz)) return; // ignore an invalid aim point instead of poisoning the turret state
     const th = ballisticAngle(this.shell.velocity, R, dy);
     _v2.set((dx / (R || 1)) * Math.cos(th), Math.sin(th), (dz / (R || 1)) * Math.cos(th));
     _q.copy(this.quat).invert(); _v2.applyQuaternion(_q);

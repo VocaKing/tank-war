@@ -201,30 +201,39 @@ export function buildStructures(mb, scene, terrain) {
   // segmented deck + parapets; the deck surface is exported for World.groundHeight
   const decks = [];
   for (const br of mb.bridges) {
-    const p = br.pts; const a = p[0], b2 = p[p.length - 1];
-    const len = Math.hypot(b2[0] - a[0], b2[1] - a[1]); if (len < 2) continue; const rot = Math.atan2(b2[0] - a[0], b2[1] - a[1]);
-    const ux = (b2[0] - a[0]) / len, uz = (b2[1] - a[1]) / len;
-    const ha = terrain.height(a[0], a[1]), hb = terrain.height(b2[0], b2[1]);
-    // arch height so the deck clears every terrain/road sample under it by 0.15 m
+    // thin the dense road points to ~3 m steps; the deck follows the road polyline
+    const raw = br.pts; const pts = [raw[0]]; for (const q of raw) { const l = pts[pts.length - 1]; if (Math.hypot(q[0] - l[0], q[1] - l[1]) >= 3) pts.push(q); }
+    const last = raw[raw.length - 1]; if (pts[pts.length - 1] !== last) { if (pts.length > 1 && Math.hypot(last[0] - pts[pts.length - 1][0], last[1] - pts[pts.length - 1][1]) < 1.5) pts[pts.length - 1] = last; else pts.push(last); }
+    if (pts.length < 2) continue;
+    const segs = []; let len = 0;
+    for (let i = 0; i < pts.length - 1; i++) { const A = pts[i], Bq = pts[i + 1]; const l = Math.hypot(Bq[0] - A[0], Bq[1] - A[1]); if (l < 0.05) continue; segs.push({ ax: A[0], az: A[1], ux: (Bq[0] - A[0]) / l, uz: (Bq[1] - A[1]) / l, l, s0: len }); len += l; }
+    if (len < 2 || !segs.length) continue;
+    const ha = terrain.height(pts[0][0], pts[0][1]), hb = terrain.height(last[0], last[1]);
+    // short crossings: straight ramp between the banks plus an arch that clears the water/road below by 0.15 m.
+    // long stretches (road running along the water, > 60 m): a causeway deck that follows the raised road surface.
+    const causeway = len > 60;
     let bump = 0;
-    for (const q of p) { const u = ((q[0] - a[0]) * ux + (q[1] - a[1]) * uz) / len; if (u <= 0.03 || u >= 0.97) continue; const need = terrain.height(q[0], q[1]) + 0.15 - (ha + (hb - ha) * u); if (need > 0) bump = Math.max(bump, need / Math.sin(Math.PI * u)); }
+    if (!causeway) for (const sg of segs) for (const f of [0, 0.5]) { const u = (sg.s0 + sg.l * f) / len; if (u <= 0.03 || u >= 0.97) continue; const need = terrain.height(sg.ax + sg.ux * sg.l * f, sg.az + sg.uz * sg.l * f) + 0.15 - (ha + (hb - ha) * u); if (need > 0) bump = Math.max(bump, need / Math.sin(Math.PI * u)); }
     bump = Math.min(bump, 6);
-    const deckY = (u) => ha + (hb - ha) * u + bump * Math.sin(Math.PI * Math.max(0, Math.min(1, u))) + 0.04;
-    const deck = { x0: a[0], z0: a[1], ux, uz, len, hw: br.width / 2, deckY };
+    const ss = [0], hs0 = [terrain.height(segs[0].ax, segs[0].az)]; for (const sg of segs) { ss.push(sg.s0 + sg.l); hs0.push(terrain.height(sg.ax + sg.ux * sg.l, sg.az + sg.uz * sg.l)); }
+    const hs = hs0.map((h, i) => Math.max(h, hs0[i - 1] ?? h, hs0[i + 1] ?? h)); // moving max: deck never dips into the road
+    const deckY = causeway
+      ? (u) => { const sv = Math.max(0, Math.min(len, u * len)); let i = 1; while (i < ss.length - 1 && ss[i] < sv) i++; const f = (sv - ss[i - 1]) / Math.max(1e-6, ss[i] - ss[i - 1]); return hs[i - 1] + (hs[i] - hs[i - 1]) * f + 0.04; }
+      : (u) => ha + (hb - ha) * u + bump * Math.sin(Math.PI * Math.max(0, Math.min(1, u))) + 0.04;
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9; for (const q of pts) { minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]); minZ = Math.min(minZ, q[1]); maxZ = Math.max(maxZ, q[1]); }
+    const hw = br.width / 2; const deck = { segs, len, hw, deckY, causeway, box: [minX - hw - 2, maxX + hw + 2, minZ - hw - 2, maxZ + hw + 2] };
     decks.push(deck);
-    const N = Math.max(4, Math.ceil(len / 4));
-    for (let i = 0; i < N; i++) {
-      const u0 = i / N, u1 = (i + 1) / N; const y0 = deckY(u0), y1 = deckY(u1); const sl = len / N;
-      const mx = a[0] + ux * len * (u0 + u1) / 2, mz = a[1] + uz * len * (u0 + u1) / 2, my = (y0 + y1) / 2; const tilt = Math.atan2(y1 - y0, sl);
-      const seg = boxUV(br.width, 0.9, Math.hypot(sl, y1 - y0) + 0.04, 2.5); seg.translate(0, -0.45, 0); seg.rotateX(-tilt); xf(seg, mx, my, mz, rot); B.add('castle', seg);
-      colliders.push(new OBB(mx, mz, br.width / 2, sl / 2, rot, Math.min(y0, y1) - 0.9, Math.min(y0, y1) - 0.05, 'deck'));
-      for (const s of [-1, 1]) {
-        const ox = s * (br.width / 2 + 0.25); const px = mx + ox * Math.cos(rot), pz = mz - ox * Math.sin(rot);
-        const pg = boxUV(0.5, 1.0, Math.hypot(sl, y1 - y0) + 0.04, 2.5); pg.translate(0, 0.45, 0); pg.rotateX(-tilt); xf(pg, px, my, pz, rot); B.add('castle', pg);
-        // pier/side wall below the deck edge
+    for (const sg of segs) {
+      const u0 = sg.s0 / len, u1 = (sg.s0 + sg.l) / len; const y0 = deckY(u0), y1 = deckY(u1); const rot = Math.atan2(sg.ux, sg.uz);
+      const mx = sg.ax + sg.ux * sg.l / 2, mz = sg.az + sg.uz * sg.l / 2, my = (y0 + y1) / 2; const tilt = Math.atan2(y1 - y0, sg.l); const sl = Math.hypot(sg.l, y1 - y0) + 0.3;
+      const seg = boxUV(br.width, 0.9, sl, 2.5); seg.translate(0, -0.45, 0); seg.rotateX(-tilt); xf(seg, mx, my, mz, rot); B.add('castle', seg);
+      colliders.push(new OBB(mx, mz, hw, sg.l / 2, rot, Math.min(y0, y1) - 0.9, Math.min(y0, y1) - 0.05, 'deck'));
+      if (!causeway) for (const sd of [-1, 1]) {
+        const ox = sd * (hw + 0.25); const px = mx + ox * Math.cos(rot), pz = mz - ox * Math.sin(rot);
+        const pg = boxUV(0.5, 1.0, sl, 2.5); pg.translate(0, 0.45, 0); pg.rotateX(-tilt); xf(pg, px, my, pz, rot); B.add('castle', pg);
         const lowT = Math.min(terrain.height(px, pz), my - 1);
-        const sw = boxUV(0.5, my - lowT, sl + 0.04, 2.5); xf(sw, px, (my + lowT) / 2 - 0.45, pz, rot); B.add('castle', sw);
-        colliders.push(new OBB(px, pz, 0.25, sl / 2, rot, lowT - 1, Math.max(y0, y1) + 0.95, 'wall'));
+        const sw = boxUV(0.5, my - lowT, sl, 2.5); xf(sw, px, (my + lowT) / 2 - 0.45, pz, rot); B.add('castle', sw);
+        colliders.push(new OBB(px, pz, 0.25, sg.l / 2 + 0.1, rot, lowT - 1, Math.max(y0, y1) + 0.95, 'wall'));
       }
     }
   }
