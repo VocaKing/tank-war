@@ -133,9 +133,13 @@ export class HUD {
     // concealment
     const st = this.$('h-status'); const sinceFire = G.time - p.lastFired;
     if (!p.alive) { st.textContent = ''; st.className = 'status'; }
-    else if (p.inBush && sinceFire > 5) { st.textContent = '🌿 IN BUSH — CONCEALED'; st.className = 'status hidden'; }
-    else if (p.inBush) { st.textContent = `🌿 IN BUSH — REVEALED BY FIRING (${(5 - sinceFire).toFixed(1)}s)`; st.className = 'status revealed'; }
-    else { st.textContent = ''; st.className = 'status'; }
+    else {
+      const cam = Math.round((p.camo || 0) * 100); const vr = Math.round(Math.max(50, 400 * (1 - (p.camo || 0))));
+      const why = `${p.inBush ? '🌿 IN BUSH' : 'IN THE OPEN'}${Math.abs(p.speed) > 1 ? ' · moving' : ''}${p.equip.has('camonet') && G.time - (p.lastMoving ?? G.time) > 3 ? ' · net' : ''}`;
+      if (sinceFire < 5) { st.textContent = `${why} — CAMO ${cam}% (firing: revealed ${(5 - sinceFire).toFixed(1)}s) · seen within ~${vr} m`; st.className = 'status revealed'; }
+      else if (p.inBush || cam >= 30) { st.textContent = `${why} — CAMO ${cam}% · seen within ~${vr} m (always within 50 m)`; st.className = 'status hidden'; }
+      else { st.textContent = ''; st.className = 'status'; }
+    }
     this.$('h-spotted').style.display = p.alive && p.spotted[1] ? 'block' : 'none';
     // damage direction
     const dd = this.$('h-dmgdir'); if (this.dmgT > 0 && this.dmgSrc) { this.dmgT -= dt; const ang = Math.atan2(this.dmgSrc.x - p.pos.x, this.dmgSrc.z - p.pos.z) - G.cam.yaw; dd.style.display = 'block'; dd.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`; dd.style.opacity = Math.min(1, this.dmgT); } else dd.style.display = 'none';
