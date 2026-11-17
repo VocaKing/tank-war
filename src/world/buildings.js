@@ -67,7 +67,7 @@ export function buildStructures(mb, scene, terrain) {
     for (let f = 0; f < floors; f++) for (let i = 0; i < n; i++) {
       const t = -len / 2 + (i + 0.5) * (len / n); if (skipDoor && f === 0 && i === Math.floor(n / 2)) continue;
       const small = b.style === 'desert'; const ww = small ? 0.8 : 1.0, wh = small ? 1.0 : 1.3; const y = H0 + f * 3 + 1.6;
-      const off = (axis === 'x' ? b.w / 2 : b.d / 2) + 0.03;
+      const off = (axis === 'x' ? b.w / 2 : b.d / 2) + (b.style === 'cabin' ? 0.08 : 0.03);
       const put = (gg, dx, dy, dz, mat) => { if (axis === 'x') place(gg, b, sign * (off + dz), y + dy, t + dx, Math.PI / 2); else place(gg, b, t + dx, y + dy, sign * (off + dz), 0); B.add(mat, gg); };
       const broken = b.damage && r.next() < 0.3;
       put(boxUV(ww, wh, 0.06, 1), 0, 0, 0, broken ? 'dark' : 'window'); // recessed glazing
@@ -156,7 +156,7 @@ export function buildStructures(mb, scene, terrain) {
       const rc = boxUV(0.32, 0.18, dd + 0.9, 1); place(rc, b, 0, H + R + 0.05, 0, ry); B.add(b.style === 'cabin' || b.barn ? 'slate' : 'roof', rc);
       for (const sg of [-1, 1]) { const ex = sg * (ww / 2 + 0.45); const ey = H - 0.45 * R / (ww / 2); const fa = boxUV(0.05, 0.22, dd + 0.9, 1); const gu = new THREE.CylinderGeometry(0.07, 0.07, dd + 0.9, 6); gu.rotateX(Math.PI / 2);
         if (ridgeZ) { place(fa, b, ex, ey - 0.08, 0); place(gu, b, ex + sg * 0.06, ey - 0.12, 0); } else { place(fa, b, 0, ey - 0.08, ex, Math.PI / 2); place(gu, b, 0, ey - 0.12, ex + sg * 0.06, Math.PI / 2); }
-        B.add('paintwood', fa); if (b.style !== 'cabin') B.add('metal', gu); }
+        B.add(b.style === 'cabin' ? 'wood' : 'paintwood', fa); if (b.style !== 'cabin') B.add('metal', gu); }
       if (!b.barn) { const cx = ridgeZ ? ww * 0.22 : dd * 0.3, cz = ridgeZ ? dd * 0.3 : ww * 0.22; const ch = boxUV(0.7, 2.0, 0.7, 1.5); place(ch, b, cx, H + R * 0.6 + 0.6, cz); B.add(wm === 'wood' ? 'stone' : wm, ch);
         const cap = boxUV(0.86, 0.1, 0.86, 1); place(cap, b, cx, H + R * 0.6 + 1.65, cz); B.add('castle', cap); for (const o of [-0.15, 0.15]) { const pot = new THREE.CylinderGeometry(0.09, 0.11, 0.35, 8); place(pot, b, cx + o, H + R * 0.6 + 1.85, cz); B.add('rust', pot); } }
       if (b.damage && r.next() < 0.6) { const hole = boxUV(r.range(1.2, 2.5), 0.1, r.range(1.2, 2.2), 1); place(hole, b, ridgeZ ? ww * 0.12 : 0, H + R * 0.55, ridgeZ ? 0 : ww * 0.12, ry, 0, ridgeZ ? Math.atan(R / (ww / 2)) : 0); B.add('dark', hole); }
