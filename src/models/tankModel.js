@@ -47,7 +47,14 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * (0.06 + 0.16 * nA.g));
         diffuseColor.rgb *= 0.9 + 0.2 * nA.r;
         if (normalize(vObjN).y < -0.4) diffuseColor.rgb *= 0.72;
-        float vRough = 0.86 + 0.3 * nB.r + mud * 0.2;`)
+        // v4 weathering: vertical rain/oil streaks on side faces, paint chipping (bare primer/steel) and soot near the top
+        vec3 nN = normalize(vObjN); float side = 1.0 - abs(nN.y);
+        float streak = texture2D(uNoise, vec2((vObjPos.x + vObjPos.z) * 1.1, yL * 0.06)).g;
+        diffuseColor.rgb *= 1.0 - side * smoothstep(0.6, 0.85, streak) * 0.14;
+        float chip = triN(vObjPos * 5.5, bw).b * 0.6 + nB.g * 0.4;
+        float chipM = smoothstep(0.78, 0.82, chip) * (0.4 + 0.6 * nA.b);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.21, 0.19), chipM * 0.75);
+        float vRough = 0.86 + 0.3 * nB.r + mud * 0.2 - chipM * 0.35;`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
@@ -58,7 +65,7 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
           vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2); normal = normalize(abs(fDet) * normal - vGrad * 0.02);
         }`);
   };
-  m.customProgramCacheKey = () => 'paint2';
+  m.customProgramCacheKey = () => 'paint3';
   return m;
 }
 const MATS = {};
@@ -73,6 +80,8 @@ function sharedMats() {
   MATS.burnt = new THREE.MeshStandardMaterial({ color: 0x1d1a17, roughness: 0.95, metalness: 0.15 });
   MATS.track = new THREE.MeshStandardMaterial({ color: 0x55514b, roughness: 0.62, metalness: 0.6 });
   MATS.steel = new THREE.MeshStandardMaterial({ color: 0x6a6760, roughness: 0.4, metalness: 0.85 });
+  MATS.tail = new THREE.MeshStandardMaterial({ color: 0x7a0c08, roughness: 0.2, metalness: 0.1, emissive: 0x2a0200 });
+  MATS.amber = new THREE.MeshStandardMaterial({ color: 0x9a5a08, roughness: 0.2, metalness: 0.1, emissive: 0x2a1400 });
   return MATS;
 }
 export function burntMaterial() { return sharedMats().burnt; }
@@ -393,9 +402,36 @@ function linkGeometry(w, pitch, th, modern) {
   for (const s of [-1, 1]) add(box(0.04, th * 0.7, pitch * 0.25, s * w * 0.52, 0, pitch * 0.42), dark);
   return mergeGeometries(parts);
 }
+// v4 finishing pass for every tank: rear fender tail-light clusters, rubber mud flaps, fender support brackets,
+// track-tension adjuster at the idler and tow shackles on the rear plate.
+function finishDetails(P, d, b, spec) {
+  const hl = d.L / 2; const circ = [...b.wheels, ...b.sprockets, ...b.idlers, ...b.rollers];
+  const fy = Math.max(...circ.map((c) => c.y + c.r)) + 0.075; const tx = d.W / 2 - d.trackW / 2; const rearZ = Math.min(...circ.map((c) => c.z - c.r)) - 0.1;
+  const modern = spec.era !== 'WWII'; const sponson = ['sherman', 'tiger', 't34'].includes(spec.id);
+  for (const s of [-1, 1]) {
+    // tail light cluster on the rear fender end
+    if (!sponson) {
+    const lx = s * (d.W / 2 - 0.16), lz = -hl + 0.16;
+    P.add('hull', 'paint', box(0.2, 0.12, 0.1, lx, fy + 0.07, lz)); P.add('hull', 'tail', box(0.07, 0.06, 0.02, lx - s * 0.045, fy + 0.08, lz - 0.055)); P.add('hull', 'amber', box(0.07, 0.06, 0.02, lx + s * 0.045, fy + 0.08, lz - 0.055));
+    P.add('hull', 'metal', box(0.24, 0.02, 0.05, lx, fy + 0.14, lz - 0.03));
+    }
+    // rubber mud flap hanging from the fender behind the idler
+    P.add('hull', 'rubber', box(d.trackW * 0.92, 0.32, 0.018, s * tx, fy - 0.17, Math.min(rearZ, -hl + 0.02) - 0.01, 0.12, 0));
+    // fender support brackets
+    if (!sponson) for (const fz of [-hl * 0.55, 0, hl * 0.55]) P.add('hull', 'paint', box(0.03, 0.08, 0.05, s * (d.W / 2 - 0.02), fy - 0.06, fz));
+    // track tension adjuster at the idler
+    for (const idl of b.idlers) { P.add('hull', 'metal', cylZ(0.035, 0.3, 8, s * (tx - d.trackW * 0.5 - 0.05), idl.y + 0.02, idl.z + 0.26)); P.add('hull', 'metal', T(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 6), s * (tx - d.trackW * 0.5 - 0.05), idl.y + 0.02, idl.z + 0.43, Math.PI / 2, 0, 0)); }
+    // rear tow shackles
+    P.add('hull', 'metal', T(new THREE.TorusGeometry(0.07, 0.022, 6, 12), s * (d.W * 0.26), d.clearance + 0.32, -hl + 0.04, 0, 0, Math.PI / 2));
+  }
+  if (modern) { // rear infantry phone box + towing pintle
+    P.add('hull', 'paint', box(0.22, 0.26, 0.12, d.W * 0.36, d.clearance + 0.62, -hl + 0.02)); P.add('hull', 'dark', box(0.16, 0.18, 0.01, d.W * 0.36, d.clearance + 0.62, -hl - 0.045));
+  }
+  P.add('hull', 'metal', box(0.16, 0.12, 0.18, 0, d.clearance + 0.3, -hl + 0.02)); P.add('hull', 'metal', cylY(0.03, 0.18, 8, 0, d.clearance + 0.3, -hl - 0.06));
+}
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
-  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b);
+  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
