@@ -41,11 +41,14 @@ export class Ballistics {
           const hit = t.rayTest(_a, _b); if (hit && hit.t < bestT) { bestT = hit.t; kind = 'tank'; hitTank = t; hitInfo = hit; }
         }
         // shells travelling under water keep going but lose penetration with every metre of water (see waterPenFactor)
-        if (s.wet) { const wla = W.terrain.waterLevel(_a.x, _a.z); if (wla > -1e8 && _a.y < wla) { s.waterDist += _a.distanceTo(_b) * (kind ? bestT : 1); if (s.waterDist > 15) { done = true; break; } } }
+        if (s.wet) { const tEnd = kind ? bestT : 1; let wla = W.terrain.waterLevel(_a.x, _a.z), wlb = W.terrain.waterLevel(_b.x, _b.z); if (wla < -1e8) wla = s.wl; if (wlb < -1e8) wlb = s.wl; // near the bank use the surface level where the shell entered
+          { const da = _a.y - wla, yb = _a.y + (_b.y - _a.y) * tEnd, db = yb - wlb;
+            const frac = da <= 0 && db <= 0 ? 1 : da > 0 && db > 0 ? 0 : da <= 0 ? da / (da - db) : db / (db - da);
+            s.waterDist += _a.distanceTo(_b) * tEnd * Math.max(0, Math.min(1, frac)); if (s.waterDist > 15) { done = true; break; } } }
         if (kind) {
           const p = new THREE.Vector3().lerpVectors(_a, _b, bestT); s.dist += _a.distanceTo(p);
           done = this.onImpact(s, kind, p, hitTank, hitInfo);
-          if (!done) { s.pos.copy(p); }
+          if (!done) { s.pos.copy(p); if (kind === 'water') s.pos.y -= 0.02; }
         } else { s.dist += _a.distanceTo(_b); s.pos.copy(_b); }
       }
       if (!done && (s.life > 8 || s.pos.y < -200 || Math.abs(s.pos.x) > 1500 || Math.abs(s.pos.z) > 1500)) done = true;
@@ -68,7 +71,7 @@ export class Ballistics {
     if (kind === 'water') {
       g.effects.impactWater(p); g.audio.impact(p, 'ground');
       if (he) { if (!s.noDamage) this.heBlast(s, p); return true; } // HE bursts on the surface (still splashes a tank in the water)
-      s.wet = true; s.waterDist = 0; s.vel.multiplyScalar(0.8); s.pos.copy(p); s.pos.y -= 0.02; return false;
+      s.wet = true; s.waterDist = 0; s.wl = p.y; s.vel.multiplyScalar(0.8); s.pos.copy(p); s.pos.y -= 0.02; return false;
     }
     // tank impact
     const ev = this.evaluate(tank, hit, s.spec, s.dist);
@@ -85,6 +88,7 @@ export class Ballistics {
       return false;
     }
     const roll = ev.pen * g.rng.range(1 - PEN_RNG, 1 + PEN_RNG);
+    g.lastTankHit = { pen: ev.pen, eff: ev.eff, waterF: ev.waterF || 1, waterDist: s.waterDist || 0, penetrated: roll >= ev.eff, tank };
     if (roll >= ev.eff) {
       const mult = s.type.he ? 1.0 : 1.0; const dmg = s.spec.damage * mult * g.rng.range(0.85, 1.15);
       g.effects.penetration(p); g.audio.impact(p, 'metal');
