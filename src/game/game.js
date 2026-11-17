@@ -1,0 +1,262 @@
+// Match orchestration: world, teams, input, camera, spotting, capture, win conditions
+import * as THREE from 'three';
+import { World } from '../world/world.js';
+import { setWindTime } from '../world/vegetation.js';
+import { TANKS, TANK_BY_ID } from './tankData.js';
+import { Tank } from './tank.js';
+import { Ballistics } from './ballistics.js';
+import { Spotting } from './spotting.js';
+import { NavGrid } from './nav.js';
+import { AIController } from './ai.js';
+import { Effects } from './effects.js';
+import { HUD } from '../ui/hud.js';
+import { RNG, clamp, DEG, wrapAngle } from '../util.js';
+
+const ALLY_NAMES = ['Sgt. Miller', 'Cpl. Novak', 'Lt. Hayes', 'Sgt. Dubois', 'Pvt. Kowalski', 'Cpt. Reyes', 'Sgt. Okafor', 'Lt. Varga'];
+const ENEMY_NAMES = ['Lt. Weber', 'Sgt. Volkov', 'Cpt. Brandt', 'Sgt. Petrov', 'Uffz. Krüger', 'Lt. Orlov', 'Sgt. Haas', 'Cpl. Zaitsev'];
+
+export class Game {
+  constructor(renderer, uiRoot, audio, opts) {
+    this.renderer = renderer; this.audio = audio; this.opts = opts; this.rng = new RNG(opts.seed || ((Math.random() * 1e9) | 0));
+    this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
+    this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 6000);
+    this.time = 0; this.timeLimit = 15 * 60; this.paused = false; this.ended = false; this.flying = [];
+    this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46]);
+    this.ballistics = new Ballistics(this); this.spotting = new Spotting(this); this.nav = new NavGrid(this.world);
+    this.capture = [{ points: 0 }, { points: 0 }]; this.kits = { repair: 1, ext: 1 };
+    this.tanks = []; this.ai = [];
+    this.spawnTeams(opts.tankId);
+    this.player = this.tanks[0];
+    this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, follow: this.player };
+    this.keys = {}; this.mouseDown = false; this.aimPoint = new THREE.Vector3();
+    this.hud = new HUD(uiRoot, this);
+    this.bindInput();
+    this.resize();
+    this.debug = this.makeDebug();
+  }
+  spawnTeams(playerTankId) {
+    const ids = TANKS.map((t) => t.id); const pool = []; const r = this.rng;
+    const others = []; for (let i = 0; i < 6; i++) others.push(ids[(ids.indexOf(playerTankId) + 1 + i) % ids.length]);
+    const team0 = [playerTankId, ...others]; const team1 = team0.slice().sort(() => r.next() - 0.5); void pool;
+    const roles = ['assault', 'sniper', 'assault', 'defender', 'assault', 'sniper', 'assault'];
+    const lanes = [1, 0, 2, 1, 0, 2, 1];
+    for (let team = 0; team < 2; team++) {
+      const base = this.world.bases[team], other = this.world.bases[1 - team];
+      const dx = other.x - base.x, dz = other.z - base.z; const l = Math.hypot(dx, dz); const fx = dx / l, fz = dz / l; const px = -fz, pz = fx;
+      const list = team ? team1 : team0; const names = (team ? ENEMY_NAMES : ALLY_NAMES).slice().sort(() => r.next() - 0.5);
+      list.forEach((id, i) => {
+        const isPlayer = team === 0 && i === 0;
+        const spec = TANK_BY_ID[id]; const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer);
+        let x = base.x + fx * 22 + px * (i - 3) * 13 + r.range(-2, 2), z = base.z + fz * 22 + pz * (i - 3) * 13 + r.range(-2, 2);
+        const [ci, cj] = this.nav.nearestWalkable(...this.nav.toCell(x, z)); [x, z] = this.nav.center(ci, cj);
+        t.placeAt(x, z, Math.atan2(fx, fz)); t.input.aim.set(x + fx * 300, t.pos.y + 2, z + fz * 300);
+        this.tanks.push(t);
+        if (!isPlayer) this.ai.push(new AIController(this, t, roles[i], lanes[i], 0.8 + r.next() * 0.5));
+      });
+    }
+  }
+  bindInput() {
+    const c = this.renderer.domElement; this._h = {};
+    const on = (tgt, ev, fn, o) => { tgt.addEventListener(ev, fn, o); (this._h[ev] ||= []).push([tgt, fn]); };
+    on(window, 'keydown', (e) => {
+      if (e.code === 'Tab') { e.preventDefault(); this.hud.scoreboard(true); }
+      if (e.code === 'Escape') { this.setPaused(!this.paused); }
+      this.keys[e.code] = true; this.audio.init(); this.audio.resume();
+      const p = this.player; if (!p.alive || this.paused) return;
+      if (e.code === 'Digit1') p.selectShell(0); if (e.code === 'Digit2') p.selectShell(1); if (e.code === 'Digit3') p.selectShell(2);
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
+      if (e.code === 'KeyR' && this.kits.repair) { this.kits.repair = 0; p.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; p.trackRepair = 0; this.hud.message('Modules repaired', '#9fd39f'); }
+      if (e.code === 'KeyF' && this.kits.ext && p.burning > 0) { this.kits.ext = 0; p.burning = 0; this.hud.message('Fire extinguished', '#9fd39f'); }
+    });
+    on(window, 'keyup', (e) => { this.keys[e.code] = false; if (e.code === 'Tab') this.hud.scoreboard(false); });
+    on(c, 'mousedown', (e) => {
+      this.audio.init(); this.audio.resume();
+      if (this.paused || this.ended) return;
+      if (document.pointerLockElement !== c) { c.requestPointerLock?.(); }
+      if (e.button === 0) this.mouseDown = true; if (e.button === 2) this.toggleSniper();
+    });
+    on(window, 'mouseup', (e) => { if (e.button === 0) this.mouseDown = false; });
+    on(c, 'contextmenu', (e) => e.preventDefault());
+    on(window, 'mousemove', (e) => {
+      if (this.paused) return; const locked = document.pointerLockElement === c; if (!locked && !this.mouseDown) return;
+      const k = this.cam.sniper ? 0.0022 / this.cam.zoom * 2.2 : 0.0024;
+      this.cam.yaw -= e.movementX * k; this.cam.pitch = clamp(this.cam.pitch - e.movementY * k, this.cam.sniper ? -0.35 : -0.9, this.cam.sniper ? 0.45 : 0.35);
+    });
+    on(c, 'wheel', (e) => {
+      e.preventDefault(); const up = e.deltaY < 0;
+      if (this.cam.sniper) { const Z = [4, 8, 12]; let i = Z.indexOf(this.cam.zoom); i = clamp(i + (up ? 1 : -1), -1, 2); if (i < 0) this.toggleSniper(); else this.cam.zoom = Z[i]; }
+      else { this.cam.dist = clamp(this.cam.dist * (up ? 0.88 : 1.14), 7, 40); if (up && this.cam.dist <= 7.1) this.toggleSniper(); }
+    }, { passive: false });
+    on(document, 'pointerlockchange', () => { if (!document.pointerLockElement && !this.ended && this._wasLocked) this.setPaused(true); this._wasLocked = !!document.pointerLockElement; });
+    on(window, 'resize', () => this.resize());
+  }
+  toggleSniper() { this.cam.sniper = !this.cam.sniper; if (this.cam.sniper) { this.cam.zoom = 4; this.cam.pitch = clamp(this.cam.pitch, -0.3, 0.4); } }
+  setPaused(v) { if (this.ended) return; this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
+  exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
+  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); }
+  onKill(attacker, victim, cause) {
+    this.hud.kill(attacker, victim, cause);
+    if (victim.isPlayer) { this.cam.sniper = false; const a = this.tanks.find((t) => t.team === 0 && t.alive); if (a) this.cam.follow = a; }
+    this.checkEnd();
+  }
+  checkEnd() {
+    if (this.ended) return;
+    const a0 = this.tanks.some((t) => t.team === 0 && t.alive), a1 = this.tanks.some((t) => t.team === 1 && t.alive);
+    if (!a1) this.end('win', 'All enemy tanks destroyed.'); else if (!a0) this.end('lose', 'Your platoon was wiped out.');
+    else if (this.capture[1].points >= 100) this.end('win', 'Enemy base captured!'); else if (this.capture[0].points >= 100) this.end('lose', 'The enemy captured your base.');
+    else if (this.time >= this.timeLimit) this.end('draw', 'Time expired.');
+  }
+  end(result, reason) { this.ended = true; this.result = result; this.hud.showEnd(result, reason); if (document.pointerLockElement) document.exitPointerLock(); this.audio.stopEngine(); }
+  // ---------- per-frame ----------
+  updatePlayerInput() {
+    const p = this.player; const k = this.keys;
+    if (!p.alive || this.ended) { p.input.throttle = 0; p.input.steer = 0; return; }
+    p.input.throttle = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0); p.input.steer = (k.KeyA ? 1 : 0) - (k.KeyD ? 1 : 0);
+    if (k.Space) { p.input.throttle = 0; p.speed *= 0.9; }
+    p.input.aim.copy(this.aimPoint);
+    if (this.mouseDown) p.tryFire(this.time);
+  }
+  updateCapture(dt) {
+    for (let i = 0; i < 2; i++) {
+      const b = this.world.bases[i]; const cap = this.capture[i];
+      const inside = (team) => this.tanks.filter((t) => t.alive && t.team === team && Math.hypot(t.pos.x - b.x, t.pos.z - b.z) < b.r);
+      const att = inside(1 - i), def = inside(i);
+      if (att.length && !def.length) {
+        if (att.some((t) => this.time - t.lastDamagedAt < 0.05)) cap.points = Math.max(0, cap.points - 30);
+        cap.points = Math.min(100, cap.points + dt * (100 / 90) * Math.min(3, att.length));
+      } else if (!att.length) cap.points = Math.max(0, cap.points - dt * 6);
+    }
+  }
+  resolveCollisions() {
+    const T = this.tanks; const W = this.world;
+    for (const t of T) {
+      const d = t.spec.dims; const fx = Math.sin(t.heading), fz = Math.cos(t.heading); const r = d.W * 0.5;
+      for (const off of [-d.L * 0.3, 0, d.L * 0.3]) {
+        const cx = t.pos.x + fx * off, cz = t.pos.z + fz * off;
+        for (const c of W.colGrid.query(cx, cz, r + 2)) { const res = c.circle(cx, cz, r); if (res) { t.pos.x += res[0] * res[2]; t.pos.z += res[1] * res[2]; if (t.alive) t.speed *= 0.93; } }
+        for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) { if (rk.s < 1.6) continue; const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.85; if (dd < R && dd > 0.01) { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.95; } }
+      }
+      const H = W.playHalf - 4; if (Math.abs(t.pos.x) > H) { t.pos.x = Math.sign(t.pos.x) * H; t.speed *= 0.8; } if (Math.abs(t.pos.z) > H) { t.pos.z = Math.sign(t.pos.z) * H; t.speed *= 0.8; }
+    }
+    for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
+      const a = T[i], b = T[j]; const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z; const d = Math.hypot(dx, dz);
+      const R = (a.spec.dims.L + b.spec.dims.L) * 0.36; if (d > R || d < 0.01) continue;
+      const push = (R - d); const ma = a.alive ? a.spec.mass : 200, mb = b.alive ? b.spec.mass : 200; const wa = mb / (ma + mb), wb = ma / (ma + mb);
+      a.pos.x -= dx / d * push * wa; a.pos.z -= dz / d * push * wa; b.pos.x += dx / d * push * wb; b.pos.z += dz / d * push * wb; a.speed *= 0.9; b.speed *= 0.9;
+    }
+  }
+  computeAim() {
+    if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; return; }
+    // ray from camera centre: terrain, structures, visible tanks
+    const cam = this.camera; const o = cam.position; const dir = new THREE.Vector3(); cam.getWorldDirection(dir);
+    const far = 2000; const e = o.clone().addScaledVector(dir, far); let best = 1;
+    const W = this.world; const tt = W.terrain.segmentHit(o.x, o.y, o.z, e.x, e.y, e.z, 2); if (tt >= 0) best = tt;
+    const ts = W.structureHit(o.x, o.y, o.z, e.x, e.y, e.z); if (ts >= 0 && ts < best) best = ts;
+    this.aimTank = null;
+    for (const t of this.tanks) { if (t === this.player) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; const h = t.rayTest(o, e); if (h && h.t < best) { best = h.t; this.aimTank = t; } }
+    this.aimPoint.copy(o).addScaledVector(dir, far * best);
+    this.aimDist = far * best;
+  }
+  updateReticle() {
+    // simulate actual gun trajectory to find where the shell would land
+    const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    const m = p.model; const pos = m.muzzle.getWorldPosition(new THREE.Vector3()); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
+    const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
+    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02;
+    for (let i = 0; i < 200 && !hitP; i++) {
+      a.copy(pos); v.y -= 9.81 * h; b.copy(pos).addScaledVector(v, h);
+      let best = 2; const tt = W.terrain.segmentHit(a.x, a.y, a.z, b.x, b.y, b.z, 2); if (tt >= 0) best = tt;
+      const ts = W.structureHit(a.x, a.y, a.z, b.x, b.y, b.z); if (ts >= 0 && ts < best) best = ts;
+      for (const t of this.tanks) { if (t === p) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; if (t.pos.distanceTo(b) > 40) continue; const hh = t.rayTest(a, b); if (hh && hh.t < best) { best = hh.t; hitTank = t; hitInfo = hh; } }
+      if (best <= 1) { hitP = a.clone().lerp(b, best); dist += a.distanceTo(hitP); if (!hitInfo || best !== hitInfo.t) { hitTank = hitInfo && best === hitInfo.t ? hitTank : hitTank; } }
+      else { dist += a.distanceTo(b); pos.copy(b); }
+    }
+    if (!hitP) hitP = pos;
+    const sp = hitP.clone().project(this.camera); const sx = (sp.x * 0.5 + 0.5) * innerWidth, sy = (-sp.y * 0.5 + 0.5) * innerHeight;
+    // dispersion circle in pixels
+    const fovR = this.camera.fov * DEG; const radPx = (p.dispersion() * 2) / fovR * innerHeight;
+    let state = 'neutral', text = `${Math.round(dist)} m`;
+    if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
+      const ev = this.ballistics.evaluate(hitTank, hitInfo, p.shell, dist);
+      if (ev.ricochet) { state = 'red'; text = `RICOCHET · ${ev.angle.toFixed(0)}°`; }
+      else if (ev.ratio > 1.08) { state = 'green'; text = `PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+      else if (ev.ratio > 0.92) { state = 'yellow'; text = `CHANCE ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+      else { state = 'red'; text = `NO PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+      text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(dist)} m`;
+    }
+    if (p.reloadLeft > 0) state += ' loading';
+    hud.setReticle(sx, sy, radPx, state, text);
+  }
+  updateCamera(dt) {
+    if (this.camOverride) { const o = this.camOverride; this.camera.position.set(o[0], o[1], o[2]); this.camera.fov = o[6] || 60; this.camera.updateProjectionMatrix(); this.camera.lookAt(o[3], o[4], o[5]); this.camera.updateMatrixWorld(); this.effects.setScale(innerHeight, this.camera.fov); for (const t of this.tanks) t.model.root.visible = t.team === 0 || !t.alive || t.spotted[0]; return; }
+    const c = this.cam; const f = c.follow && c.follow.alive ? c.follow : this.player.alive ? this.player : (this.tanks.find((t) => t.team === 0 && t.alive) || this.player); c.follow = f;
+    const m = f.model; const T = this.world.terrain;
+    const dir = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch));
+    const sn = c.sniper && f === this.player && f.alive;
+    m.root.visible = !sn;
+    if (sn) {
+      const gp = m.gun.getWorldPosition(new THREE.Vector3()); gp.y += 0.55; gp.addScaledVector(dir, 0.6);
+      this.camera.position.copy(gp); this.camera.fov = 50 / c.zoom;
+    } else {
+      const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2;
+      const pos = focus.clone().addScaledVector(dir, -c.dist); const gh = T.height(pos.x, pos.z) + 1.2; if (pos.y < gh) pos.y = gh;
+      this.camera.position.lerp(pos, Math.min(1, dt * 18 + (this._camInit ? 0 : 1))); this._camInit = true; this.camera.fov = 60;
+    }
+    this.camera.updateProjectionMatrix();
+    this.camera.lookAt(this.camera.position.clone().add(dir));
+    this.camera.updateMatrixWorld();
+    this.effects.setScale(innerHeight, this.camera.fov);
+  }
+  update(dt) {
+    if (this.paused) return;
+    dt = Math.min(dt, 0.05); this.time += dt; setWindTime(this.time);
+    this.updatePlayerInput();
+    for (const ai of this.ai) if (!this.freezeAI) ai.update(dt);
+    for (const t of this.tanks) t.update(dt, this.time);
+    this.resolveCollisions();
+    for (const t of this.tanks) { if (t.alive) t.updateGround(dt); t.syncModel(); }
+    this.ballistics.update(dt); this.spotting.update(dt, this.time);
+    // render visibility: enemies only if spotted by our team
+    for (const t of this.tanks) { if (t.team !== this.player.team && t.alive) t.model.root.visible = t.spotted[this.player.team]; }
+    // emitters (dust, exhaust)
+    for (const t of this.tanks) {
+      if (!t.alive) continue; const d = t.spec.dims; if (Math.abs(t.speed) > 1.5) { const back = t.model.root.localToWorld(new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * d.W * 0.4, 0.2, -d.L * 0.5)); this.effects.trackDust(back, t.speed, t.inWater); }
+      if (t.pos.distanceTo(this.camera.position) < 120) this.effects.exhaust(t.model.root.localToWorld(new THREE.Vector3(0.6, d.hullH + 0.2, -d.L * 0.47)), Math.abs(t.input.throttle));
+    }
+    for (let i = this.flying.length - 1; i >= 0; i--) { const f = this.flying[i]; f.t += dt; if (f.rest) continue; f.v.y -= 9.81 * dt; f.obj.position.addScaledVector(f.v, dt); f.obj.rotation.x += f.w.x * dt; f.obj.rotation.z += f.w.z * dt;
+      const gy = this.world.terrain.height(f.obj.position.x, f.obj.position.z); if (f.obj.position.y < gy && f.v.y < 0) { f.obj.position.y = gy; f.rest = true; } }
+    this.updateCapture(dt); this.checkEnd();
+    this.updateCamera(dt);
+    this.computeAim();
+    this._retT = (this._retT || 0) - dt; if (this._retT <= 0) { this._retT = 0.05; this.updateReticle(); }
+    // player bush ghosting
+    const pb = this.player.alive ? this.player.inBush : null; this.world.veg.setPlayerBush(pb && !this.cam.sniper ? pb : pb);
+    this.world.updateShadowCenter(this.cam.follow.pos); this.world.update(dt, this.time, this.camera.position);
+    this.effects.update(dt, (x, z) => this.world.terrain.height(x, z));
+    this.audio.setListener(this.camera.position);
+    if (this.player.alive && !this.ended) this.audio.engine(Math.abs(this.player.input.throttle), this.player.speed); else this.audio.stopEngine();
+    this.hud.update(dt, this.camera);
+  }
+  render() { this.renderer.render(this.scene, this.camera); }
+  dispose() {
+    for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
+    this.hud.destroy(); this.audio.stopEngine(); this.world.dispose();
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+  makeDebug() {
+    return {
+      teleport: (x, z, h = 0) => { this.player.placeAt(x, z, h); },
+      cam: (yaw, pitch, dist) => { this.cam.yaw = yaw; this.cam.pitch = pitch; if (dist) this.cam.dist = dist; this._camInit = false; },
+      freeze: (v = true) => { this.freezeAI = v; for (const t of this.tanks) if (!t.isPlayer) { t.input.throttle = 0; t.input.steer = 0; } },
+      place: (idx, x, z, h) => { this.tanks[idx].placeAt(x, z, h); },
+      simulate: (sec, dt = 1 / 30) => { const t0 = performance.now(); const n = Math.round(sec / dt); for (let i = 0; i < n && !this.ended; i++) this.update(dt); return { ms: Math.round(performance.now() - t0), perFrame: +((performance.now() - t0) / n).toFixed(2), ended: this.ended, result: this.result }; },
+      fire: () => { this.player.reloadLeft = 0; return this.player.tryFire(this.time); },
+      aim: (x, y, z) => { if (x === null) { this.debugAim = null; return; } this.debugAim = new THREE.Vector3(x, y, z); this.aimPoint.set(x, y, z); this.player.input.aim.set(x, y, z); },
+      tank: (i) => this.tanks[i],
+      camAt: (a) => { this.camOverride = a; for (const id of ['h-markers', 'h-ret', 'h-cross']) { const e = document.getElementById(id); if (e) e.style.visibility = a ? 'hidden' : ''; } },
+      pause: (v = true) => { this.debugPaused = v; },
+      info: () => ({ time: this.time, alive: this.tanks.map((t) => [t.name, t.spec.id, t.team, t.alive, Math.round(t.hp), Math.round(t.pos.x), Math.round(t.pos.z), t.spotted, !!t.inBush]), stats: this.world.stats, genMs: Math.round(this.world.genTime) }),
+    };
+  }
+}
+void wrapAngle;

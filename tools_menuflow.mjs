@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 1024, height: 576 } }); const errs = [];
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.text()); }); page.on('pageerror', (e) => errs.push(e.message));
+await page.goto('http://localhost:4173/'); await page.waitForFunction(() => window.__menu, null, { timeout: 120000 });
+await page.click('.tcard[data-id="t34"]'); await page.click('.mcard[data-id="forest"]'); await page.selectOption('select', 'low').catch(() => {});
+await page.click('#m-battle');
+await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 180000 });
+const info = await page.evaluate(() => { const g = window.__game; g.keys.KeyW = true; g.debug.simulate(4); g.keys.KeyW = false; return { tank: g.player.spec.id, speed: g.player.speed.toFixed(1), map: g.world.def?.id || g.world.mapId, n: g.tanks.length }; });
+console.log(JSON.stringify(info)); console.log('errors:', errs.length ? errs.join(' | ') : 'none'); await browser.close();
