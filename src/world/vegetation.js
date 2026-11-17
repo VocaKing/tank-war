@@ -101,9 +101,17 @@ function bushGeo(lod, r) {
     cards.push(card(s, s, cx, cy, cz, r.range(0, Math.PI), r.range(-0.9, 0.9), C)); }
   return withGroups(core, merge(cards));
 }
-function rockGeo(r) {
-  const g = new THREE.IcosahedronGeometry(1, 2); const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = 0.75 + 0.25 * Math.sin(x * 3.1 + 1) * Math.sin(y * 2.7 + 2) * Math.sin(z * 3.3) + 0.12 * Math.sin(x * 9 + z * 7); p.setXYZ(i, x * n * 1.2, y * n * 0.7, z * n); }
+// v4: several boulder shapes (layered noise, flattened base, strata facets) instead of one shared rock
+function rockGeo(r, v = 0) {
+  const g = new THREE.IcosahedronGeometry(1, 3); const p = g.attributes.position;
+  const f = [[3.1, 2.7, 3.3, 1.2, 0.7], [2.2, 3.6, 1.8, 1.0, 0.9], [4.0, 1.9, 2.6, 1.45, 0.55], [1.6, 2.2, 4.4, 1.1, 0.8]][v % 4]; const ph = v * 1.7 + 0.3;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    let n = 0.78 + 0.22 * Math.sin(x * f[0] + ph) * Math.sin(y * f[1] + 2 + ph) * Math.sin(z * f[2] + ph) + 0.1 * Math.sin(x * 9 + z * 7 + ph) + 0.05 * Math.sin(x * 17 - y * 13 + z * 11);
+    const strata = Math.round(y * 5) / 5; n *= 1 + (strata - y) * 0.12; // stepped bedding planes
+    let yy = y * n * f[4]; if (yy < -0.25) yy = -0.25 - (yy + 0.25) * 0.15; // flattened, ground-hugging base
+    p.setXYZ(i, x * n * f[3], yy, z * n);
+  }
   g.computeVertexNormals(); return g;
 }
 
@@ -131,7 +139,7 @@ export class Vegetation {
     }
     this.geos = {}; for (const k of Object.keys(TYPES)) this.geos[k] = [TYPES[k].geo(0, r), TYPES[k].geo(1, r)];
     this.rockMat = new THREE.MeshStandardMaterial({ map: pbrTex('aerial_rocks_02', 'diff'), normalMap: pbrTex('aerial_rocks_02', 'nor'), roughness: 0.95, color: mb.def.id === 'desert' ? 0xd2b48c : 0xaaa49a });
-    this.rockGeo = rockGeo(r);
+    this.rockGeos = [0, 1, 2, 3].map((v) => rockGeo(r, v));
     // records
     this.trees = mb.trees.map((t, i) => ({ ...t, id: i, alive: true, fall: 0 }));
     this.bushes = mb.bushes.map((b, i) => ({ ...b, id: i }));
@@ -151,15 +159,20 @@ export class Vegetation {
     for (const [key, ch] of this.chunks) {
       ch.meshes = {};
       for (const [type, list] of Object.entries(ch.items)) {
-        const pair = [0, 1].map((lod) => { const im = new THREE.InstancedMesh(this.geos[type][lod], this.mats[type], list.length); list.forEach((rec, i) => { im.setMatrixAt(i, rec.matrix); rec['idx'] = i; }); im.castShadow = lod === 0; im.receiveShadow = lod === 0; im.computeBoundingSphere(); this.group.add(im); return im; });
+        const tc = new THREE.Color(); const pair = [0, 1].map((lod) => { const im = new THREE.InstancedMesh(this.geos[type][lod], this.mats[type], list.length); list.forEach((rec, i) => { im.setMatrixAt(i, rec.matrix); rec['idx'] = i; const h = ((rec.x * 0.731 + rec.z * 0.377) % 1 + 1) % 1, h2 = ((rec.x * 0.173 - rec.z * 0.911) % 1 + 1) % 1; tc.setRGB(0.84 + h * 0.26 + h2 * 0.06, 0.86 + h * 0.22, 0.82 + h2 * 0.2); im.setColorAt(i, tc); }); im.castShadow = lod === 0; im.receiveShadow = lod === 0; im.computeBoundingSphere(); this.group.add(im); return im; });
         ch.meshes[type] = pair; void key;
       }
     }
     // rocks: single instanced mesh
     if (this.rocks.length) {
-      const im = new THREE.InstancedMesh(this.rockGeo, this.rockMat, this.rocks.length);
-      this.rocks.forEach((k, i) => { e.set(k.tilt, k.rot, k.tilt * 0.5); q.setFromEuler(e); m4.compose(v.set(k.x, k.y - k.s * 0.25, k.z), q, s.set(k.s, k.s, k.s)); im.setMatrixAt(i, m4); });
-      im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); this.group.add(im); this.rockMesh = im;
+      const col = new THREE.Color(); this.rockMeshes = [];
+      for (let vv = 0; vv < 4; vv++) {
+        const list = this.rocks.filter((k, i) => i % 4 === vv); if (!list.length) continue;
+        const im = new THREE.InstancedMesh(this.rockGeos[vv], this.rockMat, list.length);
+        list.forEach((k, i) => { e.set(k.tilt, k.rot, k.tilt * 0.5); q.setFromEuler(e); m4.compose(v.set(k.x, k.y - k.s * 0.25, k.z), q, s.set(k.s, k.s, k.s)); im.setMatrixAt(i, m4); const h = ((k.x * 12.9898 + k.z * 78.233) % 1 + 1) % 1; col.setRGB(0.82 + h * 0.3, 0.8 + h * 0.28, 0.78 + h * 0.26); im.setColorAt(i, col); });
+        im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); this.group.add(im); this.rockMeshes.push(im);
+      }
+      this.rockMesh = this.rockMeshes[0];
     }
     // ghost bush for the one the player sits in (see-through from inside)
     this.ghostBush = null;

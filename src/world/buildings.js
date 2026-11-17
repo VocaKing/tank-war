@@ -56,7 +56,22 @@ export function buildingMaterials() {
   return M;
 }
 
-class Buckets { constructor() { this.b = {}; } add(k, g) { (this.b[k] ||= []).push(clean(g)); } }
+// v4: per-building colour variation via vertex colours (walls, shutters/doors, roof tiles), merged per material
+const TINTABLE = { stone: 'wall', plaster: 'wall', damaged: 'wall', brick: 'brick', paintwood: 'trim', roof: 'roof', slate: 'roof', castle: 'stoneT' };
+class Buckets {
+  constructor() { this.b = {}; this.tint = null; }
+  add(k, g) {
+    const n = clean(g); const c = new Float32Array(n.attributes.position.count * 3); const t = (this.tint && this.tint[TINTABLE[k]]) || null;
+    c.fill(1); if (t) for (let i = 0; i < c.length; i += 3) { c[i] = t[0]; c[i + 1] = t[1]; c[i + 2] = t[2]; }
+    n.setAttribute('color', new THREE.BufferAttribute(c, 3)); (this.b[k] ||= []).push(n);
+  }
+}
+const WALL_TINTS = [[1, 1, 1], [1.0, 0.94, 0.82], [1.02, 0.9, 0.76], [0.95, 0.95, 0.97], [1.03, 0.88, 0.84], [0.9, 0.86, 0.8], [1.05, 1.0, 0.9]];
+const TRIM_TINTS = [[1, 1, 1], [0.75, 0.95, 1.5], [1.6, 0.85, 0.7], [1.5, 1.45, 1.3], [0.9, 1.15, 0.9], [1.3, 1.1, 0.8]];
+function pickTint(r, style) {
+  const w = WALL_TINTS[Math.floor(r.next() * WALL_TINTS.length)]; const j = 0.94 + r.next() * 0.1; const rf = 0.82 + r.next() * 0.3;
+  return { wall: style === 'desert' ? [w[0] * j, w[1] * j * 0.98, w[2] * j * 0.95] : w.map((v) => v * j), brick: [j, j * (0.95 + r.next() * 0.08), j], trim: TRIM_TINTS[Math.floor(r.next() * TRIM_TINTS.length)], roof: [rf, rf * (0.92 + r.next() * 0.1), rf * (0.9 + r.next() * 0.1)], stoneT: [j, j, j * 0.98] };
+}
 
 export function buildStructures(mb, scene, terrain) {
   const M = buildingMaterials(); const B = new Buckets(); const colliders = []; const r = new RNG(mb.def.seed + 99);
@@ -83,6 +98,7 @@ export function buildStructures(mb, scene, terrain) {
     }
   };
   for (const b of mb.buildings) {
+    B.tint = pickTint(r, b.style);
     const wm = wallMat(b); const fl = b.floors || 1; let H = fl * 3 + 0.4; let top = H;
     if (b.kind === 'tower') {
       H = fl * 4; const g = boxUV(b.w, H, b.d, 3); place(g, b, 0, H / 2, 0); B.add('castle', g);
@@ -197,6 +213,7 @@ export function buildStructures(mb, scene, terrain) {
     const g = boxUV(w.thick, w.h + 1, w.len, 2.5); xf(g, w.x, y + (w.h - 1) / 2, w.z, w.rot); B.add(mat, g);
     colliders.push(new OBB(w.x, w.z, w.thick / 2, w.len / 2, w.rot, y - 1, y + w.h, 'wall'));
   }
+  B.tint = null;
   // bridges: drivable deck that follows a ramp/arch profile between the two banks (so tanks drive ON it),
   // segmented deck + parapets; the deck surface is exported for World.groundHeight
   const decks = [];
@@ -237,6 +254,7 @@ export function buildStructures(mb, scene, terrain) {
       }
     }
   }
+  B.tint = null;
   // props
   for (const p of mb.props) {
     const y = p.y;
@@ -253,7 +271,7 @@ export function buildStructures(mb, scene, terrain) {
   const group = new THREE.Group(); group.name = 'structures';
   for (const [k, list] of Object.entries(B.b)) {
     if (!list.length) continue; const geo = mergeGeometries(list); geo.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geo, M[k]); mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
+    M[k].vertexColors = true; const mesh = new THREE.Mesh(geo, M[k]); mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
   }
   scene.add(group);
   return { group, colliders, materials: M, decks };
