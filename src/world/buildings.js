@@ -42,7 +42,7 @@ export function buildingMaterials() {
     wood: new THREE.MeshStandardMaterial({ ...tex('bark_brown_02'), roughness: 0.95, color: 0xb59a7c }),
     window: new THREE.MeshStandardMaterial({ map: windowTexture(), roughness: 0.35, metalness: 0.2 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.9 }),
-    paintwood: new THREE.MeshStandardMaterial({ color: 0x4f6a5a, roughness: 0.8 }),
+    paintwood: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }), // colour comes from per-building trim tint
     hay: new THREE.MeshStandardMaterial({ color: 0xc4a45e, roughness: 1 }),
     metal: new THREE.MeshStandardMaterial({ color: 0x55534f, roughness: 0.6, metalness: 0.6 }),
     rust: new THREE.MeshStandardMaterial({ ...tex('rusty_metal_02'), roughness: 0.85, metalness: 0.3, color: 0x7a6a5a }),
@@ -62,12 +62,12 @@ class Buckets {
   constructor() { this.b = {}; this.tint = null; }
   add(k, g) {
     const n = clean(g); const c = new Float32Array(n.attributes.position.count * 3); const t = (this.tint && this.tint[TINTABLE[k]]) || null;
-    c.fill(1); if (t) for (let i = 0; i < c.length; i += 3) { c[i] = t[0]; c[i + 1] = t[1]; c[i + 2] = t[2]; }
+    c.fill(1); if (!t && k === 'paintwood') for (let i = 0; i < c.length; i += 3) { c[i] = 0.31; c[i + 1] = 0.42; c[i + 2] = 0.35; } if (t) for (let i = 0; i < c.length; i += 3) { c[i] = t[0]; c[i + 1] = t[1]; c[i + 2] = t[2]; }
     n.setAttribute('color', new THREE.BufferAttribute(c, 3)); (this.b[k] ||= []).push(n);
   }
 }
-const WALL_TINTS = [[1, 1, 1], [1.0, 0.94, 0.82], [1.02, 0.9, 0.76], [0.95, 0.95, 0.97], [1.03, 0.88, 0.84], [0.9, 0.86, 0.8], [1.05, 1.0, 0.9]];
-const TRIM_TINTS = [[1, 1, 1], [0.75, 0.95, 1.5], [1.6, 0.85, 0.7], [1.5, 1.45, 1.3], [0.9, 1.15, 0.9], [1.3, 1.1, 0.8]];
+const WALL_TINTS = [[1.05, 1.05, 1.02], [1.3, 1.24, 1.1], [1.28, 1.1, 0.82], [1.12, 1.12, 1.16], [1.25, 1.02, 0.96], [0.95, 0.9, 0.84], [1.35, 1.3, 1.2]];
+const TRIM_TINTS = [[0.31, 0.42, 0.35], [0.2, 0.3, 0.22], [0.5, 0.2, 0.16], [0.26, 0.36, 0.52], [0.36, 0.26, 0.18], [0.78, 0.74, 0.64], [0.22, 0.22, 0.24]];
 function pickTint(r, style) {
   const w = WALL_TINTS[Math.floor(r.next() * WALL_TINTS.length)]; const j = 0.94 + r.next() * 0.1; const rf = 0.82 + r.next() * 0.3;
   return { wall: style === 'desert' ? [w[0] * j, w[1] * j * 0.98, w[2] * j * 0.95] : w.map((v) => v * j), brick: [j, j * (0.95 + r.next() * 0.08), j], trim: TRIM_TINTS[Math.floor(r.next() * TRIM_TINTS.length)], roof: [rf, rf * (0.92 + r.next() * 0.1), rf * (0.9 + r.next() * 0.1)], stoneT: [j, j, j * 0.98] };

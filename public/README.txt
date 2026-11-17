@@ -1,4 +1,4 @@
-STEEL FRONT — 3D Tank War v3 (browser game)
+STEEL FRONT — 3D Tank War v4 (browser game)
 
 Browsers block WebGL games opened straight from a file, so serve this folder:
   Windows: double-click play-windows.bat   (needs Python 3)
