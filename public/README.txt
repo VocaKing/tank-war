@@ -1,4 +1,4 @@
-STEEL FRONT — 3D Tank War v2 (browser game)
+STEEL FRONT — 3D Tank War v3 (browser game)
 
 Browsers block WebGL games opened straight from a file, so serve this folder:
   Windows: double-click play-windows.bat   (needs Python 3)
@@ -8,5 +8,12 @@ Or upload this folder to any static host (Netlify Drop, GitHub Pages, Cloudflare
 
 Controls: W/S throttle, A/D steer, mouse aim, left click fire, right click/Shift sniper mode,
 wheel zoom x2/x4/x8/x16, X armor-penetration view (sniper only: green = will penetrate,
-yellow = may, red = can't), E lock gun on target, 1/2/3 ammo, R repair kit, F extinguisher, Tab scoreboard, Esc pause.
+yellow = may, red = can't; semi-transparent overlay), E lock gun on target, 1/2/3 ammo type,
+4/5/6 equipment slots (R = repair kit slot, F = extinguisher slot), Tab scoreboard, Esc pause.
+Before battle: menu -> "Ammo & equipment" to split the fixed ammo capacity between the 3 shell
+types and pick 3 items (repair kit, medkit, extinguisher, reload booster, overdrive, smoke,
+camo net, coated optics). Item weight lowers top speed and acceleration.
+Concealment: bushes / standing still / camo net raise CAMO %; enemies spot you at
+viewRange x (1 - camo), but always within ~50 m. Firing reveals you for 5 s.
+Water slows shells: tanks hull-down in water are harder (not impossible) to penetrate.
 Use a desktop browser with a dedicated GPU for best results; pick "Medium" or "Low" graphics on weaker machines.
