@@ -15,6 +15,7 @@ export class AIController {
     this.retreatUntil = 0; this.sniperIdle = 0; this.lastHp = tank.hp; this.reserved = null; this.idleScan = Math.random() * 6;
     this.angleOff = (tank.spec.id === 'tiger' || tank.spec.id === 'sherman') ? (Math.random() < 0.5 ? 1 : -1) * 25 * DEG : 0;
     this.enemyBase = game.world.bases[1 - tank.team]; this.ownBase = game.world.bases[tank.team];
+    this.repositionT = 0;
     if (role === 'sniper' || role === 'defender') this.pickHold();
   }
   // --- helpers ---
@@ -32,14 +33,14 @@ export class AIController {
   claim(b) { if (this.reserved) this.reserved.claimed = null; this.reserved = b; if (b) b.claimed = this; }
   pickHold() {
     const L = this.lane; let pt;
-    if (this.role === 'defender') { const a = L[0], b = L[1]; pt = [a[0] + (b[0] - a[0]) * 0.25, a[1] + (b[1] - a[1]) * 0.25]; }
-    else { const k = Math.max(1, Math.floor((L.length - 1) / 2)); const a = L[k - 1], b = L[k]; const f = 0.45 + Math.random() * 0.5; pt = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
-    const b = this.findBush(pt[0], pt[1], 110);
+    if (this.role === 'defender') { const a = L[0], b = L[1]; pt = [a[0] + (b[0] - a[0]) * 0.35, a[1] + (b[1] - a[1]) * 0.35]; }
+    else { const k = Math.max(1, Math.floor((L.length - 1) / 2)); const a = L[k - 1], b = L[k]; const f = 0.55 + Math.random() * 0.4; pt = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; }
+    const b = this.findBush(pt[0], pt[1], 90);
     if (b) { this.claim(b); this.hold = [b.x, b.z]; } else this.hold = pt;
     this.holdHeading = Math.atan2(this.enemyBase.x - this.hold[0], this.enemyBase.z - this.hold[1]);
     this.setGoal(this.hold);
   }
-  setGoal(p) { this.goal = p; this.path = this.g.nav.findPath(this.t.pos.x, this.t.pos.z, p[0], p[1]); this.pi = 0; this.repath = 8 + Math.random() * 4; }
+  setGoal(p) { this.goal = p; this.path = this.g.nav.findPath(this.t.pos.x, this.t.pos.z, p[0], p[1]); this.pi = 0; this.repath = 6 + Math.random() * 3; }
   strategicGoal() {
     const t = this.t, g = this.g;
     // defend own base if being captured
@@ -49,9 +50,14 @@ export class AIController {
       return;
     } else if (this.state === 'defendBase') { this.state = 'advance'; if (this.hold) this.setGoal(this.hold); }
     if (this.state === 'retreat') { if (g.time > this.retreatUntil) { this.state = 'advance'; this.path = []; } return; }
+    // more proactive: abandon static hold sooner if no contact, or when a good target appears
     if (this.hold) {
-      if (this.role === 'sniper' && this.sniperIdle > 75) { this.hold = null; this.claim(null); this.role = 'assault'; this.path = []; }
-      else return;
+      const idleLimit = this.role === 'sniper' ? 35 : 22;
+      if ((this.sniperIdle > idleLimit && !this.target) || (this.target && this.bestRatio > 0.6 && Math.random() < 0.4)) {
+        this.hold = null; this.claim(null);
+        if (this.role === 'sniper' && Math.random() < 0.6) this.role = 'assault';
+        this.path = [];
+      } else return;
     }
     if (!this.path.length || this.pi >= this.path.length) {
       if (this.wp < this.lane.length - 1) {
@@ -76,7 +82,7 @@ export class AIController {
       let s = 600 / (d + 50) + (1 - e.hp / e.maxHp) * 1.2 + (e === this.target ? 1.0 : 0) + (e.lastAttacker === t ? 0.3 : 0) + (t.lastAttacker === e ? 1.2 : 0);
       if (s > bs) { bs = s; best = e; }
     }
-    if (best !== this.target) { this.target = best; this.reactUntil = g.time + (0.6 + Math.random() * 0.9) / this.skill; this.resampleError(); }
+    if (best !== this.target) { this.target = best; this.reactUntil = g.time + (0.5 + Math.random() * 0.7) / this.skill; this.resampleError(); }
   }
   resampleError() { const s = (0.9 + Math.random() * 0.8) / this.skill / 1000; this.aimErr.set(this.g.rng.gauss() * s, this.g.rng.gauss() * s * 0.7, this.g.rng.gauss() * s); }
   planShot() {
@@ -117,15 +123,23 @@ export class AIController {
   }
   update(dt) {
     const t = this.t, g = this.g; if (!t.alive) { this.claim(null); return; }
-    this.think -= dt; this.repath -= dt;
+    this.think -= dt; this.repath -= dt; this.repositionT -= dt;
     if (t.hp < this.lastHp) { this.lastHp = t.hp; this.recentlyHit = g.time; }
     if (this.think <= 0) {
-      this.think = 0.25 + Math.random() * 0.1;
+      this.think = 0.22 + Math.random() * 0.08;
       this.chooseTarget(); this.strategicGoal();
       if (this.target) this.planShot();
-      if (this.hold && !this.target) this.sniperIdle += 0.3; else this.sniperIdle = 0;
-      if (this.state !== 'retreat' && t.hp < t.maxHp * 0.3 && this.target && t.pos.distanceTo(this.target.pos) < 450 && !t.inBush) {
-        const b = this.findBush(t.pos.x, t.pos.z, 140, this.target.pos); if (b) { this.state = 'retreat'; this.retreatUntil = g.time + 25; this.claim(b); this.setGoal([b.x, b.z]); }
+      if (this.hold && !this.target) this.sniperIdle += 0.35; else this.sniperIdle = 0;
+      // more aggressive retreat only when critically low
+      if (this.state !== 'retreat' && t.hp < t.maxHp * 0.22 && this.target && t.pos.distanceTo(this.target.pos) < 380 && !t.inBush) {
+        const b = this.findBush(t.pos.x, t.pos.z, 120, this.target.pos); if (b) { this.state = 'retreat'; this.retreatUntil = g.time + 18; this.claim(b); this.setGoal([b.x, b.z]); }
+      }
+      // occasional reposition even while engaging for more natural movement
+      if (this.target && this.repositionT <= 0 && Math.random() < 0.25 && this.bestRatio < 0.9) {
+        this.repositionT = 8 + Math.random() * 10;
+        const ang = Math.atan2(this.target.pos.x - t.pos.x, this.target.pos.z - t.pos.z) + (Math.random() - 0.5) * 1.2;
+        const dist = 40 + Math.random() * 50;
+        this.setGoal([t.pos.x + Math.sin(ang) * dist, t.pos.z + Math.cos(ang) * dist]);
       }
       if (this.repath <= 0 && this.goal && this.state !== 'hold') this.setGoal(this.goal);
     }
@@ -134,39 +148,32 @@ export class AIController {
     let moving = true;
     if (this.reverseT > 0) { this.reverseT -= dt; t.input.throttle = -0.8; t.input.steer = this.revSteer; if (this.reverseT <= 0) this.setGoal(this.goal || [this.enemyBase.x, this.enemyBase.z]); }
     else {
-      const atHold = this.hold && Math.hypot(t.pos.x - this.hold[0], t.pos.z - this.hold[1]) < 3.5;
-      const engageStop = tgt && ((this.role === 'assault' && dTgt < 380 && this.bestRatio > 0.7) || this.state === 'capture' || atHold || (this.state === 'retreat' && t.inBush));
+      const atHold = this.hold && Math.hypot(t.pos.x - this.hold[0], t.pos.z - this.hold[1]) < 4;
+      const engageStop = tgt && ((this.role === 'assault' && dTgt < 320 && this.bestRatio > 0.75) || this.state === 'capture' || (atHold && !tgt) || (this.state === 'retreat' && t.inBush));
       if (atHold || engageStop) {
         moving = false;
         if (tgt) this.faceHeading(Math.atan2(tgt.pos.x - t.pos.x, tgt.pos.z - t.pos.z) + this.angleOff);
         else if (this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);
         else { t.input.throttle = 0; t.input.steer = 0; }
-        if (this.state === 'capture' && !tgt) { const b = this.enemyBase; if (Math.hypot(t.pos.x - b.x, t.pos.z - b.z) > b.r * 0.7) { moving = true; this.steerTo(b.x, b.z, 0.6); } }
+        if (this.state === 'capture' && !tgt) { const b = this.enemyBase; if (Math.hypot(t.pos.x - b.x, t.pos.z - b.z) > b.r * 0.7) { moving = true; this.steerTo(b.x, b.z, 0.7); } }
       } else if (this.path.length && this.pi < this.path.length) {
         const p = this.path[this.pi]; const last = this.pi === this.path.length - 1;
-        const d = this.steerTo(p[0], p[1], tgt && dTgt < 500 && t.spec.stabilizer > 0.5 ? 0.6 : 1);
-        if (d < (last ? 3 : 9)) this.pi++;
+        const d = this.steerTo(p[0], p[1], tgt && dTgt < 500 && t.spec.stabilizer > 0.5 ? 0.65 : 1);
+        if (d < (last ? 4 : 10)) this.pi++;
       } else { t.input.throttle = 0; t.input.steer = 0; moving = false; }
       if (moving) this.avoid();
     }
     // stuck detection
-    // stuck detection. A tank that is turning towards its waypoint (heavy tanks pivot slowly) is NOT stuck: the old test
-    // (moved < 1.5 m in 2.5 s) fired during slow pivots, and the reverse manoeuvre then steered with a random sign —
-    // and because steering is mirrored in reverse it usually undid the turn, so the tank oscillated in place forever.
     this.stuckT += dt;
     if (this.stuckT > 2.5) {
       const moved = t.pos.distanceTo(this.lastPos); const turned = Math.abs(wrapAngle(t.heading - (this.lastHeading ?? t.heading)));
       if (moving && Math.abs(t.input.throttle) > 0.3 && moved < 1.5 && turned < 0.35 && this.reverseT <= 0) {
         const h = t.heading; this.g.nav.penalize(t.pos.x + Math.sin(h) * 5, t.pos.z + Math.cos(h) * 5); this.g.nav.penalize(t.pos.x, t.pos.z, 4);
-        // repeated stucks in the same spot: back off further each time
         this.stuckN = this.stuckAt && Math.hypot(t.pos.x - this.stuckAt[0], t.pos.z - this.stuckAt[1]) < 8 && this.g.time - this.stuckAt[2] < 30 ? (this.stuckN || 0) + 1 : 0;
         this.stuckAt = [t.pos.x, t.pos.z, this.g.time];
-        // stuck again at the same spot: the obstacle is bigger than one cell (e.g. a bridge-end parapet) — mark the whole 3×3 ahead
         if (this.stuckN >= 1) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) this.g.nav.penalize(t.pos.x + Math.sin(h) * 6 + a * 6, t.pos.z + Math.cos(h) * 6 + b * 6, 20);
-        // stuck close to the end of the path (goal hugging a wall / unreachable within 3 m): treat it as reached
         const lp = this.path[this.path.length - 1]; if (lp && this.pi >= this.path.length - 1 && Math.hypot(lp[0] - t.pos.x, lp[1] - t.pos.z) < 20) this.pi = this.path.length;
         this.reverseT = 1.8 + Math.min(3, this.stuckN || 0) * 0.8;
-        // reverse while swinging the nose TOWARDS the next waypoint (reverse steering is mirrored in Tank.update)
         const p = this.path[this.pi] || this.goal; const diff = p ? wrapAngle(Math.atan2(p[0] - t.pos.x, p[1] - t.pos.z) - h) : 0;
         this.revSteer = Math.abs(diff) > 0.15 ? -Math.sign(diff) : (Math.random() < 0.5 ? -1 : 1);
       }
@@ -178,13 +185,12 @@ export class AIController {
       w.addScaledVector(tgt.vel, flight * (0.7 + 0.3 * this.skill)); w.x += this.aimErr.x * dTgt; w.y += this.aimErr.y * dTgt; w.z += this.aimErr.z * dTgt;
       t.input.aim.copy(w);
       const ready = t.reloadLeft <= 0 && g.time > this.reactUntil && t.aimError < 0.004 + 0.002 / this.skill && t.bloom < (t.spec.stabilizer < 0.5 ? 2.6 : 1.7);
-      const worth = this.bestRatio > 0.85 || (this.bestRatio > 0.55 && g.time - (this.recentlyHit || -99) < 6) || dTgt < 60;
-      const concealOK = !t.inBush || this.bestRatio > 1.0 || dTgt < 250 || this.role !== 'sniper';
+      const worth = this.bestRatio > 0.82 || (this.bestRatio > 0.5 && g.time - (this.recentlyHit || -99) < 6) || dTgt < 55;
+      const concealOK = !t.inBush || this.bestRatio > 0.95 || dTgt < 220 || this.role !== 'sniper';
       if (ready && worth && concealOK && !this.allyInLine(tgt)) { if (t.tryFire(g.time)) this.resampleError(); }
     } else {
-      this.idleScan += dt * 0.25; const base = this.enemyBase; const h = Math.atan2(base.x - t.pos.x, base.z - t.pos.z) + Math.sin(this.idleScan) * 0.6;
+      this.idleScan += dt * 0.3; const base = this.enemyBase; const h = Math.atan2(base.x - t.pos.x, base.z - t.pos.z) + Math.sin(this.idleScan) * 0.5;
       t.input.aim.set(t.pos.x + Math.sin(h) * 300, t.pos.y + 2, t.pos.z + Math.cos(h) * 300);
-      // keep a reasonable round loaded
       if (t.shellIdx !== 0 && t.ammo[0] > 0 && t.reloadLeft <= 0) t.selectShell(0);
     }
   }
