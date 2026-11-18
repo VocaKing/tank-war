@@ -1,6 +1,6 @@
 // Tank entity: drivetrain + terrain-following physics, turret/gun laying, firing, module & crew damage
 import * as THREE from 'three';
-import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
+import { createTankModel, updateRunningGear, burnModel, addHitMark, updateSuspension } from '../models/tankModel.js';
 import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
 import { Equipment } from './items.js';
@@ -91,6 +91,7 @@ export class Tank {
     this.vel.set((this.pos.x - ox) / Math.max(dt, 1e-4), 0, (this.pos.z - oz) / Math.max(dt, 1e-4));
     // running gear animation
     const half = d.W / 2; updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
+    updateSuspension(this.model, dt, this.speed, this.pos.y); // v9 cosmetic hull heave
     this.moved += Math.abs(this.speed) * dt;
     this.updateTurret(dt);
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
@@ -177,6 +178,7 @@ export class Tank {
     const A = best.part === 'hull' ? la : ta, B = best.part === 'hull' ? lb : tb;
     best.local = new THREE.Vector3().lerpVectors(A, B, best.t); best.ldir = new THREE.Vector3().subVectors(B, A).normalize();
     best.face = best.axis === 1 ? (best.sign > 0 ? 'top' : 'bottom') : best.axis === 2 ? (best.sign > 0 ? 'front' : 'rear') : 'side'; best.sideSign = best.axis === 0 ? best.sign : 0;
+    best.wa = a; best.wb = b; this._lastRay = best; // v9: world segment, used only for cosmetic hit marks (see Game.lastTankHit)
     return best;
   }
   // effective armour for a hit (from rayTest) and a shell; dist = shell travel
@@ -243,6 +245,8 @@ export class Tank {
     this.damage(dmg, attacker, 'pen');
     return msgs;
   }
+  // v9 cosmetic: scorch/dent decal where the last shell struck (no gameplay effect)
+  markHit(penetrated) { const r = this._lastRay; if (!r || !r.wa) return; this._lastRay = null; try { addHitMark(this.model, { wa: r.wa.clone(), wb: r.wb.clone() }, penetrated); } catch (e) { /* cosmetic only */ } }
   breakTracks() { this.modules.tracks = 0; this.trackRepair = 9; this.speed *= 0.2; }
 }
 

@@ -26,6 +26,8 @@ const ENEMY_NAMES = ['Lt. Weber', 'Sgt. Volkov', 'Cpt. Brandt', 'Sgt. Petrov', '
 export class Game {
   static ZOOMS = [2, 4, 8, 16];
   constructor(renderer, uiRoot, audio, opts) {
+    // v9 cosmetic hook: Ballistics sets lastTankHit on every shell-vs-tank impact -> leave a scorch/dent mark on that tank's model
+    Object.defineProperty(this, 'lastTankHit', { configurable: true, enumerable: true, get() { return this._lastTankHit; }, set(v) { this._lastTankHit = v; if (v && v.tank && v.tank.markHit) v.tank.markHit(!!v.penetrated); } });
     this.renderer = renderer; this.audio = audio; this.opts = opts; this.rng = new RNG(opts.seed || ((Math.random() * 1e9) | 0));
     this.quality = opts.quality || 'high'; this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
     this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 6000);

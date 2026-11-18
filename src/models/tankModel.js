@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { trackTexture, decalTexture } from '../world/textures.js';
 import { tankCamoTexture as camoTexture } from './paint.js';
-import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
+import { DEG, makeNoise2D, tileField, sampleField, RNG } from '../util.js';
 
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
@@ -151,7 +151,26 @@ function sharedMats() {
   MATS.glass = new THREE.MeshPhysicalMaterial({ color: 0x0b1820, roughness: 0.04, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.02, reflectivity: 0.9, envMapIntensity: 1.6, emissive: 0x03080c, sheen: 0.4, sheenColor: new THREE.Color(0x3a6a70) });
   MATS.wood = new THREE.MeshStandardMaterial({ color: 0x6a5134, roughness: 0.9 });
   MATS.canvas = new THREE.MeshStandardMaterial({ color: 0x5e5a43, roughness: 1.0 });
-  MATS.burnt = new THREE.MeshStandardMaterial({ color: 0x1d1a17, roughness: 0.95, metalness: 0.15 });
+  // v9 burnt-out wreck: charred black paint, grey-white ash bloom, rust-brown heat-scaled steel, all rough; one shared material for every wreck
+  MATS.burnt = new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.97, metalness: 0.1 });
+  MATS.burnt.onBeforeCompile = (sh) => {
+    sh.uniforms.uNoise = { value: noiseTexture() };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vBP; varying vec3 vBN;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvBP = position; vBN = normal;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vBP; varying vec3 vBN; uniform sampler2D uNoise; float bN;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec3 bb = pow(abs(normalize(vBN)), vec3(4.0)); bb /= (bb.x + bb.y + bb.z + 1e-5);
+        vec3 q = vBP * 0.22; vec3 a = texture2D(uNoise, q.zy).rgb * bb.x + texture2D(uNoise, q.xz).rgb * bb.y + texture2D(uNoise, q.xy).rgb * bb.z;
+        vec3 q2 = vBP * 3.1; float f = texture2D(uNoise, q2.zy).g * bb.x + texture2D(uNoise, q2.xz).g * bb.y + texture2D(uNoise, q2.xy).g * bb.z;
+        bN = f;
+        vec3 c = vec3(0.035, 0.032, 0.03);
+        c = mix(c, vec3(0.13, 0.075, 0.045), smoothstep(0.45, 0.8, a.r * 0.8 + f * 0.2) * 0.35);            // rust / heat-scaled steel
+        c = mix(c, vec3(0.42, 0.4, 0.37), smoothstep(0.55, 0.9, a.g) * 0.35 * smoothstep(0.3, 0.9, normalize(vBN).y + 0.4)); // ash on upper faces
+        diffuseColor.rgb = c * (0.8 + 0.3 * f) * 0.85;`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        { float hg = bN * 0.6; vec2 dH = vec2(dFdx(hg), dFdy(hg)); vec3 sX = dFdx(-vViewPosition), sY = dFdy(-vViewPosition);
+          vec3 R1 = cross(sY, normal), R2 = cross(normal, sX); float fD = dot(sX, R1) * faceDirection; normal = normalize(abs(fD) * normal - sign(fD) * (dH.x * R1 + dH.y * R2) * 0.03); }`);
+  };
+  MATS.burnt.customProgramCacheKey = () => 'burnt9';
   MATS.track = new THREE.MeshStandardMaterial({ color: 0x55514b, roughness: 0.62, metalness: 0.6 });
   MATS.steel = new THREE.MeshStandardMaterial({ color: 0x6a6760, roughness: 0.4, metalness: 0.85 });
   MATS.tail = new THREE.MeshStandardMaterial({ color: 0x7a0c08, roughness: 0.2, metalness: 0.1, emissive: 0x2a0200 });
@@ -629,9 +648,62 @@ export function updateRunningGear(model, distL, distR) {
   set(model.wheels, model.wheelList); set(model.sprockets, model.sprocketList); if (model.innerWheels) set(model.innerWheels, model.innerList);
   if (model.linksOn && (distL !== 0 || distR !== 0)) updateLinks(model);
 }
+// v9 suspension: the hull (body) heaves on a damped spring driven by vertical ground velocity + speed-scaled bumps, while
+// the running gear (wheels, sprockets, tracks, links) is counter-offset so it stays planted -> visible suspension travel.
+export function updateSuspension(model, dt, speed, groundY) {
+  if (!dt || dt > 0.25) { model.susY0 = groundY; return; }
+  const s = model.sus ||= { y: 0, v: 0, dist: 0 }; const gy0 = model.susY0 ?? groundY; model.susY0 = groundY;
+  const vy = (groundY - gy0) / dt; s.dist += Math.abs(speed) * dt;
+  const bump = Math.min(1, Math.abs(speed) / 12) * 0.012 * (Math.sin(s.dist * 2.1) * 0.6 + Math.sin(s.dist * 5.3 + 1.3) * 0.4);
+  const target = Math.max(-0.05, Math.min(0.05, -vy * 0.012)) + bump;
+  const k = 90, c = 11; s.v += ((target - s.y) * k - s.v * c) * dt; s.y += s.v * dt; s.y = Math.max(-0.06, Math.min(0.06, s.y));
+  model.body.position.y = s.y;
+  const off = -s.y; for (const m of [model.wheels, model.innerWheels, model.sprockets, ...model.tracks, ...model.links]) if (m) m.position.y = off;
+}
 export function burnModel(model) {
   const b = burntMaterial();
-  for (const m of model.meshes) { if (m.userData.decal) { m.visible = false; continue; } m.material = b; }
+  for (const m of model.meshes) { if (m.userData.decal) { m.visible = false; continue; } if (m.userData.hitMark) continue; m.material = b; }
+}
+// ---------- v9 battle damage: pooled scorch / dent decals at shell impacts ----------
+const MAX_MARKS = 8;
+let MARK = null;
+function markAssets() {
+  if (MARK) return MARK;
+  const S = 128; const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return [c, c.getContext('2d')]; };
+  // colour/alpha: soot halo, scorched ring, dark core (pen) / bright scraped steel (bounce)
+  const scorch = (pen) => { const [c, g] = mk(); const cx = S / 2; const r = new RNG(pen ? 3 : 4);
+    let gr = g.createRadialGradient(cx, cx, 0, cx, cx, cx); gr.addColorStop(0, pen ? 'rgba(8,7,6,1)' : 'rgba(150,145,135,0.95)'); gr.addColorStop(pen ? 0.18 : 0.12, pen ? 'rgba(12,10,9,1)' : 'rgba(95,90,82,0.9)'); gr.addColorStop(0.32, 'rgba(25,22,18,0.85)'); gr.addColorStop(0.6, 'rgba(30,26,22,0.45)'); gr.addColorStop(1, 'rgba(30,26,22,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    for (let k = 0; k < 40; k++) { const a = r.next() * 6.283, d = cx * (0.25 + r.next() * 0.6); g.fillStyle = `rgba(20,18,15,${0.15 + r.next() * 0.3})`; g.beginPath(); g.arc(cx + Math.cos(a) * d, cx + Math.sin(a) * d, 1 + r.next() * 4, 0, 6.283); g.fill(); }
+    if (pen) { g.fillStyle = 'rgba(0,0,0,1)'; g.beginPath(); g.arc(cx, cx, S * 0.07, 0, 6.283); g.fill(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  // dent normal map: shallow crater with a raised lip
+  const [nc, ng] = mk(); const img = ng.createImageData(S, S); const H = (x, y) => { const d = Math.hypot(x - S / 2, y - S / 2) / (S / 2); return d > 1 ? 0 : -Math.cos(Math.min(1, d / 0.55) * Math.PI / 2) * 0.0 - (d < 0.55 ? (1 - (d / 0.55) ** 2) : 0) * 1.0 + (d > 0.5 && d < 0.75 ? Math.sin((d - 0.5) / 0.25 * Math.PI) * 0.25 : 0); };
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const hx = (H(x + 1, y) - H(x - 1, y)) * 6, hy = (H(x, y + 1) - H(x, y - 1)) * 6; const l = Math.hypot(hx, hy, 1); const i = (y * S + x) * 4; img.data[i] = (-hx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (hy / l * 0.5 + 0.5) * 255; img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255; }
+  ng.putImageData(img, 0, 0); const nt = new THREE.CanvasTexture(nc);
+  const mat = (pen) => new THREE.MeshStandardMaterial({ map: scorch(pen), normalMap: nt, normalScale: new THREE.Vector2(1.2, 1.2), transparent: true, depthWrite: false, roughness: pen ? 0.95 : 0.5, metalness: pen ? 0.1 : 0.6, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  MARK = { geo: new THREE.PlaneGeometry(1, 1), pen: mat(true), bounce: mat(false), ray: new THREE.Raycaster(), q: new THREE.Quaternion(), pq: new THREE.Quaternion(), z: new V3(0, 0, 1), n: new V3(), nm: new THREE.Matrix3() };
+  return MARK;
+}
+// ray: {wa, wb} world segment of the shell for this step (from Tank.rayTest); pen = penetrated
+export function addHitMark(model, ray, pen) {
+  if (!model || !ray || !ray.wa || !ray.wb) return null;
+  const A = markAssets(); const dir = new V3().subVectors(ray.wb, ray.wa); const len = dir.length(); if (len < 1e-4) return null; dir.divideScalar(len);
+  const from = ray.wa.clone().addScaledVector(dir, -1.5);
+  A.ray.set(from, dir); A.ray.far = len + 3;
+  const targets = model.meshes.filter((m) => !m.isInstancedMesh && m.visible && !m.userData.decal && !m.userData.hitMark && m.parent);
+  const hit = A.ray.intersectObjects(targets, false)[0]; if (!hit || !hit.face) return null;
+  const parent = hit.object.parent;
+  A.nm.getNormalMatrix(hit.object.matrixWorld); A.n.copy(hit.face.normal).applyMatrix3(A.nm).normalize(); if (A.n.dot(dir) > 0) A.n.negate();
+  model.hitMarks ||= []; let m;
+  if (model.hitMarks.length < MAX_MARKS) { m = new THREE.Mesh(A.geo, pen ? A.pen : A.bounce); m.userData.hitMark = true; m.renderOrder = 2; model.hitMarks.push(m); model.meshes.push(m); }
+  else { m = model.hitMarks.shift(); model.hitMarks.push(m); m.material = pen ? A.pen : A.bounce; }
+  parent.add(m);
+  const wp = hit.point.clone().addScaledVector(A.n, 0.012); m.position.copy(parent.worldToLocal(wp));
+  A.q.setFromUnitVectors(A.z, A.n); A.q.multiply(new THREE.Quaternion().setFromAxisAngle(A.z, Math.random() * 6.283));
+  parent.getWorldQuaternion(A.pq); m.quaternion.copy(A.pq.invert().multiply(A.q));
+  const sz = pen ? 0.42 + Math.random() * 0.15 : 0.3 + Math.random() * 0.1; m.scale.set(sz, sz, 1);
+  return m;
 }
 // debug hook for offline showroom / triangle audits (tools_tanks_show.mjs)
-if (typeof window !== 'undefined') window.__TM = { THREE, TANKS, createTankModel, setTrackLOD, updateRunningGear };
+if (typeof window !== 'undefined') window.__TM = { THREE, TANKS, createTankModel, setTrackLOD, updateRunningGear, addHitMark, burnModel, updateSuspension };
