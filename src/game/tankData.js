@@ -21,7 +21,7 @@ export const TANKS = [
       { name: 'M93 HVAP', type: 'APCR', caliber: 76, pen: 208, velocity: 1036, damage: 200, count: 6 },
       { name: 'M42A1 HE', type: 'HE', caliber: 76, pen: 12, velocity: 800, damage: 340, count: 20 },
     ],
-    paint: { base: '#4b4f2f', camo: null, accent: '#3a3d24' },
+    paint: { base: '#4a4b2e', camo: null, accent: '#3a3b24', pattern: 'solid', fade: 16, rough: 0.78 }, // US olive drab No.9
     desc: 'Late-war Sherman with the long 76 mm M1A2 gun, HVSS suspension and wet ammo stowage. Fast-firing and reliable, but thin side armor.',
   },
   {
@@ -41,7 +41,7 @@ export const TANKS = [
       { name: 'PzGr. 40 APCR', type: 'APCR', caliber: 88, pen: 203, velocity: 930, damage: 250, count: 6 },
       { name: 'Sprgr. L/4.5 HE', type: 'HE', caliber: 88, pen: 18, velocity: 820, damage: 400, count: 36 },
     ],
-    paint: { base: '#b39a5c', camo: ['#5a6b3a', '#6b4a2e'], accent: '#8d7a48' },
+    paint: { base: '#b19a62', camo: ['#56633a', '#6a4630'], accent: '#8d7a48', pattern: 'spray', fade: 12, rough: 0.74 }, // dunkelgelb + olivgrün/rotbraun spray
     desc: 'The legendary heavy tank. Thick, mostly flat armor and the precise 8.8 cm KwK 36 – but heavy, slow and with a sluggish hydraulic turret traverse.',
   },
   {
@@ -61,7 +61,7 @@ export const TANKS = [
       { name: 'BR-365P APCR', type: 'APCR', caliber: 85, pen: 190, velocity: 1050, damage: 210, count: 5 },
       { name: 'O-365K HE', type: 'HE', caliber: 85, pen: 15, velocity: 793, damage: 360, count: 15 },
     ],
-    paint: { base: '#4e5a32', camo: null, accent: '#3d4728' },
+    paint: { base: '#4b5631', camo: null, accent: '#3d4728', pattern: 'solid', fade: 18, rough: 0.8 }, // Soviet 4BO green
     desc: 'Mass-produced Soviet medium tank with superbly sloped armor, wide tracks and an 85 mm ZiS-S-53. Agile, cramped, and hard-hitting.',
   },
   {
@@ -82,7 +82,7 @@ export const TANKS = [
       { name: '3BK18M HEAT', type: 'HEAT', caliber: 125, pen: 550, velocity: 905, damage: 450, count: 12 },
       { name: '3OF26 HE-FRAG', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 10 },
     ],
-    paint: { base: '#4f5a37', camo: ['#2e2f22', '#7a6c46'], accent: '#3e472b' },
+    paint: { base: '#4c5836', camo: null, accent: '#3e472b', pattern: 'solid', fade: 14, rough: 0.72 }, // Soviet late-Cold-War protective green
     desc: 'Cold War Soviet MBT with a 125 mm smoothbore fed by a carousel autoloader, Kontakt-1 ERA and a very low silhouette. Poor reverse speed.',
   },
   {
@@ -103,7 +103,7 @@ export const TANKS = [
       { name: 'M830A1 HEAT-MP-T', type: 'HEAT', caliber: 120, pen: 600, velocity: 1410, damage: 460, count: 12 },
       { name: 'M908 HE-OR-T', type: 'HE', caliber: 120, pen: 50, velocity: 1410, damage: 520, count: 8 },
     ],
-    paint: { base: '#b8a27a', camo: null, accent: '#9c8963' },
+    paint: { base: '#b5a07a', camo: null, accent: '#9c8963', pattern: 'solid', fade: 10, rough: 0.7 }, // CARC desert tan 686A
     desc: 'Modern US MBT: 1,500 hp gas turbine, DU composite armor, CITV hunter-killer sight with thermals, and the 120 mm M256 smoothbore. Fast in both directions.',
   },
   // ---------------- v2 additions ----------------
@@ -124,7 +124,7 @@ export const TANKS = [
       { name: 'PzGr. 40/42 APCR', type: 'APCR', caliber: 75, pen: 226, velocity: 1120, damage: 200, count: 8 },
       { name: 'Sprgr. 42 HE', type: 'HE', caliber: 75, pen: 10, velocity: 700, damage: 300, count: 16 },
     ],
-    paint: { base: '#b9a46a', camo: ['#4f5e33', '#6e4a2c'], accent: '#8f7d4b' },
+    paint: { base: '#b39e66', camo: ['#4d5a33', '#694630'], accent: '#8f7d4b', pattern: 'spray', fade: 12, rough: 0.74 }, // late-war 3-tone spray
     desc: 'Germany\'s answer to the T-34: steeply sloped 80 mm glacis, the very high-velocity 7.5 cm KwK 42 L/70 and wide interleaved road wheels. Weak lower hull and flat-ish sides.',
   },
   {
@@ -144,7 +144,7 @@ export const TANKS = [
       { name: 'BR-471B APBC', type: 'APCBC', caliber: 122, pen: 168, velocity: 795, damage: 390, count: 6 },
       { name: 'OF-471 HE', type: 'HE', caliber: 122, pen: 30, velocity: 795, damage: 520, count: 8 },
     ],
-    paint: { base: '#4a5530', camo: null, accent: '#3a4426' },
+    paint: { base: '#4a5430', camo: null, accent: '#3a4426', pattern: 'solid', fade: 18, rough: 0.8 }, // 4BO green
     desc: 'Soviet breakthrough tank with the huge 122 mm D-25T: devastating hits but separate-loading ammunition means a very long reload. Straightened 120 mm glacis.',
   },
   {
@@ -164,7 +164,7 @@ export const TANKS = [
       { name: 'T30E16 HVAP', type: 'APCR', caliber: 90, pen: 245, velocity: 1021, damage: 240, count: 8 },
       { name: 'M71 HE', type: 'HE', caliber: 90, pen: 15, velocity: 823, damage: 360, count: 12 },
     ],
-    paint: { base: '#4d5133', camo: null, accent: '#3c3f28' },
+    paint: { base: '#4b4c2f', camo: null, accent: '#3c3f28', pattern: 'solid', fade: 16, rough: 0.78 }, // US olive drab
     desc: 'The first US heavy tank to see combat: 90 mm M3 gun, torsion-bar suspension and a thick cast turret. Underpowered but well balanced.',
   },
   {
@@ -184,7 +184,7 @@ export const TANKS = [
       { name: '20 pdr APCBC Mk 3', type: 'APCBC', caliber: 84, pen: 200, velocity: 1020, damage: 300, count: 30 },
       { name: '20 pdr HE Mk 3', type: 'HE', caliber: 84, pen: 20, velocity: 600, damage: 380, count: 15 },
     ],
-    paint: { base: '#3d4630', camo: null, accent: '#2f3725' },
+    paint: { base: '#3c4430', camo: null, accent: '#2f3725', pattern: 'solid', fade: 12, rough: 0.72 }, // British deep bronze green
     desc: 'The archetypal post-war British MBT: thick cast turret, Meteor V12, side skirts and the excellent 20-pounder firing APDS, with an early Metadyne stabiliser.',
   },
   {
@@ -204,7 +204,7 @@ export const TANKS = [
       { name: 'DM12 HEAT-MP-T', type: 'HEAT', caliber: 105, pen: 400, velocity: 1174, damage: 360, count: 20 },
       { name: 'DM512 HESH', type: 'HESH', caliber: 105, pen: 125, velocity: 730, damage: 440, count: 15 },
     ],
-    paint: { base: '#4f5638', camo: ['#22231f', '#6a4a32'], accent: '#3e4430' },
+    paint: { base: '#4d5537', camo: ['#23241f', '#5f4632'], accent: '#3e4430', pattern: 'hard', fade: 8, rough: 0.7 }, // NATO 3-tone (Bronzegrün/Teerschwarz/Lederbraun)
     desc: 'Mobility over armor: the 105 mm L7A3, EMES 18 fire control with thermal sight and a fast 830 hp MTU diesel. Spaced-armor turret, very thin hull.',
   },
   {
@@ -224,7 +224,7 @@ export const TANKS = [
       { name: 'DM12 HEAT-MP-T', type: 'HEAT', caliber: 120, pen: 620, velocity: 1140, damage: 470, count: 12 },
       { name: 'DM11 HE-T', type: 'HE', caliber: 120, pen: 60, velocity: 1100, damage: 520, count: 8 },
     ],
-    paint: { base: '#4f5638', camo: ['#22231f', '#6a4a32'], accent: '#3e4430' },
+    paint: { base: '#4d5537', camo: ['#23241f', '#5f4632'], accent: '#3e4430', pattern: 'hard', fade: 8, rough: 0.68 }, // NATO 3-tone
     desc: 'Arrowhead spaced add-on armor over the turret front, the long 120 mm L55 smoothbore and a 1,500 hp V12. Bustle ammunition with blow-out panels.',
   },
   {
@@ -244,7 +244,7 @@ export const TANKS = [
       { name: '3BK31 tandem HEAT', type: 'HEAT', caliber: 125, pen: 750, velocity: 905, damage: 460, count: 10 },
       { name: '3OF26 HE-FRAG', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 10 },
     ],
-    paint: { base: '#59613d', camo: ['#7a7552', '#30352a'], accent: '#454c30' },
+    paint: { base: '#5b6340', camo: ['#8a8058', '#2d3128'], accent: '#454c30', pattern: 'hard', fade: 10, rough: 0.72 }, // Russian green/sand/black 3-tone
     desc: 'Latest T-90: Relikt ERA (effective against long rods and HEAT), new welded turret with bustle and slat armor, Kalina FCS. Low profile, autoloader carousel under the turret.',
   },
   {
@@ -264,7 +264,7 @@ export const TANKS = [
       { name: 'L31A7 HESH', type: 'HESH', caliber: 120, pen: 170, velocity: 670, damage: 520, count: 12 },
       { name: 'L23A1 APFSDS', type: 'APFSDS', caliber: 120, pen: 480, velocity: 1535, damage: 400, count: 10 },
     ],
-    paint: { base: '#c2a77a', camo: null, accent: '#a88f63' },
+    paint: { base: '#c0a77c', camo: null, accent: '#a88f63', pattern: 'solid', fade: 10, rough: 0.72 }, // British desert sand
     desc: 'British MBT with second-generation Chobham ("Dorchester") armor and the rifled 120 mm L30A1 – the only NATO tank still firing HESH. Exceptionally well protected.',
   },
   {
@@ -284,7 +284,7 @@ export const TANKS = [
       { name: 'DTP-125 HEAT', type: 'HEAT', caliber: 125, pen: 650, velocity: 900, damage: 460, count: 10 },
       { name: 'DTB-125 HE', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 8 },
     ],
-    paint: { base: '#6b7046', camo: ['#3c4229', '#8c8a62'], accent: '#555a38', pattern: 'digital' },
+    paint: { base: '#566a34', camo: ['#2c3820', '#76784a', '#405229'], accent: '#4a5a30', pattern: 'digital', fade: 6, rough: 0.66, dustAmt: 0.6 }, // PLA woodland digital (richer greens, less dust)
     desc: 'China\'s top MBT: arrowhead ERA-clad turret, 1,500 hp diesel, laser dazzler and a 125 mm autoloaded smoothbore. Fast, flat and modern, in digital camouflage.',
   },
   {
@@ -292,7 +292,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 65, power: 1500, maxSpeed: 64, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
-    dims: { L: 7.6, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 6.0, turretBoxZ: 0.0 },
+    dims: { L: 7.6, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 5.3, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [560, 30], side: [100, 0], rear: [80, 0], top: [40, 0], bottom: [30, 0] },
       turret: { front: [800, 20], side: [320, 10], rear: [100, 0], top: [60, 0] },
@@ -304,7 +304,7 @@ export const TANKS = [
       { name: 'M339 HEAT-MP', type: 'HEAT', caliber: 120, pen: 600, velocity: 1300, damage: 460, count: 12 },
       { name: 'M329 APAM HE', type: 'HE', caliber: 120, pen: 50, velocity: 1400, damage: 520, count: 10 },
     ],
-    paint: { base: '#8d8a72', camo: null, accent: '#75725c' },
+    paint: { base: '#8f8a72', camo: null, accent: '#75725c', pattern: 'solid', fade: 10, rough: 0.74 }, // IDF Sinai grey
     desc: 'Crew survivability first: front-mounted engine, modular wedge armor with a long sloped turret, rear hatch and ball-and-chain curtains under the bustle.',
   },
 ];

@@ -171,3 +171,33 @@ export function barrel(P, part, len, opts = {}) {
 export function suspensionArms(P, x, wheels, yHull, side, mat = 'metal') {
   for (const w of wheels) { const zx = w.z + 0.18 * side * 0; P.add('hull', mat, T(new THREE.BoxGeometry(0.08, 0.1, 0.42), x, (w.y + yHull) / 2, zx + 0.12, 0.6, 0, 0)); P.add('hull', mat, cylX(0.07, 0.14, 8, x - side * 0.04, yHull, zx + 0.3)); }
 }
+// v7: rippled weld bead between points a and b (rolled-plate joints). 4-sided tube whose radius pulses every ~4 cm.
+export function weld(P, part, a, b, r = 0.022, mat = 'weld') {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b); const len = A.distanceTo(B); if (len < 0.05) return;
+  const n = Math.max(2, Math.min(36, Math.round(len / 0.12)));
+  const g = new THREE.CylinderGeometry(r, r, len, 3, n, true); const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i); const k = 0.75 + 0.35 * Math.abs(Math.sin((y / len + 0.5) * n * Math.PI)); p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); }
+  g.computeVertexNormals();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+  g.applyQuaternion(q); g.translate((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2); P.add(part, mat, g);
+}
+// weld every plate joint of an extruded side profile (polygon [[z,y]..]) above y0: corner seams on both sides at ±hw
+// and transverse seams across the width at each profile vertex.
+export function profileWelds(P, prof, hw, y0, opts = {}) {
+  const pts = prof.filter(([, y]) => y >= y0 - 1e-3);
+  for (let i = 0; i < pts.length; i++) {
+    const [z1, y1] = pts[i], [z2, y2] = pts[(i + 1) % pts.length]; if (y1 < y0 + 0.01 && y2 < y0 + 0.01) continue;
+    const h1 = typeof hw === 'function' ? hw(y1) : hw, h2 = typeof hw === 'function' ? hw(y2) : hw;
+    for (const s of [-1, 1]) weld(P, 'hull', [s * h1, y1, z1], [s * h2, y2, z2], opts.r);
+    if (opts.across !== false && y1 > y0 + 0.05) weld(P, 'hull', [-h1 + 0.04, y1, z1], [h1 - 0.04, y1, z1], opts.r);
+  }
+}
+// v8: casting parting line – a low ridge running round a tapered, extruded turret body at height fraction t.
+// poly = plan outline [[x,z]] as given to topExtrude; sx/sz/cz = taper params; bevel pushes the line out to the wall.
+export function castSeam(P, part, poly, y0, h, sx, sz, cz, t = 0.55, bevel = 0.03, step = 1) {
+  const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, czc = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+  const kx = 1 + (sx - 1) * t, kz = 1 + (sz - 1) * t, y = y0 + h * t;
+  const pts = [];
+  for (let i = 0; i < poly.length; i += step) { let [x, z] = poly[i]; const dx = x - cx, dz = z - czc, l = Math.hypot(dx, dz) || 1; x += (dx / l) * (bevel + 0.005); z += (dz / l) * (bevel + 0.005); pts.push([x * kx, y, cz + (z - cz) * kz]); }
+  for (let i = 0; i < pts.length; i++) weld(P, part, pts[i], pts[(i + 1) % pts.length], 0.013);
+}
