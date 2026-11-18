@@ -10,6 +10,7 @@ import { pbrTex, waterNormalTexture, setTexQuality } from './textures.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Grid2D } from './terrain.js';
 import { DEG, ridged, smoothstep } from '../util.js';
+import { heightFog } from '../render/atmos.js';
 
 function terrainMaterial(def) {
   const L = def.layers;
@@ -183,6 +184,17 @@ export class World {
     Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 800 });
     sun.shadow.bias = -0.00025; sun.shadow.normalBias = this.shadowTexel * 1.6; if (H && H.overcast) sun.shadow.radius = 6; else sun.shadow.radius = 2;
     scene.add(sun); scene.add(sun.target); this.sun = sun;
+    // v5: far shadows beyond the near frustum (Medium/High). Same direction as the sun, zero intensity: it only
+    // provides a wide, low-res shadow map that atmos.js blends in where the near map ends. Throttled re-render.
+    if (quality !== 'low') {
+      const fs = new THREE.DirectionalLight(0xffffff, 0); fs.castShadow = true; const fm = quality === 'high' ? 2048 : 1024; const FS = 380;
+      fs.shadow.mapSize.set(fm, fm); Object.assign(fs.shadow.camera, { left: -FS, right: FS, top: FS, bottom: -FS, near: 10, far: 1400 });
+      this.farTexel = (2 * FS) / fm; fs.shadow.bias = -0.0006; fs.shadow.normalBias = this.farTexel * 1.4; fs.shadow.radius = 1; fs.shadow.autoUpdate = false; fs.shadow.needsUpdate = true;
+      scene.add(fs); scene.add(fs.target); this.farSun = fs; this._farFrame = 0; this._farAt = null;
+    }
+    // v5: exponential height fog (atmos.js) -- haze settles in low ground; base = 30th-percentile terrain height
+    { const hf = (H && H.heightFog) || [0.03, 0.5]; const hs = []; const th = mb.t.h; for (let i = 0; i < th.length; i += 97) hs.push(th[i]); hs.sort((a, b) => a - b);
+      heightFog.x = quality === 'low' ? hf[0] * 0.8 : hf[0]; heightFog.y = hs[Math.floor(hs.length * 0.3)]; heightFog.z = hf[1]; scene.fog.density *= hf[2] || 1.2; }
     sunU.uSunDir.value.copy(this.sunDir); sunU.uSunCol.value.copy(sun.color).multiplyScalar(sun.intensity);
     const hemi = new THREE.HemisphereLight(0xbfd4ff, new THREE.Color(...def.farColor).multiplyScalar(1.2), 0.7); scene.add(hemi); this.hemi = hemi;
     this.hdrLoaded = !H; this.exposure = H ? H.exposure : null;
@@ -250,6 +262,16 @@ export class World {
     const a = Math.round(P.dot(this._lr) / tx_) * tx_, b = Math.round(P.dot(this._lu) / tx_) * tx_, c = P.dot(L);
     const C = this._lr.clone().multiplyScalar(a).addScaledVector(this._lu, b).addScaledVector(L, c);
     s.target.position.copy(C); s.position.copy(C).addScaledVector(L, 400); s.target.updateMatrixWorld();
+    const f = this.farSun;
+    if (f) { // far map: re-render every 10 frames, or immediately after a big move; texel-snapped like the near map
+      const ft = this.farTexel; const fa = Math.round(P.dot(this._lr) / ft) * ft, fb = Math.round(P.dot(this._lu) / ft) * ft;
+      const moved = !this._farAt || Math.hypot(target.x - this._farAt.x, target.z - this._farAt.z) > 40;
+      if (moved || ++this._farFrame >= 10) {
+        this._farFrame = 0; this._farAt = { x: target.x, z: target.z };
+        const FC = this._lr.clone().multiplyScalar(fa).addScaledVector(this._lu, fb).addScaledVector(L, c);
+        f.target.position.copy(FC); f.position.copy(FC).addScaledVector(L, 700); f.target.updateMatrixWorld(); f.updateMatrixWorld(); f.shadow.needsUpdate = true;
+      }
+    }
   }
   update(dt, time, camPos) {
     this.veg.updateLOD(camPos); this.veg.update(dt); this.grass.update(camPos);
@@ -267,5 +289,5 @@ export class World {
     let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz); if (t >= 0 && (best < 0 || t < best)) best = t; }
     return best;
   }
-  dispose() { this.disposed = true; if (this.bgTex) this.bgTex.dispose(); this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
+  dispose() { this.disposed = true; heightFog.x = 0; if (this.bgTex) this.bgTex.dispose(); this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
 }
