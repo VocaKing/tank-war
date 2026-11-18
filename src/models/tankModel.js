@@ -84,27 +84,38 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
 // instance-space position so every wheel differs; steel stays metallic where clean, mud is matte dielectric.
 function grimeMaterial(base, mudHex, amt = 0.55, key = 'grime') {
   const m = new THREE.MeshStandardMaterial(base);
-  const U = { uNoise: { value: noiseTexture() }, uMud: { value: new THREE.Color(mudHex || '#4a3d2c') }, uAmt: { value: amt } };
+  const U = { uNoise: { value: noiseTexture() }, uMud: { value: new THREE.Color(mudHex || '#4a3d2c') }, uAmt: { value: amt }, uLink: { value: key === 'grimeL' ? 1 : 0 } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN; varying float vGR;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
-          vGP = (instanceMatrix * vec4(transformed, 1.0)).xyz; vGN = normalize(mat3(instanceMatrix) * objectNormal);
+          vGP = transformed * vec3(1.0, 0.45, 0.45) + instanceMatrix[3].xyz * 1.37; vGN = objectNormal; vGR = length(transformed.yz);
         #else
-          vGP = transformed; vGN = objectNormal;
+          vGP = transformed; vGN = objectNormal; vGR = 1.0;
         #endif`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN; uniform sampler2D uNoise; uniform vec3 uMud; uniform float uAmt; float gMud;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN; varying float vGR; uniform sampler2D uNoise; uniform vec3 uMud; uniform float uAmt; uniform float uLink; float gMud;')
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 gb = pow(abs(normalize(vGN)), vec3(4.0)); gb /= (gb.x + gb.y + gb.z + 1e-5);
-        vec3 gp = vGP * 1.7;
+        vec3 gp = vGP * 0.55;
         float gn = texture2D(uNoise, gp.zy).r * gb.x + texture2D(uNoise, gp.xz).r * gb.y + texture2D(uNoise, gp.xy).r * gb.z;
-        float gf = texture2D(uNoise, gp.zy * 4.0).g * gb.x + texture2D(uNoise, gp.xz * 4.0).g * gb.y + texture2D(uNoise, gp.xy * 4.0).g * gb.z;
-        gMud = clamp(smoothstep(0.38, 0.85, gn + (gf - 0.5) * 0.25) * uAmt * 1.2, 0.0, 0.75);
-        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.8 + 0.3 * gf), gMud) * (1.0 - 0.18 * uAmt);
+        float gf = texture2D(uNoise, gp.zy * 6.0).g * gb.x + texture2D(uNoise, gp.xz * 6.0).g * gb.y + texture2D(uNoise, gp.xy * 6.0).g * gb.z;
+        // v9: soft film of dried mud that thickens toward the rim/tyre and into recesses, broken up by fine grain (no hard blotches)
+        float rim = mix(1.0, smoothstep(0.45, 1.0, vGR), 1.0 - uLink);
+        gMud = clamp((0.25 + 0.75 * smoothstep(0.25, 0.75, gn)) * (0.45 + 0.55 * rim) * uAmt * (0.85 + 0.3 * gf), 0.0, 0.8);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.85 + 0.25 * gf), gMud * 0.85);
+        // rubber (very dark vertex colour) stays matte dielectric
+        float gRub = 1.0 - smoothstep(0.08, 0.14, max(vColor.r, max(vColor.g, vColor.b)));
         diffuseColor.rgb *= 0.92 + 0.16 * gf;`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.97, gMud);')
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.0, gMud);');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(mix(roughnessFactor * (0.85 + 0.3 * gf), 0.93, gRub), 0.97, gMud);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.0, max(gMud, gRub));')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        { // v9: procedural micro-normal – rubber tread grain, cast-steel pitting and caked mud relief
+          float hgt = gf * (0.3 + 0.7 * gMud) + gRub * texture2D(uNoise, gp.zy * 22.0).b * 0.4;
+          vec2 dH = vec2(dFdx(hgt), dFdy(hgt)); vec3 sX = dFdx(-vViewPosition), sY = dFdy(-vViewPosition);
+          vec3 R1 = cross(sY, normal), R2 = cross(normal, sX); float fD = dot(sX, R1) * faceDirection;
+          normal = normalize(abs(fD) * normal - sign(fD) * (dH.x * R1 + dH.y * R2) * 0.03);
+        }`);
   };
   m.customProgramCacheKey = () => key;
   return m;

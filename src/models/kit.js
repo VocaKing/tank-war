@@ -199,5 +199,5 @@ export function castSeam(P, part, poly, y0, h, sx, sz, cz, t = 0.55, bevel = 0.0
   const kx = 1 + (sx - 1) * t, kz = 1 + (sz - 1) * t, y = y0 + h * t;
   const pts = [];
   for (let i = 0; i < poly.length; i += step) { let [x, z] = poly[i]; const dx = x - cx, dz = z - czc, l = Math.hypot(dx, dz) || 1; x += (dx / l) * (bevel + 0.005); z += (dz / l) * (bevel + 0.005); pts.push([x * kx, y, cz + (z - cz) * kz]); }
-  for (let i = 0; i < pts.length; i++) weld(P, part, pts[i], pts[(i + 1) % pts.length], 0.013);
+  for (let i = 0; i < pts.length; i++) weld(P, part, pts[i], pts[(i + 1) % pts.length], 0.019);
 }
