@@ -528,13 +528,14 @@ export function createTankModel(spec, opts = {}) {
     const li = new THREE.InstancedMesh(tpl.linkGeo, tpl.linkMat, tpl.nLinks); li.position.x = m.position.x; li.castShadow = true; li.receiveShadow = true; li.visible = false; li.frustumCulled = false; body.add(li); links.push(li); meshes.push(li);
   }
   // wheels: instanced (road wheels + idlers + return rollers) and sprockets
-  const wl = [];
+  const wl = [], wlIn = [];
   for (const s of [-1, 1]) {
-    for (const w of b.wheels) wl.push({ x: s * (d.W / 2 - d.trackW / 2) + (w.xo || 0) * s, y: w.y, z: w.z, r: w.r, w: w.w ?? d.trackW * 0.8, side: s });
+    for (const w of b.wheels) (w.xo < 0 ? wlIn : wl).push({ x: s * (d.W / 2 - d.trackW / 2) + (w.xo || 0) * s, y: w.y, z: w.z, r: w.r, w: w.w ?? d.trackW * 0.8, side: s }); // v8: inner (hidden) layer of interleaved wheels always uses the low-poly wheel
     for (const w of b.idlers) wl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.6, side: s });
     for (const w of b.rollers) wl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.5, side: s });
   }
   const wheels = new THREE.InstancedMesh(tpl.wheelGeoLo, tpl.wheelMat, wl.length); wheels.castShadow = true; wheels.receiveShadow = true; body.add(wheels); meshes.push(wheels);
+  let innerWheels = null; if (wlIn.length) { innerWheels = new THREE.InstancedMesh(tpl.wheelGeoLo, tpl.wheelMat, wlIn.length); innerWheels.castShadow = true; innerWheels.receiveShadow = true; body.add(innerWheels); meshes.push(innerWheels); }
   const sl = []; for (const s of [-1, 1]) for (const w of b.sprockets) sl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.7, side: s });
   const sprockets = new THREE.InstancedMesh(tpl.sprocketGeo, tpl.wheelMat, sl.length); sprockets.castShadow = true; body.add(sprockets); meshes.push(sprockets);
   // decals
@@ -542,7 +543,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, muzzle, sight, tracks, trackTex, links, details, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, muzzle, sight, tracks, trackTex, links, details, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, innerWheels, innerList: wlIn, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;
@@ -574,7 +575,7 @@ export function updateRunningGear(model, distL, distR) {
   model.trackTex[0].offset.x = model.trackOffset[0]; model.trackTex[1].offset.x = model.trackOffset[1];
   model.spinL = (model.spinL || 0) + distL; model.spinR = (model.spinR || 0) + distR;
   const set = (im, list) => { list.forEach((w, i) => { const dist = w.side < 0 ? model.spinL : model.spinR; _eu.set(dist / w.r, 0, 0); _qq.setFromEuler(_eu); _pos.set(w.x, w.y, w.z); _scl.set(w.w, w.r, w.r); _mat.compose(_pos, _qq, _scl); im.setMatrixAt(i, _mat); }); im.instanceMatrix.needsUpdate = true; };
-  set(model.wheels, model.wheelList); set(model.sprockets, model.sprocketList);
+  set(model.wheels, model.wheelList); set(model.sprockets, model.sprocketList); if (model.innerWheels) set(model.innerWheels, model.innerList);
   if (model.linksOn && (distL !== 0 || distR !== 0)) updateLinks(model);
 }
 export function burnModel(model) {
