@@ -12,7 +12,7 @@ export const MAPS = [
     seed: 1944, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 48, azimuth: 205 }, turbidity: 3.5, rayleigh: 1.4, fog: { color: 0xbcc8d2, density: 0.0011 }, exposure: 0.62,
     hdri: { file: 'kloofendal_48d_partly_cloudy_puresky', sunDir: [0.555, 0.742, 0.377], sunE: [4.35, 4.38, 3.98], horizon: [0.445, 0.479, 0.582], exposure: 0.82, fogDensity: 0.0009 },
-    layers: { A: 'leafy_grass', B: 'forest_ground_04', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.64, 0.86, 0.52], tintB: [0.9, 0.85, 0.75] },
+    layers: { A: 'leafy_grass', B: 'forest_ground_04', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.5, 0.76, 0.47], tintB: [0.86, 0.84, 0.76] },
     farColor: [0.36, 0.42, 0.26],
     generate(mb) {
       const r = mb.rng;
@@ -64,7 +64,7 @@ export const MAPS = [
       const F2 = mb.fieldSize;
       mb.finalize((x, z) => { const h = Math.abs(Math.sin(Math.floor(x / F2) * 12.9898 + Math.floor(z / F2) * 78.233) * 43758.5453) % 1; return h < 0.22 ? 0.75 : 0; },
         (x, z) => { const h = Math.abs(Math.sin(Math.floor(x / F2) * 12.9898 + Math.floor(z / F2) * 78.233) * 43758.5453) % 1; const n = mb.noise2(x / 60, z / 60) * 0.06;
-          if (h > 0.22 && h < 0.42) return [1.25 + n, 1.12 + n, 0.62]; if (h > 0.42 && h < 0.55) return [1.05, 1.08, 0.7]; return [1 + n, 1 + n, 1 + n]; });
+          if (h > 0.22 && h < 0.42) return [1.13 + n, 1.07 + n, 0.78]; if (h > 0.42 && h < 0.55) return [0.98, 1.06, 0.84]; return [1 + n, 1 + n, 1 + n]; });
     },
   },
   {
@@ -72,8 +72,8 @@ export const MAPS = [
     desc: 'Steep wooded hills and a mountain stream. Spruce forests and clearings, a sawmill hamlet in the valley and a ruined watchtower on the ridge. Long sightlines are rare; ambushes are common.',
     seed: 3121, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 21, azimuth: 120 }, turbidity: 6, rayleigh: 2.0, fog: { color: 0xc7c3b4, density: 0.0019 }, exposure: 0.6,
-    hdri: { file: 'kloofendal_overcast_puresky', sunDir: [0.70, 0.55, 0.45], sunE: [0.9, 0.9, 0.92], horizon: [0.693, 0.74, 0.832], exposure: 0.8, fogDensity: 0.00105, overcast: true },
-    layers: { A: 'forest_ground_04', B: 'leafy_grass', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.85, 0.85, 0.8], tintB: [0.85, 0.95, 0.72] },
+    hdri: { file: 'kloofendal_overcast_puresky', sunDir: [0.70, 0.55, 0.45], sunE: [0.9, 0.9, 0.92], horizon: [0.56, 0.615, 0.68], exposure: 0.84, fogDensity: 0.00068, overcast: true },
+    layers: { A: 'forest_ground_04', B: 'leafy_grass', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.76, 0.74, 0.66], tintB: [0.66, 0.86, 0.56] },
     farColor: [0.18, 0.24, 0.16],
     generate(mb) {
       const r = mb.rng;

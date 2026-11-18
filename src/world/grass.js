@@ -6,8 +6,8 @@ import { OCC } from './mapgen.js';
 import { foliageShading } from './vegetation.js';
 
 const PRESETS = {
-  village: { layer: 0, dens: 1.0, col: [0.62, 0.68, 0.42], col2: [0.8, 0.74, 0.46], h: 0.55 },
-  forest: { layer: 1, dens: 0.85, col: [0.56, 0.64, 0.38], col2: [0.7, 0.66, 0.4], h: 0.6 },
+  village: { layer: 0, dens: 1.0, col: [0.56, 0.68, 0.4], col2: [0.68, 0.7, 0.44], h: 0.55 },
+  forest: { layer: 1, dens: 0.85, col: [0.5, 0.62, 0.36], col2: [0.62, 0.64, 0.38], h: 0.6 },
   desert: { layer: 1, dens: 0.16, col: [1.15, 0.95, 0.62], col2: [0.95, 0.8, 0.5], h: 0.45 },
 };
 function bladeTexture() {
