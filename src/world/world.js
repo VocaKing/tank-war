@@ -23,10 +23,10 @@ function terrainMaterial(def) {
   };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; attribute vec4 roadk; varying vec4 vSplat; varying vec4 vRK; varying vec3 vWP; varying vec3 vWN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vRK = roadk; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; attribute vec4 roadk; attribute float padk; varying float vPad; varying vec4 vSplat; varying vec4 vRK; varying vec3 vWP; varying vec3 vWN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vRK = roadk; vPad = padk; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD, aA, aB, aC, aD; uniform vec3 tintA, tintB; varying vec4 vSplat; varying vec4 vRK; float tMudR = 0.0; vec2 tCobN = vec2(0.0); varying vec3 vWP; varying vec3 vWN; float tAO = 1.0;
+      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD, aA, aB, aC, aD; uniform vec3 tintA, tintB; varying vec4 vSplat; varying vec4 vRK; varying float vPad; float tMudR = 0.0; float tPad = 0.0; vec2 tPadN = vec2(0.0); vec3 conC = vec3(0.0); vec2 tCobN = vec2(0.0); varying vec3 vWP; varying vec3 vWN; float tAO = 1.0;
       vec3 sampleL(sampler2D t, vec2 uv, float far) { vec3 a = texture2D(t, uv).rgb; vec3 b = texture2D(t, uv * 0.173).rgb; return mix(a, (a + b) * 0.5, far); }`)
       .replace('#include <map_fragment>', `
         float camD = length(vWP - cameraPosition); float far = smoothstep(25.0, 140.0, camD);
@@ -45,6 +45,16 @@ function terrainMaterial(def) {
         // v5 road surfaces: packed dirt / cobblestone setts / asphalt derived from the gravel set (no extra samplers)
         {
           float gl = dot(cD, vec3(0.333)); float dirt = vRK.x, cob = vRK.y, asp = vRK.z;
+          // v5 concrete hard-standing: cast slabs (4 x 3 m) with sawn joints, per-slab tone, weathering stains and crumbling, grassy edges
+          if (vPad > 0.01) {
+            vec2 sp = vWP.xz / vec2(5.0, 4.0); vec2 sid = floor(sp); vec2 sf = fract(sp); float hs = fract(sin(dot(sid, vec2(17.1, 113.7))) * 43758.5);
+            vec2 je = min(sf, 1.0 - sf) * vec2(5.0, 4.0); float joint = smoothstep(0.008, 0.022, min(je.x, je.y));
+            float stain = texture2D(tB, vWP.xz / 9.0).g; float grain = mix(gl, 0.42, 0.55);
+            conC = vec3(0.47, 0.455, 0.42) * grain * (0.86 + hs * 0.22) * mix(0.72, 1.04, smoothstep(0.15, 0.65, stain));
+            conC = mix(conC * 0.55, conC, mix(1.0, joint, 1.0 - far));
+            tPadN = (sf - 0.5) * (1.0 - smoothstep(0.0, 0.06, min(je.x, je.y))) * 0.8 * (1.0 - far);
+            tPad = smoothstep(0.25, 0.65, vPad * (0.7 + 0.6 * br)) * (1.0 - 0.5 * smoothstep(0.5, 0.85, texture2D(tA, vWP.xz / 13.0).g)); // soil and moss washed over the slab
+          }
           vec3 dirtC = gl * vec3(1.22, 0.96, 0.72) * 0.86; // linear-space: keep the gravel set's brightness, shift to packed brown earth
           vec3 aspC = gl * vec3(0.33, 0.34, 0.36);
           vec3 cobC = cD;
@@ -67,7 +77,7 @@ function terrainMaterial(def) {
         float hmax = max(max(hgt.x, hgt.y), max(hgt.z, hgt.w)) - 0.18;
         vec4 hb = max(hgt - hmax, 0.0) * step(0.001, w); w = hb / (hb.x + hb.y + hb.z + hb.w + 1e-4);
         vec3 col = cA * w.x + cB * w.y + cC * w.z + cD * w.w;
-        float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0)); tRough = mix(tRough, 0.42, tMudR * (w.x + w.y)); tRough = mix(tRough, 0.82, vRK.z * w.w); tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
+        float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0)); tRough = mix(tRough, 0.42, tMudR * (w.x + w.y)); tRough = mix(tRough, 0.82, vRK.z * w.w); tRough = mix(tRough, 0.88, tPad); tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
         col *= 0.82 + 0.36 * texture2D(tB, vWP.xz / 97.0).g;
         col *= mix(0.92, 1.06, smoothstep(0.2, 0.8, texture2D(tA, vWP.xz / 260.0).r));
         // v4 patchwork: large irregular parcels (fields / meadows / dry patches) tint the ground layer differently
@@ -77,6 +87,7 @@ function terrainMaterial(def) {
           vec3 pt = hs < 0.33 ? vec3(1.04, 1.01, 0.88) : hs < 0.66 ? vec3(0.90, 1.0, 0.88) : vec3(1.0, 0.95, 0.9);
           col *= mix(vec3(1.0), pt, w.x * 0.85);
         }
+        col = mix(col, conC, tPad);
         diffuseColor.rgb *= col;`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(tRough, 0.95, far * 0.5);')
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= tAO; reflectedLight.indirectSpecular *= tAO * tAO; reflectedLight.directDiffuse *= mix(1.0, tAO, 0.5);')
@@ -84,13 +95,13 @@ function terrainMaterial(def) {
         {
           vec3 nm = (texture2D(nA, uv).xyz * w.x + texture2D(nB, uv * 1.1).xyz * w.y + texture2D(nC, uvr).xyz * w.z + texture2D(nD, uvd).xyz * w.w) * 2.0 - 1.0;
           nm.xy *= (1.0 - far * 0.7) * 0.9 * (1.0 - 0.6 * tMudR * (w.x + w.y)) * (1.0 - 0.5 * (vRK.x + vRK.z) * w.w);
-          nm.xy += tCobN * vRK.y * w.w;
+          nm.xy += tCobN * vRK.y * w.w; nm.xy = mix(nm.xy, nm.xy * 0.35 + tPadN, tPad);
           vec3 T = (viewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz; vec3 Bt = (viewMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
           T = normalize(T - normal * dot(normal, T)); Bt = normalize(Bt - normal * dot(normal, Bt) - T * dot(T, Bt));
           normal = normalize(T * nm.x + Bt * nm.y + normal * nm.z);
         }`);
   };
-  m.customProgramCacheKey = () => 'terrain5r';
+  m.customProgramCacheKey = () => 'terrain5c';
   return m;
 }
 
@@ -100,15 +111,15 @@ function buildTerrainMeshes(mb, mat, step) {
     const i0 = tx * per, j0 = ty * per, i1 = tx === tiles - 1 ? t.n - 1 : i0 + per, j1 = ty === tiles - 1 ? t.n - 1 : j0 + per;
     const nx = Math.floor((i1 - i0) / step) + 1, nz = Math.floor((j1 - j0) / step) + 1;
     const pos = new Float32Array(nx * nz * 3), col = new Float32Array(nx * nz * 3), spl = new Float32Array(nx * nz * 4), rk = new Float32Array(nx * nz * 4), idx = [];
-    let v = 0; const RK = t.roadK, MUD = mb.mud;
+    let v = 0; const RK = t.roadK, MUD = mb.mud, PAD = t.pad; const pd = new Float32Array(nx * nz);
     for (let b = 0; b < nz; b++) for (let a = 0; a < nx; a++) {
       const i = Math.min(i1, i0 + a * step), j = Math.min(j1, j0 + b * step), k = j * t.n + i;
       pos[v * 3] = t.i2x(i); pos[v * 3 + 1] = t.h[k]; pos[v * 3 + 2] = t.i2x(j);
       col[v * 3] = t.tint[k * 3]; col[v * 3 + 1] = t.tint[k * 3 + 1]; col[v * 3 + 2] = t.tint[k * 3 + 2];
-      spl.set(mb.splat.subarray(k * 4, k * 4 + 4), v * 4); if (RK) { rk[v * 4] = RK[k * 3]; rk[v * 4 + 1] = RK[k * 3 + 1]; rk[v * 4 + 2] = RK[k * 3 + 2]; } if (MUD) rk[v * 4 + 3] = MUD[k]; v++;
+      spl.set(mb.splat.subarray(k * 4, k * 4 + 4), v * 4); if (RK) { rk[v * 4] = RK[k * 3]; rk[v * 4 + 1] = RK[k * 3 + 1]; rk[v * 4 + 2] = RK[k * 3 + 2]; } if (MUD) rk[v * 4 + 3] = MUD[k]; if (PAD) pd[v] = PAD[k]; v++;
     }
     for (let b = 0; b < nz - 1; b++) for (let a = 0; a < nx - 1; a++) { const p = b * nx + a; idx.push(p, p + nx, p + 1, p + 1, p + nx, p + nx + 1); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4)); g.setAttribute('roadk', new THREE.BufferAttribute(rk, 4));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4)); g.setAttribute('roadk', new THREE.BufferAttribute(rk, 4)); g.setAttribute('padk', new THREE.BufferAttribute(pd, 1));
     g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
     const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; mesh.castShadow = false; group.add(mesh);
   }
@@ -128,19 +139,29 @@ function buildFarTerrain(mb, mat) {
     const fc = def.farColor; col.set([fc[0] * 2.2, fc[1] * 2.2, fc[2] * 2.2], v * 3); spl.set([1, 0, 0, 0], v * 4);
   }
   for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) { const p = j * n + i; idx.push(p, p + n, p + 1, p + 1, p + n, p + n + 1); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4)); g.setAttribute('roadk', new THREE.BufferAttribute(new Float32Array(n * n * 4), 4));
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4)); g.setAttribute('roadk', new THREE.BufferAttribute(new Float32Array(n * n * 4), 4)); g.setAttribute('padk', new THREE.BufferAttribute(new Float32Array(n * n), 1));
   g.setIndex(idx); g.computeVertexNormals();
   const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = false; mesh.name = 'farTerrain'; return mesh;
 }
 
 export const waterTime = { value: 0 };
-function waterMaterial() {
+// v5: terrain height as a half-float texture so water can read its own depth (colour, alpha fade, shoreline foam)
+function heightTexture(t) {
+  const n = t.n; const d = new Uint16Array(n * n); for (let k = 0; k < n * n; k++) d[k] = THREE.DataUtils.toHalfFloat(t.h[k]);
+  const tex = new THREE.DataTexture(d, n, n, THREE.RedFormat, THREE.HalfFloatType); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.needsUpdate = true; return tex;
+}
+function waterMaterial(hTex, t, def) {
   const nt = waterNormalTexture();
+  const fc = def.farColor, hz = (def.hdri && def.hdri.horizon) || [0.5, 0.55, 0.6];
+  const WU = { uH: { value: hTex }, uHM: { value: new THREE.Vector2(1 / (t.res * t.n), (t.half / t.res + 0.5) / t.n) },
+    uShallow: { value: new THREE.Color(...(def.waterShallow || [0.16, 0.2, 0.13])) }, uDeep: { value: new THREE.Color(...(def.waterDeep || [0.012, 0.04, 0.045])) },
+    uBankT: { value: new THREE.Vector3(fc[0] / hz[0], fc[1] / hz[1], fc[2] / hz[2]).multiplyScalar(0.55) } };
   const m = new THREE.MeshPhysicalMaterial({ color: 0x1d3a3c, roughness: 0.04, metalness: 0.0, transparent: true, opacity: 0.9, normalMap: nt, normalScale: new THREE.Vector2(1, 1), ior: 1.33, specularIntensity: 1, envMapIntensity: 1.0 });
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uT = waterTime;
+    sh.uniforms.uT = waterTime; Object.assign(sh.uniforms, WU);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPw;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPw; uniform float uT;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vWPw; uniform float uT; uniform sampler2D uH; uniform vec2 uHM; uniform vec3 uShallow, uDeep, uBankT; float wDepth = 1.0; float wFoam = 0.0;`)
       .replace('#include <normal_fragment_maps>', `{
         vec2 p = vWPw.xz; float dist = length(vWPw - cameraPosition);
         vec3 n1 = texture2D(normalMap, p / 9.0 + vec2(uT * 0.021, uT * 0.013)).xyz * 2.0 - 1.0;
@@ -148,13 +169,33 @@ function waterMaterial() {
         vec3 n3 = texture2D(normalMap, p / 31.0 + vec2(uT * 0.006, -uT * 0.009)).xyz * 2.0 - 1.0;
         float fade = 1.0 - smoothstep(40.0, 400.0, dist) * 0.7;
         vec2 s = (n1.xy * 0.55 + n2.xy * 0.35 * (1.0 - smoothstep(20.0, 120.0, dist)) + n3.xy * 0.5) * 0.32 * fade;
+        s *= 1.0 - 0.7 * wFoam; // foam flattens the ripples
         normal = normalize((viewMatrix * vec4(s.x, 1.0, s.y, 0.0)).xyz);
       }`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.75, wFoam);')
+      // horizon-aware reflections: rays that graze the horizon see banks and treelines, not open sky
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        { vec3 wN = inverseTransformDirection(normal, viewMatrix); vec3 rW = reflect(normalize(vWPw - cameraPosition), wN);
+          float hzM = 1.0 - smoothstep(-0.02, 0.2, rW.y); reflectedLight.indirectSpecular *= mix(vec3(1.0), uBankT, hzM * 0.85);
+          reflectedLight.directSpecular *= 1.0 - 0.8 * wFoam; reflectedLight.indirectSpecular *= 1.0 - 0.8 * wFoam; }`)
       // view-dependent body colour: looking straight down you see the dark, slightly green depth; grazing angles are mirror-like (Fresnel via IBL)
       .replace('#include <color_fragment>', `#include <color_fragment>
-        { float ndv = abs(dot(normalize(cameraPosition - vWPw), vec3(0.0, 1.0, 0.0))); diffuseColor.rgb *= mix(1.25, 0.65, ndv); diffuseColor.a = mix(0.97, 0.82, ndv); }`);
+        { vec2 p = vWPw.xz; float dist = length(vWPw - cameraPosition);
+        wDepth = vWPw.y - texture2D(uH, p * uHM.x + uHM.y).r; if (wDepth < 0.0) discard;
+        // shoreline foam: broken bands that lap towards the bank, strongest in the shallowest 0.4 m
+        { float fn = texture2D(normalMap, p / 2.6 + vec2(uT * 0.03, -uT * 0.02)).r + texture2D(normalMap, p / 7.0 - vec2(uT * 0.012, uT * 0.017)).g;
+          float band = 0.5 + 0.5 * sin(wDepth * 22.0 - uT * 1.4 + fn * 3.0);
+          float shore = 1.0 - smoothstep(0.04, 0.42, wDepth);
+          wFoam = smoothstep(0.85, 1.25, fn * 0.75 + band * 0.55 + shore * 0.35) * shore * (1.0 - smoothstep(60.0, 220.0, dist)); } }
+        { float ndv = abs(dot(normalize(cameraPosition - vWPw), vec3(0.0, 1.0, 0.0)));
+          // depth-based body colour + transparency: clear, sandy-green shallows; dark teal depths; grazing angles stay opaque
+          float dk = 1.0 - exp(-wDepth * 0.9);
+          diffuseColor.rgb = mix(uShallow, uDeep, dk) * mix(1.25, 0.7, ndv);
+          float a = mix(0.97, 0.82, ndv); a = mix(mix(0.3, 0.9, 1.0 - ndv), a, smoothstep(0.15, 1.8, wDepth));
+          a *= smoothstep(0.0, 0.08, wDepth); // soft contact with the bank, no hard intersection line
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.78), wFoam); diffuseColor.a = max(a, wFoam * 0.92 * smoothstep(0.0, 0.05, wDepth)); }`);
   };
-  m.customProgramCacheKey = () => 'water5';
+  m.customProgramCacheKey = () => 'water5d';
   return m;
 }
 function buildWater(mb, mat) {
@@ -225,7 +266,7 @@ export class World {
     const tmat = terrainMaterial(def); this.terrainMat = tmat;
     this.terrainGroup = buildTerrainMeshes(mb, tmat, quality === 'low' ? 2 : 1); scene.add(this.terrainGroup);
     this.far = buildFarTerrain(mb, tmat); scene.add(this.far);
-    this.waterMat = waterMaterial(); this.water = buildWater(mb, this.waterMat); scene.add(this.water);
+    this.hTex = heightTexture(mb.t); this.waterMat = waterMaterial(this.hTex, mb.t, def); this.water = buildWater(mb, this.waterMat); scene.add(this.water);
     // structures and vegetation
     const st = buildStructures(mb, scene, mb.t); this.colliders = st.colliders; this.decks = st.decks || [];
     this.colGrid = new Grid2D(mb.t.half, 24); for (const c of this.colliders) this.colGrid.insert(c, c.x, c.z, c.r);
@@ -311,5 +352,5 @@ export class World {
     let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz); if (t >= 0 && (best < 0 || t < best)) best = t; }
     return best;
   }
-  dispose() { this.disposed = true; heightFog.x = 0; if (this.bgTex) this.bgTex.dispose(); this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
+  dispose() { this.disposed = true; heightFog.x = 0; if (this.bgTex) this.bgTex.dispose(); if (this.hTex) this.hTex.dispose(); this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
 }

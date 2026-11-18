@@ -35,6 +35,7 @@ export const MAPS = [
       for (const [fx, fz] of [[-330, -330], [-190, 385], [420, -310], [380, 330]]) {
         const rot = r.range(0, 3);
         for (let k = 0; k < 4; k++) { const a = rot + k * Math.PI / 2; const bx = fx + Math.sin(a) * 18, bz = fz + Math.cos(a) * 18; if (mb.footFree(bx, bz, 7, 6, a)) mb.building({ x: bx, z: bz, w: r.range(8, 13), d: r.range(7, 10), rot: a, style: k === 2 ? 'brick' : 'stone', floors: k === 0 ? 2 : 1, roof: 'gable', barn: k > 1 }); }
+        mb.concrete(fx, fz, 10, 10, rot, 2); // concrete farmyard between the farm buildings
         mb.prop('haystack', fx + 4, fz - 3); mb.prop('cart', fx - 5, fz + 2, rot);
       }
       // bocage hedgerows on a jittered 110 m field grid
@@ -93,6 +94,7 @@ export const MAPS = [
       // sawmill hamlet
       mb.settle(30, -40, 120, { spacing: 20, density: 0.8, w: [7, 9], d: [8, 12], make: (r) => ({ style: 'cabin', floors: r.next() < 0.3 ? 2 : 1, roof: 'gable' }) });
       mb.building({ x: 70, z: -95, w: 14, d: 26, rot: 0.8, style: 'cabin', floors: 1, roof: 'gable', barn: true });
+      mb.concrete(40, -110, 27, 17, 0, 2.5); // sawmill yard hard-standing
       for (let i = 0; i < 6; i++) mb.prop('logs', 40 + r.range(-25, 25), -110 + r.range(-15, 15), r.range(0, 3));
       // watchtower ruin on the highest ground in the south-west quadrant
       let best = [-250, 250], bh = -1e9; for (let i = 0; i < 300; i++) { const x = r.range(-500, -50), z = r.range(80, 500); const h = mb.t.height(x, z); if (h > bh && mb.isFree(x, z, 20)) { bh = h; best = [x, z]; } }
@@ -147,6 +149,7 @@ export const MAPS = [
       // mosque on central square
       mb.building({ x: 55 + 27, z: -55 - 27, w: 22, d: 22, rot: 0, style: 'desert', kind: 'mosque', floors: 2, roof: 'flat' });
       mb.occupyRect(-27, 27, 20, 20, 0, OCC.RESERVED, 0); // market square
+      mb.concrete(-27, 27, 21, 21, 0, 1.2); // paved market square
       for (let i = 0; i < 6; i++) mb.prop('stall', -27 + r.range(-14, 14), 27 + r.range(-14, 14), r.int(0, 3) * Math.PI / 2);
       // fill blocks
       for (let bi = -4; bi < 4; bi++) for (let bj = -4; bj < 4; bj++) {
@@ -163,6 +166,7 @@ export const MAPS = [
       // outlying farm compounds with walls
       for (const [fx, fz] of [[-380, -150], [330, 230], [-200, -420], [150, 470], [420, 120]]) {
         if (!mb.footFree(fx, fz, 10, 10, 0)) continue;
+        mb.concrete(fx, fz, 15, 13, 0.2, 1.5); // compound courtyard slab
         mb.building({ x: fx, z: fz, w: 12, d: 9, rot: 0.2, style: 'desert', floors: 1, roof: 'flat', ruined: r.next() < 0.4 });
         const c = Math.cos(0.2), s = Math.sin(0.2); const P = [[-16, -14], [16, -14], [16, 14], [-16, 14]].map(([a, b]) => [fx + a * c + b * s, fz - a * s + b * c]);
         for (let k = 0; k < 4; k++) { const A = P[k], B = P[(k + 1) % 4]; const m = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]; mb.wall(A[0], A[1], A[0] + (m[0] - A[0]) * 0.75, A[1] + (m[1] - A[1]) * 0.75, 2.2, 'adobe', 0.5); mb.wall(B[0], B[1], B[0] + (m[0] - B[0]) * 0.75, B[1] + (m[1] - B[1]) * 0.75, 2.2, 'adobe', 0.5); }

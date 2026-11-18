@@ -29,7 +29,7 @@ export class Grass {
     if (!this.radius) return;
     const geo = new THREE.BufferGeometry(); const pos = [], uv = [], nrm = [];
     for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI; const cx = Math.cos(a) * 0.5, cz = Math.sin(a) * 0.5;
-      const q = [[-cx, 0, -cz, 0, 0], [cx, 0, cz, 1, 0], [cx, 1, cz, 1, 1], [-cx, 1, -cz, 0, 1]];
+      const q = [[-cx, -0.22, -cz, 0, 0], [cx, -0.22, cz, 1, 0], [cx, 1, cz, 1, 1], [-cx, 1, -cz, 0, 1]]; // base starts below ground so clumps root into it
       for (const i of [0, 1, 2, 0, 2, 3]) { pos.push(q[i][0], q[i][1], q[i][2]); uv.push(q[i][3], q[i][4]); nrm.push(0, 1, 0); } }
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
     const mat = new THREE.MeshStandardMaterial({ map: bladeTexture(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9, color: new THREE.Color(...this.p.col) });
@@ -40,13 +40,13 @@ export class Grass {
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           vec3 ip = instanceMatrix[3].xyz; float ph = ip.x * 0.31 + ip.z * 0.23;
           float d = length(ip.xz - cameraPosition.xz); float fade = 1.0 - smoothstep(uR * 0.7, uR, d);
-          transformed.y *= fade;
+          transformed.y = (transformed.y + 0.22) * fade - 0.22;
           float gust = 0.6 + 0.4 * sin(uWind * 0.35 + ip.x * 0.02 + ip.z * 0.015);
-          transformed.x += sin(uWind * 2.1 + ph) * 0.13 * position.y * position.y * gust; transformed.z += cos(uWind * 1.7 + ph) * 0.09 * position.y * position.y * gust;`);
-      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= mix(0.42, 1.08, smoothstep(0.0, 0.8, vMapUv.y));');
+          float py = max(position.y, 0.0); transformed.x += sin(uWind * 2.1 + ph) * 0.13 * py * py * gust; transformed.z += cos(uWind * 1.7 + ph) * 0.09 * py * py * gust;`);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= mix(0.42, 1.08, smoothstep(0.15, 0.85, vMapUv.y));');
       foliageShading(sh, 0.06, 0.6, 'vMapUv.y');
     };
-    mat.customProgramCacheKey = () => 'grass5';
+    mat.customProgramCacheKey = () => 'grass5b';
     const max = Math.ceil((Math.PI * R * R) / (this.spacing * this.spacing) * 1.05);
     this.mesh = new THREE.InstancedMesh(geo, mat, max); this.mesh.count = 0; this.mesh.frustumCulled = false; this.mesh.receiveShadow = true; this.mesh.castShadow = false;
     this.colors = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.mesh.instanceColor = this.colors;
@@ -56,7 +56,7 @@ export class Grass {
     if (!this.mesh) return;
     if (this.last && Math.hypot(camPos.x - this.last.x, camPos.z - this.last.z) < 5) return;
     this.last = { x: camPos.x, z: camPos.z };
-    const t = this.t, mb = this.mb, p = this.p, s = this.spacing, R = this.radius; const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+    const t = this.t, mb = this.mb, p = this.p, s = this.spacing, R = this.radius; const m = new THREE.Matrix4(), q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), nv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     const i0 = Math.floor((camPos.x - R) / s), i1 = Math.ceil((camPos.x + R) / s), j0 = Math.floor((camPos.z - R) / s), j1 = Math.ceil((camPos.z + R) / s);
     let n = 0; const max = this.mesh.instanceMatrix.count; const c1 = p.col, c2 = p.col2;
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
@@ -64,10 +64,14 @@ export class Grass {
       if ((x - camPos.x) ** 2 + (z - camPos.z) ** 2 > R * R) continue;
       const gi = t.x2i(x), gj = t.x2i(z); if (!t.inside(gi, gj)) continue; const k = t.idx(gi, gj);
       const w = mb.splat[k * 4 + p.layer] * p.dens; if (h1 > w * 1.15 - 0.1) continue;
+      if (t.pad && t.pad[k] > 0.35) continue;
       if (t.occ[k] === OCC.ROAD || t.occ[k] === OCC.BUILDING || t.occ[k] === OCC.WATER) continue;
       const y = t.height(x, z); if (t.water[k] > -1e8 && y < t.water[k] + 0.1) continue;
       const hs = p.h * (0.6 + hash(i * 3, j * 7) * 0.9) * (0.7 + w * 0.5);
-      e.set(0, h1 * 6.28, 0); q.setFromEuler(e); m.compose(v.set(x, y - 0.05, z), q, sc.set(hs * 1.6, hs, hs * 1.6)); this.mesh.setMatrixAt(n, m);
+      // conform to the ground: lean 60 % towards the terrain normal and sink the base by the slope drop across the card
+      t.normal(x, z, nv); const ny = Math.max(0.3, nv.y); const tan = Math.sqrt(1 - ny * ny) / ny; nv.lerp(up, 0.4).normalize();
+      e.set(0, h1 * 6.28, 0); q.setFromEuler(e); q2.setFromUnitVectors(up, nv); q.premultiply(q2);
+      m.compose(v.set(x, y - 0.04 - Math.min(0.35, tan * hs * 0.8 * 0.4), z), q, sc.set(hs * 1.6, hs, hs * 1.6)); this.mesh.setMatrixAt(n, m);
       const f = hash(i + 11, j + 13); this.colors.setXYZ(n, (c1[0] + (c2[0] - c1[0]) * f) / p.col[0], (c1[1] + (c2[1] - c1[1]) * f) / p.col[1], (c1[2] + (c2[2] - c1[2]) * f) / p.col[2]);
       if (++n >= max) break;
     }

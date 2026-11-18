@@ -160,6 +160,12 @@ export class MapBuilder {
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; if (t.road[k] <= 0) continue; const d = Math.hypot(t.i2x(i) - x, t.i2x(j) - z); if (d > r) continue;
       const f = 1 - smoothstep(r * 0.85, r, d); t.roadK[k * 3] *= 1 - f; t.roadK[k * 3 + 1] = Math.max(t.roadK[k * 3 + 1], kind === 1 ? f : 0); t.roadK[k * 3 + 2] = Math.max(t.roadK[k * 3 + 2], kind === 2 ? f : 0); }
   }
+  // v5: concrete hard-standing (farm yards, sawmill yard, market square, compounds) -> t.pad (0..1 per cell)
+  concrete(x, z, hw, hd, rot = 0, blend = 1.5) {
+    const t = this.t; if (!t.pad) t.pad = new Float32Array(t.n * t.n); const c = Math.cos(rot), s = Math.sin(rot);
+    this.forCells(x, z, Math.hypot(hw, hd) + blend + 1, (k, cx, cz) => { const dx = cx - x, dz = cz - z; const lx = Math.abs(dx * c - dz * s) - hw, lz = Math.abs(dx * s + dz * c) - hd;
+      const v = 1 - smoothstep(0, blend, Math.max(lx, lz)); if (v > t.pad[k] && t.water[k] < -1e8) t.pad[k] = v; });
+  }
   // v5: wet mud along river banks and in road shoulders -> this.mud (0..1 per cell)
   _mud() {
     const t = this.t; const n = t.n; const N = n * n; const m = new Float32Array(N);
