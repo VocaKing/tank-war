@@ -8,7 +8,7 @@ const errs = []; let fails = 0;
 const check = (name, ok, info) => { console.log((ok ? 'PASS ' : 'FAIL ') + name, info !== undefined ? JSON.stringify(info) : ''); if (!ok) fails++; };
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => errs.push(e.message)); page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-await page.goto(base + `?autostart=1&q=${Q}&seed=11&map=village&tank=t34`);
+await page.goto(base + `?autostart=1&q=${Q}&seed=11&map=village&tank=t34`, { timeout: 300000 });
 await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 300000 });
 const frames = (n = 3) => page.evaluate((n) => new Promise((res) => { setTimeout(res, 200000); let k = 0; const f = () => (++k >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
 // count outline-red pixels in a screenshot (decoded in the page)
@@ -80,7 +80,7 @@ const sc = await page.evaluate(() => { const g = window.__game, D = g.debug, e =
   return { ...D.assist(), aimShift_m: +before.distanceTo(after).toFixed(2), armor: g.armorView.enabled, sniper: g.cam.sniper }; });
 const shot2 = await shot('outline_scope');
 const sc2 = await page.evaluate(() => window.__game.debug.assist()); sc.outline = sc2.outline;
-await page.evaluate(() => { window.__game.outline.enabled = false; }); const shot2b = await page.screenshot({ timeout: 300000 }); await page.evaluate(() => { window.__game.outline.enabled = true; });
+await page.evaluate(() => { window.__game.outline.enabled = false; }); await frames(4); const shot2b = await page.screenshot({ timeout: 300000 }); await page.evaluate(() => { window.__game.outline.enabled = true; });
 const red2 = (await redCount(shot2, [240, 60, 1040, 660])) - (await redCount(shot2b, [240, 60, 1040, 660]));
 check('scope: outline drawn with armor view on, lock kept', sc.outline === eIdx && sc.locked && sc.armor && red2 > 60, { ...sc, redPixels: red2 });
 check('scope: aim point consistent on entering scope (<0.6 m)', sc.aimShift_m < 0.6, sc.aimShift_m);
