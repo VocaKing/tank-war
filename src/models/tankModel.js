@@ -65,19 +65,19 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         // dust settles in horizontal recesses (upward faces)
         diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * 0.08 * uDustAmt);
         vChip = chipM;
-        float vRough = 0.86 + 0.3 * nB.r + mud * 0.25 + dustH * 0.15 - chipM * 0.4;`)
+        float vRough = 0.86 + 0.3 * nB.r + mud * 0.25 + dustH * 0.15 - chipM * 0.4 + uCast * 0.14 * (nB.b - 0.3);`)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.55, vChip * 0.8);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.35 + mud * nB.g * 0.6) ;
+          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.5 + triN(vObjPos * 9.0, bw).g * uCast * 0.18 + mud * nB.g * 0.6) ;
           vec2 dHdxy = vec2(dFdx(hgt), dFdy(hgt)) * 0.9;
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX); float fDet = dot(vSigmaX, R1) * faceDirection;
           vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2); normal = normalize(abs(fDet) * normal - vGrad * 0.02);
         }`);
   };
-  m.customProgramCacheKey = () => 'paint6';
+  m.customProgramCacheKey = () => 'paint8';
   return m;
 }
 // v6: running-gear grime (road wheels, sprockets, idlers, track links). Mud is caked on in noisy patches using
@@ -225,6 +225,7 @@ function buildSherman(d) {
   // turret (cast, T23)
   const tp = superEllipse(0.98, 1.0, 1.25, 2.4, 44, (x, z) => [x * (z > 0.4 ? 1 - (z - 0.4) * 0.25 : 1), z]);
   P.add('turret', 'paint', taper(topExtrude(tp, 0.78, 0, 0.12, 3), 0, 0.78, 0.84, 0.86));
+  K.castSeam(P, 'turret', tp, 0, 0.78, 0.84, 0.86, 0, 0.5, 0.12, 2); // casting parting line
   P.add('turret', 'paint', box(1.25, 0.56, 0.32, 0, 0.4, 1.05)); P.add('turret', 'paint', cylX(0.29, 1.24, 16, 0, 0.4, 1.12));
   P.add('turret', 'paint', cylY(0.33, 0.22, 16, 0.42, 0.88, -0.25)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; P.add('turret', 'glass', box(0.1, 0.07, 0.03, 0.42 + Math.cos(a) * 0.33, 0.9, -0.25 + Math.sin(a) * 0.33, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', box(0.5, 0.05, 0.6, -0.42, 0.8, -0.2)); P.add('turret', 'dark', cylY(0.1, 0.12, 8, -0.1, 0.82, -0.7));
@@ -295,6 +296,7 @@ function buildT34(d) {
   // turret (cast)
   const tp = superEllipse(1.07, 1.25, 1.2, 2.2, 40, (x, z) => [x * (z > 0.3 ? 1 - (z - 0.3) * 0.22 : 1), z]);
   P.add('turret', 'paint', taper(topExtrude(tp, 0.78, 0, 0.1, 2), 0, 0.78, 0.8, 0.86));
+  K.castSeam(P, 'turret', tp, 0, 0.78, 0.8, 0.86, 0, 0.5, 0.1, 2); // casting parting line
   P.add('turret', 'paint', taper(box(1.2, 0.6, 0.35, 0, 0.38, 1.15), 0.08, 0.68, 0.9, 1)); P.add('turret', 'paint', cylX(0.3, 0.9, 14, 0, 0.38, 1.25));
   P.add('turret', 'paint', cylY(0.33, 0.25, 16, -0.42, 0.9, -0.45)); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; P.add('turret', 'glass', box(0.08, 0.06, 0.03, -0.42 + Math.cos(a) * 0.335, 0.93, -0.45 + Math.sin(a) * 0.335, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', cylY(0.23, 0.05, 12, 0.42, 0.8, -0.3)); for (const x of [-0.2, 0.55]) P.add('turret', 'metal', box(0.1, 0.12, 0.18, x, 0.84, 0.45));
@@ -327,6 +329,7 @@ function buildT72(d) {
   const dome = new THREE.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, 0.72, 1.28);
   { const p = dome.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getZ(i) > 0.4) p.setZ(i, 0.4 + (p.getZ(i) - 0.4) * 0.85); } dome.computeVertexNormals(); }
   P.add('turret', 'paint', dome); P.add('turret', 'paint', cylY(1.12, 0.12, 32, 0, 0.0, 0, 1.15));
+  K.castSeam(P, 'turret', superEllipse(1.02, 1.05, 1.16, 2.0, 24), 0.3, 0, 1, 1, 0, 0, 0.005); // dome parting line
   // ERA on turret arc
   for (let r = 0; r < 3; r++) for (let a = -72; a <= 72; a += 12) { if (Math.abs(a) < 13) continue; const ar = a * DEG; const rr = [1.13, 1.02, 0.86][r];
     P.add('turret', 'paint', box(0.25, 0.19, 0.09, Math.sin(ar) * rr * 1.08, 0.18 + r * 0.2, Math.cos(ar) * rr * 1.12 + 0.05, -0.25 - r * 0.3, ar)); }

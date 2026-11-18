@@ -109,7 +109,8 @@ function is2(d) {
   // cast turret
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
   const poly = superEllipse(tw, 1.12, 1.3, 2.2, 40).map(([x, z]) => [x, z + bz]);
-  turretBody(P, poly, d.turretH * 0.9, 0.8, 0.82, bz); P.add('turret', 'paint', taper(topExtrude(superEllipse(tw * 0.8, 0.9, 1.05, 2.2, 32).map(([x, z]) => [x, z + bz]), 0.1, d.turretH * 0.88, 0.05, 2), d.turretH * 0.88, d.turretH * 0.98, 0.9, 0.9, bz));
+  turretBody(P, poly, d.turretH * 0.9, 0.8, 0.82, bz);
+  K.castSeam(P, 'turret', poly, 0, d.turretH * 0.9, 0.8, 0.82, bz, 0.45, 0.03, 2); P.add('turret', 'paint', taper(topExtrude(superEllipse(tw * 0.8, 0.9, 1.05, 2.2, 32).map(([x, z]) => [x, z + bz]), 0.1, d.turretH * 0.88, 0.05, 2), d.turretH * 0.88, d.turretH * 0.98, 0.9, 0.9, bz));
   P.add('turret', 'paint', box(1.0, 0.55, 0.45, 0, 0.45, bz + 1.0)); for (const s of [-1, 1]) P.add('turret', 'paint', cylY(0.25, 0.6, 12, s * 0.62, 0.42, bz + 0.95));
   K.cupola(P, 'turret', -0.5, d.turretH * 0.95, bz - 0.45, 0.3, 0.26, 6, 'ww2');
   K.hatch(P, 'turret', 0.45, d.turretH * 0.96, bz - 0.4, 0.25); K.mg(P, 'turret', 0.45, d.turretH + 0.25, bz - 0.4, 0, 'dshk');
@@ -139,6 +140,7 @@ function pershing(d) {
   // cast turret with bustle
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
   turretBody(P, superEllipse(tw, 1.05, 1.62, 2.5, 40).map(([x, z]) => [x, z + bz]), d.turretH, 0.84, 0.9, bz);
+  K.castSeam(P, 'turret', superEllipse(tw, 1.05, 1.62, 2.5, 40).map(([x, z]) => [x, z + bz]), 0, d.turretH, 0.84, 0.9, bz, 0.5, 0.03, 2);
   K.cupola(P, 'turret', 0.55, d.turretH, bz - 0.5, 0.33, 0.26, 6, 'ww2'); K.mg(P, 'turret', 0.55, d.turretH + 0.42, bz - 0.5, 0, 'm2');
   K.hatch(P, 'turret', -0.5, d.turretH, bz - 0.35, 0.27); K.periscope(P, 'turret', -0.45, d.turretH, bz + 0.35, 0, 0.8);
   K.antenna(P, 'turret', -0.8, d.turretH * 0.8, bz - 1.2, 2.2); K.stowageBox(P, 'turret', 0, 0.35, bz - 1.75, 1.6, 0.35, 0.3);
@@ -171,6 +173,7 @@ function centurion(d) {
   // cast/welded turret with side bins and rear basket
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
   turretBody(P, superEllipse(tw * 0.9, 1.35, 1.6, 3.0, 40).map(([x, z]) => [x, z + bz]), d.turretH, 0.86, 0.93, bz);
+  K.castSeam(P, 'turret', superEllipse(tw * 0.9, 1.35, 1.6, 3.0, 40).map(([x, z]) => [x, z + bz]), 0, d.turretH, 0.86, 0.93, bz, 0.5, 0.03, 2);
   for (const s of [-1, 1]) { K.stowageBox(P, 'turret', s * (tw * 0.92 + 0.05), 0.38, bz - 0.3, 0.26, 0.5, 1.7); K.smokeDischargers(P, 'turret', s * 0.95, 0.72, bz + 1.1, s * 0.7, 6, 0.08, 0.2, 0.035); }
   for (let i = 0; i < 6; i++) P.add('turret', 'metal', box(0.02, 0.4, 0.02, -1.0 + i * 0.4, 0.35, bz - 1.75)); P.add('turret', 'metal', box(2.05, 0.03, 0.4, 0, 0.16, bz - 1.6)); P.add('turret', 'metal', box(2.05, 0.03, 0.03, 0, 0.55, bz - 1.78));
   P.add('turret', 'canvas', box(1.6, 0.25, 0.25, 0, 0.3, bz - 1.6));

@@ -192,3 +192,12 @@ export function profileWelds(P, prof, hw, y0, opts = {}) {
     if (opts.across !== false && y1 > y0 + 0.05) weld(P, 'hull', [-h1 + 0.04, y1, z1], [h1 - 0.04, y1, z1], opts.r);
   }
 }
+// v8: casting parting line – a low ridge running round a tapered, extruded turret body at height fraction t.
+// poly = plan outline [[x,z]] as given to topExtrude; sx/sz/cz = taper params; bevel pushes the line out to the wall.
+export function castSeam(P, part, poly, y0, h, sx, sz, cz, t = 0.55, bevel = 0.03, step = 1) {
+  const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, czc = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+  const kx = 1 + (sx - 1) * t, kz = 1 + (sz - 1) * t, y = y0 + h * t;
+  const pts = [];
+  for (let i = 0; i < poly.length; i += step) { let [x, z] = poly[i]; const dx = x - cx, dz = z - czc, l = Math.hypot(dx, dz) || 1; x += (dx / l) * (bevel + 0.005); z += (dz / l) * (bevel + 0.005); pts.push([x * kx, y, cz + (z - cz) * kz]); }
+  for (let i = 0; i < pts.length; i++) weld(P, part, pts[i], pts[(i + 1) % pts.length], 0.013);
+}
