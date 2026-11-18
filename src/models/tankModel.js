@@ -65,19 +65,19 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         // dust settles in horizontal recesses (upward faces)
         diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * 0.08 * uDustAmt);
         vChip = chipM;
-        float vRough = 0.86 + 0.3 * nB.r + mud * 0.25 + dustH * 0.15 - chipM * 0.4;`)
+        float vRough = 0.86 + 0.3 * nB.r + mud * 0.25 + dustH * 0.15 - chipM * 0.4 + uCast * 0.14 * (nB.b - 0.3);`)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.55, vChip * 0.8);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.35 + mud * nB.g * 0.6) ;
+          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.5 + triN(vObjPos * 9.0, bw).g * uCast * 0.18 + mud * nB.g * 0.6) ;
           vec2 dHdxy = vec2(dFdx(hgt), dFdy(hgt)) * 0.9;
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX); float fDet = dot(vSigmaX, R1) * faceDirection;
           vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2); normal = normalize(abs(fDet) * normal - vGrad * 0.02);
         }`);
   };
-  m.customProgramCacheKey = () => 'paint6';
+  m.customProgramCacheKey = () => 'paint8';
   return m;
 }
 // v6: running-gear grime (road wheels, sprockets, idlers, track links). Mud is caked on in noisy patches using
@@ -225,6 +225,7 @@ function buildSherman(d) {
   // turret (cast, T23)
   const tp = superEllipse(0.98, 1.0, 1.25, 2.4, 44, (x, z) => [x * (z > 0.4 ? 1 - (z - 0.4) * 0.25 : 1), z]);
   P.add('turret', 'paint', taper(topExtrude(tp, 0.78, 0, 0.12, 3), 0, 0.78, 0.84, 0.86));
+  K.castSeam(P, 'turret', tp, 0, 0.78, 0.84, 0.86, 0, 0.5, 0.12, 2); // casting parting line
   P.add('turret', 'paint', box(1.25, 0.56, 0.32, 0, 0.4, 1.05)); P.add('turret', 'paint', cylX(0.29, 1.24, 16, 0, 0.4, 1.12));
   P.add('turret', 'paint', cylY(0.33, 0.22, 16, 0.42, 0.88, -0.25)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; P.add('turret', 'glass', box(0.1, 0.07, 0.03, 0.42 + Math.cos(a) * 0.33, 0.9, -0.25 + Math.sin(a) * 0.33, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', box(0.5, 0.05, 0.6, -0.42, 0.8, -0.2)); P.add('turret', 'dark', cylY(0.1, 0.12, 8, -0.1, 0.82, -0.7));
@@ -295,6 +296,7 @@ function buildT34(d) {
   // turret (cast)
   const tp = superEllipse(1.07, 1.25, 1.2, 2.2, 40, (x, z) => [x * (z > 0.3 ? 1 - (z - 0.3) * 0.22 : 1), z]);
   P.add('turret', 'paint', taper(topExtrude(tp, 0.78, 0, 0.1, 2), 0, 0.78, 0.8, 0.86));
+  K.castSeam(P, 'turret', tp, 0, 0.78, 0.8, 0.86, 0, 0.5, 0.1, 2); // casting parting line
   P.add('turret', 'paint', taper(box(1.2, 0.6, 0.35, 0, 0.38, 1.15), 0.08, 0.68, 0.9, 1)); P.add('turret', 'paint', cylX(0.3, 0.9, 14, 0, 0.38, 1.25));
   P.add('turret', 'paint', cylY(0.33, 0.25, 16, -0.42, 0.9, -0.45)); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; P.add('turret', 'glass', box(0.08, 0.06, 0.03, -0.42 + Math.cos(a) * 0.335, 0.93, -0.45 + Math.sin(a) * 0.335, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', cylY(0.23, 0.05, 12, 0.42, 0.8, -0.3)); for (const x of [-0.2, 0.55]) P.add('turret', 'metal', box(0.1, 0.12, 0.18, x, 0.84, 0.45));
@@ -327,6 +329,7 @@ function buildT72(d) {
   const dome = new THREE.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, 0.72, 1.28);
   { const p = dome.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getZ(i) > 0.4) p.setZ(i, 0.4 + (p.getZ(i) - 0.4) * 0.85); } dome.computeVertexNormals(); }
   P.add('turret', 'paint', dome); P.add('turret', 'paint', cylY(1.12, 0.12, 32, 0, 0.0, 0, 1.15));
+  K.castSeam(P, 'turret', superEllipse(1.02, 1.05, 1.16, 2.0, 24), 0.3, 0, 1, 1, 0, 0, 0.005); // dome parting line
   // ERA on turret arc
   for (let r = 0; r < 3; r++) for (let a = -72; a <= 72; a += 12) { if (Math.abs(a) < 13) continue; const ar = a * DEG; const rr = [1.13, 1.02, 0.86][r];
     P.add('turret', 'paint', box(0.25, 0.19, 0.09, Math.sin(ar) * rr * 1.08, 0.18 + r * 0.2, Math.cos(ar) * rr * 1.12 + 0.05, -0.25 - r * 0.3, ar)); }
@@ -370,7 +373,7 @@ function buildAbrams(d) {
       const sx = 1 - 0.03 * (y / 0.74); p.setX(i, p.getX(i) * sx); }
     g.computeVertexNormals(); P.add('turret', 'paint', g); }
   // cheek armour panel joints + bolted top plates over the special-armour cavities
-  for (const s of [-1, 1]) { K.boltRow(P, 'turret', [s * 0.65, 0.58, 1.9], [s * 1.65, 0.62, 1.4], 6, 0.022); K.boltRow(P, 'turret', [s * 0.7, 0.5, 2.05], [s * 1.75, 0.55, 1.58], 6, 0.018); P.add('turret', 'dark', box(0.012, 0.6, 0.02, s * 1.81, 0.36, 0.2)); }
+  for (const s of [-1, 1]) { K.boltRow(P, 'turret', [s * 0.65, 0.58, 1.9], [s * 1.65, 0.62, 1.4], 6, 0.022, 'y', 'weld'); K.boltRow(P, 'turret', [s * 0.7, 0.5, 2.05], [s * 1.75, 0.55, 1.58], 6, 0.018, 'y', 'weld'); P.add('turret', 'dark', box(0.012, 0.6, 0.02, s * 1.81, 0.36, 0.2)); }
   P.add('turret', 'dark', box(0.75, 0.6, 0.2, 0, 0.36, 1.95)); P.add('turret', 'paint', box(0.62, 0.5, 0.35, 0, 0.38, 2.05));
   P.add('turret', 'paint', box(0.65, 0.42, 0.75, 0.95, 0.82, 1.15)); P.add('turret', 'glass', box(0.5, 0.25, 0.03, 0.95, 0.84, 1.53)); // GPS doghouse
   P.add('turret', 'paint', cylY(0.22, 0.35, 12, -0.55, 0.88, -0.6)); P.add('turret', 'paint', box(0.42, 0.35, 0.42, -0.55, 1.15, -0.6)); P.add('turret', 'glass', box(0.3, 0.18, 0.02, -0.55, 1.17, -0.38)); // CITV
@@ -486,7 +489,7 @@ function getTemplate(spec) {
   const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
-  const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
+  const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust, dustAmt: spec.paint.dustAmt };
   const paint = paintMaterial(spec.paint, seed, 0, opts);
   const paintT = paintMaterial(spec.paint, seed, b.turretPos[1], { ...opts, cast: b.castTurret ?? opts.cast });
   const paintG = paintMaterial(spec.paint, seed, b.turretPos[1] + b.gunPos[1], { ...opts, cast: 0.15 });
@@ -511,7 +514,7 @@ export function createTankModel(spec, opts = {}) {
   const body = new THREE.Group(); root.add(body); // body receives pitch/roll
   const meshes = [];
   const details = [];
-  const mk = (g, k, parent, paintMat) => { const m = new THREE.Mesh(g, k === 'paint' || k === 'weld' ? paintMat : mats[k]); if (k === 'weld') { details.push(m); m.visible = false; m.castShadow = false; } m.castShadow = true; m.receiveShadow = true; m.userData.matKey = k; parent.add(m); meshes.push(m); return m; };
+  const mk = (g, k, parent, paintMat) => { const m = new THREE.Mesh(g, k === 'paint' || k === 'weld' ? paintMat : k === 'darkN' ? mats.dark : mats[k]); if (k === 'weld' || k === 'darkN') { details.push(m); m.visible = false; m.castShadow = false; } m.castShadow = true; m.receiveShadow = true; m.userData.matKey = k; parent.add(m); meshes.push(m); return m; };
   for (const [k, g] of Object.entries(geo.hull)) mk(g, k, body, tpl.paint);
   const turret = new THREE.Group(); turret.position.set(...b.turretPos); body.add(turret);
   for (const [k, g] of Object.entries(geo.turret)) mk(g, k, turret, tpl.paintT);
@@ -528,13 +531,14 @@ export function createTankModel(spec, opts = {}) {
     const li = new THREE.InstancedMesh(tpl.linkGeo, tpl.linkMat, tpl.nLinks); li.position.x = m.position.x; li.castShadow = true; li.receiveShadow = true; li.visible = false; li.frustumCulled = false; body.add(li); links.push(li); meshes.push(li);
   }
   // wheels: instanced (road wheels + idlers + return rollers) and sprockets
-  const wl = [];
+  const wl = [], wlIn = [];
   for (const s of [-1, 1]) {
-    for (const w of b.wheels) wl.push({ x: s * (d.W / 2 - d.trackW / 2) + (w.xo || 0) * s, y: w.y, z: w.z, r: w.r, w: w.w ?? d.trackW * 0.8, side: s });
+    for (const w of b.wheels) (w.xo < 0 ? wlIn : wl).push({ x: s * (d.W / 2 - d.trackW / 2) + (w.xo || 0) * s, y: w.y, z: w.z, r: w.r, w: w.w ?? d.trackW * 0.8, side: s }); // v8: inner (hidden) layer of interleaved wheels always uses the low-poly wheel
     for (const w of b.idlers) wl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.6, side: s });
     for (const w of b.rollers) wl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.5, side: s });
   }
   const wheels = new THREE.InstancedMesh(tpl.wheelGeoLo, tpl.wheelMat, wl.length); wheels.castShadow = true; wheels.receiveShadow = true; body.add(wheels); meshes.push(wheels);
+  let innerWheels = null; if (wlIn.length) { innerWheels = new THREE.InstancedMesh(tpl.wheelGeoLo, tpl.wheelMat, wlIn.length); innerWheels.castShadow = true; innerWheels.receiveShadow = true; body.add(innerWheels); meshes.push(innerWheels); }
   const sl = []; for (const s of [-1, 1]) for (const w of b.sprockets) sl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.7, side: s });
   const sprockets = new THREE.InstancedMesh(tpl.sprocketGeo, tpl.wheelMat, sl.length); sprockets.castShadow = true; body.add(sprockets); meshes.push(sprockets);
   // decals
@@ -542,7 +546,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, muzzle, sight, tracks, trackTex, links, details, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, muzzle, sight, tracks, trackTex, links, details, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, innerWheels, innerList: wlIn, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;
@@ -574,7 +578,7 @@ export function updateRunningGear(model, distL, distR) {
   model.trackTex[0].offset.x = model.trackOffset[0]; model.trackTex[1].offset.x = model.trackOffset[1];
   model.spinL = (model.spinL || 0) + distL; model.spinR = (model.spinR || 0) + distR;
   const set = (im, list) => { list.forEach((w, i) => { const dist = w.side < 0 ? model.spinL : model.spinR; _eu.set(dist / w.r, 0, 0); _qq.setFromEuler(_eu); _pos.set(w.x, w.y, w.z); _scl.set(w.w, w.r, w.r); _mat.compose(_pos, _qq, _scl); im.setMatrixAt(i, _mat); }); im.instanceMatrix.needsUpdate = true; };
-  set(model.wheels, model.wheelList); set(model.sprockets, model.sprocketList);
+  set(model.wheels, model.wheelList); set(model.sprockets, model.sprocketList); if (model.innerWheels) set(model.innerWheels, model.innerList);
   if (model.linksOn && (distL !== 0 || distR !== 0)) updateLinks(model);
 }
 export function burnModel(model) {

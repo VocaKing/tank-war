@@ -284,7 +284,7 @@ export const TANKS = [
       { name: 'DTP-125 HEAT', type: 'HEAT', caliber: 125, pen: 650, velocity: 900, damage: 460, count: 10 },
       { name: 'DTB-125 HE', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 8 },
     ],
-    paint: { base: '#67704a', camo: ['#3b4229', '#8e8a62', '#4f5a38'], accent: '#555a38', pattern: 'digital', fade: 8, rough: 0.7 }, // PLA woodland digital
+    paint: { base: '#566a34', camo: ['#2c3820', '#76784a', '#405229'], accent: '#4a5a30', pattern: 'digital', fade: 6, rough: 0.66, dustAmt: 0.6 }, // PLA woodland digital (richer greens, less dust)
     desc: 'China\'s top MBT: arrowhead ERA-clad turret, 1,500 hp diesel, laser dazzler and a 125 mm autoloaded smoothbore. Fast, flat and modern, in digital camouflage.',
   },
   {
@@ -292,7 +292,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 65, power: 1500, maxSpeed: 64, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
-    dims: { L: 7.6, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 6.0, turretBoxZ: 0.0 },
+    dims: { L: 7.6, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 5.3, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [560, 30], side: [100, 0], rear: [80, 0], top: [40, 0], bottom: [30, 0] },
       turret: { front: [800, 20], side: [320, 10], rear: [100, 0], top: [60, 0] },
