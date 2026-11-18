@@ -389,7 +389,18 @@ export class Game {
   render() { if (this.post) this.post.render(); else this.renderer.render(this.scene, this.camera); }
   dispose() {
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose(); if (this.post) this.post.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine();
+    // free every GPU resource the match created (World.dispose only frees geometries): materials, their textures (incl.
+    // shader-uniform textures) and geometries of everything in the scene. Shared/cached textures & tank templates are
+    // simply re-uploaded by three.js if a later match uses them again. Without this each match leaked ~30–60 GPU textures.
+    const geos = new Set(), mats = new Set(), texs = new Set();
+    const addTex = (v) => { if (v && v.isTexture) texs.add(v); };
+    this.scene.traverse((o) => { if (o.geometry) geos.add(o.geometry); const m = o.material; if (m) for (const mm of Array.isArray(m) ? m : [m]) mats.add(mm); });
+    for (const m of mats) { for (const k in m) addTex(m[k]); if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k]?.value; if (Array.isArray(v)) v.forEach(addTex); else addTex(v); } }
+    addTex(this.scene.background); addTex(this.scene.environment);
+    this.world.dispose(); if (this.post) { for (const ps of this.post.composer.passes) ps.dispose?.(); this.post.dispose(); }
+    for (const x of geos) x.dispose(); for (const x of mats) x.dispose(); for (const x of texs) x.dispose();
+    this.renderer.renderLists?.dispose?.(); this.scene.clear(); this.flying.length = 0; this.tanks.length = 0; this.ai.length = 0;
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly
