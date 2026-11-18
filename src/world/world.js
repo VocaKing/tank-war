@@ -45,22 +45,22 @@ function terrainMaterial(def) {
         // v5 road surfaces: packed dirt / cobblestone setts / asphalt derived from the gravel set (no extra samplers)
         {
           float gl = dot(cD, vec3(0.333)); float dirt = vRK.x, cob = vRK.y, asp = vRK.z;
-          vec3 dirtC = vec3(0.47, 0.38, 0.28) * (0.62 + 0.75 * gl) * mix(vec3(1.0), cB / max(dot(cB, vec3(0.333)), 0.05), 0.25);
-          vec3 aspC = vec3(0.16, 0.16, 0.17) * (0.75 + 0.6 * gl);
+          vec3 dirtC = gl * vec3(1.22, 0.96, 0.72) * 0.86; // linear-space: keep the gravel set's brightness, shift to packed brown earth
+          vec3 aspC = gl * vec3(0.33, 0.34, 0.36);
           vec3 cobC = cD;
           if (cob > 0.01) {
             vec2 cp = vWP.xz / vec2(0.24, 0.17); float row = floor(cp.y); cp.x += mod(row, 2.0) * 0.5;
             vec2 cid = floor(cp); vec2 cf = fract(cp) - 0.5; float hs = fract(sin(dot(cid, vec2(41.3, 289.1))) * 43758.5);
             vec2 ed = 0.5 - abs(cf); float e = min(ed.x * 0.24, ed.y * 0.17); float mortar = smoothstep(0.004, 0.018, e);
-            vec3 stone = mix(vec3(0.52, 0.5, 0.47), vec3(0.62, 0.57, 0.5), hs) * (0.7 + 0.55 * gl);
-            cobC = mix(vec3(0.2, 0.19, 0.17) * (0.8 + gl), stone, mortar);
+            vec3 stone = mix(vec3(0.85, 0.84, 0.82), vec3(1.08, 1.0, 0.88), hs) * gl;
+            cobC = mix(stone * 0.28, stone, mortar);
             tCobN = cf * (1.0 - smoothstep(0.0, 0.05, e)) * 1.6 * (1.0 - far); // rounded sett edges
           }
           cD = mix(cD, dirtC, dirt); cD = mix(cD, mix(cobC, cD, far * 0.6), cob); cD = mix(cD, aspC, asp);
           w.w *= 0.75 + 0.5 * br; // irregular, interlocking road edges instead of a clean ribbon
           // wet mud on river banks and road shoulders: darker, smoother, glossier soil
           float mud = vRK.w * smoothstep(0.25, 0.6, br * 0.6 + br2 * 0.6);
-          vec3 mudC = vec3(0.24, 0.19, 0.14) * (0.7 + 0.6 * dot(cA, vec3(0.333)));
+          vec3 mudC = dot(cA, vec3(0.333)) * vec3(0.62, 0.5, 0.4);
           cA = mix(cA, mudC, mud); cB = mix(cB, mudC, mud * 0.9); tMudR = mud;
         }
         vec4 hgt = vec4(dot(cA, vec3(0.33)), dot(cB, vec3(0.33)), dot(cC, vec3(0.33)), dot(cD, vec3(0.33))) * 0.6 + w * 1.4;
