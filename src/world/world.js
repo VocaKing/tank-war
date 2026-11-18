@@ -185,17 +185,17 @@ function waterMaterial(hTex, t, def) {
         // shoreline foam: broken bands that lap towards the bank, strongest in the shallowest 0.4 m
         { float fn = texture2D(normalMap, p / 2.6 + vec2(uT * 0.03, -uT * 0.02)).r + texture2D(normalMap, p / 7.0 - vec2(uT * 0.012, uT * 0.017)).g;
           float band = 0.5 + 0.5 * sin(wDepth * 22.0 - uT * 1.4 + fn * 3.0);
-          float shore = 1.0 - smoothstep(0.04, 0.42, wDepth);
-          wFoam = smoothstep(0.85, 1.25, fn * 0.75 + band * 0.55 + shore * 0.35) * shore * (1.0 - smoothstep(60.0, 220.0, dist)); } }
+          float shore = 1.0 - smoothstep(0.03, 0.3, wDepth);
+          wFoam = smoothstep(0.72, 1.0, fn * 0.6 + band * 0.4) * shore * 0.85 * (1.0 - smoothstep(60.0, 220.0, dist)); } }
         { float ndv = abs(dot(normalize(cameraPosition - vWPw), vec3(0.0, 1.0, 0.0)));
           // depth-based body colour + transparency: clear, sandy-green shallows; dark teal depths; grazing angles stay opaque
           float dk = 1.0 - exp(-wDepth * 0.9);
-          diffuseColor.rgb = mix(uShallow, uDeep, dk) * mix(1.25, 0.7, ndv);
+          diffuseColor.rgb = mix(uShallow, uDeep, dk) * mix(1.1, 0.6, ndv);
           float a = mix(0.97, 0.82, ndv); a = mix(mix(0.3, 0.9, 1.0 - ndv), a, smoothstep(0.15, 1.8, wDepth));
           a *= smoothstep(0.0, 0.08, wDepth); // soft contact with the bank, no hard intersection line
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.78), wFoam); diffuseColor.a = max(a, wFoam * 0.92 * smoothstep(0.0, 0.05, wDepth)); }`);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.78), wFoam); diffuseColor.a = max(a, wFoam * smoothstep(0.0, 0.05, wDepth)); }`);
   };
-  m.customProgramCacheKey = () => 'water5d';
+  m.customProgramCacheKey = () => 'water5d'; m.userData.WU = WU;
   return m;
 }
 function buildWater(mb, mat) {
