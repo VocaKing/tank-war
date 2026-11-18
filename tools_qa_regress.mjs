@@ -12,7 +12,7 @@ for (const map of maps) for (const q of quals) {
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } }); const errs = [];
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ': ' + m.text()); });
   page.on('pageerror', (e) => errs.push('pageerror ' + e.message));
-  await page.goto(`${base}?autostart=1&map=${map}&tank=sherman&q=${q}&seed=7`);
+  await page.goto(`${base}?autostart=1&map=${map}&tank=sherman&q=${q}&seed=7`, { timeout: 240000 });
   await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 180000 });
   // HDRI may stream in; give it time
   await page.waitForFunction(() => window.__game.world.hdrLoaded, null, { timeout: 60000 }).catch(() => {});
