@@ -50,12 +50,13 @@ for (const map of maps) for (const q of quals) {
       for (const ang of [0, 1.57]) { const x = c.x + Math.sin(ang) * (Math.max(c.hx, c.hz) + 12), z = c.z + Math.cos(ang) * (Math.max(c.hx, c.hz) + 12); p.placeAt(x, z, Math.atan2(c.x - x, c.z - z)); p.speed = 0; if (pen(p) > 0 || W.colGrid.query(x, z, 6).some((o) => o !== c && o.kind === 'building' && Rp(x, z, 3, 5, p.heading, o))) continue; // start spot inside a neighbouring block
         g.keys.KeyW = true; for (let k = 0; k < 150; k++) { g.debug.simulate(1 / 30); worstDrive = Math.max(worstDrive, pen(p)); } g.keys.KeyW = false; } }
     g.debug.freeze(false); g.debug.teleport(...(() => { const b = W.bases[0]; return [b.x, b.z, 0]; })());
+    const pd = p.damage; p.damage = () => {}; // keep the player alive through the AI battle: later probes need it as observer
     let worstAI = 0, who = null; for (let s = 0; s < 60 * 5; s++) { g.debug.simulate(0.2); for (const t of g.tanks) { if (!t.alive) continue; const v = pen(t); if (v > worstAI) { worstAI = v; who = [t.spec.id, Math.round(t.pos.x), Math.round(t.pos.z)]; } } }
-    return { pass: worstDrive < 0.15 && worstAI < 0.15, kinds, triedBuildings: tried, worstDrivePen: +worstDrive.toFixed(3), worstAIPen: +worstAI.toFixed(3), who }; });
+    p.damage = pd; return { pass: worstDrive < 0.15 && worstAI < 0.15, kinds, triedBuildings: tried, worstDrivePen: +worstDrive.toFixed(3), worstAIPen: +worstAI.toFixed(3), who }; });
   // ---- bush spotting ----
   await run('spot', () => { const g = window.__game, W = g.world, p = g.player, S = g.spotting; g.debug.freeze(true);
     const b0 = W.bases[0]; p.placeAt(b0.x, b0.z, 0); g.debug.simulate(0.5);
-    const allies = g.tanks.filter((t) => t.team === 0 && t.alive), enemy = g.tanks.find((t) => t.team === 1);
+    const allies = g.tanks.filter((t) => t.team === 0 && t.alive), enemy = g.tanks.find((t) => t.team === 1 && t.alive); if (!p.alive) return { pass: false, error: 'player dead before spot probe' };
     // park the other enemies far away in the enemy base corner so they don't interfere
     const eye = (o) => [o.pos.x, o.pos.y + o.spec.dims.hullH + o.spec.dims.turretH + 0.3, o.pos.z];
     const res = {}; const bushes = W.veg.bushes || []; const cand = bushes.filter((b) => b.r >= 2.5 && W.veg.bushAt(b.x, b.z));
