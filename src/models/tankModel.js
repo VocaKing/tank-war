@@ -57,13 +57,13 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         float chipM = smoothstep(0.78, 0.82, chip) * (0.4 + 0.6 * nA.b);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.21, 0.19), chipM * 0.75);
         // v6: dust haze that builds up from the lower hull (thrown up by the tracks), stronger on side faces
-        float dustH = smoothstep(uDirtY + 1.1, uDirtY - 0.1, yL + (nA.g - 0.5) * 0.6) * side;
-        diffuseColor.rgb = mix(diffuseColor.rgb, uDust * (0.85 + 0.3 * nB.r), clamp(dustH * (0.25 + 0.35 * nA.b) * uDustAmt, 0.0, 0.55));
+        float dustH = smoothstep(uDirtY + 0.75, uDirtY - 0.15, yL + (nA.g - 0.5) * 0.5) * side;
+        diffuseColor.rgb = mix(diffuseColor.rgb, uDust * (0.85 + 0.3 * nB.r), clamp(dustH * (0.16 + 0.24 * nA.b) * uDustAmt, 0.0, 0.38));
         // fine mud splatter specks just above the mud line
         float spk = step(0.83, triN(vObjPos * 3.1, bw).g) * smoothstep(uDirtY + 0.6, uDirtY, yL);
         diffuseColor.rgb = mix(diffuseColor.rgb, uMud * 0.8, spk * 0.7);
         // dust settles in horizontal recesses (upward faces)
-        diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * 0.12 * uDustAmt);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * 0.08 * uDustAmt);
         vChip = chipM;
         float vRough = 0.86 + 0.3 * nB.r + mud * 0.25 + dustH * 0.15 - chipM * 0.4;`)
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.55, vChip * 0.8);')
@@ -247,6 +247,7 @@ function buildTiger(d) {
   P.add('hull', 'paint', sideExtrude([[-3.0, 1.0], [2.95, 1.0], [2.8, 1.95], [-2.85, 1.95], [-3.0, 1.5]], 3.12, 0, 0.03));
   P.add('hull', 'paint', sideExtrude([[-3.05, 0.55], [2.6, 0.5], [3.15, 0.9], [3.1, 1.02], [-3.1, 1.02]], 1.85, 0, 0.03));
   P.add('hull', 'paint', box(3.12, 0.06, 0.4, 0, 1.0, 3.12)); // front mudguards
+  K.profileWelds(P, [[-3.0, 1.0], [2.95, 1.0], [2.8, 1.95], [-2.85, 1.95], [-3.0, 1.5]], 1.56, 1.0); K.weld(P, 'hull', [-0.92, 1.02, 3.13], [0.92, 1.02, 3.13]); K.weld(P, 'hull', [-0.92, 0.55, 2.62], [-0.92, 1.0, 3.12]); K.weld(P, 'hull', [0.92, 0.55, 2.62], [0.92, 1.0, 3.12]); // interlocked plate welds
   for (const s of [-1, 1]) { P.add('hull', 'metal', cylZ(0.1, 0.25, 10, s * 1.0, 0.95, 3.1)); P.add('hull', 'metal', box(0.8, 0.05, 0.06, s * 0.9, 1.9, 2.85)); }
   P.add('hull', 'dark', box(0.32, 0.08, 0.04, 0.6, 1.62, 2.88, -9 * DEG)); P.add('hull', 'paint', cylZ(0.11, 0.12, 12, -0.75, 1.55, 2.9)); P.add('hull', 'dark', cylZ(0.03, 0.3, 6, -0.75, 1.55, 3.0));
   P.add('hull', 'metal', cylZ(0.09, 0.18, 10, -0.35, 1.8, 2.93)); // headlight
@@ -319,7 +320,7 @@ function buildT72(d) {
   P.add('hull', 'dark', box(2.0, 0.02, 1.5, 0, 1.51, -2.2)); for (let i = 0; i < 8; i++) P.add('hull', 'paint', box(2.0, 0.035, 0.05, 0, 1.53, -1.55 - i * 0.18));
   P.add('hull', 'paint', box(0.6, 0.06, 0.45, 0, 1.52, 1.75)); P.add('hull', 'glass', box(0.12, 0.05, 0.03, 0, 1.53, 2.0));
   // Kontakt-1 ERA on glacis (rotated to plate slope 68°)
-  const gl = 21.8 * DEG; for (let r = 0; r < 2; r++) for (let i = 0; i < 7; i++) { const t = 0.2 + r * 0.32; const z = 3.43 - t * 1.5, y = 0.92 + t * 0.58; P.add('hull', 'paint', box(0.3, 0.08, 0.26, -1.0 + i * 0.33, y + 0.05, z, gl)); }
+  const gl = 21.8 * DEG; for (let r = 0; r < 4; r++) for (let i = 0; i < 8; i++) { if (r === 3 && Math.abs(i - 3.5) < 1) continue; const t = 0.12 + r * 0.23; const z = 3.43 - t * 1.5, y = 0.92 + t * 0.58; P.add('hull', 'paint', box(0.27, 0.075, 0.3, -1.03 + i * 0.295, y + 0.05, z, gl)); P.add('hull', 'dark', box(0.05, 0.02, 0.05, -1.03 + i * 0.295 + 0.09, y + 0.09, z + 0.08, gl)); } // Kontakt-1 4S20 boxes, 4 rows
   P.add('hull', 'metal', box(2.2, 0.06, 0.12, 0, 1.05, 3.12, gl)); // splash guard
   for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.1, 10, s * 0.95, 1.05, 3.3));
   // turret dome
@@ -327,8 +328,8 @@ function buildT72(d) {
   { const p = dome.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getZ(i) > 0.4) p.setZ(i, 0.4 + (p.getZ(i) - 0.4) * 0.85); } dome.computeVertexNormals(); }
   P.add('turret', 'paint', dome); P.add('turret', 'paint', cylY(1.12, 0.12, 32, 0, 0.0, 0, 1.15));
   // ERA on turret arc
-  for (let r = 0; r < 2; r++) for (let a = -70; a <= 70; a += 14) { if (Math.abs(a) < 12) continue; const ar = a * DEG; const rr = r ? 0.96 : 1.12;
-    P.add('turret', 'paint', box(0.27, 0.2, 0.09, Math.sin(ar) * rr * 1.08, 0.2 + r * 0.25, Math.cos(ar) * rr * 1.12 + 0.05, -0.25 - r * 0.3, ar)); }
+  for (let r = 0; r < 3; r++) for (let a = -72; a <= 72; a += 12) { if (Math.abs(a) < 13) continue; const ar = a * DEG; const rr = [1.13, 1.02, 0.86][r];
+    P.add('turret', 'paint', box(0.25, 0.19, 0.09, Math.sin(ar) * rr * 1.08, 0.18 + r * 0.2, Math.cos(ar) * rr * 1.12 + 0.05, -0.25 - r * 0.3, ar)); }
   for (let i = 0; i < 6; i++) P.add('turret', 'paint', box(0.27, 0.08, 0.22, -0.6 + i * 0.24 + (i > 2 ? 0.2 : -0.2), 0.68, 0.55, 0.15));
   P.add('turret', 'paint', box(0.6, 0.48, 0.3, 0, 0.32, 1.25)); // mantlet
   P.add('turret', 'paint', cylY(0.32, 0.2, 16, 0.45, 0.76, -0.2)); P.add('turret', 'metal', box(0.12, 0.16, 0.7, 0.45, 1.0, 0.0)); P.add('turret', 'dark', cylZ(0.022, 1.2, 6, 0.45, 1.0, 0.5)); // NSVT
@@ -361,13 +362,20 @@ function buildAbrams(d) {
   P.add('hull', 'dark', box(2.8, 0.02, 2.0, 0, 1.53, -2.6)); for (let i = 0; i < 10; i++) P.add('hull', 'paint', box(2.8, 0.03, 0.06, 0, 1.55, -1.7 - i * 0.19));
   P.add('hull', 'paint', box(0.7, 0.05, 0.5, 0, 1.43, 2.1, 0.2)); for (let i = 0; i < 3; i++) P.add('hull', 'glass', box(0.12, 0.05, 0.03, -0.18 + i * 0.18, 1.45, 2.38, 0.2));
   // turret: angular faceted wedge with bustle
-  const tp = [[0.95, 2.05], [1.72, 0.55], [1.72, -1.2], [1.55, -2.3], [-1.55, -2.3], [-1.72, -1.2], [-1.72, 0.55], [-0.95, 2.05]];
-  P.add('turret', 'paint', taper(topExtrude(tp, 0.72, 0, 0.03, 1), 0, 0.72, 0.95, 0.97));
+  // v7: wide, low, slab-sided turret. Plan view: shallow-angled frontal cheeks (special armour arrays) out to ~3.6 m,
+  // near-vertical flat sides, slightly narrower bustle. Side view: roof drops toward the front so the turret reads as a wedge.
+  const tp = [[0.5, 2.1], [1.79, 1.62], [1.8, -1.15], [1.62, -2.35], [-1.62, -2.35], [-1.8, -1.15], [-1.79, 1.62], [-0.5, 2.1]];
+  { const g = topExtrude(tp, 0.74, 0, 0.025, 1); const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i), z = p.getZ(i); const t = Math.min(1, Math.max(0, (z + 0.2) / 2.3)); if (y > 0.3) p.setY(i, 0.3 + (y - 0.3) * (1 - 0.48 * t)); // roof slopes down to the front
+      const sx = 1 - 0.03 * (y / 0.74); p.setX(i, p.getX(i) * sx); }
+    g.computeVertexNormals(); P.add('turret', 'paint', g); }
+  // cheek armour panel joints + bolted top plates over the special-armour cavities
+  for (const s of [-1, 1]) { K.boltRow(P, 'turret', [s * 0.65, 0.58, 1.9], [s * 1.65, 0.62, 1.4], 6, 0.022); K.boltRow(P, 'turret', [s * 0.7, 0.5, 2.05], [s * 1.75, 0.55, 1.58], 6, 0.018); P.add('turret', 'dark', box(0.012, 0.6, 0.02, s * 1.81, 0.36, 0.2)); }
   P.add('turret', 'dark', box(0.75, 0.6, 0.2, 0, 0.36, 1.95)); P.add('turret', 'paint', box(0.62, 0.5, 0.35, 0, 0.38, 2.05));
-  P.add('turret', 'paint', box(0.65, 0.42, 0.75, 0.95, 0.9, 1.15)); P.add('turret', 'glass', box(0.5, 0.25, 0.03, 0.95, 0.92, 1.53)); // GPS doghouse
+  P.add('turret', 'paint', box(0.65, 0.42, 0.75, 0.95, 0.82, 1.15)); P.add('turret', 'glass', box(0.5, 0.25, 0.03, 0.95, 0.84, 1.53)); // GPS doghouse
   P.add('turret', 'paint', cylY(0.22, 0.35, 12, -0.55, 0.88, -0.6)); P.add('turret', 'paint', box(0.42, 0.35, 0.42, -0.55, 1.15, -0.6)); P.add('turret', 'glass', box(0.3, 0.18, 0.02, -0.55, 1.17, -0.38)); // CITV
   P.add('turret', 'paint', cylY(0.38, 0.22, 16, 0.75, 0.82, -0.4)); P.add('turret', 'metal', box(0.15, 0.2, 0.9, 0.75, 1.05, -0.2)); P.add('turret', 'dark', cylZ(0.025, 1.4, 6, 0.75, 1.07, 0.5)); // CWS + M2
-  P.add('turret', 'paint', cylY(0.33, 0.06, 14, -0.85, 0.74, 0.3)); P.add('turret', 'dark', cylZ(0.018, 1.0, 6, -1.05, 1.0, 0.5)); P.add('turret', 'metal', box(0.06, 0.25, 0.06, -1.05, 0.86, 0.2));
+  P.add('turret', 'paint', cylY(0.33, 0.06, 14, -0.85, 0.69, 0.3)); P.add('turret', 'dark', cylZ(0.018, 1.0, 6, -1.05, 1.0, 0.5)); P.add('turret', 'metal', box(0.06, 0.25, 0.06, -1.05, 0.86, 0.2));
   // bustle rack
   for (const y of [0.75, 1.05]) { P.add('turret', 'metal', box(3.0, 0.04, 0.04, 0, y, -2.75)); for (const s of [-1, 1]) P.add('turret', 'metal', box(0.04, 0.04, 0.5, s * 1.5, y, -2.52)); }
   for (let i = 0; i < 9; i++) P.add('turret', 'metal', box(0.03, 0.34, 0.03, -1.5 + i * 0.375, 0.9, -2.75));
@@ -440,9 +448,9 @@ function linkGeometry(w, pitch, th, modern) {
   if (modern) for (const s of [-1, 1]) add(box(w * 0.4, th * 0.45, pitch * 0.6, s * w * 0.26, -th * 0.42, pitch * 0.05), rub); // rubber pads
   for (const s of [-1, 1]) add(box(0.05, th * 1.6, pitch * 0.42, s * w * 0.07, th * 0.95, 0), steel); // guide horns (inner, +y)
   for (const z of [-1, 1]) add(cylX(th * 0.32, w * 1.04, 6, 0, 0, z * pitch * 0.43), dark); // pins / end connectors
-  for (const s of [-1, 1]) add(box(0.04, th * 0.7, pitch * 0.25, s * w * 0.52, 0, pitch * 0.42), dark);
+  if (modern) for (const s of [-1, 1]) add(box(0.04, th * 0.7, pitch * 0.25, s * w * 0.52, 0, pitch * 0.42), dark); // end connectors (modern double-pin)
   // v6: cast-link detail – WWII skeleton links get chevron ribs + a dark lightening window, modern links a centre end-connector wedge
-  if (!modern) { for (const s of [-1, 1]) add(box(w * 0.36, th * 0.3, pitch * 0.1, s * w * 0.22, -th * 0.42, pitch * 0.3, 0, s * 0.35, 0), steel); add(box(w * 0.18, th * 0.62, pitch * 0.3, 0, 0.002, -pitch * 0.12), dark); }
+  if (!modern) { for (const s of [-1, 1]) add(box(w * 0.36, th * 0.3, pitch * 0.1, s * w * 0.22, -th * 0.42, pitch * 0.3, 0, s * 0.35, 0), steel); }
   else add(box(w * 0.16, th * 0.5, pitch * 0.2, 0, -th * 0.15, pitch * 0.42), dark);
   return mergeGeometries(parts);
 }
@@ -502,7 +510,8 @@ export function createTankModel(spec, opts = {}) {
   const root = new THREE.Group(); root.name = spec.id;
   const body = new THREE.Group(); root.add(body); // body receives pitch/roll
   const meshes = [];
-  const mk = (g, k, parent, paintMat) => { const m = new THREE.Mesh(g, k === 'paint' ? paintMat : mats[k]); m.castShadow = true; m.receiveShadow = true; m.userData.matKey = k; parent.add(m); meshes.push(m); return m; };
+  const details = [];
+  const mk = (g, k, parent, paintMat) => { const m = new THREE.Mesh(g, k === 'paint' || k === 'weld' ? paintMat : mats[k]); if (k === 'weld') { details.push(m); m.visible = false; m.castShadow = false; } m.castShadow = true; m.receiveShadow = true; m.userData.matKey = k; parent.add(m); meshes.push(m); return m; };
   for (const [k, g] of Object.entries(geo.hull)) mk(g, k, body, tpl.paint);
   const turret = new THREE.Group(); turret.position.set(...b.turretPos); body.add(turret);
   for (const [k, g] of Object.entries(geo.turret)) mk(g, k, turret, tpl.paintT);
@@ -533,7 +542,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, muzzle, sight, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, muzzle, sight, tracks, trackTex, links, details, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;
@@ -542,7 +551,7 @@ const _mat = new THREE.Matrix4(), _pos = new V3(), _scl = new V3(), _qq = new TH
 // switch between individual links (near) and the scrolling textured ribbon (far)
 export function setTrackLOD(model, near) {
   if (model.linksOn === near) return; model.linksOn = near;
-  for (let i = 0; i < 2; i++) { model.links[i].visible = near; model.tracks[i].visible = !near; }
+  for (let i = 0; i < 2; i++) { model.links[i].visible = near; model.tracks[i].visible = !near; } for (const m of model.details || []) m.visible = near; // weld beads etc. only up close
   model.wheels.geometry = near ? model.wheelGeo : model.wheelGeoLo;
   if (near) updateLinks(model);
 }
