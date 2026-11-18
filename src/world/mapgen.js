@@ -175,7 +175,26 @@ export class MapBuilder {
     return m;
   }
   // finalize: splat weights per grid vertex [A,B,rock,road] and tint
+  // v5 QA: solid rocks (s >= 1.6 collide + block nav) must never sit on a road / road shoulder or a bridge approach.
+  // Rock RNG is already consumed, so dropping them here doesn't shift any later placement (High and Low differ in
+  // tree density -> different RNG streams, so this has to be a geometric rule, not a seed fix).
+  _clearRoadRocks() {
+    const t = this.t, appr = 22; const segs = [];
+    for (const b of this.bridges) { const P = b.pts; if (P.length < 2) continue;
+      const ext = (a, c) => { const dx = a[0] - c[0], dz = a[1] - c[1], l = Math.hypot(dx, dz) || 1; return [a[0] + dx / l * appr, a[1] + dz / l * appr]; };
+      const Q = [ext(P[0], P[1]), ...P, ext(P[P.length - 1], P[P.length - 2])];
+      for (let i = 0; i + 1 < Q.length; i++) segs.push([Q[i][0], Q[i][1], Q[i + 1][0], Q[i + 1][1], b.width / 2]); }
+    const segD = (x, z, s) => { const dx = s[2] - s[0], dz = s[3] - s[1], l2 = dx * dx + dz * dz || 1; const u = clamp(((x - s[0]) * dx + (z - s[1]) * dz) / l2, 0, 1); return Math.hypot(x - s[0] - dx * u, z - s[1] - dz * u); };
+    const before = this.rocks.length;
+    this.rocks = this.rocks.filter((rk) => {
+      if (rk.s < 1.6) return true; const rr = rk.s * 0.85 + 2.5;
+      for (const s of segs) if (segD(rk.x, rk.z, s) < s[4] + rr + 2) return false;
+      let hit = false; this.forCells(rk.x, rk.z, rr, (k, cx, cz, d) => { if (d <= rr && (t.road[k] > 0.05 || t.occ[k] === OCC.ROAD)) hit = true; }); return !hit;
+    });
+    this.rocksCleared = before - this.rocks.length;
+  }
   finalize(maskBFn, tintFn) {
+    this._clearRoadRocks();
     const t = this.t; const n = t.n; this.splat = new Float32Array(n * n * 4);
     this.mud = this._mud(); if (!t.roadK) t.roadK = new Float32Array(n * n * 3);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
