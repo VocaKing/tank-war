@@ -32,7 +32,12 @@ void main(){
     m2 = max(m2, texture2D(tMask, vUv + d * radius * 0.5).r);
   }
   float edge = max(m, m2);
-  if (edge < 0.02) discard;
+  if (edge < 0.02) {
+    // thin dark halo just outside the red line: keeps it readable against red armour-view / bright sky
+    float h = 0.0;
+    for (int i = 0; i < ${taps}; i++) { float a = 6.2831853 * (float(i) + 0.5) / float(${taps}); h = max(h, texture2D(tMask, vUv + vec2(cos(a), sin(a)) * texel * (radius + 1.5)).r); }
+    if (h < 0.02) discard; gl_FragColor = vec4(0.0, 0.0, 0.0, 0.5 * h); return;
+  }
   gl_FragColor = vec4(color, alpha * smoothstep(0.0, 0.6, edge));
 }`;
 
@@ -46,7 +51,7 @@ export class Outline {
       uniforms: { tMask: { value: this.rt.texture }, texel: { value: new THREE.Vector2() }, radius: { value: 2 }, color: { value: new THREE.Color(...OUTLINE.color) }, alpha: { value: OUTLINE.alpha } },
       vertexShader: VS, fragmentShader: FS(OUTLINE.taps[this.q]), transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
     });
-    this.quad = new FullScreenQuad(this.mat); this._cc = new THREE.Color(); this.lastDrawn = null;
+    this.enabled = true; this.quad = new FullScreenQuad(this.mat); this._cc = new THREE.Color(); this.lastDrawn = null;
     this.resize();
   }
   resize() {
@@ -59,7 +64,7 @@ export class Outline {
   // draw the outline of tank `t` (or nothing) on top of what is already on screen
   render(t, camera) {
     this.lastDrawn = null;
-    if (!t || !t.model || !t.model.root.visible) return;
+    if (!this.enabled || !t || !t.model || !t.model.root.visible) return;
     const R = this.renderer; const root = t.model.root; const parent = root.parent; if (!parent) return;
     const s = new THREE.Vector2(); R.getDrawingBufferSize(s); const k = OUTLINE.maskScale[this.q];
     if (Math.abs(this.rt.width - Math.round(s.x * k)) > 1 || Math.abs(this.rt.height - Math.round(s.y * k)) > 1) this.resize();
