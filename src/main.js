@@ -24,7 +24,7 @@ function start(opts, gesture = true) {
     try {
       game = new Game(renderer, ui, audio, { ...opts, seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; mode = 'menu'; menu.show(true); } });
       window.__game = game; renderer.render(game.scene, game.camera);
-      if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
+      if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';
     } catch (e) { console.error(e); loading.innerHTML = '<div><h2>Failed to start</h2><pre>' + (e.stack || e) + '</pre></div>'; return; }
     loading.style.display = 'none';

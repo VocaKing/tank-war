@@ -6,7 +6,8 @@ import { MAP_BY_ID } from './maps.js';
 import { buildStructures } from './buildings.js';
 import { Vegetation, windUniform } from './vegetation.js';
 import { Grass } from './grass.js';
-import { pbrTex, waterNormalTexture } from './textures.js';
+import { pbrTex, waterNormalTexture, setTexQuality } from './textures.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Grid2D } from './terrain.js';
 import { DEG, ridged, smoothstep } from '../util.js';
 
@@ -132,22 +133,31 @@ export class World {
     const mb = new MapBuilder(def, quality); def.generate(mb); this.mb = mb; this.terrain = mb.t;
     this.genTime = performance.now() - t0;
     const scene = new THREE.Scene(); this.scene = scene;
-    // sky + lighting
+    // sky + lighting (v5: Poly Haven HDRI sky + image-based lighting, physically matched sun)
+    setTexQuality(quality);
+    const H = def.hdri;
     const sky = new Sky(); sky.scale.setScalar(20000); scene.add(sky); this.sky = sky;
     const su = sky.material.uniforms; su.turbidity.value = def.turbidity; su.rayleigh.value = def.rayleigh; su.mieCoefficient.value = 0.006; su.mieDirectionalG.value = 0.82;
     const phi = (90 - def.sun.elevation) * DEG, theta = def.sun.azimuth * DEG; this.sunDir = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
+    if (H) this.sunDir.set(...H.sunDir).normalize();
     su.sunPosition.value.copy(this.sunDir);
-    const pm = new THREE.PMREMGenerator(renderer); const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(1000); envScene.add(sky2);
+    const pm = new THREE.PMREMGenerator(renderer); this.pm = pm; const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(1000); envScene.add(sky2);
     Object.assign(sky2.material.uniforms.turbidity, { value: def.turbidity }); sky2.material.uniforms.rayleigh.value = def.rayleigh; sky2.material.uniforms.sunPosition.value.copy(this.sunDir);
     sky2.material.uniforms.mieCoefficient.value = 0.006;
     this.envRT = pm.fromScene(envScene, 0, 0.1, 2000); scene.environment = this.envRT.texture; scene.environmentIntensity = 0.7;
-    scene.fog = new THREE.FogExp2(def.fog.color, def.fog.density);
+    const fogDen = H ? H.fogDensity : def.fog.density;
+    scene.fog = new THREE.FogExp2(H ? new THREE.Color().setRGB(...H.horizon) : def.fog.color, fogDen);
     const sunCol = new THREE.Color().setHSL(0.1, 0.5, def.sun.elevation < 25 ? 0.78 : 0.92);
     const sun = new THREE.DirectionalLight(sunCol, def.sun.elevation < 25 ? 2.8 : 3.3); sun.castShadow = true;
-    const sm = quality === 'low' ? 1024 : 2048; sun.shadow.mapSize.set(sm, sm);
-    const S = 110; Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 700 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.6;
+    if (H) { const e = H.sunE; const m = Math.max(...e); sun.color.setRGB(e[0] / m, e[1] / m, e[2] / m); sun.intensity = m; }
+    const sm = quality === 'low' ? 1024 : quality === 'high' ? 4096 : 2048; sun.shadow.mapSize.set(sm, sm);
+    const S = quality === 'high' ? 95 : 110; this.shadowS = S; this.shadowTexel = (2 * S) / sm;
+    Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 800 });
+    sun.shadow.bias = -0.00025; sun.shadow.normalBias = this.shadowTexel * 1.6; if (H && H.overcast) sun.shadow.radius = 6; else sun.shadow.radius = 2;
     scene.add(sun); scene.add(sun.target); this.sun = sun;
-    const hemi = new THREE.HemisphereLight(0xbfd4ff, new THREE.Color(...def.farColor).multiplyScalar(1.2), 0.7); scene.add(hemi);
+    const hemi = new THREE.HemisphereLight(0xbfd4ff, new THREE.Color(...def.farColor).multiplyScalar(1.2), 0.7); scene.add(hemi); this.hemi = hemi;
+    this.hdrLoaded = !H; this.exposure = H ? H.exposure : null;
+    if (H) this._loadHdri(renderer, H, quality);
     // terrain
     const tmat = terrainMaterial(def); this.terrainMat = tmat;
     this.terrainGroup = buildTerrainMeshes(mb, tmat, quality === 'low' ? 2 : 1); scene.add(this.terrainGroup);
@@ -171,6 +181,23 @@ export class World {
       this.baseMarkers.push({ ring, flag });
     }
   }
+  _loadHdri(renderer, H, quality) {
+    const res = quality === 'low' ? '1k' : '2k';
+    new RGBELoader().setDataType(THREE.FloatType).load(`./tex/${H.file}_${res}.hdr`, (tex) => {
+      if (this.disposed) { tex.dispose(); return; }
+      // clamp the sun disc: its energy is carried by the DirectionalLight (measured from this HDRI), so IBL must not count it twice
+      const d = tex.image.data; for (let i = 0; i < d.length; i += 4) { const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; if (l > 40) { const k = 40 / l; d[i] *= k; d[i + 1] *= k; d[i + 2] *= k; } }
+      // below the horizon puresky maps are a flat fill; tint it with the ground so the lower hemisphere bounces the right colour
+      const W = tex.image.width, Hh = tex.image.height, fc = this.def.farColor;
+      for (let y = Math.floor(Hh * 0.52); y < Hh; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; const g = 0.35 * (0.6 + 0.4 * (d[i] + d[i + 1] + d[i + 2]) / 3); d[i] = fc[0] * g * 2.0; d[i + 1] = fc[1] * g * 2.0; d[i + 2] = fc[2] * g * 2.0; }
+      tex.needsUpdate = true; tex.mapping = THREE.EquirectangularReflectionMapping;
+      const rt = this.pm.fromEquirectangular(tex); if (this.envRT) this.envRT.dispose(); this.envRT = rt;
+      this.scene.environment = rt.texture; this.scene.environmentIntensity = 1.0;
+      this.scene.background = tex; this.scene.backgroundIntensity = 1.0; this.bgTex = tex;
+      this.sky.visible = false; this.hemi.intensity = 0.0;
+      this.hdrLoaded = true;
+    });
+  }
   // ground height including bridges (terrain already raised under roads)
   groundHeight(x, z) { const t = this.terrain.height(x, z); const d = this.deckAt(x, z); return d > t ? d : t; }
   // bridge deck surface height at (x,z) or -Infinity when not over a deck
@@ -187,8 +214,13 @@ export class World {
     return best;
   }
   updateShadowCenter(target) {
-    const s = this.sun; const snap = 2; const tx = Math.round(target.x / snap) * snap, tz = Math.round(target.z / snap) * snap; const ty = this.terrain.height(tx, tz);
-    s.target.position.set(tx, ty, tz); s.position.set(tx + this.sunDir.x * 350, ty + this.sunDir.y * 350, tz + this.sunDir.z * 350); s.target.updateMatrixWorld();
+    // stable shadows: snap the shadow centre to whole shadow-map texels in light space (no shimmering when moving)
+    const s = this.sun; const L = this.sunDir; const ty0 = this.terrain.height(target.x, target.z);
+    if (!this._lr) { this._lr = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), L).normalize(); this._lu = new THREE.Vector3().crossVectors(L, this._lr).normalize(); }
+    const P = new THREE.Vector3(target.x, ty0, target.z); const tx_ = this.shadowTexel;
+    const a = Math.round(P.dot(this._lr) / tx_) * tx_, b = Math.round(P.dot(this._lu) / tx_) * tx_, c = P.dot(L);
+    const C = this._lr.clone().multiplyScalar(a).addScaledVector(this._lu, b).addScaledVector(L, c);
+    s.target.position.copy(C); s.position.copy(C).addScaledVector(L, 400); s.target.updateMatrixWorld();
   }
   update(dt, time, camPos) {
     this.veg.updateLOD(camPos); this.veg.update(dt); this.grass.update(camPos);
@@ -206,5 +238,5 @@ export class World {
     let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz); if (t >= 0 && (best < 0 || t < best)) best = t; }
     return best;
   }
-  dispose() { this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
+  dispose() { this.disposed = true; if (this.bgTex) this.bgTex.dispose(); this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
 }

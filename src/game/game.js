@@ -14,6 +14,7 @@ import { ArmorView } from './armorView.js';
 import { sanitizeItems, DEFAULT_ITEMS } from './items.js';
 import { setTrackLOD } from '../models/tankModel.js';
 import { RNG, clamp, DEG, wrapAngle } from '../util.js';
+import { Post } from '../render/post.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
 function _segDist(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceTo(p); }
 
@@ -38,6 +39,7 @@ export class Game {
     this.keys = {}; this.mouseDown = false; this.aimPoint = new THREE.Vector3();
     this.hud = new HUD(uiRoot, this);
     this.bindInput();
+    if (this.quality === 'high' && !opts.noPost) { try { this.post = new Post(renderer, this.scene, this.camera); } catch (e) { console.warn('post-processing disabled', e); this.post = null; } }
     this.resize();
     this.debug = this.makeDebug();
   }
@@ -171,7 +173,7 @@ export class Game {
   }
   setPaused(v) { if (this.ended) return; this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
   exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
-  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); }
+  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); if (this.post) this.post.resize(innerWidth, innerHeight); }
   onKill(attacker, victim, cause) {
     this.hud.kill(attacker, victim, cause);
     if (victim.isPlayer) { this.cam.sniper = false; const a = this.tanks.find((t) => t.team === 0 && t.alive); if (a) this.cam.follow = a; }
@@ -373,10 +375,10 @@ export class Game {
     if (this.player.alive && !this.ended) this.audio.engine(Math.abs(this.player.input.throttle), this.player.speed); else this.audio.stopEngine();
     this.hud.update(dt, this.camera);
   }
-  render() { this.renderer.render(this.scene, this.camera); }
+  render() { if (this.post) this.post.render(); else this.renderer.render(this.scene, this.camera); }
   dispose() {
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose(); if (this.post) this.post.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly
