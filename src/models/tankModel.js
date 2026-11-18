@@ -91,7 +91,7 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0); roughnessFactor = mix(roughnessFactor, 0.32, vOil * 0.8); roughnessFactor = mix(roughnessFactor, 0.97, vGrit * 0.6); roughnessFactor = mix(roughnessFactor, 0.45, vHeat * 0.6);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.5 + triN(vObjPos * 9.0, bw).g * uCast * 0.18 + mud * nB.g * 0.6 + vGrit * triN(vObjPos * 18.0, bw).b * 0.9) ;
+          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.5 + triN(vObjPos * 9.0, bw).g * uCast * 0.18 + mud * nB.g * 0.35 + vGrit * triN(vObjPos * 18.0, bw).b * 0.9) ;
           vec2 dHdxy = vec2(dFdx(hgt), dFdy(hgt)) * 0.9;
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX); float fDet = dot(vSigmaX, R1) * faceDirection;
@@ -124,18 +124,18 @@ function grimeMaterial(base, mudHex, amt = 0.55, key = 'grime') {
         // v9: soft film of dried mud that thickens toward the rim/tyre and into recesses, broken up by fine grain (no hard blotches)
         float rim = mix(1.0, smoothstep(0.45, 1.0, vGR), 1.0 - uLink);
         gMud = clamp((0.25 + 0.75 * smoothstep(0.25, 0.75, gn)) * (0.45 + 0.55 * rim) * uAmt * (0.85 + 0.3 * gf), 0.0, 0.8);
-        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.85 + 0.25 * gf), gMud * 0.85);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.92 + 0.12 * gf), gMud * 0.8);
         // rubber (very dark vertex colour) stays matte dielectric
         float gRub = 1.0 - smoothstep(0.08, 0.14, max(vColor.r, max(vColor.g, vColor.b)));
-        diffuseColor.rgb *= 0.92 + 0.16 * gf;`)
+        diffuseColor.rgb *= 0.96 + 0.08 * gf;`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(mix(roughnessFactor * (0.85 + 0.3 * gf), 0.93, gRub), 0.97, gMud);')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.0, max(gMud, gRub));')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         { // v9: procedural micro-normal – rubber tread grain, cast-steel pitting and caked mud relief
-          float hgt = gf * (0.3 + 0.7 * gMud) + gRub * texture2D(uNoise, gp.zy * 22.0).b * 0.4;
+          float hgt = gf * gMud * 0.7 + gRub * texture2D(uNoise, gp.zy * 22.0).b * 0.3;
           vec2 dH = vec2(dFdx(hgt), dFdy(hgt)); vec3 sX = dFdx(-vViewPosition), sY = dFdy(-vViewPosition);
           vec3 R1 = cross(sY, normal), R2 = cross(normal, sX); float fD = dot(sX, R1) * faceDirection;
-          normal = normalize(abs(fD) * normal - sign(fD) * (dH.x * R1 + dH.y * R2) * 0.03);
+          normal = normalize(abs(fD) * normal - sign(fD) * (dH.x * R1 + dH.y * R2) * 0.015);
         }`);
   };
   m.customProgramCacheKey = () => key;
