@@ -2,6 +2,7 @@
 // not holding) but it moved <1.5 m in the last 3 s. Prints per-NPC stuck seconds + worst spots (with terrain slope).
 // usage: node tools_qa_stuck.mjs [base] [maps] [seconds]
 import { chromium } from 'playwright';
+import fs from 'fs'; import path from 'path';
 const base = process.argv[2] || 'http://localhost:4176/';
 const maps = (process.argv[3] || 'village,forest,desert').split(','); const SEC = +(process.argv[4] || 300);
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -9,7 +10,11 @@ let worst = 0;
 for (const map of maps) for (const tank of ['sherman', 'tiger']) {
   const page = await browser.newPage({ viewport: { width: 320, height: 180 } }); const errs = [];
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.text()); }); page.on('pageerror', (e) => errs.push('pageerror ' + e.message));
-  await page.goto(`${base}?autostart=1&map=${map}&tank=${tank}&q=low&seed=7`);
+  // DIST=<dir>: serve that build instead of the preview's dist (A/B a variant without a second server/port)
+  if (process.env.DIST) await page.route('**/*', (rt) => { const u = new URL(rt.request().url()); if (!u.host.startsWith('localhost')) return rt.continue(); let f = path.join(process.env.DIST, decodeURIComponent(u.pathname)); if (u.pathname.endsWith('/')) f = path.join(f, 'index.html'); if (!fs.existsSync(f)) return rt.continue(); const ext = path.extname(f); rt.fulfill({ body: fs.readFileSync(f), contentType: { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.hdr': 'application/octet-stream' }[ext] }); });
+  // deterministic Math.random (AI uses it) so before/after runs are comparable
+  await page.addInitScript(() => { let s = 12345; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; });
+  await page.goto(`${base}?autostart=1&map=${map}&tank=${tank}&q=low&seed=7`, { timeout: 240000 });
   await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 180000 });
   const r = await page.evaluate((SEC) => {
     const g = window.__game; const T = g.world.terrain; g.timeLimit = 1e9;

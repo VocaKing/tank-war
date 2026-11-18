@@ -161,6 +161,8 @@ export class AIController {
         // repeated stucks in the same spot: back off further each time
         this.stuckN = this.stuckAt && Math.hypot(t.pos.x - this.stuckAt[0], t.pos.z - this.stuckAt[1]) < 8 && this.g.time - this.stuckAt[2] < 30 ? (this.stuckN || 0) + 1 : 0;
         this.stuckAt = [t.pos.x, t.pos.z, this.g.time];
+        // stuck close to the end of the path (goal hugging a wall / unreachable within 3 m): treat it as reached
+        const lp = this.path[this.path.length - 1]; if (lp && this.pi >= this.path.length - 1 && Math.hypot(lp[0] - t.pos.x, lp[1] - t.pos.z) < 20) this.pi = this.path.length;
         this.reverseT = 1.8 + Math.min(3, this.stuckN || 0) * 0.8;
         // reverse while swinging the nose TOWARDS the next waypoint (reverse steering is mirrored in Tank.update)
         const p = this.path[this.pi] || this.goal; const diff = p ? wrapAngle(Math.atan2(p[0] - t.pos.x, p[1] - t.pos.z) - h) : 0;
