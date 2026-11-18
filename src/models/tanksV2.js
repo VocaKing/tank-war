@@ -88,7 +88,7 @@ function panther(d) {
 
 function is2(d) {
   const P = new Parts(); const hl = d.L / 2, H = d.hullH, c = d.clearance;
-  const g = gear({ n: 6, z0: -2.3, z1: 2.0, r: 0.34, w: 0.5, rollers: [-1.5, 0.0, 1.5], ry: 0.97, rr: 0.1, spr: { z: -hl + 0.35, y: 0.76, r: 0.33 }, idl: { z: hl - 0.32, y: 0.7, r: 0.3 } });
+  const g = gear({ n: 6, z0: -2.3, z1: 2.0, r: 0.28, w: 0.5, rollers: [-1.5, 0.0, 1.5], ry: 0.97, rr: 0.1, spr: { z: -hl + 0.35, y: 0.76, r: 0.33 }, idl: { z: hl - 0.32, y: 0.7, r: 0.3 } });
   const fy = trackTop(g);
   // model 1944 "straightened nose": one flat 100 mm upper glacis at 60° from vertical, lower plate at ~30° (not the stepped 1943 cast nose)
   const prof = [[-hl + 0.2, c], [hl - 0.42, c], [hl, 0.98], [hl - 1.5, H], [-hl + 0.12, H], [-hl, 1.42], [-hl, c + 0.2]];
