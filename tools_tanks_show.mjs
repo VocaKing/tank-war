@@ -21,7 +21,7 @@ await page.evaluate(() => { const g = window.__game, D = g.debug, W = g.world, T
   window.__show = (id, view) => { const TM = window.__TM, S = TM.TANKS.find((t) => t.id === id); if (window.__cur) g.scene.remove(window.__cur.root);
     const m = TM.createTankModel(S, { links: true }); TM.setTrackLOD(m, true); const [x, z] = window.__spot; const y = T.height(x, z); m.root.position.set(x, y, z); m.root.rotation.y = 0.5; m.turret.rotation.y = 0.3; g.scene.add(m.root); window.__cur = m; m.root.updateMatrixWorld(true);
     const L = S.dims.L, H = S.dims.hullH; const loc = { q: [L * 0.9, L * 0.42, L * 1.0, 0, H * 0.7, 0, 45], f: [0.6, H + 0.6, L * 1.35, 0, H * 0.7, 0, 45], s: [L * 1.35, H * 0.9, 0.2, 0, H * 0.7, 0, 45], r: [-L * 0.85, L * 0.45, -L * 0.95, 0, H * 0.7, 0, 45],
-      c1: [L * 0.45, H * 0.55, L * 0.5, 0, H * 0.45, L * 0.1, 40], c2: [L * 0.35, H + 1.6, L * 0.35, 0, H + 0.5, 0, 45], wheel: [L * 0.62, H * 0.35, L * 0.12, 0, S.dims.clearance + 0.2, -L * 0.15, 40] }[view];
+      c1: [S.dims.W / 2 + L * 0.62, 0.8, -L * 0.04, S.dims.W / 2, S.dims.clearance + 0.32, 0, 46], c2: [L * 0.35, H + 1.6, L * 0.35, 0, H + 0.5, 0, 45], wheel: [L * 0.62, H * 0.35, L * 0.12, 0, S.dims.clearance + 0.2, -L * 0.15, 40] }[view];
     const P = (a, b, c) => m.root.localToWorld(new TM.THREE.Vector3(a, b, c)); const c = P(loc[0], loc[1], loc[2]), t = P(loc[3], loc[4], loc[5]);
     D.pause(false); D.camAt([c.x, c.y, c.z, t.x, t.y, t.z, loc[6]]); D.simulate(0.05); D.pause(true);
     let tri = 0, draws = 0; m.root.traverse((o) => { if (o.isMesh && o.visible) { draws++; const gg = o.geometry; const n = (gg.index ? gg.index.count : gg.attributes.position.count) / 3; tri += o.isInstancedMesh ? n * o.count : n; } });
