@@ -21,10 +21,19 @@ export class NavGrid {
       c += slope * slope * 14 + trees * 0.35 - road * 0.07;
       this.cost[j * n + i] = blocked ? Infinity : Math.max(0.4, c);
     }
+    // walls (compound / field walls) are solid colliders but are not in the terrain occupancy map: rasterise them so A*
+    // routes around them (heavy cost, not Infinity, so a wall that the 6 m grid over-covers can't seal off a gap).
+    // Bridge parapets only mark cells OFF the deck (deck cells stay cheap) so paths can't cut onto a ramp over the parapet.
+    if (world.colliders) for (const c of world.colliders) {
+      if (c.kind !== 'wall') continue; const parapet = world.deckAt && world.deckAt(c.x, c.z) > -1e8;
+      if (!parapet && c.y1 < T.height(c.x, c.z) + 0.3) continue;
+      const len = Math.max(c.hx, c.hz), ax = c.hx >= c.hz; const ux = ax ? c.c : c.s, uz = ax ? -c.s : c.c; const seen = new Set();
+      for (let u = -len; u <= len + 1e-6; u += 1) { const [i, j] = this.toCell(c.x + ux * u, c.z + uz * u); const k = j * n + i; if (seen.has(k)) continue; seen.add(k); if (parapet) { const [cx, cz] = this.center(i, j); if (world.deckAt(cx, cz) > -1e8) continue; } if (this.cost[k] < Infinity) this.cost[k] += 30; }
+    }
     // large boulders are solid obstacles for tanks
     if (world.veg) for (const rk of world.veg.rocks) { if (rk.s < 1.6) continue; const [i, j] = this.toCell(rk.x, rk.z); this.cost[j * n + i] = Infinity; }
   }
-  penalize(x, z, amount = 12) { const [i, j] = this.toCell(x, z); const k = j * this.n + i; if (this.cost[k] < Infinity) this.cost[k] += amount; }
+  penalize(x, z, amount = 12) { const [i, j] = this.toCell(x, z); const k = j * this.n + i; if (this.cost[k] < Infinity) this.cost[k] = Math.min(this.cost[k] + amount, 60); } // capped: unbounded growth walled off whole spawn areas
   toCell(x, z) { return [Math.max(0, Math.min(this.n - 1, Math.floor((x + this.half) / this.cell))), Math.max(0, Math.min(this.n - 1, Math.floor((z + this.half) / this.cell)))]; }
   center(i, j) { return [-this.half + (i + 0.5) * this.cell, -this.half + (j + 0.5) * this.cell]; }
   walkable(i, j) { return i >= 0 && j >= 0 && i < this.n && j < this.n && this.cost[j * this.n + i] < Infinity; }
@@ -35,6 +44,7 @@ export class NavGrid {
   }
   findPath(sx, sz, gx, gz, maxIter = 30000) {
     const n = this.n; let [si, sj] = this.toCell(sx, sz); let [gi, gj] = this.toCell(gx, gz);
+    const startBlocked = !this.walkable(si, sj), goalBlocked = !this.walkable(gi, gj);
     [si, sj] = this.nearestWalkable(si, sj); [gi, gj] = this.nearestWalkable(gi, gj);
     const start = sj * n + si, goal = gj * n + gi; if (start === goal) return [[gx, gz]];
     const g = new Float32Array(n * n).fill(Infinity); const came = new Int32Array(n * n).fill(-1); const closed = new Uint8Array(n * n);
@@ -55,7 +65,11 @@ export class NavGrid {
     // smooth: greedy line-of-walk
     const pts = cells.map((c) => this.center(c % n, (c / n) | 0)); const out = [];
     let a = 0; while (a < pts.length - 1) { let b = Math.min(pts.length - 1, a + 25); while (b > a + 1 && !this.lineClear(pts[a], pts[b])) b--; out.push(pts[b]); a = b; }
-    if (best === goal) out.push([gx, gz]);
+    // goal inside a blocked cell (e.g. a lane waypoint against a wall/cliff): end at the nearest walkable cell instead,
+    // otherwise the tank pushes into the obstacle forever trying to get within 3 m of an unreachable point
+    if (best === goal) out.push(goalBlocked ? this.center(gi, gj) : [gx, gz]);
+    // tank standing in a blocked cell (pushed onto a steep slope / cliff foot): first get back to the walkable cell A* started from
+    if (startBlocked) out.unshift(this.center(si, sj));
     return out;
   }
   lineClear(p, q) {

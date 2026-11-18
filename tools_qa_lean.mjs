@@ -18,7 +18,7 @@ const seen = new Set();
 for (const m of maps) for (const t of PLAN[m]) {
   const page = await browser.newPage({ viewport: { width: 320, height: 180 } }); const errs = [];
   page.on('console', (x) => { if (x.type() === 'error' || x.type() === 'warning') errs.push(x.text()); }); page.on('pageerror', (e) => errs.push('pageerror ' + e.message));
-  await page.goto(`${base}?autostart=1&map=${m}&tank=${t}&q=low&seed=7`);
+  await page.goto(`${base}?autostart=1&map=${m}&tank=${t}&q=low&seed=7`, { timeout: 240000 });
   try {
     await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 120000 });
     // exercise: AI sim, then sniper + armor view on the nearest enemy, then render real frames (compiles every shader incl. armor view)

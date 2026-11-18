@@ -268,7 +268,7 @@ export class Game {
     }
   }
   computeAim() {
-    if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; this.aimHit = null; return; }
+    if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; this.aimHit = null; this.aimDist = this.aimPoint.distanceTo(this.camera.position); return; }
     if (this.lock) {
       const t = this.lock; if (!t.alive || !t.spotted[this.player.team] || !this.player.alive) { this.lock = null; }
       else {
@@ -291,6 +291,13 @@ export class Game {
     // simulate actual gun trajectory to find where the shell would land
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
     const m = p.model; const pos = m.muzzle.getWorldPosition(new THREE.Vector3()); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
+    // the firing kick drives a hull "rock" spring that tilts hull+gun up to ~4° for ~0.5 s; that is cosmetic (the next shot
+    // can't be fired before it has settled) so the reticle uses the laid gun without the rock — otherwise the predicted
+    // impact jumps to the far hills / sky (2–3 km readouts) after every shot
+    if (Math.abs(p.rock) > 1e-5) {
+      const qNo = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.pitch, p.heading, p.roll, 'YXZ')); const corr = qNo.multiply(p.quat.clone().invert());
+      pos.sub(p.pos).applyQuaternion(corr).add(p.pos); q.premultiply(corr);
+    }
     const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
     let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02;
     for (let i = 0; i < 200 && !hitP; i++) {
@@ -302,7 +309,10 @@ export class Game {
       if (best <= 1) { hitP = a.clone().lerp(b, best); dist += a.distanceTo(hitP); hitTank = stepTank; hitInfo = stepInfo; }
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
-    if (!hitP) hitP = pos;
+    // no impact inside the 4 s look-ahead (e.g. the hull recoil rock throws the gun ~4° up for ~0.3 s after a shot, or
+    // the gun points at the sky): keep the reticle on the gun's line, but don't report the look-ahead path length
+    // (v·4 s ≈ 3.2 km) as a range — size the circle from the camera aim distance and show no range readout
+    const noHit = !hitP; if (noHit) { hitP = pos; dist = Math.min(dist, Math.max(this.aimDist || 0, 1)); }
     const sp = hitP.clone().project(this.camera); const sx = (sp.x * 0.5 + 0.5) * innerWidth, sy = (-sp.y * 0.5 + 0.5) * innerHeight;
     // dispersion circle in pixels
     // aim circle: shells deviate at most ±dispersion (clipped 2σ gaussian) → project that cone
@@ -312,7 +322,8 @@ export class Game {
     this.reticleRadiusWorld = rW;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
     if (sp.z > 1) { hud.setReticle(-100, -100, 0, '', ''); return; }
-    let state = 'neutral', text = `${Math.round(dist)} m`;
+    this.reticleNoHit = noHit;
+    let state = 'neutral', text = noHit ? '— m' : `${Math.round(dist)} m`;
     if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
       const ev = this.ballistics.evaluate(hitTank, hitInfo, p.shell, dist);
       if (ev.ricochet) { state = 'red'; text = `RICOCHET · ${ev.angle.toFixed(0)}°`; }
@@ -391,7 +402,18 @@ export class Game {
   }
   dispose() {
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine();
+    // free every GPU resource the match created (World.dispose only frees geometries): materials, their textures (incl.
+    // shader-uniform textures) and geometries of everything in the scene. Shared/cached textures & tank templates are
+    // simply re-uploaded by three.js if a later match uses them again. Without this each match leaked ~30–60 GPU textures.
+    const geos = new Set(), mats = new Set(), texs = new Set();
+    const addTex = (v) => { if (v && v.isTexture) texs.add(v); };
+    this.scene.traverse((o) => { if (o.geometry) geos.add(o.geometry); const m = o.material; if (m) for (const mm of Array.isArray(m) ? m : [m]) mats.add(mm); });
+    for (const m of mats) { for (const k in m) addTex(m[k]); if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k]?.value; if (Array.isArray(v)) v.forEach(addTex); else addTex(v); } }
+    addTex(this.scene.background); addTex(this.scene.environment);
+    this.world.dispose(); if (this.post) { for (const ps of this.post.composer.passes) ps.dispose?.(); this.post.dispose(); } if (this.outline) this.outline.dispose();
+    for (const x of geos) x.dispose(); for (const x of mats) x.dispose(); for (const x of texs) x.dispose();
+    this.renderer.renderLists?.dispose?.(); this.scene.clear(); this.flying.length = 0; this.tanks.length = 0; this.ai.length = 0;
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly

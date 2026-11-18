@@ -150,8 +150,28 @@ export class AIController {
       if (moving) this.avoid();
     }
     // stuck detection
+    // stuck detection. A tank that is turning towards its waypoint (heavy tanks pivot slowly) is NOT stuck: the old test
+    // (moved < 1.5 m in 2.5 s) fired during slow pivots, and the reverse manoeuvre then steered with a random sign —
+    // and because steering is mirrored in reverse it usually undid the turn, so the tank oscillated in place forever.
     this.stuckT += dt;
-    if (this.stuckT > 2.5) { const moved = t.pos.distanceTo(this.lastPos); if (moving && Math.abs(t.input.throttle) > 0.3 && moved < 1.5 && this.reverseT <= 0) { const h = t.heading; this.g.nav.penalize(t.pos.x + Math.sin(h) * 5, t.pos.z + Math.cos(h) * 5); this.g.nav.penalize(t.pos.x, t.pos.z, 4); this.reverseT = 1.8; this.revSteer = Math.random() < 0.5 ? -1 : 1; } this.lastPos.copy(t.pos); this.stuckT = 0; }
+    if (this.stuckT > 2.5) {
+      const moved = t.pos.distanceTo(this.lastPos); const turned = Math.abs(wrapAngle(t.heading - (this.lastHeading ?? t.heading)));
+      if (moving && Math.abs(t.input.throttle) > 0.3 && moved < 1.5 && turned < 0.35 && this.reverseT <= 0) {
+        const h = t.heading; this.g.nav.penalize(t.pos.x + Math.sin(h) * 5, t.pos.z + Math.cos(h) * 5); this.g.nav.penalize(t.pos.x, t.pos.z, 4);
+        // repeated stucks in the same spot: back off further each time
+        this.stuckN = this.stuckAt && Math.hypot(t.pos.x - this.stuckAt[0], t.pos.z - this.stuckAt[1]) < 8 && this.g.time - this.stuckAt[2] < 30 ? (this.stuckN || 0) + 1 : 0;
+        this.stuckAt = [t.pos.x, t.pos.z, this.g.time];
+        // stuck again at the same spot: the obstacle is bigger than one cell (e.g. a bridge-end parapet) — mark the whole 3×3 ahead
+        if (this.stuckN >= 1) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) this.g.nav.penalize(t.pos.x + Math.sin(h) * 6 + a * 6, t.pos.z + Math.cos(h) * 6 + b * 6, 20);
+        // stuck close to the end of the path (goal hugging a wall / unreachable within 3 m): treat it as reached
+        const lp = this.path[this.path.length - 1]; if (lp && this.pi >= this.path.length - 1 && Math.hypot(lp[0] - t.pos.x, lp[1] - t.pos.z) < 20) this.pi = this.path.length;
+        this.reverseT = 1.8 + Math.min(3, this.stuckN || 0) * 0.8;
+        // reverse while swinging the nose TOWARDS the next waypoint (reverse steering is mirrored in Tank.update)
+        const p = this.path[this.pi] || this.goal; const diff = p ? wrapAngle(Math.atan2(p[0] - t.pos.x, p[1] - t.pos.z) - h) : 0;
+        this.revSteer = Math.abs(diff) > 0.15 ? -Math.sign(diff) : (Math.random() < 0.5 ? -1 : 1);
+      }
+      this.lastPos.copy(t.pos); this.lastHeading = t.heading; this.stuckT = 0;
+    }
     // ---- gunnery ----
     if (tgt) {
       const flight = dTgt / t.shell.velocity; const w = tgt.model.root.localToWorld(_q.copy(this.aimLocal));
