@@ -47,7 +47,7 @@ for (const map of maps) for (const q of quals) {
     const blds = W.colliders.filter((c) => c.kind === 'building' || c.kind === 'wall' || !c.kind).slice(0, 400); const kinds = {}; for (const c of W.colliders) kinds[c.kind] = (kinds[c.kind] || 0) + 1;
     let worstDrive = 0, tried = 0;
     for (let i = 0; i < blds.length && tried < 6; i += Math.max(1, Math.floor(blds.length / 6))) { const c = blds[i]; if (c.kind !== 'building') continue; tried++;
-      for (const ang of [0, 1.57]) { const x = c.x + Math.sin(ang) * (Math.max(c.hx, c.hz) + 12), z = c.z + Math.cos(ang) * (Math.max(c.hx, c.hz) + 12); p.placeAt(x, z, Math.atan2(c.x - x, c.z - z)); p.speed = 0;
+      for (const ang of [0, 1.57]) { const x = c.x + Math.sin(ang) * (Math.max(c.hx, c.hz) + 12), z = c.z + Math.cos(ang) * (Math.max(c.hx, c.hz) + 12); p.placeAt(x, z, Math.atan2(c.x - x, c.z - z)); p.speed = 0; if (pen(p) > 0 || W.colGrid.query(x, z, 6).some((o) => o !== c && o.kind === 'building' && Rp(x, z, 3, 5, p.heading, o))) continue; // start spot inside a neighbouring block
         g.keys.KeyW = true; for (let k = 0; k < 150; k++) { g.debug.simulate(1 / 30); worstDrive = Math.max(worstDrive, pen(p)); } g.keys.KeyW = false; } }
     g.debug.freeze(false); g.debug.teleport(...(() => { const b = W.bases[0]; return [b.x, b.z, 0]; })());
     let worstAI = 0, who = null; for (let s = 0; s < 60 * 5; s++) { g.debug.simulate(0.2); for (const t of g.tanks) { if (!t.alive) continue; const v = pen(t); if (v > worstAI) { worstAI = v; who = [t.spec.id, Math.round(t.pos.x), Math.round(t.pos.z)]; } } }

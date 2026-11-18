@@ -161,6 +161,8 @@ export class AIController {
         // repeated stucks in the same spot: back off further each time
         this.stuckN = this.stuckAt && Math.hypot(t.pos.x - this.stuckAt[0], t.pos.z - this.stuckAt[1]) < 8 && this.g.time - this.stuckAt[2] < 30 ? (this.stuckN || 0) + 1 : 0;
         this.stuckAt = [t.pos.x, t.pos.z, this.g.time];
+        // stuck again at the same spot: the obstacle is bigger than one cell (e.g. a bridge-end parapet) — mark the whole 3×3 ahead
+        if (this.stuckN >= 1) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) this.g.nav.penalize(t.pos.x + Math.sin(h) * 6 + a * 6, t.pos.z + Math.cos(h) * 6 + b * 6, 20);
         // stuck close to the end of the path (goal hugging a wall / unreachable within 3 m): treat it as reached
         const lp = this.path[this.path.length - 1]; if (lp && this.pi >= this.path.length - 1 && Math.hypot(lp[0] - t.pos.x, lp[1] - t.pos.z) < 20) this.pi = this.path.length;
         this.reverseT = 1.8 + Math.min(3, this.stuckN || 0) * 0.8;
