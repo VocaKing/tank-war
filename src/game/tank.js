@@ -7,7 +7,7 @@ import { Equipment } from './items.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
 export function ballisticAngle(v, R, dy) {
   const g = GRAVITY; const v2 = v * v; const disc = v2 * v2 - g * (g * R * R + 2 * dy * v2);
@@ -141,10 +141,10 @@ export class Tank {
   tryFire(time) {
     if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
     const g = this.game; const sh = this.shell; const m = this.model;
-    const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3()); const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
+    const muzzle = m.muzzle.getWorldPosition(_v3); const dir = _v4.set(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
     // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
-    const disp = this.dispersion(); const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    const a = new THREE.Vector3().crossVectors(dir, up).normalize(), b = new THREE.Vector3().crossVectors(dir, a).normalize();
+    const disp = this.dispersion(); const up = _v5.set(0, Math.abs(dir.y) < 0.95 ? 1 : 0, 0);
+    const a = _v.copy(dir).cross(up).normalize(), b = _v2.copy(dir).cross(a).normalize();
     let gx = g.rng.gauss() / 2.2, gy = g.rng.gauss() / 2.2; const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
     this.lastDeviation = Math.hypot(gx, gy) * disp;
     dir.addScaledVector(a, Math.tan(gx * disp)).addScaledVector(b, Math.tan(gy * disp)).normalize();
@@ -184,11 +184,11 @@ export class Tank {
   // effective armour for a hit (from rayTest) and a shell; dist = shell travel
   armorAt(hit, shellSpec, typeInfo) {
     const A = this.spec.armor; const [arm, zone] = armorZone(this.spec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
-    let n;
-    if (hit.face === 'front') n = new THREE.Vector3(0, Math.sin(slope), Math.cos(slope));
-    else if (hit.face === 'rear') n = new THREE.Vector3(0, Math.sin(slope), -Math.cos(slope));
-    else if (hit.face === 'side') n = new THREE.Vector3(hit.sideSign * Math.cos(slope), Math.sin(slope), 0);
-    else n = new THREE.Vector3(0, hit.face === 'top' ? 1 : -1, 0);
+    let n = _v3;
+    if (hit.face === 'front') n.set(0, Math.sin(slope), Math.cos(slope));
+    else if (hit.face === 'rear') n.set(0, Math.sin(slope), -Math.cos(slope));
+    else if (hit.face === 'side') n.set(hit.sideSign * Math.cos(slope), Math.sin(slope), 0);
+    else n.set(0, hit.face === 'top' ? 1 : -1, 0);
     const cosA = -hit.ldir.dot(n); let angle = Math.acos(clamp(cosA, -1, 1)) / DEG; if (cosA <= 0) angle = 89.5;
     const normAngle = Math.max(0, angle - (typeInfo.normalize || 0));
     let eff = tmm / Math.max(0.05, Math.cos(normAngle * DEG));
@@ -200,7 +200,7 @@ export class Tank {
     const overmatch = shellSpec.caliber > tmm * 3;
     const ricochet = !typeInfo.he && angle > typeInfo.ricochet && !overmatch;
     // world normal (for ricochet reflection)
-    const nw = n.clone(); if (hit.part === 'turret') nw.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.turretYaw); nw.applyQuaternion(this.quat);
+    const nw = _v4.copy(n); if (hit.part === 'turret') nw.applyAxisAngle(_v5.set(0, 1, 0), this.turretYaw); nw.applyQuaternion(this.quat);
     return { eff, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
   }
   // ----- damage -----
@@ -238,28 +238,20 @@ export class Tank {
     } else {
       if (hit.face === 'front' && r.next() < 0.35) { if (this.modules.gun === 1) msgs.push('Gun damaged'); this.modules.gun = 0.5; }
       if ((hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
-      if (this.spec.ammoRack.turretBustle && hit.face === 'rear') { this.ammo = this.ammo.map((n) => Math.floor(n * 0.4)); msgs.push('Bustle ammo cooked off – blow-out panels vented'); }
+      if (this.spec.ammoRack.turretBustle && hit.face === 'rear' && r.next() < 0.4) { this.damage(this.hp + 1, attacker, 'ammo'); return ['AMMO RACK DETONATED']; }
     }
-    for (const c of this.crew) if (c.alive && r.next() < (shellSpec.type === 'APFSDS' ? 0.16 : shellSpec.type === 'HEAT' ? 0.22 : 0.2)) { c.alive = false; msgs.push(c.role + ' knocked out'); }
-    if (this.crew.every((c) => !c.alive)) { this.damage(this.hp + 1, attacker, 'crew'); return msgs.concat(['Crew knocked out']); }
+    // crew casualties
+    const crewHit = r.next() < 0.35; if (crewHit) { const role = this.crew[r.int(0, this.crew.length - 1)]; if (role.alive) { role.alive = false; msgs.push(role.role + ' killed'); } }
     this.damage(dmg, attacker, 'pen');
     return msgs;
   }
-  // v9 cosmetic: scorch/dent decal where the last shell struck (no gameplay effect)
-  markHit(penetrated) { const r = this._lastRay; if (!r || !r.wa) return; this._lastRay = null; try { addHitMark(this.model, { wa: r.wa.clone(), wb: r.wb.clone() }, penetrated); } catch (e) { /* cosmetic only */ } }
-  breakTracks() { this.modules.tracks = 0; this.trackRepair = 9; this.speed *= 0.2; }
+  breakTracks() { if (this.modules.tracks < 1) return; this.modules.tracks = 0; this.trackRepair = 8 + Math.random() * 6; if (this.isPlayer) this.game.hud.message('Tracks destroyed', '#ff8a80'); }
+  markHit(penetrated) { if (this._lastRay) addHitMark(this.model, this._lastRay.wa, this._lastRay.wb, penetrated); }
 }
 
-// slab test: returns {t, axis, sign} where sign is outward direction of entered face
 function slab(a, b, x0, x1, y0, y1, z0, z1) {
-  let tmin = 0, tmax = 1, axis = -1, sign = 0;
-  const A = [a.x, a.y, a.z], B = [b.x, b.y, b.z], lo = [x0, y0, z0], hi = [x1, y1, z1];
-  for (let i = 0; i < 3; i++) {
-    const d = B[i] - A[i];
-    if (Math.abs(d) < 1e-9) { if (A[i] < lo[i] || A[i] > hi[i]) return null; continue; }
-    let t0 = (lo[i] - A[i]) / d, t1 = (hi[i] - A[i]) / d, s = -1; if (t0 > t1) { const tt = t0; t0 = t1; t1 = tt; s = 1; }
-    if (t0 > tmin) { tmin = t0; axis = i; sign = s; } if (t1 < tmax) tmax = t1; if (tmin > tmax) return null;
-  }
-  if (axis < 0) return null; // started inside
+  const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z; let tmin = 0, tmax = 1, axis = -1, sign = 0;
+  const clip = (o, d, lo, hi, ax) => { if (Math.abs(d) < 1e-9) return o >= lo && o <= hi; const t0 = (lo - o) / d, t1 = (hi - o) / d; const s = d > 0 ? 1 : -1; if (t0 > t1) { const t = t0; t0 = t1; t1 = t; } if (t0 > tmin) { tmin = t0; axis = ax; sign = s; } if (t1 < tmax) tmax = t1; return tmin <= tmax; };
+  if (!clip(a.x, dx, x0, x1, 0) || !clip(a.y, dy, y0, y1, 1) || !clip(a.z, dz, z0, z1, 2)) return null;
   return { t: tmin, axis, sign };
 }
