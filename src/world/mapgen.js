@@ -138,6 +138,18 @@ export class MapBuilder {
   tree(x, z, type, scale = 1) { this.trees.push({ x, z, type, scale, rot: this.rng.range(0, Math.PI * 2), y: this.t.height(x, z) }); const k = this.t.idx(this.t.x2i(x), this.t.x2i(z)); if (this.t.occ[k] === OCC.FREE) this.t.occ[k] = OCC.TREE; }
   rock(x, z, s) { this.rocks.push({ x, z, s, rot: this.rng.range(0, 6.28), tilt: this.rng.range(-0.3, 0.3), y: this.t.height(x, z) }); }
   prop(kind, x, z, rot = 0, extra = {}) { this.props.push({ kind, x, z, rot, y: this.t.height(x, z), ...extra }); }
+  // v5 #5: yard clutter (crate stacks, barrel groups, split-rail fence runs) around a yard centre. Uses its OWN rng so the
+  // main generation stream (trees, rocks, bushes) is unchanged. Crates/barrels get 'prop' colliders in buildStructures and
+  // reserve their cells so trees/rocks avoid them; fences are decorative (no collider, skipped on Low).
+  yardProps(x, z, rad, seed, kinds = ['crates', 'barrels', 'fence']) {
+    const r = new RNG((this.def.seed || 1) * 7919 + seed); const n = 2 + Math.floor(r.next() * 3);
+    for (let i = 0; i < n; i++) {
+      const kind = kinds[i % kinds.length]; const a = r.range(0, 6.283), d = r.range(rad * 0.55, rad); const px = x + Math.sin(a) * d, pz = z + Math.cos(a) * d; const rot = r.range(0, 3.14);
+      if (kind === 'fence') { const len = r.range(8, 16); if (!this.isFree(px, pz, 2)) continue; this.prop('fence', px, pz, rot, { len, seed: r.int(0, 1e6) }); continue; }
+      if (!this.isFree(px, pz, 2.2)) continue;
+      this.prop(kind, px, pz, rot, { n: 2 + Math.floor(r.next() * 3), seed: r.int(0, 1e6) }); this.occupyRect(px, pz, 1.6, 1.6, rot, OCC.RESERVED, 0.5);
+    }
+  }
   // scatter by density function; spacing ~ cell
   scatter(cell, densityFn, placeFn, half = this.t.half - 10) {
     const r = this.rng;

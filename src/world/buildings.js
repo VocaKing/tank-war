@@ -37,8 +37,10 @@ export function buildingMaterials() {
     brick: new THREE.MeshStandardMaterial({ ...tex('red_brick_03'), roughness: 0.9 }),
     plaster: new THREE.MeshStandardMaterial({ ...tex('clay_plaster'), roughness: 0.95, color: 0xe8d2ae }),
     damaged: new THREE.MeshStandardMaterial({ ...tex('damaged_plaster'), roughness: 0.95, color: 0xd9c4a0 }),
-    roof: new THREE.MeshStandardMaterial({ ...tex('clay_roof_tiles_02'), roughness: 0.85, side: THREE.DoubleSide }),
-    slate: new THREE.MeshStandardMaterial({ ...tex('clay_roof_tiles_02'), roughness: 0.8, color: 0x6c6a6a, side: THREE.DoubleSide }),
+    // v5 #5 roof tuning: deeper tile relief (normalScale), full-strength AO in the tile overlaps, a touch less env sheen so
+    // terracotta reads matte-fired; slate (cabins, barns) is a cooler blue-grey and slightly glossier, like weathered slate
+    roof: new THREE.MeshStandardMaterial({ ...tex('clay_roof_tiles_02'), aoMapIntensity: 1.0, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 0.9, envMapIntensity: 0.75, color: 0xf2e6dc, side: THREE.DoubleSide }),
+    slate: new THREE.MeshStandardMaterial({ ...tex('clay_roof_tiles_02'), aoMapIntensity: 1.0, normalScale: new THREE.Vector2(1.3, 1.3), roughness: 0.72, envMapIntensity: 0.9, color: 0x5f646b, side: THREE.DoubleSide }),
     wood: new THREE.MeshStandardMaterial({ ...tex('brown_planks_05'), roughness: 1.0, color: 0xc8b49a }),
     window: new THREE.MeshPhysicalMaterial({ map: windowTexture(), roughnessMap: windowRoughTexture(), roughness: 1.0, metalness: 0.0, ior: 1.52, specularIntensity: 1.0, envMapIntensity: 1.6 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.9 }),
@@ -52,6 +54,10 @@ export function buildingMaterials() {
     dome: new THREE.MeshStandardMaterial({ color: 0x3f8a8f, roughness: 0.45, metalness: 0.3 }),
     burnt: new THREE.MeshStandardMaterial({ color: 0x1a1714, roughness: 1, transparent: true, opacity: 0.75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide }),
     paintwhite: new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.85 }),
+    leafG: new THREE.MeshStandardMaterial({ color: 0x3f6a2c, roughness: 0.95 }), // window-box greenery
+    bloom: new THREE.MeshStandardMaterial({ color: 0xc23a2e, roughness: 0.8 }), // geraniums
+    zinc: new THREE.MeshStandardMaterial({ color: 0x8a8e8f, roughness: 0.45, metalness: 0.7 }), // gutters + downpipes
+    streak: new THREE.MeshStandardMaterial({ color: 0x2a241c, roughness: 1, transparent: true, opacity: 0.28, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), // scupper water stains
   };
   return M;
 }
@@ -76,6 +82,8 @@ function pickTint(r, style) {
 
 export function buildStructures(mb, scene, terrain) {
   const M = buildingMaterials(); const B = new Buckets(); const colliders = []; const r = new RNG(mb.def.seed + 99);
+  // v5 #5: detail pass has its own stream so the main layout (damage, tints, clutter) is identical on every quality
+  const r2 = new RNG(mb.def.seed + 4099); const lowQ = mb.quality === 'low';
   const wallMat = (b) => (b.style === 'brick' ? 'brick' : b.style === 'desert' ? (b.ruined ? 'damaged' : 'plaster') : b.style === 'castle' ? 'castle' : b.style === 'cabin' ? 'wood' : 'stone');
   const place = (g, b, lx, ly, lz, ry = 0, rx = 0, rz = 0) => { xf(g, lx, ly, lz, ry, rx, rz); xf(g, b.x, b.y, b.z, b.rot); return g; };
   const windowsOnWall = (b, len, axis, sign, floors, H0, skipDoor) => {
@@ -93,6 +101,11 @@ export function buildStructures(mb, scene, terrain) {
       if (!small && !broken) { put(boxUV(0.04, wh, 0.05, 1), 0, 0, 0.03, fm); put(boxUV(ww, 0.04, 0.05, 1), 0, wh * 0.18, 0.03, fm); }
       const sm = b.style === 'brick' ? 'stone' : wallMat(b) === 'wood' ? 'wood' : b.style === 'desert' ? 'plaster' : 'castle';
       put(boxUV(ww + 0.3, 0.08, 0.22, 1), 0, -wh / 2 - fw - 0.04, 0.06, sm); // sill
+      if ((b.style === 'stone' || b.style === 'brick') && !broken && !b.ruined && r2.next() < 0.22 && !lowQ) { // geranium window box
+        const by = -wh / 2 - fw - 0.2; put(boxUV(ww + 0.05, 0.2, 0.22, 1), 0, by, 0.2, 'paintwood');
+        const fg = new THREE.SphereGeometry(0.5, 8, 4); fg.scale((ww + 0.05) / 1.0, 0.32, 0.24); put(fg, 0, by + 0.12, 0.2, 'leafG');
+        for (let k = 0; k < 4; k++) { const fb = new THREE.SphereGeometry(0.075, 5, 3); put(fb, (k / 3 - 0.5) * ww * 0.8 + r2.range(-0.05, 0.05), by + 0.24 + r2.range(0, 0.05), 0.2 + r2.range(-0.05, 0.08), 'bloom'); }
+      }
       if (b.style !== 'desert') put(boxUV(ww + 0.36, 0.18, 0.1, 1), 0, wh / 2 + fw + 0.09, 0.0, sm); // lintel
       else if (r.next() < 0.4) put(boxUV(ww + 0.2, 0.06, 0.4, 1), 0, wh / 2 + 0.25, 0.2, 'wood'); // sun shade
       if (b.style === 'stone' && !b.ruined && r.next() < 0.6) for (const s of [-1, 1]) { const sh = boxUV(0.5, wh + 0.1, 0.05, 1); const so = off + 0.03; if (axis === 'x') place(sh, b, sign * so, y, t + s * (ww / 2 + 0.27), Math.PI / 2); else place(sh, b, t + s * (ww / 2 + 0.27), y, sign * so, 0); B.add('paintwood', sh); }
@@ -162,7 +175,7 @@ export function buildStructures(mb, scene, terrain) {
       for (let i = 0; i < 6; i++) { const s2 = r.range(0.2, 0.6); const rb = boxUV(s2, s2 * 0.6, s2, 1); const ox = side < 2 ? sg * (off + r.range(0.2, 1.5)) : tpos + r.range(-1, 1); const oz = side < 2 ? tpos + r.range(-1, 1) : sg * (off + r.range(0.2, 1.5)); place(rb, b, ox, s2 * 0.25, oz, r.range(0, 3), r.range(-0.5, 0.5)); B.add(wm === 'wood' ? 'stone' : wm, rb); }
     }
     // downpipe at a corner + gutter line for pitched roofs
-    if (b.roof === 'gable' && b.style !== 'cabin') { const dp = new THREE.CylinderGeometry(0.06, 0.06, H, 6); place(dp, b, b.w / 2 + 0.08, H / 2, b.d / 2 - 0.25); B.add('metal', dp); }
+    // (v5 #5: downpipes now hang from the gutter ends, see the gable roof block)
     if (b.style === 'cabin') { const up = boxUV(b.w + 0.1, H - 0.9, b.d + 0.1, 2.5); place(up, b, 0, 0.9 + (H - 0.9) / 2, 0); B.add('wood', up); }
     if (b.roof === 'gable') {
       const ridgeZ = b.d >= b.w; const ww = ridgeZ ? b.w : b.d, dd = ridgeZ ? b.d : b.w; const R = ww * (b.style === 'cabin' ? 0.55 : 0.42);
@@ -173,7 +186,16 @@ export function buildStructures(mb, scene, terrain) {
       const rc = boxUV(0.32, 0.18, dd + 0.9, 1); place(rc, b, 0, H + R + 0.05, 0, ry); B.add(b.style === 'cabin' || b.barn ? 'slate' : 'roof', rc);
       for (const sg of [-1, 1]) { const ex = sg * (ww / 2 + 0.45); const ey = H - 0.45 * R / (ww / 2); const fa = boxUV(0.05, 0.22, dd + 0.9, 1); const gu = new THREE.CylinderGeometry(0.07, 0.07, dd + 0.9, 6); gu.rotateX(Math.PI / 2);
         if (ridgeZ) { place(fa, b, ex, ey - 0.08, 0); place(gu, b, ex + sg * 0.06, ey - 0.12, 0); } else { place(fa, b, 0, ey - 0.08, ex, Math.PI / 2); place(gu, b, 0, ey - 0.12, ex + sg * 0.06, Math.PI / 2); }
-        B.add(b.style === 'cabin' ? 'wood' : 'paintwood', fa); if (b.style !== 'cabin') B.add('metal', gu); }
+        B.add(b.style === 'cabin' ? 'wood' : 'paintwood', fa); if (b.style !== 'cabin') B.add('zinc', gu);
+        if (b.style !== 'cabin') { // v5 #5: downpipe at one end of each gutter: outlet + swan neck back to the wall, wall run, brackets, shoe
+          const lat = (l, y2, a, g2, ry2 = 0, rx2 = 0, rz2 = 0) => { if (ridgeZ) place(g2, b, l, y2, a, ry2, rx2, rz2); else place(g2, b, a, y2, l, ry2 - Math.PI / 2, rx2, rz2); B.add('zinc', g2); };
+          const al = sg * (dd / 2 - 0.3), gx = ex + sg * 0.06, wx = sg * (ww / 2 + 0.09), gy = ey - 0.16, ny = gy - 0.55;
+          lat(gx, gy - 0.1, al, new THREE.CylinderGeometry(0.05, 0.05, 0.22, 6));
+          const nl = Math.hypot(gx - wx, gy - 0.2 - ny); const ng = new THREE.CylinderGeometry(0.05, 0.05, nl, 6); lat((gx + wx) / 2, (gy - 0.2 + ny) / 2, al, ng, 0, 0, Math.atan2(wx - gx, gy - 0.2 - ny));
+          const run = ny - 0.25; const dp = new THREE.CylinderGeometry(0.05, 0.05, run, 6); lat(wx, 0.25 + run / 2, al, dp);
+          const sh = new THREE.CylinderGeometry(0.05, 0.06, 0.3, 6); lat(wx + sg * 0.1, 0.2, al, sh, 0, 0, sg * 0.9);
+          if (!lowQ) for (let yb = 1.2; yb < ny - 0.3; yb += 1.8) { const bk = boxUV(0.12, 0.05, 0.14, 1); lat(sg * (ww / 2 + 0.04), yb, al, bk); }
+        } }
       if (!b.barn) { const cx = ridgeZ ? ww * 0.22 : dd * 0.3, cz = ridgeZ ? dd * 0.3 : ww * 0.22; const ch = boxUV(0.7, 2.0, 0.7, 1.5); place(ch, b, cx, H + R * 0.6 + 0.6, cz); B.add(wm === 'wood' ? 'stone' : wm, ch);
         const cap = boxUV(0.86, 0.1, 0.86, 1); place(cap, b, cx, H + R * 0.6 + 1.65, cz); B.add('castle', cap); for (const o of [-0.15, 0.15]) { const pot = new THREE.CylinderGeometry(0.09, 0.11, 0.35, 8); place(pot, b, cx + o, H + R * 0.6 + 1.85, cz); B.add('rust', pot); } }
       if (b.damage && r.next() < 0.6) { const hole = boxUV(r.range(1.2, 2.5), 0.1, r.range(1.2, 2.2), 1); place(hole, b, ridgeZ ? ww * 0.12 : 0, H + R * 0.55, ridgeZ ? 0 : ww * 0.12, ry, 0, ridgeZ ? Math.atan(R / (ww / 2)) : 0); B.add('dark', hole); }
@@ -181,6 +203,12 @@ export function buildStructures(mb, scene, terrain) {
       // flat roof with parapet, rooftop clutter
       for (const [w2, d2, x2, z2] of [[b.w, 0.3, 0, b.d / 2 - 0.15], [b.w, 0.3, 0, -b.d / 2 + 0.15], [0.3, b.d, b.w / 2 - 0.15, 0], [0.3, b.d, -b.w / 2 + 0.15, 0]]) { const pg = boxUV(w2, 0.7, d2, 3); place(pg, b, x2, H + 0.35, z2); B.add(wm, pg); }
       const slab = boxUV(b.w - 0.2, 0.1, b.d - 0.2, 3); place(slab, b, 0, H + 0.05, 0); B.add('damaged', slab);
+      // v5 #5: roof drains — wooden/clay scupper spouts through the parapet with a dark run-off streak down the wall
+      for (let k = 0, nk = 1 + Math.floor(r2.next() * 2); k < nk; k++) { const sd = r2.next() < 0.5 ? 1 : -1; const xAx = r2.next() < 0.5; const along = (r2.next() - 0.5) * ((xAx ? b.d : b.w) - 2);
+        const sp = boxUV(0.16, 0.12, 0.75, 1); const st = new THREE.PlaneGeometry(0.32, H * 0.7); const half = (xAx ? b.w : b.d) / 2;
+        if (xAx) { place(sp, b, sd * (half + 0.3), H + 0.15, along, Math.PI / 2); place(st, b, sd * (half + 0.02), H - H * 0.35, along, sd * Math.PI / 2); }
+        else { place(sp, b, along, H + 0.15, sd * (half + 0.3)); place(st, b, along, H - H * 0.35, sd * (half + 0.02), sd > 0 ? 0 : Math.PI); }
+        B.add('wood', sp); if (!lowQ) B.add('streak', st); }
       if (r.next() < 0.5) { const tk = new THREE.CylinderGeometry(0.6, 0.6, 1.4, 12); place(tk, b, r.range(-b.w / 3, b.w / 3), H + 1.0, r.range(-b.d / 3, b.d / 3)); B.add('metal', tk); }
       if (fl >= 2 && r.next() < 0.4) { const sw = b.w * 0.45, sd = b.d * 0.45; const sg = boxUV(sw, 2.6, sd, 3); place(sg, b, b.w / 2 - sw / 2 - 0.3, H + 1.3, -b.d / 2 + sd / 2 + 0.3); B.add(wm, sg); top = H + 2.6; }
       if (r.next() < 0.35) { const aw = new THREE.PlaneGeometry(3, 1.6); aw.rotateX(-1.1); place(aw, b, 0, 2.6, b.d / 2 + 0.8); B.add(r.next() < 0.5 ? 'canvasR' : 'canvasB', aw); }
@@ -267,6 +295,27 @@ export function buildStructures(mb, scene, terrain) {
     else if (p.kind === 'stall') { for (const [a, c] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const g = new THREE.CylinderGeometry(0.05, 0.05, 2.4, 5); xf(g, a * 1.3, 1.2, c * 1.0); xf(g, p.x, y, p.z, p.rot); B.add('wood', g); } const aw = new THREE.PlaneGeometry(3, 2.4); aw.rotateX(-Math.PI / 2 + 0.15); xf(aw, p.x, y + 2.45, p.z, p.rot); B.add(r.next() < 0.5 ? 'canvasR' : 'canvasB', aw); const t = boxUV(2.4, 0.8, 1.6, 1); xf(t, p.x, y + 0.4, p.z, p.rot); B.add('wood', t); colliders.push(new OBB(p.x, p.z, 1.35, 1.05, p.rot, y - 1, y + 2.5, 'prop')); }
     else if (p.kind === 'wreck') { const g = boxUV(1.8, 0.9, 4.4, 1.5); xf(g, p.x, y + 0.75, p.z, p.rot, 0, 0.08); B.add('rust', g); const c = boxUV(1.6, 0.7, 2.0, 1.5); xf(c, 0, 1.5, -0.3); xf(c, p.x, y, p.z, p.rot); B.add('rust', c); colliders.push(new OBB(p.x, p.z, 0.95, 2.25, p.rot, y - 1, y + 1.9, 'prop')); }
     else if (p.kind === 'hedgehog') { for (let k = 0; k < 3; k++) { const g = boxUV(0.2, 0.2, 2.4, 1); xf(g, 0, 0.7, 0, k * Math.PI / 3, k === 1 ? 0.9 : -0.9, k === 2 ? 0.9 : 0); xf(g, p.x, y, p.z, p.rot); B.add('rust', g); } colliders.push(new OBB(p.x, p.z, 0.9, 0.9, p.rot, y - 1, y + 1.4, 'prop')); }
+    else if (p.kind === 'crates' || p.kind === 'barrels' || p.kind === 'fence') {
+      // v5 #5 yard clutter (see MapBuilder.yardProps). Crates/barrels collide as one 'prop' box; fences are decorative and Low skips them.
+      const pr = new RNG(p.seed || 7); const put = (g, lx, ly, lz, ry = 0, rx = 0, rz = 0) => { xf(g, lx, ly, lz, ry, rx, rz); xf(g, p.x, y, p.z, p.rot); return g; };
+      if (p.kind === 'crates') { let top = 0; const hb = [0, 0];
+        for (let k = 0; k < Math.min(4, p.n); k++) { const ammo = pr.next() < 0.4; const cw = ammo ? 1.1 : pr.range(0.8, 1.1), ch = ammo ? 0.5 : cw, cd = ammo ? 0.55 : cw;
+          const stack = k >= 2 && k < 4; const lx = stack ? (k - 2.5) * 0.8 : (k - 0.5) * 1.15, lz = stack ? 0 : pr.range(-0.15, 0.15), ly = stack ? Math.max(hb[0], hb[1]) : 0; if (!stack) hb[k] = ch;
+          const cg = boxUV(cw, ch, cd, 0.9); put(cg, lx, ly + ch / 2, lz, pr.range(-0.25, 0.25)); B.add(ammo ? 'paintwood' : 'wood', cg); top = Math.max(top, ly + ch);
+          if (!ammo) for (const sy of [0.08, ch - 0.08]) { const band = boxUV(cw + 0.02, 0.06, cd + 0.02, 1); put(band, lx, ly + sy, lz); B.add('dark', band); } }
+        colliders.push(new OBB(p.x, p.z, 1.45, 0.75, p.rot, y - 1, y + top + 0.05, 'prop')); }
+      else if (p.kind === 'barrels') {
+        for (let k = 0; k < p.n; k++) { const a = k / p.n * 6.283 + pr.range(-0.3, 0.3), d = p.n > 1 ? 0.55 : 0; const lx = Math.sin(a) * d, lz = Math.cos(a) * d; const lying = k === 3;
+          const bg = new THREE.CylinderGeometry(0.3, 0.3, 0.9, 12); if (lying) put(bg, lx * 1.9, 0.3, lz * 1.9, a, 0, Math.PI / 2); else put(bg, lx, 0.45, lz); B.add(pr.next() < 0.5 ? 'rust' : 'paintwood', bg);
+          if (!lying) for (const hy of [0.18, 0.72]) { const ring = new THREE.TorusGeometry(0.305, 0.02, 4, 12); ring.rotateX(Math.PI / 2); put(ring, lx, hy, lz); B.add('metal', ring); } }
+        colliders.push(new OBB(p.x, p.z, 1.0, 1.0, p.rot, y - 1, y + 0.95, 'prop')); }
+      else if (!lowQ) { const n = Math.max(2, Math.round(p.len / 2.4)); const c = Math.cos(p.rot), s = Math.sin(p.rot); let prev = null;
+        for (let k = 0; k <= n; k++) { const t = (k / n - 0.5) * p.len; const px = p.x + s * t, pz = p.z + c * t; const py = terrain.height(px, pz); if (pr.next() < 0.06) { prev = null; continue; }
+          const pg = boxUV(0.14, 1.25, 0.14, 1); xf(pg, px, py + 0.55, pz, p.rot + pr.range(-0.2, 0.2), pr.range(-0.05, 0.05)); B.add('wood', pg);
+          if (prev) for (const ry2 of [0.45, 0.95]) { const dx = px - prev[0], dz = pz - prev[1], dy = py - prev[2]; const L = Math.hypot(dx, dz); const rl = new THREE.CylinderGeometry(0.06, 0.07, L + 0.2, 5); rl.rotateX(Math.PI / 2);
+            xf(rl, (px + prev[0]) / 2, (py + prev[2]) / 2 + ry2 + pr.range(-0.04, 0.04), (pz + prev[1]) / 2, Math.atan2(dx, dz), -Math.atan2(dy, L)); B.add('wood', rl); }
+          prev = [px, pz, py]; } }
+    }
     else if (p.kind === 'sandbags') { for (let i = 0; i < 10; i++) { const row = i < 6 ? 0 : 1; const k = row ? i - 6 : i; const g = new THREE.SphereGeometry(0.4, 8, 5); g.scale(1.1, 0.4, 0.6); xf(g, -2 + k * 0.8 + row * 0.4, 0.18 + row * 0.3, 0); xf(g, p.x, y, p.z, p.rot); B.add('sand', g); } colliders.push(new OBB(p.x, p.z, 2.3, 0.4, p.rot, y - 1, y + 0.75, 'prop')); }
   }
   const group = new THREE.Group(); group.name = 'structures';
