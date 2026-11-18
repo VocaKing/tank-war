@@ -7,7 +7,7 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const page = await browser.newPage({ viewport: { width: +(process.env.VW || 1280), height: +(process.env.VH || 720) } }); const errs = [];
 page.on('pageerror', (e) => errs.push('pageerror ' + e.message)); page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
 const frames = (n = 3) => page.evaluate((n) => new Promise((res) => { setTimeout(res, 200000); let k = 0; const f = () => (++k >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
-await page.goto(base + `?autostart=1&q=high&seed=11&map=${map}&tank=sherman`);
+await page.goto(base + `?autostart=1&q=high&seed=11&map=${map}&tank=sherman`, { timeout: 300000 });
 await page.waitForFunction(() => window.__game && window.__game.player && window.__game.world.hdrLoaded && window.__TM, null, { timeout: 300000 });
 // specs: from player tank list in garage data via game.tanks + a full list exposed by __TM
 const list = await page.evaluate((idsArg) => { const all = window.__TM.TANKS.map((t) => t.id); return idsArg === 'all' ? all : idsArg.split(','); }, idsArg);
