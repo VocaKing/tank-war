@@ -12,8 +12,8 @@ export const MAPS = [
     seed: 1944, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 48, azimuth: 205 }, turbidity: 3.5, rayleigh: 1.4, fog: { color: 0xbcc8d2, density: 0.0011 }, exposure: 0.62,
     hdri: { file: 'kloofendal_48d_partly_cloudy_puresky', sunDir: [0.555, 0.742, 0.377], sunE: [4.35, 4.38, 3.98], horizon: [0.445, 0.479, 0.582], exposure: 0.82, fogDensity: 0.0009, heightFog: [0.03, 0.45, 1.25] },
-    layers: { A: 'leafy_grass', B: 'forest_ground_04', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.5, 0.76, 0.47], tintB: [0.86, 0.84, 0.76] },
-    farColor: [0.36, 0.42, 0.26],
+    layers: { A: 'leafy_grass', B: 'forest_ground_04', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.48, 0.74, 0.42], tintB: [0.82, 0.80, 0.68] },
+    farColor: [0.32, 0.40, 0.24],
     generate(mb) {
       const r = mb.rng;
       mb.setHeights((x, z) => 12 + 13 * mb.fbm(x, z, 420, 4) + 4.5 * mb.fbm(x + 300, z, 140, 3) + 0.7 * mb.fbm(x, z, 33, 2) + 26 * smoothstep(320, 700, -z) + 10 * smoothstep(380, 700, x + z * 0.2));
@@ -46,19 +46,19 @@ export const MAPS = [
         for (const dir of [0, 1]) { if (r.next() > 0.72) continue;
           const pts = []; for (let k = 0; k <= 4; k++) { const t = k / 4; const px = dir ? x0 + F * t : x0, pz = dir ? z0 : z0 + F * t; pts.push([px + mb.noise(px / 40, pz / 40) * 6, pz + mb.noise(pz / 40, px / 40) * 6]); }
           const gap = r.int(1, 3); const a = pts.slice(0, gap), b = pts.slice(gap);
-          if (a.length > 1) mb.hedgerow(a, { treeChance: 0.18, treeType: r.next() < 0.5 ? 'oak' : 'broadleaf', step: 6.5 }); if (b.length > 1) mb.hedgerow(b, { treeChance: 0.18, treeType: 'oak', step: 6.5 }); }
+          if (a.length > 1) mb.hedgerow(a, { treeChance: 0.22, treeType: r.next() < 0.5 ? 'oak' : 'broadleaf', step: 6.2 }); if (b.length > 1) mb.hedgerow(b, { treeChance: 0.22, treeType: 'oak', step: 6.2 }); }
       }
       // orchard
       for (let i = 0; i < 8; i++) for (let j = 0; j < 6; j++) { const x = 40 + i * 9 + r.range(-1, 1), z = 300 + j * 9 + r.range(-1, 1); if (mb.isFree(x, z)) mb.tree(x, z, 'broadleaf', r.range(0.42, 0.55)); }
       // woods
-      mb.scatter(9, (x, z) => { if (!mb.isFree(x, z, 3)) return 0; if (mb.bases.some((b) => Math.hypot(x - b.x, z - b.z) < 110)) return 0; if (Math.hypot(x - 190, z) < 200) return 0; const n = mb.fbm(x + 900, z - 400, 260, 4); return smoothstep(0.18, 0.34, n) * 0.9 + (Math.abs(x) > 640 || Math.abs(z) > 640 ? 0.5 : 0); },
+      mb.scatter(9, (x, z) => { if (!mb.isFree(x, z, 3)) return 0; if (mb.bases.some((b) => Math.hypot(x - b.x, z - b.z) < 110)) return 0; if (Math.hypot(x - 190, z) < 200) return 0; const n = mb.fbm(x + 900, z - 400, 260, 4); return smoothstep(0.18, 0.34, n) * 0.95 + (Math.abs(x) > 640 || Math.abs(z) > 640 ? 0.55 : 0); },
         (x, z) => mb.tree(x, z, r.next() < 0.55 ? 'oak' : r.next() < 0.6 ? 'broadleaf' : 'birch', r.range(0.75, 1.2)));
-      mb.scatter(60, (x, z) => (mb.isFree(x, z, 4) ? 0.35 : 0), (x, z) => mb.tree(x, z, 'oak', r.range(0.8, 1.25)));
-      mb.scatter(22, (x, z) => { if (!mb.isFree(x, z, 4)) return 0; const n = mb.fbm(x + 900, z - 400, 260, 4); return n > 0.1 && n < 0.2 ? 0.6 : 0.05; }, (x, z) => mb.bush(x, z, r.range(3.5, 5.5), r.range(2.8, 3.8)));
+      mb.scatter(60, (x, z) => (mb.isFree(x, z, 4) ? 0.4 : 0), (x, z) => mb.tree(x, z, 'oak', r.range(0.8, 1.25)));
+      mb.scatter(22, (x, z) => { if (!mb.isFree(x, z, 4)) return 0; const n = mb.fbm(x + 900, z - 400, 260, 4); return n > 0.1 && n < 0.2 ? 0.7 : 0.08; }, (x, z) => mb.bush(x, z, r.range(3.5, 5.5), r.range(2.8, 3.8)));
       // telegraph poles along main road
       { const rd = mb.roads[0]; for (let i = 0; i < rd.pts.length; i += 22) { const [x, z] = rd.pts[i]; const j = Math.min(rd.pts.length - 1, i + 1); const dx = rd.pts[j][0] - x, dz = rd.pts[j][1] - z; const l = Math.hypot(dx, dz) || 1; const px = x + dz / l * 7, pz = z - dx / l * 7; if (mb.isFree(px, pz)) mb.prop('pole', px, pz, Math.atan2(dx, dz)); } }
-      mb.scatter(70, (x, z) => (mb.isFree(x, z, 3) ? 0.25 : 0), (x, z) => mb.prop('haybale', x, z, r.range(0, 3)));
-      mb.scatter(45, (x, z) => (mb.slope(x, z) > 0.35 && mb.isFree(x, z) ? 0.7 : 0.04), (x, z) => mb.rock(x, z, r.range(0.8, 2.4)));
+      mb.scatter(70, (x, z) => (mb.isFree(x, z, 3) ? 0.28 : 0), (x, z) => mb.prop('haybale', x, z, r.range(0, 3)));
+      mb.scatter(45, (x, z) => (mb.slope(x, z) > 0.35 && mb.isFree(x, z) ? 0.75 : 0.05), (x, z) => mb.rock(x, z, r.range(0.8, 2.4)));
       mb.lanes = [
         [[-470, -20], [-330, -250], [-18, -400], [250, -330], [470, 40]],
         [[-470, -20], [-300, -90], [-120, -150], [30, -130], [190, 20], [470, 40]],
@@ -66,8 +66,14 @@ export const MAPS = [
       ];
       const F2 = mb.fieldSize;
       mb.finalize((x, z) => { const h = Math.abs(Math.sin(Math.floor(x / F2) * 12.9898 + Math.floor(z / F2) * 78.233) * 43758.5453) % 1; return h < 0.22 ? 0.75 : 0; },
-        (x, z) => { const h = Math.abs(Math.sin(Math.floor(x / F2) * 12.9898 + Math.floor(z / F2) * 78.233) * 43758.5453) % 1; const n = mb.noise2(x / 60, z / 60) * 0.06;
-          if (h > 0.22 && h < 0.42) return [1.13 + n, 1.07 + n, 0.78]; if (h > 0.42 && h < 0.55) return [0.98, 1.06, 0.84]; return [1 + n, 1 + n, 1 + n]; });
+        (x, z) => {
+          const h = Math.abs(Math.sin(Math.floor(x / F2) * 12.9898 + Math.floor(z / F2) * 78.233) * 43758.5453) % 1;
+          const n = mb.noise2(x / 60, z / 60) * 0.08;
+          const moisture = mb.noise2(x / 140, z / 140) * 0.12;
+          if (h > 0.22 && h < 0.42) return [1.08 + n - moisture * 0.3, 1.02 + n, 0.72 - moisture * 0.1]; // warmer field
+          if (h > 0.42 && h < 0.55) return [0.92 + n, 1.04 + n, 0.78 + moisture * 0.1]; // greener patch
+          return [0.96 + n, 0.98 + n + moisture * 0.05, 0.94 + n]; // base soil variation
+        });
     },
   },
   {
@@ -76,8 +82,8 @@ export const MAPS = [
     seed: 3121, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 21, azimuth: 120 }, turbidity: 6, rayleigh: 2.0, fog: { color: 0xc7c3b4, density: 0.0019 }, exposure: 0.6,
     hdri: { file: 'kloofendal_overcast_puresky', sunDir: [0.70, 0.55, 0.45], sunE: [0.9, 0.9, 0.92], horizon: [0.56, 0.615, 0.68], exposure: 0.84, fogDensity: 0.00068, overcast: true, heightFog: [0.045, 0.3, 1.35] },
-    layers: { A: 'forest_ground_04', B: 'leafy_grass', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.76, 0.74, 0.66], tintB: [0.66, 0.86, 0.56] },
-    farColor: [0.18, 0.24, 0.16],
+    layers: { A: 'forest_ground_04', B: 'leafy_grass', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.70, 0.68, 0.58], tintB: [0.58, 0.82, 0.48] },
+    farColor: [0.14, 0.20, 0.12],
     generate(mb) {
       const r = mb.rng;
       const valley = (x, z) => { const d = (x + z + 40 * mb.noise(x / 300, z / 300)) / Math.SQRT2; return Math.exp(-((d / 170) ** 2)); };
@@ -106,18 +112,23 @@ export const MAPS = [
       for (const [fx, fz] of [[-400, 150], [300, -480], [480, 90]]) for (let k = 0; k < 3; k++) { const a = r.range(0, 6); const bx = fx + Math.sin(a) * 15, bz = fz + Math.cos(a) * 15; if (mb.footFree(bx, bz, 6, 6, a)) mb.building({ x: bx, z: bz, w: 7, d: 9, rot: a, style: 'cabin', floors: 1, roof: 'gable' }); }
       // dense forest with clearings
       const forestD = (x, z) => { const n = mb.fbm(x - 500, z + 200, 230, 4); const clearing = smoothstep(-0.05, 0.12, n); const v = valley(x, z); return clearing * (1 - 0.65 * smoothstep(0.75, 0.95, v)); };
-      mb.scatter(8.5, (x, z) => { if (!mb.isFree(x, z, 3)) return 0; if (mb.bases.some((b) => Math.hypot(x - b.x, z - b.z) < 100)) return 0; if (Math.hypot(x - 30, z + 40) < 120) return 0; if (Math.hypot(x - best[0], z - best[1]) < 40) return 0; return forestD(x, z) * (mb.quality === 'low' ? 0.55 : 0.92); },
+      mb.scatter(8.5, (x, z) => { if (!mb.isFree(x, z, 3)) return 0; if (mb.bases.some((b) => Math.hypot(x - b.x, z - b.z) < 100)) return 0; if (Math.hypot(x - 30, z + 40) < 120) return 0; if (Math.hypot(x - best[0], z - best[1]) < 40) return 0; return forestD(x, z) * (mb.quality === 'low' ? 0.55 : 0.95); },
         (x, z) => { const h = mb.t.height(x, z); mb.tree(x, z, h > 45 || r.next() < 0.7 ? 'spruce' : r.next() < 0.5 ? 'birch' : 'broadleaf', r.range(0.75, 1.25)); });
       // bushes at forest edges / clearings
-      mb.scatter(14, (x, z) => { if (!mb.isFree(x, z, 4)) return 0; const f = forestD(x, z); return f > 0.05 && f < 0.6 ? 0.55 : 0.04; }, (x, z) => mb.bush(x, z, r.range(3.5, 5.2), r.range(2.8, 3.6)));
-      mb.scatter(26, (x, z) => (mb.slope(x, z) > 0.4 && mb.isFree(x, z) ? 0.8 : 0.06), (x, z) => mb.rock(x, z, r.range(1, 3.5)));
+      mb.scatter(14, (x, z) => { if (!mb.isFree(x, z, 4)) return 0; const f = forestD(x, z); return f > 0.05 && f < 0.6 ? 0.6 : 0.05; }, (x, z) => mb.bush(x, z, r.range(3.5, 5.2), r.range(2.8, 3.6)));
+      mb.scatter(26, (x, z) => (mb.slope(x, z) > 0.4 && mb.isFree(x, z) ? 0.85 : 0.07), (x, z) => mb.rock(x, z, r.range(1, 3.5)));
       mb.lanes = [
         [[-430, -430], [-520, -150], [-470, 120], [-250, 220], [-100, 460], [430, 430]],
         [[-430, -430], [-200, -230], [30, -40], [250, 170], [430, 430]],
         [[-430, -430], [-150, -500], [300, -320], [500, 120], [430, 430]],
       ];
       mb.finalize((x, z, s) => { const v = valley(x, z); return clamp(1 - forestD(x, z) * 1.3, 0, 1) * 0.9 + v * 0.3; },
-        (x, z) => { const n = mb.noise2(x / 80, z / 80) * 0.08; return [1 + n, 1 + n, 1 + n]; });
+        (x, z) => {
+          const n = mb.noise2(x / 80, z / 80) * 0.1;
+          const canopy = mb.fbm(x - 200, z + 100, 180, 3);
+          const shade = smoothstep(0.3, 0.7, canopy) * 0.15;
+          return [0.88 + n - shade, 0.92 + n - shade * 0.5, 0.82 + n - shade * 0.8]; // cooler, shaded forest floor
+        });
     },
   },
   {
@@ -126,8 +137,8 @@ export const MAPS = [
     seed: 1991, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 34, azimuth: 250 }, turbidity: 8, rayleigh: 1.1, fog: { color: 0xd8c6a6, density: 0.00095 }, exposure: 0.56,
     hdri: { file: 'kloofendal_43d_clear_puresky', sunDir: [0.591, 0.682, 0.431], sunE: [6.45, 6.08, 5.56], horizon: [0.74, 0.72, 0.70], exposure: 0.8, fogDensity: 0.0008, heightFog: [0.022, 0.6, 1.15] },
-    layers: { A: 'coast_sand_01', B: 'dry_ground_01', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [1.08, 0.98, 0.84], tintB: [1.05, 0.95, 0.82] },
-    farColor: [0.62, 0.5, 0.36],
+    layers: { A: 'coast_sand_01', B: 'dry_ground_01', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [1.12, 0.96, 0.78], tintB: [1.02, 0.88, 0.70] },
+    farColor: [0.68, 0.52, 0.34],
     generate(mb) {
       const r = mb.rng;
       const town = (x, z) => 1 - smoothstep(240, 420, Math.hypot(x, z));
@@ -177,11 +188,11 @@ export const MAPS = [
       }
       // palms: oasis, wadi, town gardens
       for (let i = 0; i < 40; i++) { const a = r.range(0, 6.28), d = r.range(36, 60); const x = -260 + Math.cos(a) * d, z = 335 + Math.sin(a) * d; if (mb.isFree(x, z)) mb.tree(x, z, 'palm', r.range(0.8, 1.2)); }
-      mb.scatter(16, (x, z) => { const o = mb.t.occAt(x, z); const nearWadi = Math.abs(z - (300 + x * 0.1)) < 90; return (o === OCC.FREE || o === OCC.WATER) && nearWadi && mb.isFree(x, z) ? 0.25 : 0; }, (x, z) => mb.tree(x, z, 'palm', r.range(0.7, 1.15)));
-      mb.scatter(30, (x, z) => (Math.hypot(x, z) < 240 && mb.isFree(x, z, 3) ? 0.3 : 0), (x, z) => mb.tree(x, z, 'palm', r.range(0.6, 1.0)));
+      mb.scatter(16, (x, z) => { const o = mb.t.occAt(x, z); const nearWadi = Math.abs(z - (300 + x * 0.1)) < 90; return (o === OCC.FREE || o === OCC.WATER) && nearWadi && mb.isFree(x, z) ? 0.28 : 0; }, (x, z) => mb.tree(x, z, 'palm', r.range(0.7, 1.15)));
+      mb.scatter(30, (x, z) => (Math.hypot(x, z) < 240 && mb.isFree(x, z, 3) ? 0.35 : 0), (x, z) => mb.tree(x, z, 'palm', r.range(0.6, 1.0)));
       // dry scrub bushes (concealment) – denser along wadi and near town edges
-      mb.scatter(18, (x, z) => { if (!mb.isFree(x, z, 4)) return 0; const nearWadi = Math.abs(z - (320 + x * 0.1)) < 80; const d = Math.hypot(x, z); return nearWadi ? 0.5 : d > 250 && d < 380 ? 0.28 : 0.1; }, (x, z) => mb.bush(x, z, r.range(3.4, 4.8), r.range(2.6, 3.3), 'dry'));
-      mb.scatter(20, (x, z) => (mb.slope(x, z) > 0.45 && mb.isFree(x, z) ? 0.9 : 0.03), (x, z) => mb.rock(x, z, r.range(1.2, 4)));
+      mb.scatter(18, (x, z) => { if (!mb.isFree(x, z, 4)) return 0; const nearWadi = Math.abs(z - (320 + x * 0.1)) < 80; const d = Math.hypot(x, z); return nearWadi ? 0.55 : d > 250 && d < 380 ? 0.32 : 0.12; }, (x, z) => mb.bush(x, z, r.range(3.4, 4.8), r.range(2.6, 3.3), 'dry'));
+      mb.scatter(20, (x, z) => (mb.slope(x, z) > 0.45 && mb.isFree(x, z) ? 0.95 : 0.04), (x, z) => mb.rock(x, z, r.range(1.2, 4)));
       for (let i = 0; i < 14; i++) { const x = r.range(-400, 400), z = r.range(-400, 400); if (mb.isFree(x, z, 3)) mb.prop('wreck', x, z, r.range(0, 6)); }
       for (const [x, z] of [[-240, 0], [240, 0], [0, -240], [0, 240]]) for (let k = 0; k < 5; k++) { const px = x + r.range(-14, 14) + (x ? 0 : r.range(-12, 12)), pz = z + r.range(-14, 14); if (mb.isFree(px, pz)) mb.prop(k % 2 ? 'hedgehog' : 'sandbags', px, pz, r.range(0, 3)); }
       mb.lanes = [
@@ -190,7 +201,12 @@ export const MAPS = [
         [[-460, 430], [-100, 470], [150, 470], [420, 120], [460, -400]],
       ];
       mb.finalize((x, z, s) => { const n = mb.fbm(x + 50, z, 120, 3); return smoothstep(-0.05, 0.25, n) * 0.8 + town(x, z) * 0.5; },
-        (x, z) => { const n = mb.noise2(x / 90, z / 90) * 0.07; return [1 + n, 1 + n * 0.8, 1 + n * 0.6]; });
+        (x, z) => {
+          const n = mb.noise2(x / 90, z / 90) * 0.09;
+          const duneShade = Math.sin((x * 0.8 + z * 0.6) / 42) * 0.06;
+          const oasis = Math.exp(-Math.hypot(x + 260, z - 335) / 80) * 0.2;
+          return [1.05 + n + duneShade, 0.92 + n * 0.7 - oasis * 0.15, 0.72 + n * 0.5 - oasis * 0.2]; // warmer dunes, cooler near oasis
+        });
     },
   },
 ];
