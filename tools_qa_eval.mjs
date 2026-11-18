@@ -4,8 +4,8 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 const [map = 'village', tank = 'sherman', q = 'low', file, base = 'http://localhost:4176/', shot] = process.argv.slice(2);
 const code = fs.readFileSync(file, 'utf8');
-const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const page = await browser.newPage({ viewport: { width: 960, height: 540 } }); const errs = [];
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info', '--js-flags=--expose-gc'] });
+const page = await browser.newPage({ viewport: { width: 800, height: 450 } }); const errs = [];
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ': ' + m.text()); else if (m.text().startsWith('QA ')) console.log(m.text()); });
 page.on('pageerror', (e) => errs.push('pageerror ' + e.message));
 if (process.env.SEEDRAND) await page.addInitScript(() => { let s = 12345; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; });
@@ -14,6 +14,6 @@ await page.goto(`${base}?autostart=1&map=${map}&tank=${tank}&q=${q}&seed=7`, { t
 await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 180000 });
 let res;
 try { res = await page.evaluate(`(async () => { ${code} })()`); } catch (e) { res = { error: e.message }; }
-if (shot) await page.screenshot({ path: shot });
+if (shot) await page.screenshot({ path: shot, timeout: 300000 });
 console.log(JSON.stringify({ map, tank, q, res, errs }, null, 1));
 await browser.close();
