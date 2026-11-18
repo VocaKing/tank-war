@@ -284,7 +284,7 @@ export const TANKS = [
       { name: 'DTP-125 HEAT', type: 'HEAT', caliber: 125, pen: 650, velocity: 900, damage: 460, count: 10 },
       { name: 'DTB-125 HE', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 8 },
     ],
-    paint: { base: '#67704a', camo: ['#3b4229', '#8e8a62', '#4f5a38'], accent: '#555a38', pattern: 'digital', fade: 8, rough: 0.7 }, // PLA woodland digital
+    paint: { base: '#566a34', camo: ['#2c3820', '#76784a', '#405229'], accent: '#4a5a30', pattern: 'digital', fade: 6, rough: 0.66, dustAmt: 0.6 }, // PLA woodland digital (richer greens, less dust)
     desc: 'China\'s top MBT: arrowhead ERA-clad turret, 1,500 hp diesel, laser dazzler and a 125 mm autoloaded smoothbore. Fast, flat and modern, in digital camouflage.',
   },
   {

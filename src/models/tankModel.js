@@ -489,7 +489,7 @@ function getTemplate(spec) {
   const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
-  const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
+  const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust, dustAmt: spec.paint.dustAmt };
   const paint = paintMaterial(spec.paint, seed, 0, opts);
   const paintT = paintMaterial(spec.paint, seed, b.turretPos[1], { ...opts, cast: b.castTurret ?? opts.cast });
   const paintG = paintMaterial(spec.paint, seed, b.turretPos[1] + b.gunPos[1], { ...opts, cast: 0.15 });
