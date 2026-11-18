@@ -41,7 +41,8 @@ HDRIs are the original Radiance `.hdr` files at 1K and 2K.
 
 ## Procedural assets (made for this project, no third-party license)
 - All 15 tank models (geometry built in code from published dimensions), camouflage, track links, wheels, decal textures.
-- Grass cards and building details (frames, gutters, damage) — procedural.
+- Grass cards and building details (frames, sills, gutters + downpipes, window boxes, roof scuppers, damage) — procedural.
+- Yard props (crates, ammo boxes, barrels, split-rail fences), roads, concrete hard-standing, mud, shoreline foam — procedural, reusing the Poly Haven textures listed above (no new third-party assets).
 - Foliage cards (leaves, needles, palm fronds), water normals, window textures — drawn on canvas at runtime.
 - Terrain, maps, buildings, vegetation placement — procedural.
 - All sound effects — synthesized at runtime with WebAudio.
