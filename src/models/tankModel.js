@@ -100,8 +100,8 @@ function grimeMaterial(base, mudHex, amt = 0.55, key = 'grime') {
         vec3 gp = vGP * 1.7;
         float gn = texture2D(uNoise, gp.zy).r * gb.x + texture2D(uNoise, gp.xz).r * gb.y + texture2D(uNoise, gp.xy).r * gb.z;
         float gf = texture2D(uNoise, gp.zy * 4.0).g * gb.x + texture2D(uNoise, gp.xz * 4.0).g * gb.y + texture2D(uNoise, gp.xy * 4.0).g * gb.z;
-        gMud = clamp(smoothstep(0.42, 0.7, gn + (gf - 0.5) * 0.35) * uAmt * 1.5, 0.0, 0.9);
-        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.7 + 0.5 * gf), gMud);
+        gMud = clamp(smoothstep(0.38, 0.85, gn + (gf - 0.5) * 0.25) * uAmt * 1.2, 0.0, 0.75);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.8 + 0.3 * gf), gMud) * (1.0 - 0.18 * uAmt);
         diffuseColor.rgb *= 0.92 + 0.16 * gf;`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.97, gMud);')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.0, gMud);');
@@ -441,6 +441,9 @@ function linkGeometry(w, pitch, th, modern) {
   for (const s of [-1, 1]) add(box(0.05, th * 1.6, pitch * 0.42, s * w * 0.07, th * 0.95, 0), steel); // guide horns (inner, +y)
   for (const z of [-1, 1]) add(cylX(th * 0.32, w * 1.04, 6, 0, 0, z * pitch * 0.43), dark); // pins / end connectors
   for (const s of [-1, 1]) add(box(0.04, th * 0.7, pitch * 0.25, s * w * 0.52, 0, pitch * 0.42), dark);
+  // v6: cast-link detail – WWII skeleton links get chevron ribs + a dark lightening window, modern links a centre end-connector wedge
+  if (!modern) { for (const s of [-1, 1]) add(box(w * 0.36, th * 0.3, pitch * 0.1, s * w * 0.22, -th * 0.42, pitch * 0.3, 0, s * 0.35, 0), steel); add(box(w * 0.18, th * 0.62, pitch * 0.3, 0, 0.002, -pitch * 0.12), dark); }
+  else add(box(w * 0.16, th * 0.5, pitch * 0.2, 0, -th * 0.15, pitch * 0.42), dark);
   return mergeGeometries(parts);
 }
 // v4 finishing pass for every tank: rear fender tail-light clusters, rubber mud flaps, fender support brackets,
