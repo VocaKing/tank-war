@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage({ viewport: { width: 800, height: 450 } }); const errs = [];
+page.on('pageerror', (e) => errs.push(e.message)); page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.text()); });
+await page.goto('http://localhost:4177/?autostart=1&q=high&seed=11&map=village&tank=t34', { timeout: 300000 });
+await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 300000 });
+const r = await page.evaluate(() => new Promise((res) => { const g = window.__game; const e = g.tanks.find((t) => t.team === 1); g.debug.freeze(true);
+  const p = g.player; e.placeAt(p.pos.x + Math.sin(p.heading) * 40, p.pos.z + Math.cos(p.heading) * 40, 1.2); for (const t of g.tanks) if (t.team === 1 && t !== e) t.placeAt(560, 560 - t.id * 9, 0);
+  e.visibleUntil[0] = 1e9; g.debug.simulate(0.5); const P = e.model.root.localToWorld(new e.pos.constructor(0, 1.2, 0)); g.alignCamTo(P); g.debug.look(0.01, 0); g.debug.simulate(0.4); g.debug.pause(true);
+  let k = 0; const f = () => { if (++k >= 4) res({ post: !!g.post, ...g.debug.assist() }); else requestAnimationFrame(f); }; requestAnimationFrame(f); }));
+await page.screenshot({ path: '/tmp/outline_high.png', timeout: 300000 });
+console.log(JSON.stringify(r), 'errs:', errs.join(' | ') || 'none'); await browser.close();

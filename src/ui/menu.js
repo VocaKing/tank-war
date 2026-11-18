@@ -19,16 +19,17 @@ export class Menu {
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
         <div class="maps">${MAPS.map((m) => `<button class="mcard" data-id="${m.id}"><b>${m.name}</b><small>${m.subtitle} · 1.2 × 1.2 km</small><p>${m.desc}</p></button>`).join('')}</div>
-        <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+        <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to soft-lock the camera on it; mouse input is dampened near the target, pull away firmly to break"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
         <div class="mode">Team Battle · 7 vs 7 · Base capture · tier-matched</div><div class="losum" id="m-losum"></div><button class="tbl-btn lo-btn" id="m-lo-btn">🎒 Ammo &amp; equipment</button><button class="battle" id="m-battle">BATTLE!</button></div>
       </div>
       <div class="overlay" id="m-tbl"></div><div class="overlay" id="m-lo"></div>`;
     this.root.querySelectorAll('.tcard').forEach((b) => (b.onclick = () => this.select(b.dataset.id)));
     this.root.querySelectorAll('.mcard').forEach((b) => (b.onclick = () => this.selectMap(b.dataset.id)));
-    this.root.querySelector('#m-battle').onclick = () => this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items() });
+    this.root.querySelector('#m-battle').onclick = () => this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items(), aimAssist: localStorage.getItem('tw_aa') !== '0' });
     this.root.querySelector('#m-lo-btn').onclick = () => this.showLoadout(true);
     this.root.querySelector('#m-table').onclick = () => this.showTable(true);
     const q = this.root.querySelector('#m-q'); q.value = this.quality; q.onchange = () => { this.quality = q.value; localStorage.setItem('tw_q', q.value); };
+    const aa = this.root.querySelector('#m-aa'); aa.checked = localStorage.getItem('tw_aa') !== '0'; aa.onchange = () => localStorage.setItem('tw_aa', aa.checked ? '1' : '0');
     this.selectMap(this.map);
   }
   selectMap(id) { this.map = id; localStorage.setItem('tw_map', id); this.root.querySelectorAll('.mcard').forEach((b) => b.classList.toggle('sel', b.dataset.id === id)); }
