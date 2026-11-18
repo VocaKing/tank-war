@@ -53,6 +53,7 @@ function panther(d) {
   const fy = trackTop(g);
   const prof = [[-hl + 0.12, c], [hl - 0.85, c], [hl - 0.05, 1.08], [hl - 1.32, H], [-hl + 0.28, H], [-hl + 0.02, H - 0.35], [-hl + 0.02, c + 0.25]];
   const inner = hullShell(P, d, prof, fy, { sideTaper: 0.72 });
+  K.profileWelds(P, prof, (y) => (d.W / 2 - 0.01) * (1 - 0.28 * Math.max(0, (y - fy) / (H - fy))), fy);
   torsionArms(P, inner, g, c);
   // glacis details: bow MG ball, driver periscope, headlight, tow shackles
   P.add('hull', 'paint', T(new THREE.SphereGeometry(0.13, 12, 8), 0.55, 1.45, hl - 0.68)); P.add('hull', 'dark', cylZ(0.02, 0.35, 6, 0.55, 1.47, hl - 0.52));
@@ -89,10 +90,12 @@ function is2(d) {
   const P = new Parts(); const hl = d.L / 2, H = d.hullH, c = d.clearance;
   const g = gear({ n: 6, z0: -2.3, z1: 2.0, r: 0.34, w: 0.5, rollers: [-1.5, 0.0, 1.5], ry: 0.97, rr: 0.1, spr: { z: -hl + 0.35, y: 0.76, r: 0.33 }, idl: { z: hl - 0.32, y: 0.7, r: 0.3 } });
   const fy = trackTop(g);
-  const prof = [[-hl + 0.2, c], [hl - 0.6, c], [hl, 0.98], [hl - 1.05, H], [-hl + 0.12, H], [-hl, 1.42], [-hl, c + 0.2]];
+  // model 1944 "straightened nose": one flat 100 mm upper glacis at 60° from vertical, lower plate at ~30° (not the stepped 1943 cast nose)
+  const prof = [[-hl + 0.2, c], [hl - 0.42, c], [hl, 0.98], [hl - 1.5, H], [-hl + 0.12, H], [-hl, 1.42], [-hl, c + 0.2]];
   const inner = hullShell(P, d, prof, fy, { sideTaper: 0.86 });
+  K.profileWelds(P, prof, (y) => (d.W / 2 - 0.01) * (1 - 0.14 * Math.max(0, (y - fy) / (H - fy))), fy);
   torsionArms(P, inner, g, c);
-  P.add('hull', 'dark', box(0.32, 0.06, 0.03, 0, 1.55, hl - 0.66, -60 * DEG)); P.add('hull', 'paint', box(0.42, 0.14, 0.12, 0, 1.55, hl - 0.68, -60 * DEG)); // driver visor
+  P.add('hull', 'dark', box(0.32, 0.06, 0.03, 0, 1.47, hl - 0.85, -60 * DEG)); P.add('hull', 'paint', box(0.42, 0.14, 0.12, 0, 1.45, hl - 0.86, -60 * DEG)); // driver vision block on the flat glacis
   K.headlight(P, 'hull', -1.2, fy + 0.15, hl - 0.25);
   for (const s of [-1, 1]) {
     P.add('hull', 'paint', cylZ(0.17, 0.95, 14, s * 1.28, fy + 0.18, -1.6)); P.add('hull', 'metal', box(0.4, 0.04, 0.05, s * 1.28, fy + 0.05, -1.3)); P.add('hull', 'metal', box(0.4, 0.04, 0.05, s * 1.28, fy + 0.05, -1.9)); // external fuel tanks
@@ -102,7 +105,7 @@ function is2(d) {
   }
   K.tools(P, 'hull', 1.3, fy + 0.02, 1.9, 1);
   deckGrilles(P, -0.7, 0.7, H, -hl + 0.5, -hl + 1.6, 6); P.add('hull', 'paint', box(1.6, 0.06, 0.5, 0, H + 0.02, -hl + 2.1));
-  K.spareLinks(P, 'hull', -0.4, 1.15, hl - 0.25, 3, d.trackW, 0.16, 0, -60 * DEG);
+  K.spareLinks(P, 'hull', -0.45, 1.12, hl - 0.3, 3, d.trackW, 0.16, 0, -60 * DEG);
   // cast turret
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
   const poly = superEllipse(tw, 1.12, 1.3, 2.2, 40).map(([x, z]) => [x, z + bz]);
@@ -124,6 +127,7 @@ function pershing(d) {
   const fy = trackTop(g);
   const prof = [[-hl + 0.25, c], [hl - 0.5, c], [hl, 0.95], [hl - 1.12, H], [-hl + 0.05, H], [-hl, 1.38], [-hl + 0.05, c + 0.15]];
   const inner = hullShell(P, d, prof, fy, {});
+  K.profileWelds(P, prof, d.W / 2 - 0.01, fy);
   torsionArms(P, inner, g, c);
   P.add('hull', 'paint', T(new THREE.SphereGeometry(0.14, 12, 8), 0.6, 1.35, hl - 0.6)); P.add('hull', 'dark', cylZ(0.02, 0.35, 6, 0.6, 1.4, hl - 0.45));
   for (const s of [-1, 1]) { K.headlight(P, 'hull', s * 1.3, fy + 0.12, hl - 0.15); K.hatch(P, 'hull', s * 0.6, H, hl - 1.45, 0.27, { periscope: true }); P.add('hull', 'paint', box(0.06, 0.32, d.L * 0.92, s * (d.W / 2 + 0.01), fy - 0.15, 0)); }

@@ -41,4 +41,4 @@ function loop() {
 }
 loop();
 window.__ready = true;
-if (params.get('autostart')) start({ tankId: params.get('tank') || 'sherman', mapId: params.get('map') || 'village', quality: params.get('q') || 'high', loadout: params.get('loadout') ? params.get('loadout').split(',').map(Number) : undefined, items: params.get('items') ? params.get('items').split(',') : undefined }, false);
+if (params.get('autostart')) start({ tankId: params.get('tank') || 'sherman', mapId: params.get('map') || 'village', quality: params.get('q') || 'high', loadout: params.get('loadout') ? params.get('loadout').split(',').map(Number) : undefined, items: params.get('items') ? params.get('items').split(',') : undefined, aimAssist: params.get('aa') !== '0' && localStorage.getItem('tw_aa') !== '0' }, false);

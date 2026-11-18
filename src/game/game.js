@@ -15,6 +15,8 @@ import { sanitizeItems, DEFAULT_ITEMS } from './items.js';
 import { setTrackLOD } from '../models/tankModel.js';
 import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 import { Post } from '../render/post.js';
+import { Outline } from '../render/outline.js';
+import { AimAssist } from './aimAssist.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
 function _segDist(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceTo(p); }
 
@@ -36,10 +38,12 @@ export class Game {
     this.player = this.tanks[0];
     this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, fov: 60, follow: this.player };
     this.armorView = new ArmorView(this); this.lock = null;
+    this.assist = new AimAssist(this, opts.aimAssist !== false);
     this.keys = {}; this.mouseDown = false; this.aimPoint = new THREE.Vector3();
     this.hud = new HUD(uiRoot, this);
     this.bindInput();
     if (this.quality === 'high' && !opts.noPost) { try { this.post = new Post(renderer, this.scene, this.camera); } catch (e) { console.warn('post-processing disabled', e); this.post = null; } }
+    try { this.outline = new Outline(renderer, this.quality); } catch (e) { console.warn('outline disabled', e); this.outline = null; }
     this.resize();
     this.debug = this.makeDebug();
   }
@@ -103,8 +107,7 @@ export class Game {
     on(c, 'contextmenu', (e) => e.preventDefault());
     on(window, 'mousemove', (e) => {
       if (this.paused) return; const locked = document.pointerLockElement === c; if (!locked && !this.mouseDown) return;
-      const k = this.cam.sniper ? 0.0022 / this.cam.zoom * 2.2 : 0.0024;
-      this.cam.yaw -= e.movementX * k; this.cam.pitch = clamp(this.cam.pitch - e.movementY * k, this.cam.sniper ? -0.35 : -0.9, this.cam.sniper ? 0.45 : 0.35);
+      this.mouseLook(e.movementX, e.movementY);
     });
     on(c, 'wheel', (e) => {
       e.preventDefault(); const up = e.deltaY < 0;
@@ -113,6 +116,12 @@ export class Game {
     }, { passive: false });
     on(document, 'pointerlockchange', () => { if (!document.pointerLockElement && !this.ended && this._wasLocked) this.setPaused(true); this._wasLocked = !!document.pointerLockElement; });
     on(window, 'resize', () => this.resize());
+  }
+  // mouse look (also used by the headless tests): the aim assist may absorb / dampen the movement while locked
+  mouseLook(dx, dy) {
+    const k = this.cam.sniper ? 0.0022 / this.cam.zoom * 2.2 : 0.0024;
+    const [dyaw, dpitch] = this.assist.look(dx, dy, k);
+    this.cam.yaw += dyaw; this.cam.pitch = clamp(this.cam.pitch + dpitch, this.cam.sniper ? -0.35 : -0.9, this.cam.sniper ? 0.45 : 0.35);
   }
   toggleSniper() {
     const P = this.aimPoint.clone(); const valid = this.player.alive && Number.isFinite(P.x) && this.aimDist > 0;
@@ -149,7 +158,7 @@ export class Game {
   // gun lock: keep the gun laid on the centre of mass of the enemy under the crosshair (with lead)
   toggleLock() {
     if (this.lock) { this.lock = null; this.hud.message('Target lock released', '#c8c8c8'); return; }
-    const t = this.aimTank; if (t && t.alive && t.team !== this.player.team && t.spotted[this.player.team]) { this.lock = t; this.hud.message('Target locked: ' + t.spec.short, '#ffd84a'); }
+    const t = this.assist.target || this.aimTank; if (t && t.alive && t.team !== this.player.team && t.spotted[this.player.team]) { this.lock = t; this.hud.message('Target locked: ' + t.spec.short, '#ffd84a'); }
   }
   useItem(i, t = this.player) {
     const [ok, msg] = t.equip.use(i, this); if (t.isPlayer && msg) this.hud.message(msg, ok ? '#9fd39f' : '#c8c8c8'); return ok;
@@ -173,7 +182,7 @@ export class Game {
   }
   setPaused(v) { if (this.ended) return; this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
   exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
-  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); if (this.post) this.post.resize(innerWidth, innerHeight); }
+  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); if (this.post) this.post.resize(innerWidth, innerHeight); if (this.outline) this.outline.resize(); }
   onKill(attacker, victim, cause) {
     this.hud.kill(attacker, victim, cause);
     if (victim.isPlayer) { this.cam.sniper = false; const a = this.tanks.find((t) => t.team === 0 && t.alive); if (a) this.cam.follow = a; }
@@ -259,7 +268,7 @@ export class Game {
     }
   }
   computeAim() {
-    if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; return; }
+    if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; this.aimHit = null; return; }
     if (this.lock) {
       const t = this.lock; if (!t.alive || !t.spotted[this.player.team] || !this.player.alive) { this.lock = null; }
       else {
@@ -273,8 +282,8 @@ export class Game {
     const far = 2000; const e = o.clone().addScaledVector(dir, far); let best = 1;
     const W = this.world; const tt = W.terrain.segmentHit(o.x, o.y, o.z, e.x, e.y, e.z, 2); if (tt >= 0) best = tt;
     const ts = W.structureHit(o.x, o.y, o.z, e.x, e.y, e.z); if (ts >= 0 && ts < best) best = ts;
-    this.aimTank = null;
-    for (const t of this.tanks) { if (t === this.player) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; const h = t.rayTest(o, e); if (h && h.t < best) { best = h.t; this.aimTank = t; } }
+    this.aimTank = null; this.aimHit = null;
+    for (const t of this.tanks) { if (t === this.player) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; const h = t.rayTest(o, e); if (h && h.t < best) { best = h.t; this.aimTank = t; this.aimHit = h; } }
     this.aimPoint.copy(o).addScaledVector(dir, far * best);
     this.aimDist = far * best;
   }
@@ -363,8 +372,9 @@ export class Game {
     for (let i = this.flying.length - 1; i >= 0; i--) { const f = this.flying[i]; f.t += dt; if (f.rest) continue; f.v.y -= 9.81 * dt; f.obj.position.addScaledVector(f.v, dt); f.obj.rotation.x += f.w.x * dt; f.obj.rotation.z += f.w.z * dt;
       const gy = this.world.terrain.height(f.obj.position.x, f.obj.position.z); if (f.obj.position.y < gy && f.v.y < 0) { f.obj.position.y = gy; f.rest = true; } }
     this.updateCapture(dt); this.checkEnd();
+    this.assist.preCamera();
     this.updateCamera(dt);
-    this.computeAim();
+    this.computeAim(); this.assist.postAim(dt);
     this.updateReticle();
     this.armorView.update();
     // player bush ghosting
@@ -375,10 +385,13 @@ export class Game {
     if (this.player.alive && !this.ended) this.audio.engine(Math.abs(this.player.input.throttle), this.player.speed); else this.audio.stopEngine();
     this.hud.update(dt, this.camera);
   }
-  render() { if (this.post) this.post.render(); else this.renderer.render(this.scene, this.camera); }
+  render() {
+    if (this.post) this.post.render(); else this.renderer.render(this.scene, this.camera);
+    if (this.outline && !this.camOverride) this.outline.render(this.assist.outlineTarget(), this.camera);
+  }
   dispose() {
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose(); if (this.post) this.post.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly
@@ -397,6 +410,8 @@ export class Game {
       freeze: (v = true) => { this.freezeAI = v; for (const t of this.tanks) if (!t.isPlayer) { t.input.throttle = 0; t.input.steer = 0; } },
       place: (idx, x, z, h) => { this.tanks[idx].placeAt(x, z, h); },
       simulate: (sec, dt = 1 / 30) => { const t0 = performance.now(); const n = Math.round(sec / dt); for (let i = 0; i < n && !this.ended; i++) this.update(dt); return { ms: Math.round(performance.now() - t0), perFrame: +((performance.now() - t0) / n).toFixed(2), ended: this.ended, result: this.result }; },
+      look: (dx, dy) => this.mouseLook(dx, dy),
+      assist: () => { const a = this.assist; return { enabled: a.enabled, locked: !!a.target, target: a.target ? this.tanks.indexOf(a.target) : -1, focus: a.focus ? this.tanks.indexOf(a.focus) : -1, outline: this.outline && this.outline.lastDrawn ? this.tanks.indexOf(this.outline.lastDrawn) : -1, offPx: +a.offPx().toFixed(1), drag: +a.dragFactor().toFixed(3), lastBreak: a.lastBreak, stats: { ...a.stats }, yaw: this.cam.yaw, pitch: this.cam.pitch, aimTank: this.aimTank ? this.tanks.indexOf(this.aimTank) : -1 }; },
       fire: () => { this.player.reloadLeft = 0; return this.player.tryFire(this.time); },
       aim: (x, y, z) => { if (x === null) { this.debugAim = null; return; } this.debugAim = new THREE.Vector3(x, y, z); this.aimPoint.set(x, y, z); this.player.input.aim.set(x, y, z); },
       tank: (i) => this.tanks[i],
