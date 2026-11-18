@@ -282,6 +282,13 @@ export class Game {
     // simulate actual gun trajectory to find where the shell would land
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
     const m = p.model; const pos = m.muzzle.getWorldPosition(new THREE.Vector3()); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
+    // the firing kick drives a hull "rock" spring that tilts hull+gun up to ~4° for ~0.5 s; that is cosmetic (the next shot
+    // can't be fired before it has settled) so the reticle uses the laid gun without the rock — otherwise the predicted
+    // impact jumps to the far hills / sky (2–3 km readouts) after every shot
+    if (Math.abs(p.rock) > 1e-5) {
+      const qNo = new THREE.Quaternion().setFromEuler(new THREE.Euler(p.pitch, p.heading, p.roll, 'YXZ')); const corr = qNo.multiply(p.quat.clone().invert());
+      pos.sub(p.pos).applyQuaternion(corr).add(p.pos); q.premultiply(corr);
+    }
     const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
     let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02;
     for (let i = 0; i < 200 && !hitP; i++) {
