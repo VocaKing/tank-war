@@ -151,7 +151,7 @@ export class Vegetation {
       this.mats[k] = [stem, leaf];
     }
     this.geos = {}; for (const k of Object.keys(TYPES)) this.geos[k] = [TYPES[k].geo(0, r), TYPES[k].geo(1, r)];
-    this.rockMat = new THREE.MeshStandardMaterial({ map: pbrTex('aerial_rocks_02', 'diff'), normalMap: pbrTex('aerial_rocks_02', 'nor'), roughness: 0.95, color: mb.def.id === 'desert' ? 0xd2b48c : 0xaaa49a });
+    this.rockMat = new THREE.MeshStandardMaterial({ map: pbrTex('aerial_rocks_02', 'diff'), normalMap: pbrTex('aerial_rocks_02', 'nor'), roughnessMap: pbrTex('aerial_rocks_02', 'arm'), aoMap: pbrTex('aerial_rocks_02', 'arm'), roughness: 1.0, color: mb.def.id === 'desert' ? 0xd2b48c : 0xaaa49a });
     this.rockGeos = [0, 1, 2, 3].map((v) => rockGeo(r, v));
     // records
     this.trees = mb.trees.map((t, i) => ({ ...t, id: i, alive: true, fall: 0 }));

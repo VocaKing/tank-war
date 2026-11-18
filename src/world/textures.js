@@ -174,22 +174,30 @@ export function softSprite() {
   });
 }
 export function waterNormalTexture() {
-  return once('waternormal', () => {
-    const S = 256; const [c, g] = canvas(S, S); const noise = makeNoise2D(77);
-    const h = new Float32Array(S * S);
-    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-      const a = x / S * Math.PI * 2, b = y / S * Math.PI * 2;
-      h[y * S + x] = fbm(noise, Math.cos(a) * 2 + Math.cos(b) * 0.5, Math.sin(a) * 2 + Math.sin(b) * 2, 4);
-    }
+  // v5: tileable spectrum of directional ripples (integer wave vectors so it wraps seamlessly)
+  return once('waternormal5', () => {
+    const S = 512; const [c, g] = canvas(S, S); const r = new RNG(77);
+    const waves = []; for (let i = 0; i < 48; i++) { const kmag = 2 + Math.floor(r.next() ** 1.6 * 28); const a = r.range(-1.2, 1.2) + (i % 3 === 0 ? Math.PI / 2 : 0); const kx = Math.round(Math.cos(a) * kmag), ky = Math.round(Math.sin(a) * kmag); if (!kx && !ky) continue; waves.push([kx, ky, 1 / Math.pow(Math.hypot(kx, ky), 1.25), r.range(0, 6.283)]); }
     const img = g.createImageData(S, S); const d = img.data;
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-      const hx = h[y * S + ((x + 1) % S)] - h[y * S + ((x - 1 + S) % S)];
-      const hy = h[((y + 1) % S) * S + x] - h[((y - 1 + S) % S) * S + x];
-      const nx = -hx * 3, ny = -hy * 3, nz = 1; const l = Math.hypot(nx, ny, nz);
+      let dx = 0, dy = 0; const u = x / S * 6.2831853, v = y / S * 6.2831853;
+      for (const [kx, ky, A, ph] of waves) { const t = kx * u + ky * v + ph; const cc = Math.cos(t) * A; dx += cc * kx; dy += cc * ky; }
+      const nx = -dx * 0.06, ny = -dy * 0.06, nz = 1; const l = Math.hypot(nx, ny, nz);
       const i = (y * S + x) * 4; d[i] = (nx / l * 0.5 + 0.5) * 255; d[i + 1] = (ny / l * 0.5 + 0.5) * 255; d[i + 2] = (nz / l * 0.5 + 0.5) * 255; d[i + 3] = 255;
     }
     g.putImageData(img, 0, 0);
     return toTex(c, false, true);
+  });
+}
+// v5: glass/frame roughness to pair with windowTexture (frame rough, panes glossy)
+export function windowRoughTexture() {
+  return once('windowR', () => {
+    const [c, g] = canvas(128, 128);
+    g.fillStyle = '#e0e0e0'; g.fillRect(0, 0, 128, 128);
+    g.fillStyle = '#101010'; g.fillRect(10, 10, 108, 108);
+    g.fillStyle = '#e0e0e0'; g.fillRect(60, 10, 8, 108); g.fillRect(10, 58, 108, 8);
+    const r = new RNG(5); for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(200,200,200,${r.range(0.1, 0.4)})`; g.beginPath(); g.arc(r.range(10, 118), r.range(10, 118), r.range(2, 7), 0, 6.3); g.fill(); } // dust/grime
+    return toTex(c, false, false);
   });
 }
 export function windowTexture() {

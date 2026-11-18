@@ -1,7 +1,7 @@
 // Procedural buildings, walls, bridges and props merged into a few draw calls per material.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { pbrTex, windowTexture } from './textures.js';
+import { pbrTex, windowTexture, windowRoughTexture } from './textures.js';
 import { OBB } from './terrain.js';
 import { RNG } from '../util.js';
 
@@ -30,7 +30,7 @@ function gableRoof(w, d, H, R, o, tile = 2.5) {
 }
 
 export function buildingMaterials() {
-  const tex = (n, rep = 1) => ({ map: pbrTex(n, 'diff'), normalMap: pbrTex(n, 'nor') });
+  const tex = (n, rep = 1) => ({ map: pbrTex(n, 'diff'), normalMap: pbrTex(n, 'nor'), roughnessMap: pbrTex(n, 'arm'), aoMap: pbrTex(n, 'arm'), aoMapIntensity: 0.8 });
   const M = {
     stone: new THREE.MeshStandardMaterial({ ...tex('plastered_stone_wall'), roughness: 0.92, color: 0xf0e8dc }),
     castle: new THREE.MeshStandardMaterial({ ...tex('plastered_stone_wall'), roughness: 0.95, color: 0xa8a49c }),
@@ -39,8 +39,8 @@ export function buildingMaterials() {
     damaged: new THREE.MeshStandardMaterial({ ...tex('damaged_plaster'), roughness: 0.95, color: 0xd9c4a0 }),
     roof: new THREE.MeshStandardMaterial({ ...tex('clay_roof_tiles_02'), roughness: 0.85, side: THREE.DoubleSide }),
     slate: new THREE.MeshStandardMaterial({ ...tex('clay_roof_tiles_02'), roughness: 0.8, color: 0x6c6a6a, side: THREE.DoubleSide }),
-    wood: new THREE.MeshStandardMaterial({ ...tex('bark_brown_02'), roughness: 0.95, color: 0xb59a7c }),
-    window: new THREE.MeshStandardMaterial({ map: windowTexture(), roughness: 0.35, metalness: 0.2 }),
+    wood: new THREE.MeshStandardMaterial({ ...tex('brown_planks_05'), roughness: 1.0, color: 0xc8b49a }),
+    window: new THREE.MeshPhysicalMaterial({ map: windowTexture(), roughnessMap: windowRoughTexture(), roughness: 1.0, metalness: 0.0, ior: 1.52, specularIntensity: 1.0, envMapIntensity: 1.6 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.9 }),
     paintwood: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }), // colour comes from per-building trim tint
     hay: new THREE.MeshStandardMaterial({ color: 0xc4a45e, roughness: 1 }),

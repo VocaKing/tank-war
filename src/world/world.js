@@ -110,9 +110,28 @@ function buildFarTerrain(mb, mat) {
   const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = false; mesh.name = 'farTerrain'; return mesh;
 }
 
+export const waterTime = { value: 0 };
 function waterMaterial() {
-  const nt = waterNormalTexture(); nt.repeat.set(1, 1);
-  const m = new THREE.MeshPhysicalMaterial({ color: 0x2c4a48, roughness: 0.06, metalness: 0.0, transmission: 0, transparent: true, opacity: 0.88, normalMap: nt, normalScale: new THREE.Vector2(0.35, 0.35), clearcoat: 0.6, envMapIntensity: 1.2 });
+  const nt = waterNormalTexture();
+  const m = new THREE.MeshPhysicalMaterial({ color: 0x1d3a3c, roughness: 0.04, metalness: 0.0, transparent: true, opacity: 0.9, normalMap: nt, normalScale: new THREE.Vector2(1, 1), ior: 1.33, specularIntensity: 1, envMapIntensity: 1.0 });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uT = waterTime;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPw;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPw = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPw; uniform float uT;')
+      .replace('#include <normal_fragment_maps>', `{
+        vec2 p = vWPw.xz; float dist = length(vWPw - cameraPosition);
+        vec3 n1 = texture2D(normalMap, p / 9.0 + vec2(uT * 0.021, uT * 0.013)).xyz * 2.0 - 1.0;
+        vec3 n2 = texture2D(normalMap, p / 3.1 + vec2(-uT * 0.034, uT * 0.027)).xyz * 2.0 - 1.0;
+        vec3 n3 = texture2D(normalMap, p / 31.0 + vec2(uT * 0.006, -uT * 0.009)).xyz * 2.0 - 1.0;
+        float fade = 1.0 - smoothstep(40.0, 400.0, dist) * 0.7;
+        vec2 s = (n1.xy * 0.55 + n2.xy * 0.35 * (1.0 - smoothstep(20.0, 120.0, dist)) + n3.xy * 0.5) * 0.32 * fade;
+        normal = normalize((viewMatrix * vec4(s.x, 1.0, s.y, 0.0)).xyz);
+      }`)
+      // view-dependent body colour: looking straight down you see the dark, slightly green depth; grazing angles are mirror-like (Fresnel via IBL)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        { float ndv = abs(dot(normalize(cameraPosition - vWPw), vec3(0.0, 1.0, 0.0))); diffuseColor.rgb *= mix(1.25, 0.65, ndv); diffuseColor.a = mix(0.97, 0.82, ndv); }`);
+  };
+  m.customProgramCacheKey = () => 'water5';
   return m;
 }
 function buildWater(mb, mat) {
@@ -234,7 +253,7 @@ export class World {
   }
   update(dt, time, camPos) {
     this.veg.updateLOD(camPos); this.veg.update(dt); this.grass.update(camPos);
-    const nm = this.waterMat.normalMap; nm.offset.x = time * 0.02; nm.offset.y = time * 0.013;
+    waterTime.value = time;
     for (const b of this.baseMarkers) { const p = b.flag.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i) + 1.3; p.setZ(i, Math.sin(time * 4 + x * 2.2) * 0.12 * x); } p.needsUpdate = true; }
   }
   // line of sight blocked by terrain or structures? (eye -> target)
