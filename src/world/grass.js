@@ -6,9 +6,9 @@ import { OCC } from './mapgen.js';
 import { foliageShading } from './vegetation.js';
 
 const PRESETS = {
-  village: { layer: 0, dens: 1.0, col: [0.56, 0.68, 0.4], col2: [0.68, 0.7, 0.44], h: 0.55 },
-  forest: { layer: 1, dens: 0.85, col: [0.5, 0.62, 0.36], col2: [0.62, 0.64, 0.38], h: 0.6 },
-  desert: { layer: 1, dens: 0.16, col: [1.15, 0.95, 0.62], col2: [0.95, 0.8, 0.5], h: 0.45 },
+  village: { layer: 0, dens: 1.05, col: [0.52, 0.70, 0.38], col2: [0.64, 0.72, 0.42], h: 0.55 },
+  forest: { layer: 1, dens: 0.90, col: [0.46, 0.58, 0.32], col2: [0.58, 0.62, 0.36], h: 0.6 },
+  desert: { layer: 1, dens: 0.18, col: [1.08, 0.88, 0.58], col2: [0.92, 0.76, 0.48], h: 0.45 },
 };
 function bladeTexture() {
   const W = 256, H = 256; const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
