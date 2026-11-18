@@ -101,8 +101,13 @@ export class MapBuilder {
       else if (bridgeStart >= 0) { if (!opts.noBridges) this.bridges.push({ pts: pts.slice(Math.max(0, bridgeStart - 4), Math.min(pts.length, i + 4)), width: width + 1 }); bridgeStart = -1; }
     });
     for (const [x, z, h] of pts) this.forCells(x, z, R, (k, cx, cz, d) => { if (d < dist[k]) { dist[k] = d; lvl[k] = h; } });
+    // v5: per-cell road surface weights [dirt, cobble, asphalt] (gravel = remainder); the strongest road wins
+    if (!t.roadK) t.roadK = new Float32Array(N * 3);
+    const kc = kind === 'dirt' ? 0 : kind === 'cobble' ? 1 : kind === 'asphalt' ? 2 : -1;
     for (let k = 0; k < N; k++) {
       const d = dist[k]; if (d > R) continue; const h = lvl[k];
+      { const wgt = d < half ? 1 - smoothstep(half * 0.7, half, d) * 0.6 : (1 - smoothstep(half, R, d)) * 0.25;
+        if (wgt >= t.road[k] - 1e-4) { t.roadK[k * 3] = kc === 0 ? 1 : 0; t.roadK[k * 3 + 1] = kc === 1 ? 1 : 0; t.roadK[k * 3 + 2] = kc === 2 ? 1 : 0; } }
       if (d < half) { t.h[k] = h; t.road[k] = Math.max(t.road[k], 1 - smoothstep(half * 0.7, half, d) * 0.6); if (t.occ[k] === OCC.WATER) t.water[k] = -1e9; t.occ[k] = OCC.ROAD; }
       else { const f = smoothstep(half, R, d); t.h[k] = lerp(h, t.h[k], f); t.road[k] = Math.max(t.road[k], (1 - f) * 0.25); }
     }
@@ -149,9 +154,24 @@ export class MapBuilder {
       else this.bush(px, pz, r.range(3.6, 5.2), r.range(2.9, 3.9), opts.bushType || 'bush');
     }
   }
+  // v5: pave every road cell within r of (x,z) as cobblestone (village streets / square)
+  paveArea(x, z, r, kind = 1) {
+    const t = this.t; if (!t.roadK) return; const n = t.n;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; if (t.road[k] <= 0) continue; const d = Math.hypot(t.i2x(i) - x, t.i2x(j) - z); if (d > r) continue;
+      const f = 1 - smoothstep(r * 0.85, r, d); t.roadK[k * 3] *= 1 - f; t.roadK[k * 3 + 1] = Math.max(t.roadK[k * 3 + 1], kind === 1 ? f : 0); t.roadK[k * 3 + 2] = Math.max(t.roadK[k * 3 + 2], kind === 2 ? f : 0); }
+  }
+  // v5: wet mud along river banks and in road shoulders -> this.mud (0..1 per cell)
+  _mud() {
+    const t = this.t; const n = t.n; const N = n * n; const m = new Float32Array(N);
+    for (const rv of this.rivers) { if (rv.dry) continue; const R = rv.width / 2 + 9; for (const [x, z] of rv.pts) this.forCells(x, z, R, (k, cx, cz, d) => { const v = 1 - smoothstep(rv.width / 2 - 1, R, d); if (v > m[k]) m[k] = v; }); }
+    for (const lk of this.lakes) this.forCells(lk.x, lk.z, lk.r + 10, (k, cx, cz, d) => { const v = 1 - smoothstep(lk.r - 1, lk.r + 10, d); if (v > m[k]) m[k] = v; });
+    for (let k = 0; k < N; k++) { const rd = t.road[k]; if (rd > 0.02 && rd < 0.5) m[k] = Math.max(m[k], 0.55 * (1 - Math.abs(rd - 0.22) / 0.22)); }
+    return m;
+  }
   // finalize: splat weights per grid vertex [A,B,rock,road] and tint
   finalize(maskBFn, tintFn) {
     const t = this.t; const n = t.n; this.splat = new Float32Array(n * n * 4);
+    this.mud = this._mud(); if (!t.roadK) t.roadK = new Float32Array(n * n * 3);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i; const x = t.i2x(i), z = t.i2x(j);
       const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(n - 1, j + 1);

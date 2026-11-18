@@ -28,6 +28,7 @@ export const MAPS = [
       mb.road([[-300, -90], [-330, -300], [-300, -460], [-200, -560]], 4.5, 'dirt');
       mb.road([[320, 80], [380, -150], [420, -330]], 4.5, 'dirt');
       // church + square
+      mb.paveArea(190, 0, 185); // cobbled village streets
       mb.building({ x: 230, z: -10, w: 11, d: 24, rot: 0.15, style: 'stone', kind: 'church', floors: 3, roof: 'gable' });
       mb.occupyRect(205, 40, 18, 14, 0.15, OCC.RESERVED, 0);
       mb.settle(190, 0, 175, { spacing: 15, density: 0.9, w: [7, 10], d: [8, 13], make: houseStyle });

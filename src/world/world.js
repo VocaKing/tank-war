@@ -23,10 +23,10 @@ function terrainMaterial(def) {
   };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; attribute vec4 roadk; varying vec4 vSplat; varying vec4 vRK; varying vec3 vWP; varying vec3 vWN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vRK = roadk; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD, aA, aB, aC, aD; uniform vec3 tintA, tintB; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN; float tAO = 1.0;
+      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD, aA, aB, aC, aD; uniform vec3 tintA, tintB; varying vec4 vSplat; varying vec4 vRK; float tMudR = 0.0; vec2 tCobN = vec2(0.0); varying vec3 vWP; varying vec3 vWN; float tAO = 1.0;
       vec3 sampleL(sampler2D t, vec2 uv, float far) { vec3 a = texture2D(t, uv).rgb; vec3 b = texture2D(t, uv * 0.173).rgb; return mix(a, (a + b) * 0.5, far); }`)
       .replace('#include <map_fragment>', `
         float camD = length(vWP - cameraPosition); float far = smoothstep(25.0, 140.0, camD);
@@ -42,11 +42,32 @@ function terrainMaterial(def) {
         if (steep > 0.01) { cC = texture2D(tC, vWP.zy / 6.0).rgb * bw.x + cC * bw.y + texture2D(tC, vWP.xy / 6.0).rgb * bw.z; }
         vec3 rA = texture2D(aA, uv).rgb, rB = texture2D(aB, uv * 1.1).rgb, rC = texture2D(aC, uvr).rgb, rD = texture2D(aD, uvd).rgb;
         // height blending: each texture's luminance acts as its height map, giving natural interlocking transitions
+        // v5 road surfaces: packed dirt / cobblestone setts / asphalt derived from the gravel set (no extra samplers)
+        {
+          float gl = dot(cD, vec3(0.333)); float dirt = vRK.x, cob = vRK.y, asp = vRK.z;
+          vec3 dirtC = vec3(0.47, 0.38, 0.28) * (0.62 + 0.75 * gl) * mix(vec3(1.0), cB / max(dot(cB, vec3(0.333)), 0.05), 0.25);
+          vec3 aspC = vec3(0.16, 0.16, 0.17) * (0.75 + 0.6 * gl);
+          vec3 cobC = cD;
+          if (cob > 0.01) {
+            vec2 cp = vWP.xz / vec2(0.24, 0.17); float row = floor(cp.y); cp.x += mod(row, 2.0) * 0.5;
+            vec2 cid = floor(cp); vec2 cf = fract(cp) - 0.5; float hs = fract(sin(dot(cid, vec2(41.3, 289.1))) * 43758.5);
+            vec2 ed = 0.5 - abs(cf); float e = min(ed.x * 0.24, ed.y * 0.17); float mortar = smoothstep(0.004, 0.018, e);
+            vec3 stone = mix(vec3(0.52, 0.5, 0.47), vec3(0.62, 0.57, 0.5), hs) * (0.7 + 0.55 * gl);
+            cobC = mix(vec3(0.2, 0.19, 0.17) * (0.8 + gl), stone, mortar);
+            tCobN = cf * (1.0 - smoothstep(0.0, 0.05, e)) * 1.6 * (1.0 - far); // rounded sett edges
+          }
+          cD = mix(cD, dirtC, dirt); cD = mix(cD, mix(cobC, cD, far * 0.6), cob); cD = mix(cD, aspC, asp);
+          w.w *= 0.75 + 0.5 * br; // irregular, interlocking road edges instead of a clean ribbon
+          // wet mud on river banks and road shoulders: darker, smoother, glossier soil
+          float mud = vRK.w * smoothstep(0.25, 0.6, br * 0.6 + br2 * 0.6);
+          vec3 mudC = vec3(0.24, 0.19, 0.14) * (0.7 + 0.6 * dot(cA, vec3(0.333)));
+          cA = mix(cA, mudC, mud); cB = mix(cB, mudC, mud * 0.9); tMudR = mud;
+        }
         vec4 hgt = vec4(dot(cA, vec3(0.33)), dot(cB, vec3(0.33)), dot(cC, vec3(0.33)), dot(cD, vec3(0.33))) * 0.6 + w * 1.4;
         float hmax = max(max(hgt.x, hgt.y), max(hgt.z, hgt.w)) - 0.18;
         vec4 hb = max(hgt - hmax, 0.0) * step(0.001, w); w = hb / (hb.x + hb.y + hb.z + hb.w + 1e-4);
         vec3 col = cA * w.x + cB * w.y + cC * w.z + cD * w.w;
-        float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0)); tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
+        float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0)); tRough = mix(tRough, 0.42, tMudR * (w.x + w.y)); tRough = mix(tRough, 0.82, vRK.z * w.w); tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
         col *= 0.82 + 0.36 * texture2D(tB, vWP.xz / 97.0).g;
         col *= mix(0.92, 1.06, smoothstep(0.2, 0.8, texture2D(tA, vWP.xz / 260.0).r));
         // v4 patchwork: large irregular parcels (fields / meadows / dry patches) tint the ground layer differently
@@ -62,13 +83,14 @@ function terrainMaterial(def) {
       .replace('#include <normal_fragment_maps>', `
         {
           vec3 nm = (texture2D(nA, uv).xyz * w.x + texture2D(nB, uv * 1.1).xyz * w.y + texture2D(nC, uvr).xyz * w.z + texture2D(nD, uvd).xyz * w.w) * 2.0 - 1.0;
-          nm.xy *= (1.0 - far * 0.7) * 0.9;
+          nm.xy *= (1.0 - far * 0.7) * 0.9 * (1.0 - 0.6 * tMudR * (w.x + w.y)) * (1.0 - 0.5 * (vRK.x + vRK.z) * w.w);
+          nm.xy += tCobN * vRK.y * w.w;
           vec3 T = (viewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz; vec3 Bt = (viewMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
           T = normalize(T - normal * dot(normal, T)); Bt = normalize(Bt - normal * dot(normal, Bt) - T * dot(T, Bt));
           normal = normalize(T * nm.x + Bt * nm.y + normal * nm.z);
         }`);
   };
-  m.customProgramCacheKey = () => 'terrain5';
+  m.customProgramCacheKey = () => 'terrain5r';
   return m;
 }
 
@@ -77,16 +99,16 @@ function buildTerrainMeshes(mb, mat, step) {
   for (let ty = 0; ty < tiles; ty++) for (let tx = 0; tx < tiles; tx++) {
     const i0 = tx * per, j0 = ty * per, i1 = tx === tiles - 1 ? t.n - 1 : i0 + per, j1 = ty === tiles - 1 ? t.n - 1 : j0 + per;
     const nx = Math.floor((i1 - i0) / step) + 1, nz = Math.floor((j1 - j0) / step) + 1;
-    const pos = new Float32Array(nx * nz * 3), col = new Float32Array(nx * nz * 3), spl = new Float32Array(nx * nz * 4), idx = [];
-    let v = 0;
+    const pos = new Float32Array(nx * nz * 3), col = new Float32Array(nx * nz * 3), spl = new Float32Array(nx * nz * 4), rk = new Float32Array(nx * nz * 4), idx = [];
+    let v = 0; const RK = t.roadK, MUD = mb.mud;
     for (let b = 0; b < nz; b++) for (let a = 0; a < nx; a++) {
       const i = Math.min(i1, i0 + a * step), j = Math.min(j1, j0 + b * step), k = j * t.n + i;
       pos[v * 3] = t.i2x(i); pos[v * 3 + 1] = t.h[k]; pos[v * 3 + 2] = t.i2x(j);
       col[v * 3] = t.tint[k * 3]; col[v * 3 + 1] = t.tint[k * 3 + 1]; col[v * 3 + 2] = t.tint[k * 3 + 2];
-      spl.set(mb.splat.subarray(k * 4, k * 4 + 4), v * 4); v++;
+      spl.set(mb.splat.subarray(k * 4, k * 4 + 4), v * 4); if (RK) { rk[v * 4] = RK[k * 3]; rk[v * 4 + 1] = RK[k * 3 + 1]; rk[v * 4 + 2] = RK[k * 3 + 2]; } if (MUD) rk[v * 4 + 3] = MUD[k]; v++;
     }
     for (let b = 0; b < nz - 1; b++) for (let a = 0; a < nx - 1; a++) { const p = b * nx + a; idx.push(p, p + nx, p + 1, p + 1, p + nx, p + nx + 1); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4)); g.setAttribute('roadk', new THREE.BufferAttribute(rk, 4));
     g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
     const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; mesh.castShadow = false; group.add(mesh);
   }
@@ -106,7 +128,7 @@ function buildFarTerrain(mb, mat) {
     const fc = def.farColor; col.set([fc[0] * 2.2, fc[1] * 2.2, fc[2] * 2.2], v * 3); spl.set([1, 0, 0, 0], v * 4);
   }
   for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) { const p = j * n + i; idx.push(p, p + n, p + 1, p + 1, p + n, p + n + 1); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4));
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4)); g.setAttribute('roadk', new THREE.BufferAttribute(new Float32Array(n * n * 4), 4));
   g.setIndex(idx); g.computeVertexNormals();
   const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = false; mesh.name = 'farTerrain'; return mesh;
 }
