@@ -511,7 +511,7 @@ export function createTankModel(spec, opts = {}) {
   const body = new THREE.Group(); root.add(body); // body receives pitch/roll
   const meshes = [];
   const details = [];
-  const mk = (g, k, parent, paintMat) => { const m = new THREE.Mesh(g, k === 'paint' || k === 'weld' ? paintMat : mats[k]); if (k === 'weld') { details.push(m); m.visible = false; m.castShadow = false; } m.castShadow = true; m.receiveShadow = true; m.userData.matKey = k; parent.add(m); meshes.push(m); return m; };
+  const mk = (g, k, parent, paintMat) => { const m = new THREE.Mesh(g, k === 'paint' || k === 'weld' ? paintMat : k === 'darkN' ? mats.dark : mats[k]); if (k === 'weld' || k === 'darkN') { details.push(m); m.visible = false; m.castShadow = false; } m.castShadow = true; m.receiveShadow = true; m.userData.matKey = k; parent.add(m); meshes.push(m); return m; };
   for (const [k, g] of Object.entries(geo.hull)) mk(g, k, body, tpl.paint);
   const turret = new THREE.Group(); turret.position.set(...b.turretPos); body.add(turret);
   for (const [k, g] of Object.entries(geo.turret)) mk(g, k, turret, tpl.paintT);

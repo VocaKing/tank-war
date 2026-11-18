@@ -232,7 +232,11 @@ function leo2a6(d) {
   turretBody(P, [[1.15, bz + tl - 0.85], [tw, bz + tl - 1.35], [tw, bz - tl + 0.4], [tw - 0.12, bz - tl], [-tw + 0.12, bz - tl], [-tw, bz - tl + 0.4], [-tw, bz + tl - 1.35], [-1.15, bz + tl - 0.85]], th, 0.94, 0.97, bz);
   for (const s of [-1, 1]) {
     const w = [[s * 0.42, bz + tl - 0.8], [s * tw, bz + tl - 1.35], [s * 0.42, bz + tl]]; if (s < 0) w.reverse();
-    P.add('turret', 'paint', taper(topExtrude(w, th * 0.86, 0.04, 0.02, 1), 0.04, th * 0.9, 1, 0.96, bz + tl - 0.9));
+    { const g = taper(topExtrude(w, th * 0.86, 0.04, 0.02, 1), 0.04, th * 0.9, 1, 0.96, bz + tl - 0.9); const p = g.attributes.position; const zb = bz + tl - 1.35, zf = bz + tl;
+      for (let i = 0; i < p.count; i++) { const tt = Math.min(1, Math.max(0, (p.getZ(i) - zb) / (zf - zb))); if (p.getY(i) > th * 0.3) p.setY(i, th * 0.3 + (p.getY(i) - th * 0.3) * (1 - 0.42 * tt)); }
+      g.computeVertexNormals(); P.add('turret', 'paint', g); }
+    P.add('turret', 'darkN', box(0.03, th * 0.55, 0.5, s * 0.47, th * 0.4, bz + tl - 0.45, 0, -s * 0.55)); // spaced-armour gap behind the wedge face
+    K.boltRow(P, 'turret', [s * 0.45, th * 0.62, bz + tl - 0.06], [s * (tw - 0.05), th * 0.85, bz + tl - 1.28], 6, 0.02, 'y', 'weld');
     K.smokeDischargers(P, 'turret', s * (tw - 0.1), th + 0.05, bz - 1.0, s * Math.PI / 2, 4, 0.11, 0.22, 0.04);
     for (let i = 0; i < 4; i++) P.add('turret', 'metal', box(0.02, 0.35, 0.02, s * (tw + 0.1), th * 0.55, bz - 1.9 + i * 0.4)); P.add('turret', 'canvas', box(0.18, 0.32, 1.3, s * (tw + 0.08), th * 0.5, bz - 1.35));
   }
@@ -262,19 +266,33 @@ function t90m(d) {
   // Relikt ERA on the glacis and skirts
   eraBlocks(P, 'hull', [-1.3, 0.94, hl - 0.06], [1, 0, 0], slopeV(1.46, 0.56), 9, 3, 0.29, 0.5, 0.08);
   for (const s of [-1, 1]) {
-    K.skirt(P, s * (d.W / 2 + 0.02), fy + 0.03, -hl + 0.3, hl - 2.2, 0.55, 4, 0.03, 0, 'rubber');
+    K.skirt(P, s * (d.W / 2 + 0.02), fy + 0.03, -hl + 2.0, hl - 2.2, 0.55, 3, 0.03, 0, 'rubber');
+    // rear-hull side slat screens (engine bay), no Shtora on the M
+    for (let i = 0; i <= 10; i++) P.add('hull', 'metal', box(0.025, 0.5, 0.025, s * (d.W / 2 + 0.05), fy - 0.22, -hl + 0.3 + i * 0.165));
+    for (const yy of [fy + 0.02, fy - 0.45]) P.add('hull', 'metal', box(0.03, 0.04, 1.7, s * (d.W / 2 + 0.05), yy, -hl + 1.13));
     sideEra(P, 'hull', s, s * (d.W / 2 + 0.02), fy - 0.6, hl - 0.25, 4, 2, 0.48, 0.3, 0.09);
     P.add('hull', 'paint', cylX(0.29, 0.9, 16, s * 0.62, 1.15, -hl - 0.12));
     for (let i = 0; i < 3; i++) K.stowageBox(P, 'hull', s * (d.W / 2 - 0.3), fy + 0.2, 0.9 - i * 1.0, 0.5, 0.36, 0.9);
     K.headlight(P, 'hull', s * 1.4, fy + 0.15, hl - 0.4);
   }
   P.add('hull', 'wood', cylX(0.14, 2.6, 10, 0, 1.62, -hl + 0.1)); deckGrilles(P, -1.1, 1.1, H, -hl + 0.4, -hl + 2.0, 9);
+  P.add('hull', 'rubber', box(2.3, 0.32, 0.03, 0, 0.5, hl - 0.12, -0.35)); // lower-glacis rubber flap
   K.towCable(P, 'hull', 0, 1.0, hl - 0.15, hl - 0.15 + 0.001, 0); K.periscope(P, 'hull', 0, H, hl - 1.25, 0, 0.9);
   // welded turret with Relikt wedges, bustle + slat cage
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0, th = d.turretH;
   turretBody(P, [[0.55, bz + tl - 0.2], [tw, bz + tl - 0.95], [tw, bz - tl + 0.65], [tw - 0.25, bz - tl + 0.35], [-tw + 0.25, bz - tl + 0.35], [-tw, bz - tl + 0.65], [-tw, bz + tl - 0.95], [-0.55, bz + tl - 0.2]], th, 0.9, 0.95, bz);
   for (const s of [-1, 1]) {
-    for (let i = 0; i < 4; i++) { const t = (i + 0.5) / 4; const x = s * (0.55 + (tw - 0.55) * t), z = bz + tl - 0.2 - 0.75 * t; P.add('turret', 'paint', box(0.34, 0.1, 0.42, x, th + 0.05, z - 0.12, 0, s * 0.96)); P.add('turret', 'paint', box(0.34, th * 0.8, 0.12, x, th * 0.45, z + 0.04, 0, s * 0.96)); }
+    // v8: T-90M "Proryv" boxy Relikt turret-front module: a flat-fronted slab per side that squares off the cast/welded nose,
+    // its top sloping down a little to the front, with cassette joint lines and a roof Relikt panel behind it
+    { const x0 = s * 0.4, x1 = s * (tw + 0.08), zf = bz + tl + 0.12, zb = bz + tl - 1.0;
+      const poly = [[x0, zf], [x1, zf - 0.32], [x1, zb], [x0, zb]]; if (s < 0) poly.reverse();
+      const g = topExtrude(poly, th * 0.92, 0.02, 0.02, 1); const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) { const tt = Math.min(1, Math.max(0, (p.getZ(i) - zb) / (zf - zb))); if (p.getY(i) > th * 0.5) p.setY(i, th * 0.5 + (p.getY(i) - th * 0.5) * (1 - 0.35 * tt)); }
+      g.computeVertexNormals(); P.add('turret', 'paint', g);
+      for (let k = 1; k < 3; k++) { const f = k / 3; P.add('turret', 'darkN', box(0.015, th * 0.6, 0.02, x0 + (x1 - x0) * f, th * 0.42, zf - 0.32 * f + 0.012, 0, Math.atan2(0.32, Math.abs(x1 - x0)) * -s)); }
+      P.add('turret', 'darkN', box(Math.abs(x1 - x0) * 0.95, 0.015, 0.02, (x0 + x1) / 2, th * 0.5, zf - 0.16 + 0.012, 0, Math.atan2(0.32, Math.abs(x1 - x0)) * -s));
+      P.add('turret', 'paint', box(Math.abs(x1 - x0) * 0.8, 0.07, 0.75, (x0 + x1) / 2 - s * 0.05, th + 0.03, zb - 0.35)); // roof Relikt panel
+    }
     for (let i = 0; i < 2; i++) sideEra(P, 'turret', s, s * (tw + 0.02), 0.1 + i * 0.32, bz + tl - 0.95, 3, 1, 0.42, 0.3, 0.09);
     K.smokeDischargers(P, 'turret', s * (tw - 0.2), th + 0.08, bz + tl - 1.15, s * 0.9, 6, 0.09, 0.22, 0.04);
   }
