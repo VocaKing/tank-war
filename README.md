@@ -18,3 +18,10 @@ See CREDITS.md for licenses.
 - **Reticle.** The dispersion circle is projected at the real impact distance in both third-person and sniper view. Fixed a bug where the reticle disappeared while reloading.
 - **Tanks.** Weathering (rain streaks, paint chipping), plus tail-light clusters, rubber mud flaps, fender brackets, track tensioners, tow shackles, a tow pintle and a rear infantry phone on modern tanks.
 - **Maps.** Building colour variation for walls, shutters/doors and roofs. Four boulder shapes with bedding strata and tint variety. Per-instance tree and bush tint. Field patchwork on the terrain.
+
+## Focus outline & aim assist (v6)
+- **Red outline**: the spotted enemy under the crosshair (or within 14 px of it) gets a red silhouette outline (`src/render/outline.js`: single-tank mask + screen-space dilation, drawn after the frame on every graphics setting, on top of the High post chain). Unspotted / concealed tanks are never candidates. The outline is only drawn *outside* the silhouette, so the armour view (X) stays fully visible.
+- **Soft lock**: hold focus on an enemy for ~0.2 s after moving the mouse and the camera tracks it, keeping the crosshair on the exact spot you chose (anchor stored in turret- or hull-local space). Small mouse moves on the tank pick a new spot.
+- **Drag**: mouse input is scaled to ~42 % near the anchor, rising smoothly to 100 % at 110 px; past that (or a fast flick) the lock breaks. Same target can't re-lock for 1.2 s unless you leave it and re-aim. HUD shows `◆ LOCK · <tank>`.
+- **E gun lock** still lays the gun on the target centre with lead; while it is active the soft lock is suspended. Pressing E while soft-locked gun-locks that target.
+- Toggle: menu checkbox “Aim assist” or the pause menu (saved in `localStorage.tw_aa`; `?aa=0` URL param). Tunables: `AIM_ASSIST` in `src/game/aimAssist.js`, `OUTLINE` in `src/render/outline.js`. QA: `node tools_aim.mjs http://localhost:4177/`.
