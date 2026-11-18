@@ -7,22 +7,21 @@ let maxAniso = 8;
 export function setMaxAniso(a) { maxAniso = a; }
 
 // Poly Haven CC0 textures shipped in /public/tex
-export function pbrTex(name, kind = 'diff', repeat = 1) {
-  const key = name + kind;
-  if (!cache.has(key)) {
-    const t = loader.load(`./tex/${name}_${kind}.jpg`);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = maxAniso;
-    if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace;
-    cache.set(key, t);
-  }
-  const t = cache.get(key);
-  if (repeat !== 1) {
-    const k2 = key + repeat;
-    if (!cache.has(k2)) { const c = loader.load(`./tex/${name}_${kind}.jpg`); c.wrapS = c.wrapT = THREE.RepeatWrapping; c.anisotropy = maxAniso; if (kind === 'diff') c.colorSpace = THREE.SRGBColorSpace; c.repeat.set(repeat, repeat); cache.set(k2, c); }
-    return cache.get(k2);
-  }
+// v5: 2k sets for terrain layers on High (1k otherwise); 'arm' = AO/Roughness/Metal packed (linear)
+const HI_SETS = new Set(['leafy_grass', 'forest_ground_04', 'aerial_rocks_02', 'gravel_road', 'coast_sand_01', 'dry_ground_01']);
+let texHi = false;
+export function setTexQuality(q) { texHi = q === 'high'; }
+function loadPbr(name, kind) {
+  const hi = texHi && kind !== 'arm' && HI_SETS.has(name);
+  const t = loader.load(`./tex/${name}_${kind}${hi ? '_2k' : ''}.jpg`);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso;
+  if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+export function pbrTex(name, kind = 'diff', repeat = 1) {
+  const key = name + kind + (texHi ? 'H' : 'L') + repeat;
+  if (!cache.has(key)) { const t = loadPbr(name, kind); if (repeat !== 1) t.repeat.set(repeat, repeat); cache.set(key, t); }
+  return cache.get(key);
 }
 
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }

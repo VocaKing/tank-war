@@ -11,6 +11,7 @@ export const MAPS = [
     desc: 'Rolling bocage farmland cut by a river, with a stone village and church at its heart. Dense hedgerows give superb concealment; three bridges and a ford are the key crossings.',
     seed: 1944, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 48, azimuth: 205 }, turbidity: 3.5, rayleigh: 1.4, fog: { color: 0xbcc8d2, density: 0.0011 }, exposure: 0.62,
+    hdri: { file: 'kloofendal_48d_partly_cloudy_puresky', sunDir: [0.555, 0.742, 0.377], sunE: [4.35, 4.38, 3.98], horizon: [0.445, 0.479, 0.582], exposure: 1.0, fogDensity: 0.0009 },
     layers: { A: 'leafy_grass', B: 'forest_ground_04', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.8, 0.93, 0.62], tintB: [0.9, 0.85, 0.75] },
     farColor: [0.36, 0.42, 0.26],
     generate(mb) {
@@ -71,6 +72,7 @@ export const MAPS = [
     desc: 'Steep wooded hills and a mountain stream. Spruce forests and clearings, a sawmill hamlet in the valley and a ruined watchtower on the ridge. Long sightlines are rare; ambushes are common.',
     seed: 3121, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 21, azimuth: 120 }, turbidity: 6, rayleigh: 2.0, fog: { color: 0xc7c3b4, density: 0.0019 }, exposure: 0.6,
+    hdri: { file: 'kloofendal_overcast_puresky', sunDir: [0.70, 0.55, 0.45], sunE: [0.9, 0.9, 0.92], horizon: [0.693, 0.74, 0.832], exposure: 0.85, fogDensity: 0.0017, overcast: true },
     layers: { A: 'forest_ground_04', B: 'leafy_grass', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.85, 0.85, 0.8], tintB: [0.85, 0.95, 0.72] },
     farColor: [0.18, 0.24, 0.16],
     generate(mb) {
@@ -118,6 +120,7 @@ export const MAPS = [
     desc: 'A sun-baked town of flat-roofed sandstone houses, a mosque and a market, partly ruined by fighting. Dunes and a rocky mesa surround it; a dry wadi with an oasis cuts the south.',
     seed: 1991, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 34, azimuth: 250 }, turbidity: 8, rayleigh: 1.1, fog: { color: 0xd8c6a6, density: 0.00095 }, exposure: 0.56,
+    hdri: { file: 'kloofendal_43d_clear_puresky', sunDir: [0.591, 0.682, 0.431], sunE: [6.45, 6.08, 5.56], horizon: [0.74, 0.72, 0.70], exposure: 0.8, fogDensity: 0.0008 },
     layers: { A: 'coast_sand_01', B: 'dry_ground_01', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [1.08, 0.98, 0.84], tintB: [1.05, 0.95, 0.82] },
     farColor: [0.62, 0.5, 0.36],
     generate(mb) {
