@@ -1,12 +1,14 @@
 // Procedural, real-scale (1 unit = 1 m) tank models built from code.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { camoTexture, trackTexture, decalTexture } from '../world/textures.js';
+import { trackTexture, decalTexture } from '../world/textures.js';
+import { tankCamoTexture as camoTexture } from './paint.js';
 import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
 
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
 import * as K from './kit.js';
+import { TANKS } from '../game/tankData.js';
 
 // ---------- Materials ----------
 let NOISE_TEX = null;
@@ -24,15 +26,15 @@ function noiseTexture() {
 // Triplanar camo paint with procedural cast/rolled-plate surface relief, mud build-up near the running gear,
 // dust on upward faces and roughness variation. yOff converts part-local y to hull height (turret/gun parts).
 function paintMaterial(paint, seed, yOff = 0, opts = {}) {
-  const m = new THREE.MeshStandardMaterial({ map: camoTexture(paint, seed), roughness: 0.74, metalness: 0.2 });
-  const U = { uNoise: { value: noiseTexture() }, uYOff: { value: yOff }, uDirtY: { value: opts.dirtY ?? 0.9 }, uCast: { value: opts.cast ?? 0.5 }, uMud: { value: new THREE.Color(opts.mud || '#4a3d2c') }, uDust: { value: new THREE.Color(opts.dust || '#8f8166') } };
+  const m = new THREE.MeshStandardMaterial({ map: camoTexture(paint, seed), roughness: paint.rough ?? 0.72, metalness: 0.04, envMapIntensity: 0.9 });
+  const U = { uNoise: { value: noiseTexture() }, uYOff: { value: yOff }, uDirtY: { value: opts.dirtY ?? 0.9 }, uCast: { value: opts.cast ?? 0.5 }, uMud: { value: new THREE.Color(opts.mud || '#4a3d2c') }, uDust: { value: new THREE.Color(opts.dust || '#8f8166') }, uDustAmt: { value: opts.dustAmt ?? 1.0 } };
   m.userData.uniforms = U;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vObjPos; varying vec3 vObjN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjPos = position; vObjN = normal;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vObjPos; varying vec3 vObjN; uniform sampler2D uNoise; uniform float uYOff, uDirtY, uCast; uniform vec3 uMud, uDust;
+      varying vec3 vObjPos; varying vec3 vObjN; uniform sampler2D uNoise; uniform float uYOff, uDirtY, uCast, uDustAmt; uniform vec3 uMud, uDust; float vChip;
       vec3 triN(vec3 p, vec3 bw) { return texture2D(uNoise, p.zy).rgb * bw.x + texture2D(uNoise, p.xz).rgb * bw.y + texture2D(uNoise, p.xy).rgb * bw.z; }`)
       .replace('#include <map_fragment>', `
         vec3 bw = pow(abs(normalize(vObjN)), vec3(4.0)); bw /= (bw.x + bw.y + bw.z + 1e-5);
@@ -54,18 +56,57 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         float chip = triN(vObjPos * 5.5, bw).b * 0.6 + nB.g * 0.4;
         float chipM = smoothstep(0.78, 0.82, chip) * (0.4 + 0.6 * nA.b);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.21, 0.19), chipM * 0.75);
-        float vRough = 0.86 + 0.3 * nB.r + mud * 0.2 - chipM * 0.35;`)
+        // v6: dust haze that builds up from the lower hull (thrown up by the tracks), stronger on side faces
+        float dustH = smoothstep(uDirtY + 1.1, uDirtY - 0.1, yL + (nA.g - 0.5) * 0.6) * side;
+        diffuseColor.rgb = mix(diffuseColor.rgb, uDust * (0.85 + 0.3 * nB.r), clamp(dustH * (0.25 + 0.35 * nA.b) * uDustAmt, 0.0, 0.55));
+        // fine mud splatter specks just above the mud line
+        float spk = step(0.83, triN(vObjPos * 3.1, bw).g) * smoothstep(uDirtY + 0.6, uDirtY, yL);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * 0.8, spk * 0.7);
+        // dust settles in horizontal recesses (upward faces)
+        diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * 0.12 * uDustAmt);
+        vChip = chipM;
+        float vRough = 0.86 + 0.3 * nB.r + mud * 0.25 + dustH * 0.15 - chipM * 0.4;`)
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.55, vChip * 0.8);')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          float hgt = (nA.r * uCast + nB.b * 0.12 + nB.r * 0.25) ;
+          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.35 + mud * nB.g * 0.6) ;
           vec2 dHdxy = vec2(dFdx(hgt), dFdy(hgt)) * 0.9;
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX); float fDet = dot(vSigmaX, R1) * faceDirection;
           vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2); normal = normalize(abs(fDet) * normal - vGrad * 0.02);
         }`);
   };
-  m.customProgramCacheKey = () => 'paint3';
+  m.customProgramCacheKey = () => 'paint6';
+  return m;
+}
+// v6: running-gear grime (road wheels, sprockets, idlers, track links). Mud is caked on in noisy patches using
+// instance-space position so every wheel differs; steel stays metallic where clean, mud is matte dielectric.
+function grimeMaterial(base, mudHex, amt = 0.55, key = 'grime') {
+  const m = new THREE.MeshStandardMaterial(base);
+  const U = { uNoise: { value: noiseTexture() }, uMud: { value: new THREE.Color(mudHex || '#4a3d2c') }, uAmt: { value: amt } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        #ifdef USE_INSTANCING
+          vGP = (instanceMatrix * vec4(transformed, 1.0)).xyz; vGN = normalize(mat3(instanceMatrix) * objectNormal);
+        #else
+          vGP = transformed; vGN = objectNormal;
+        #endif`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN; uniform sampler2D uNoise; uniform vec3 uMud; uniform float uAmt; float gMud;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec3 gb = pow(abs(normalize(vGN)), vec3(4.0)); gb /= (gb.x + gb.y + gb.z + 1e-5);
+        vec3 gp = vGP * 1.7;
+        float gn = texture2D(uNoise, gp.zy).r * gb.x + texture2D(uNoise, gp.xz).r * gb.y + texture2D(uNoise, gp.xy).r * gb.z;
+        float gf = texture2D(uNoise, gp.zy * 4.0).g * gb.x + texture2D(uNoise, gp.xz * 4.0).g * gb.y + texture2D(uNoise, gp.xy * 4.0).g * gb.z;
+        gMud = clamp(smoothstep(0.42, 0.7, gn + (gf - 0.5) * 0.35) * uAmt * 1.5, 0.0, 0.9);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.7 + 0.5 * gf), gMud);
+        diffuseColor.rgb *= 0.92 + 0.16 * gf;`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.97, gMud);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.0, gMud);');
+  };
+  m.customProgramCacheKey = () => key;
   return m;
 }
 const MATS = {};
@@ -445,10 +486,10 @@ function getTemplate(spec) {
   const wheelGeo = wheelGeometry(spec.paint.base, b.wheelType || (b.wheels[0].spoked ? 'spoked' : spec.era === 'WWII' ? 'disc' : 'modern'));
   const sprocketGeo = sprocketGeometry(spec.paint.base);
   const wheelGeoLo = wheelGeometryLo(spec.paint.base);
-  const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.25 });
+  const wheelMat = grimeMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.2 }, spec.paint.mud, 0.5, 'grimeW');
   const nLinks = Math.round(track.length / pitch);
   const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.era !== 'WWII');
-  const linkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.45 });
+  const linkMat = grimeMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.7 }, spec.paint.mud, 0.45, 'grimeL');
   templates[spec.id] = { b, geo, paint, paintT, paintG, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch };
   return templates[spec.id];
 }
@@ -528,3 +569,5 @@ export function burnModel(model) {
   const b = burntMaterial();
   for (const m of model.meshes) { if (m.userData.decal) { m.visible = false; continue; } m.material = b; }
 }
+// debug hook for offline showroom / triangle audits (tools_tanks_show.mjs)
+if (typeof window !== 'undefined') window.__TM = { THREE, TANKS, createTankModel, setTrackLOD, updateRunningGear };
