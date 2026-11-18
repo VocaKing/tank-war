@@ -292,8 +292,9 @@ function t90m(d) {
       const g = topExtrude(poly, th * 0.92, 0.02, 0.02, 1); const p = g.attributes.position;
       for (let i = 0; i < p.count; i++) { const tt = Math.min(1, Math.max(0, (p.getZ(i) - zb) / (zf - zb))); if (p.getY(i) > th * 0.5) p.setY(i, th * 0.5 + (p.getY(i) - th * 0.5) * (1 - 0.35 * tt)); }
       g.computeVertexNormals(); P.add('turret', 'paint', g);
-      for (let k = 1; k < 3; k++) { const f = k / 3; P.add('turret', 'darkN', box(0.015, th * 0.6, 0.02, x0 + (x1 - x0) * f, th * 0.42, zf - 0.32 * f + 0.012, 0, Math.atan2(0.32, Math.abs(x1 - x0)) * -s)); }
-      P.add('turret', 'darkN', box(Math.abs(x1 - x0) * 0.95, 0.015, 0.02, (x0 + x1) / 2, th * 0.5, zf - 0.16 + 0.012, 0, Math.atan2(0.32, Math.abs(x1 - x0)) * -s));
+      // crisp cassette joints: full-height recessed gaps on the front face that wrap over the (sloped) top, no cross lines
+      for (let k = 1; k < 4; k++) { const f = k / 4; const xx = x0 + (x1 - x0) * f, zz = zf - 0.32 * f; const ang = Math.atan2(0.32, Math.abs(x1 - x0)) * -s;
+        P.add('turret', 'darkN', box(0.022, th * 0.82, 0.03, xx, th * 0.45, zz + 0.006, 0, ang)); P.add('turret', 'darkN', box(0.022, 0.02, 0.9, xx, th * 0.92 * (1 - 0.35 * 0.55) + 0.02, zz - 0.45, 0, 0)); }
       P.add('turret', 'paint', box(Math.abs(x1 - x0) * 0.8, 0.07, 0.75, (x0 + x1) / 2 - s * 0.05, th + 0.03, zb - 0.35)); // roof Relikt panel
     }
     for (let i = 0; i < 2; i++) sideEra(P, 'turret', s, s * (tw + 0.02), 0.1 + i * 0.32, bz + tl - 0.95, 3, 1, 0.42, 0.3, 0.09);

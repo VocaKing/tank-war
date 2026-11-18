@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { trackTexture, decalTexture } from '../world/textures.js';
 import { tankCamoTexture as camoTexture } from './paint.js';
-import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
+import { DEG, makeNoise2D, tileField, sampleField, RNG } from '../util.js';
 
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
@@ -27,14 +27,14 @@ function noiseTexture() {
 // dust on upward faces and roughness variation. yOff converts part-local y to hull height (turret/gun parts).
 function paintMaterial(paint, seed, yOff = 0, opts = {}) {
   const m = new THREE.MeshStandardMaterial({ map: camoTexture(paint, seed), roughness: paint.rough ?? 0.72, metalness: 0.04, envMapIntensity: 0.9 });
-  const U = { uNoise: { value: noiseTexture() }, uYOff: { value: yOff }, uDirtY: { value: opts.dirtY ?? 0.9 }, uCast: { value: opts.cast ?? 0.5 }, uMud: { value: new THREE.Color(opts.mud || '#4a3d2c') }, uDust: { value: new THREE.Color(opts.dust || '#8f8166') }, uDustAmt: { value: opts.dustAmt ?? 1.0 } };
+  const U = { uNoise: { value: noiseTexture() }, uYOff: { value: yOff }, uDirtY: { value: opts.dirtY ?? 0.9 }, uCast: { value: opts.cast ?? 0.5 }, uMud: { value: new THREE.Color(opts.mud || '#4a3d2c') }, uDust: { value: new THREE.Color(opts.dust || '#8f8166') }, uDustAmt: { value: opts.dustAmt ?? 1.0 }, uEngine: { value: opts.engine ?? 0 }, uHL: { value: opts.hl ?? 3 }, uDeckY: { value: opts.deckY ?? 99 }, uHeat: { value: opts.heat ?? 0 }, uGunLen: { value: opts.gunLen ?? 5 } };
   m.userData.uniforms = U;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vObjPos; varying vec3 vObjN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjPos = position; vObjN = normal;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vObjPos; varying vec3 vObjN; uniform sampler2D uNoise; uniform float uYOff, uDirtY, uCast, uDustAmt; uniform vec3 uMud, uDust; float vChip;
+      varying vec3 vObjPos; varying vec3 vObjN; uniform sampler2D uNoise; uniform float uYOff, uDirtY, uCast, uDustAmt, uEngine, uHL, uDeckY, uHeat, uGunLen; uniform vec3 uMud, uDust; float vChip; float vOil; float vGrit; float vHeat;
       vec3 triN(vec3 p, vec3 bw) { return texture2D(uNoise, p.zy).rgb * bw.x + texture2D(uNoise, p.xz).rgb * bw.y + texture2D(uNoise, p.xy).rgb * bw.z; }`)
       .replace('#include <map_fragment>', `
         vec3 bw = pow(abs(normalize(vObjN)), vec3(4.0)); bw /= (bw.x + bw.y + bw.z + 1e-5);
@@ -65,46 +65,78 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         // dust settles in horizontal recesses (upward faces)
         diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * 0.08 * uDustAmt);
         vChip = chipM;
+        // v9: soot from the exhausts on the engine-end plate, oil/fuel stains on the engine deck (hull material only: uEngine != 0)
+        vOil = 0.0; vGrit = 0.0; vHeat = 0.0;
+        if (uEngine != 0.0) {
+          float zE = vObjPos.z * uEngine;
+          float endFace = smoothstep(0.55, 0.85, nN.z * uEngine) * smoothstep(uHL * 0.8, uHL * 0.97, zE);
+          float sootN = texture2D(uNoise, vec2(vObjPos.x * 0.9, yL * 0.25)).g;
+          float soot = endFace * smoothstep(uDirtY - 0.2, uDeckY - 0.1, yL) * (0.45 + 0.55 * sootN);
+          float deck = up * smoothstep(uHL * 0.25, uHL * 0.75, zE);
+          float topSoot = deck * smoothstep(uHL * 0.8, uHL * 0.98, zE) * 0.7;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.04, 0.035), clamp(max(soot, topSoot) * 0.75, 0.0, 0.8));
+          vOil = deck * smoothstep(0.62, 0.78, triN(vObjPos * 0.9, bw).r + nB.g * 0.25);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.32, 0.3, 0.27), vOil * 0.8);
+          // anti-slip grit on walkways of the hull top
+          vGrit = up * step(uDeckY - 0.25, yL);
+        }
+        // v9: barrel heat discolouration toward the muzzle on modern guns (burnt paint -> straw/blue-brown steel)
+        if (uHeat > 0.0) {
+          vHeat = uHeat * smoothstep(uGunLen * 0.62, uGunLen * 0.98, vObjPos.z) * (0.75 + 0.25 * nB.r);
+          vec3 tint = mix(vec3(0.33, 0.25, 0.17), vec3(0.17, 0.17, 0.22), smoothstep(uGunLen * 0.85, uGunLen, vObjPos.z));
+          diffuseColor.rgb = mix(diffuseColor.rgb, tint, vHeat * 0.7);
+        }
         float vRough = 0.86 + 0.3 * nB.r + mud * 0.25 + dustH * 0.15 - chipM * 0.4 + uCast * 0.14 * (nB.b - 0.3);`)
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.55, vChip * 0.8);')
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.55, vChip * 0.8); metalnessFactor = mix(metalnessFactor, 0.6, vHeat * 0.5);')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0); roughnessFactor = mix(roughnessFactor, 0.32, vOil * 0.8); roughnessFactor = mix(roughnessFactor, 0.97, vGrit * 0.6); roughnessFactor = mix(roughnessFactor, 0.45, vHeat * 0.6);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.5 + triN(vObjPos * 9.0, bw).g * uCast * 0.18 + mud * nB.g * 0.6) ;
+          float hgt = (nA.r * uCast * 1.3 + nB.b * 0.12 + nB.r * 0.25 + triN(vObjPos * 4.0, bw).r * uCast * 0.5 + triN(vObjPos * 9.0, bw).g * uCast * 0.18 + mud * nB.g * 0.35 + vGrit * triN(vObjPos * 18.0, bw).b * 0.9) ;
           vec2 dHdxy = vec2(dFdx(hgt), dFdy(hgt)) * 0.9;
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX); float fDet = dot(vSigmaX, R1) * faceDirection;
           vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2); normal = normalize(abs(fDet) * normal - vGrad * 0.02);
         }`);
   };
-  m.customProgramCacheKey = () => 'paint8';
+  m.customProgramCacheKey = () => 'paint9';
   return m;
 }
 // v6: running-gear grime (road wheels, sprockets, idlers, track links). Mud is caked on in noisy patches using
 // instance-space position so every wheel differs; steel stays metallic where clean, mud is matte dielectric.
 function grimeMaterial(base, mudHex, amt = 0.55, key = 'grime') {
   const m = new THREE.MeshStandardMaterial(base);
-  const U = { uNoise: { value: noiseTexture() }, uMud: { value: new THREE.Color(mudHex || '#4a3d2c') }, uAmt: { value: amt } };
+  const U = { uNoise: { value: noiseTexture() }, uMud: { value: new THREE.Color(mudHex || '#4a3d2c') }, uAmt: { value: amt }, uLink: { value: key === 'grimeL' ? 1 : 0 } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN; varying float vGR;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_INSTANCING
-          vGP = (instanceMatrix * vec4(transformed, 1.0)).xyz; vGN = normalize(mat3(instanceMatrix) * objectNormal);
+          vGP = transformed * vec3(1.0, 0.45, 0.45) + instanceMatrix[3].xyz * 1.37; vGN = objectNormal; vGR = length(transformed.yz);
         #else
-          vGP = transformed; vGN = objectNormal;
+          vGP = transformed; vGN = objectNormal; vGR = 1.0;
         #endif`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN; uniform sampler2D uNoise; uniform vec3 uMud; uniform float uAmt; float gMud;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vGP; varying vec3 vGN; varying float vGR; uniform sampler2D uNoise; uniform vec3 uMud; uniform float uAmt; uniform float uLink; float gMud;')
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 gb = pow(abs(normalize(vGN)), vec3(4.0)); gb /= (gb.x + gb.y + gb.z + 1e-5);
-        vec3 gp = vGP * 1.7;
+        vec3 gp = vGP * 0.55;
         float gn = texture2D(uNoise, gp.zy).r * gb.x + texture2D(uNoise, gp.xz).r * gb.y + texture2D(uNoise, gp.xy).r * gb.z;
-        float gf = texture2D(uNoise, gp.zy * 4.0).g * gb.x + texture2D(uNoise, gp.xz * 4.0).g * gb.y + texture2D(uNoise, gp.xy * 4.0).g * gb.z;
-        gMud = clamp(smoothstep(0.38, 0.85, gn + (gf - 0.5) * 0.25) * uAmt * 1.2, 0.0, 0.75);
-        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.8 + 0.3 * gf), gMud) * (1.0 - 0.18 * uAmt);
-        diffuseColor.rgb *= 0.92 + 0.16 * gf;`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.97, gMud);')
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.0, gMud);');
+        float gf = texture2D(uNoise, gp.zy * 6.0).g * gb.x + texture2D(uNoise, gp.xz * 6.0).g * gb.y + texture2D(uNoise, gp.xy * 6.0).g * gb.z;
+        // v9: soft film of dried mud that thickens toward the rim/tyre and into recesses, broken up by fine grain (no hard blotches)
+        float rim = mix(1.0, smoothstep(0.45, 1.0, vGR), 1.0 - uLink);
+        gMud = clamp((0.25 + 0.75 * smoothstep(0.25, 0.75, gn)) * (0.45 + 0.55 * rim) * uAmt * (0.85 + 0.3 * gf), 0.0, 0.8);
+        diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.92 + 0.12 * gf), gMud * 0.8);
+        // rubber (very dark vertex colour) stays matte dielectric
+        float gRub = 1.0 - smoothstep(0.08, 0.14, max(vColor.r, max(vColor.g, vColor.b)));
+        diffuseColor.rgb *= 0.96 + 0.08 * gf;`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(mix(roughnessFactor * (0.85 + 0.3 * gf), 0.93, gRub), 0.97, gMud);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.0, max(gMud, gRub));')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        { // v9: procedural micro-normal – rubber tread grain, cast-steel pitting and caked mud relief
+          float hgt = gf * gMud * 0.7 + gRub * texture2D(uNoise, gp.zy * 22.0).b * 0.3;
+          vec2 dH = vec2(dFdx(hgt), dFdy(hgt)); vec3 sX = dFdx(-vViewPosition), sY = dFdy(-vViewPosition);
+          vec3 R1 = cross(sY, normal), R2 = cross(normal, sX); float fD = dot(sX, R1) * faceDirection;
+          normal = normalize(abs(fD) * normal - sign(fD) * (dH.x * R1 + dH.y * R2) * 0.015);
+        }`);
   };
   m.customProgramCacheKey = () => key;
   return m;
@@ -115,15 +147,50 @@ function sharedMats() {
   MATS.metal = new THREE.MeshStandardMaterial({ color: 0x3b3a37, roughness: 0.55, metalness: 0.65 });
   MATS.rubber = new THREE.MeshStandardMaterial({ color: 0x1c1c1b, roughness: 0.95, metalness: 0.0 });
   MATS.dark = new THREE.MeshStandardMaterial({ color: 0x0c0d0e, roughness: 0.6, metalness: 0.3 });
-  MATS.glass = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.08, metalness: 0.9, emissive: 0x050a10 });
+  // v9: optics are coated glass – dielectric with a clear-coat sheen that picks up the HDRI sky, faint blue-green coating tint
+  MATS.glass = new THREE.MeshPhysicalMaterial({ color: 0x0b1820, roughness: 0.04, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.02, reflectivity: 0.9, envMapIntensity: 1.6, emissive: 0x03080c, sheen: 0.4, sheenColor: new THREE.Color(0x3a6a70) });
   MATS.wood = new THREE.MeshStandardMaterial({ color: 0x6a5134, roughness: 0.9 });
   MATS.canvas = new THREE.MeshStandardMaterial({ color: 0x5e5a43, roughness: 1.0 });
-  MATS.burnt = new THREE.MeshStandardMaterial({ color: 0x1d1a17, roughness: 0.95, metalness: 0.15 });
+  // v9 burnt-out wreck: charred black paint, grey-white ash bloom, rust-brown heat-scaled steel, all rough; one shared material for every wreck
+  MATS.burnt = new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.97, metalness: 0.1 });
+  MATS.burnt.onBeforeCompile = (sh) => {
+    sh.uniforms.uNoise = { value: noiseTexture() };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vBP; varying vec3 vBN;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvBP = position; vBN = normal;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vBP; varying vec3 vBN; uniform sampler2D uNoise; float bN;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec3 bb = pow(abs(normalize(vBN)), vec3(4.0)); bb /= (bb.x + bb.y + bb.z + 1e-5);
+        vec3 q = vBP * 0.22; vec3 a = texture2D(uNoise, q.zy).rgb * bb.x + texture2D(uNoise, q.xz).rgb * bb.y + texture2D(uNoise, q.xy).rgb * bb.z;
+        vec3 q2 = vBP * 3.1; float f = texture2D(uNoise, q2.zy).g * bb.x + texture2D(uNoise, q2.xz).g * bb.y + texture2D(uNoise, q2.xy).g * bb.z;
+        bN = f;
+        vec3 c = vec3(0.035, 0.032, 0.03);
+        c = mix(c, vec3(0.13, 0.075, 0.045), smoothstep(0.45, 0.8, a.r * 0.8 + f * 0.2) * 0.35);            // rust / heat-scaled steel
+        c = mix(c, vec3(0.42, 0.4, 0.37), smoothstep(0.55, 0.9, a.g) * 0.35 * smoothstep(0.3, 0.9, normalize(vBN).y + 0.4)); // ash on upper faces
+        diffuseColor.rgb = c * (0.8 + 0.3 * f) * 0.85;`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        { float hg = bN * 0.6; vec2 dH = vec2(dFdx(hg), dFdy(hg)); vec3 sX = dFdx(-vViewPosition), sY = dFdy(-vViewPosition);
+          vec3 R1 = cross(sY, normal), R2 = cross(normal, sX); float fD = dot(sX, R1) * faceDirection; normal = normalize(abs(fD) * normal - sign(fD) * (dH.x * R1 + dH.y * R2) * 0.03); }`);
+  };
+  MATS.burnt.customProgramCacheKey = () => 'burnt9';
   MATS.track = new THREE.MeshStandardMaterial({ color: 0x55514b, roughness: 0.62, metalness: 0.6 });
   MATS.steel = new THREE.MeshStandardMaterial({ color: 0x6a6760, roughness: 0.4, metalness: 0.85 });
   MATS.tail = new THREE.MeshStandardMaterial({ color: 0x7a0c08, roughness: 0.2, metalness: 0.1, emissive: 0x2a0200 });
   MATS.amber = new THREE.MeshStandardMaterial({ color: 0x9a5a08, roughness: 0.2, metalness: 0.1, emissive: 0x2a1400 });
+  // v9: shared cached canvas maps for bare metal parts – roughness variation (worn/greasy patches) + scratch/grit normal map
+  const rgh = metalRoughTexture(), nrm = metalNormalTexture();
+  for (const k of ['metal', 'steel', 'track', 'dark']) { MATS[k].roughnessMap = rgh; MATS[k].normalMap = nrm; MATS[k].normalScale = new THREE.Vector2(0.35, 0.35); }
   return MATS;
+}
+function metalRoughTexture() {
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); const n = makeNoise2D(5); const N = 64; const f = tileField(n, N, 4, 4), f2 = tileField(n, N, 16, 2, 9, 9);
+  const img = g.createImageData(S, S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const v = 0.75 + sampleField(f, N, x / S, y / S) * 0.5 + sampleField(f2, N, x / S, y / S) * 0.25; const i = (y * S + x) * 4; const b = Math.max(70, Math.min(255, v * 200)); img.data[i] = img.data[i + 1] = img.data[i + 2] = b; img.data[i + 3] = 255; }
+  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t;
+}
+function metalNormalTexture() { // height field (grit + fine scratches) -> tangent-space normal map
+  const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); const n = makeNoise2D(17); const N = 128; const f = tileField(n, N, 24, 2);
+  const h = new Float32Array(S * S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) h[y * S + x] = sampleField(f, N, x / S, y / S) * 0.6 + (Math.random() - 0.5) * 0.25;
+  for (let k = 0; k < 90; k++) { let x = Math.random() * S, y = Math.random() * S; const a = Math.random() * Math.PI, l = 6 + Math.random() * 30; for (let j = 0; j < l; j++) { const xi = ((x + Math.cos(a) * j) | 0) & (S - 1), yi = ((y + Math.sin(a) * j) | 0) & (S - 1); h[yi * S + xi] -= 0.6; } }
+  const img = g.createImageData(S, S); for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const hx = h[y * S + ((x + 1) & (S - 1))] - h[y * S + ((x - 1) & (S - 1))], hy = h[((y + 1) & (S - 1)) * S + x] - h[((y - 1) & (S - 1)) * S + x]; const l = Math.hypot(hx, hy, 1); const i = (y * S + x) * 4; img.data[i] = (-hx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (-hy / l * 0.5 + 0.5) * 255; img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255; }
+  g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 3); return t;
 }
 export function burntMaterial() { return sharedMats().burnt; }
 
@@ -490,9 +557,9 @@ function getTemplate(spec) {
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust, dustAmt: spec.paint.dustAmt };
-  const paint = paintMaterial(spec.paint, seed, 0, opts);
+  const paint = paintMaterial(spec.paint, seed, 0, { ...opts, engine: spec.engineZone === 'front' ? 1 : -1, hl: d.L / 2, deckY: d.hullH });
   const paintT = paintMaterial(spec.paint, seed, b.turretPos[1], { ...opts, cast: b.castTurret ?? opts.cast });
-  const paintG = paintMaterial(spec.paint, seed, b.turretPos[1] + b.gunPos[1], { ...opts, cast: 0.15 });
+  const paintG = paintMaterial(spec.paint, seed, b.turretPos[1] + b.gunPos[1], { ...opts, cast: 0.15, heat: spec.era === 'WWII' ? 0 : 1, gunLen: d.gunLen });
   const geo = b.P.merged();
   const trackCircles = [...b.wheels.map((w) => ({ z: w.z, y: w.y, r: w.r })), ...b.sprockets, ...b.idlers, ...b.rollers.filter((r) => !r.free)];
   const pitch = d.trackPitch || (spec.era === 'WWII' ? 0.15 : 0.18);
@@ -581,9 +648,62 @@ export function updateRunningGear(model, distL, distR) {
   set(model.wheels, model.wheelList); set(model.sprockets, model.sprocketList); if (model.innerWheels) set(model.innerWheels, model.innerList);
   if (model.linksOn && (distL !== 0 || distR !== 0)) updateLinks(model);
 }
+// v9 suspension: the hull (body) heaves on a damped spring driven by vertical ground velocity + speed-scaled bumps, while
+// the running gear (wheels, sprockets, tracks, links) is counter-offset so it stays planted -> visible suspension travel.
+export function updateSuspension(model, dt, speed, groundY) {
+  if (!dt || dt > 0.25) { model.susY0 = groundY; return; }
+  const s = model.sus ||= { y: 0, v: 0, dist: 0 }; const gy0 = model.susY0 ?? groundY; model.susY0 = groundY;
+  const vy = (groundY - gy0) / dt; s.dist += Math.abs(speed) * dt;
+  const bump = Math.min(1, Math.abs(speed) / 12) * 0.012 * (Math.sin(s.dist * 2.1) * 0.6 + Math.sin(s.dist * 5.3 + 1.3) * 0.4);
+  const target = Math.max(-0.05, Math.min(0.05, -vy * 0.012)) + bump;
+  const k = 90, c = 11; s.v += ((target - s.y) * k - s.v * c) * dt; s.y += s.v * dt; s.y = Math.max(-0.06, Math.min(0.06, s.y));
+  model.body.position.y = s.y;
+  const off = -s.y; for (const m of [model.wheels, model.innerWheels, model.sprockets, ...model.tracks, ...model.links]) if (m) m.position.y = off;
+}
 export function burnModel(model) {
   const b = burntMaterial();
-  for (const m of model.meshes) { if (m.userData.decal) { m.visible = false; continue; } m.material = b; }
+  for (const m of model.meshes) { if (m.userData.decal) { m.visible = false; continue; } if (m.userData.hitMark) continue; m.material = b; }
+}
+// ---------- v9 battle damage: pooled scorch / dent decals at shell impacts ----------
+const MAX_MARKS = 8;
+let MARK = null;
+function markAssets() {
+  if (MARK) return MARK;
+  const S = 128; const mk = () => { const c = document.createElement('canvas'); c.width = c.height = S; return [c, c.getContext('2d')]; };
+  // colour/alpha: soot halo, scorched ring, dark core (pen) / bright scraped steel (bounce)
+  const scorch = (pen) => { const [c, g] = mk(); const cx = S / 2; const r = new RNG(pen ? 3 : 4);
+    let gr = g.createRadialGradient(cx, cx, 0, cx, cx, cx); gr.addColorStop(0, pen ? 'rgba(8,7,6,1)' : 'rgba(150,145,135,0.95)'); gr.addColorStop(pen ? 0.18 : 0.12, pen ? 'rgba(12,10,9,1)' : 'rgba(95,90,82,0.9)'); gr.addColorStop(0.32, 'rgba(25,22,18,0.85)'); gr.addColorStop(0.6, 'rgba(30,26,22,0.45)'); gr.addColorStop(1, 'rgba(30,26,22,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    for (let k = 0; k < 40; k++) { const a = r.next() * 6.283, d = cx * (0.25 + r.next() * 0.6); g.fillStyle = `rgba(20,18,15,${0.15 + r.next() * 0.3})`; g.beginPath(); g.arc(cx + Math.cos(a) * d, cx + Math.sin(a) * d, 1 + r.next() * 4, 0, 6.283); g.fill(); }
+    if (pen) { g.fillStyle = 'rgba(0,0,0,1)'; g.beginPath(); g.arc(cx, cx, S * 0.07, 0, 6.283); g.fill(); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  // dent normal map: shallow crater with a raised lip
+  const [nc, ng] = mk(); const img = ng.createImageData(S, S); const H = (x, y) => { const d = Math.hypot(x - S / 2, y - S / 2) / (S / 2); return d > 1 ? 0 : -Math.cos(Math.min(1, d / 0.55) * Math.PI / 2) * 0.0 - (d < 0.55 ? (1 - (d / 0.55) ** 2) : 0) * 1.0 + (d > 0.5 && d < 0.75 ? Math.sin((d - 0.5) / 0.25 * Math.PI) * 0.25 : 0); };
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const hx = (H(x + 1, y) - H(x - 1, y)) * 6, hy = (H(x, y + 1) - H(x, y - 1)) * 6; const l = Math.hypot(hx, hy, 1); const i = (y * S + x) * 4; img.data[i] = (-hx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (hy / l * 0.5 + 0.5) * 255; img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255; }
+  ng.putImageData(img, 0, 0); const nt = new THREE.CanvasTexture(nc);
+  const mat = (pen) => new THREE.MeshStandardMaterial({ map: scorch(pen), normalMap: nt, normalScale: new THREE.Vector2(1.2, 1.2), transparent: true, depthWrite: false, roughness: pen ? 0.95 : 0.5, metalness: pen ? 0.1 : 0.6, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  MARK = { geo: new THREE.PlaneGeometry(1, 1), pen: mat(true), bounce: mat(false), ray: new THREE.Raycaster(), q: new THREE.Quaternion(), pq: new THREE.Quaternion(), z: new V3(0, 0, 1), n: new V3(), nm: new THREE.Matrix3() };
+  return MARK;
+}
+// ray: {wa, wb} world segment of the shell for this step (from Tank.rayTest); pen = penetrated
+export function addHitMark(model, ray, pen) {
+  if (!model || !ray || !ray.wa || !ray.wb) return null;
+  const A = markAssets(); const dir = new V3().subVectors(ray.wb, ray.wa); const len = dir.length(); if (len < 1e-4) return null; dir.divideScalar(len);
+  const from = ray.wa.clone().addScaledVector(dir, -1.5);
+  A.ray.set(from, dir); A.ray.far = len + 3;
+  const targets = model.meshes.filter((m) => !m.isInstancedMesh && m.visible && !m.userData.decal && !m.userData.hitMark && m.parent);
+  const hit = A.ray.intersectObjects(targets, false)[0]; if (!hit || !hit.face) return null;
+  const parent = hit.object.parent;
+  A.nm.getNormalMatrix(hit.object.matrixWorld); A.n.copy(hit.face.normal).applyMatrix3(A.nm).normalize(); if (A.n.dot(dir) > 0) A.n.negate();
+  model.hitMarks ||= []; let m;
+  if (model.hitMarks.length < MAX_MARKS) { m = new THREE.Mesh(A.geo, pen ? A.pen : A.bounce); m.userData.hitMark = true; m.renderOrder = 2; model.hitMarks.push(m); model.meshes.push(m); }
+  else { m = model.hitMarks.shift(); model.hitMarks.push(m); m.material = pen ? A.pen : A.bounce; }
+  parent.add(m);
+  const wp = hit.point.clone().addScaledVector(A.n, 0.012); m.position.copy(parent.worldToLocal(wp));
+  A.q.setFromUnitVectors(A.z, A.n); A.q.multiply(new THREE.Quaternion().setFromAxisAngle(A.z, Math.random() * 6.283));
+  parent.getWorldQuaternion(A.pq); m.quaternion.copy(A.pq.invert().multiply(A.q));
+  const sz = pen ? 0.42 + Math.random() * 0.15 : 0.3 + Math.random() * 0.1; m.scale.set(sz, sz, 1);
+  return m;
 }
 // debug hook for offline showroom / triangle audits (tools_tanks_show.mjs)
-if (typeof window !== 'undefined') window.__TM = { THREE, TANKS, createTankModel, setTrackLOD, updateRunningGear };
+if (typeof window !== 'undefined') window.__TM = { THREE, TANKS, createTankModel, setTrackLOD, updateRunningGear, addHitMark, burnModel, updateSuspension };
