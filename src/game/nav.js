@@ -30,8 +30,15 @@ export class NavGrid {
       const len = Math.max(c.hx, c.hz), ax = c.hx >= c.hz; const ux = ax ? c.c : c.s, uz = ax ? -c.s : c.c; const seen = new Set();
       for (let u = -len; u <= len + 1e-6; u += 1) { const [i, j] = this.toCell(c.x + ux * u, c.z + uz * u); const k = j * n + i; if (seen.has(k)) continue; seen.add(k); if (parapet) { const [cx, cz] = this.center(i, j); if (world.deckAt(cx, cz) > -1e8) continue; } if (this.cost[k] < Infinity) this.cost[k] += 30; }
     }
-    // large boulders are solid obstacles for tanks
-    if (world.veg) for (const rk of world.veg.rocks) { if (rk.s < 1.6) continue; const [i, j] = this.toCell(rk.x, rk.z); this.cost[j * n + i] = Infinity; }
+    // rocks: only very large boulders fully block. Medium rocks raise cost so tanks prefer to go around but can still pass.
+    // Small stones are almost free to drive over.
+    if (world.veg) for (const rk of world.veg.rocks) {
+      const [i, j] = this.toCell(rk.x, rk.z); const k = j * n + i;
+      if (this.cost[k] === Infinity) continue;
+      if (rk.s >= 2.8) this.cost[k] = Infinity;
+      else if (rk.s >= 1.4) this.cost[k] += 8 + (rk.s - 1.4) * 6;
+      else if (rk.s >= 0.8) this.cost[k] += 2.5;
+    }
   }
   penalize(x, z, amount = 12) { const [i, j] = this.toCell(x, z); const k = j * this.n + i; if (this.cost[k] < Infinity) this.cost[k] = Math.min(this.cost[k] + amount, 60); } // capped: unbounded growth walled off whole spawn areas
   toCell(x, z) { return [Math.max(0, Math.min(this.n - 1, Math.floor((x + this.half) / this.cell))), Math.max(0, Math.min(this.n - 1, Math.floor((z + this.half) / this.cell)))]; }
