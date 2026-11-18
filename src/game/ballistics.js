@@ -10,6 +10,19 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3();
 // it travels through (kinetic rounds −12 %/m, HEAT jets −30 %/m), down to a floor of 35 % / 25 %.
 export function waterPenFactor(type, metres) { return type.heat ? Math.max(0.25, 1 - 0.3 * metres) : Math.max(0.35, 1 - 0.12 * metres); }
 
+// first point (t in 0..1) where segment a→b dives below the water surface, or -1. The surface is sampled along the
+// segment (≤2 m apart), not only at b: a step that ends past the far bank (or past the target) must still get wet.
+export function waterEntry(T, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z; if (dy >= 0) return -1;
+  const n = Math.max(1, Math.min(64, Math.ceil(Math.hypot(dx, dz) / 2))); let pt = 0, pd = null;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n; const wl = T.waterLevel(a.x + dx * t, a.z + dz * t); const d = wl > -1e8 ? a.y + dy * t - wl : null; // <0 = under water
+    if (d !== null && d < 0) { if (i === 0) return -1; if (pd !== null && pd >= 0) return pt + (t - pt) * (pd / (pd - d)); return t; }
+    pt = t; pd = d;
+  }
+  return -1;
+}
+
 export class Ballistics {
   constructor(game) { this.game = game; this.shells = []; }
   spawn(owner, spec, pos, vel) {
@@ -31,7 +44,7 @@ export class Ballistics {
         let bestT = 2, kind = null, hitTank = null, hitInfo = null;
         const tt = W.terrain.segmentHit(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z, 1.5); if (tt >= 0 && tt < bestT) { bestT = tt; kind = 'ground'; }
         const ts = W.structureHit(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z); if (ts >= 0 && ts < bestT) { bestT = ts; kind = 'structure'; }
-        const wl = W.terrain.waterLevel(_b.x, _b.z); if (!s.wet && wl > -1e8 && _b.y < wl && _a.y >= wl) { const tw = (_a.y - wl) / (_a.y - _b.y); if (tw < bestT) { bestT = tw; kind = 'water'; } }
+        if (!s.wet) { const tw = waterEntry(W.terrain, _a, _b); if (tw >= 0 && tw < bestT) { bestT = tw; kind = 'water'; } }
         for (const t of g.tanks) {
           if (t === s.owner && s.life < 0.3) continue;
           const cx = t.pos.x, cz = t.pos.z; const R = t.spec.dims.L * 0.65 + 1;
