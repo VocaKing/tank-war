@@ -24,7 +24,7 @@ export class NavGrid {
     // large boulders are solid obstacles for tanks
     if (world.veg) for (const rk of world.veg.rocks) { if (rk.s < 1.6) continue; const [i, j] = this.toCell(rk.x, rk.z); this.cost[j * n + i] = Infinity; }
   }
-  penalize(x, z, amount = 12) { const [i, j] = this.toCell(x, z); const k = j * this.n + i; if (this.cost[k] < Infinity) this.cost[k] += amount; }
+  penalize(x, z, amount = 12) { const [i, j] = this.toCell(x, z); const k = j * this.n + i; if (this.cost[k] < Infinity) this.cost[k] = Math.min(this.cost[k] + amount, 60); } // capped: unbounded growth walled off whole spawn areas
   toCell(x, z) { return [Math.max(0, Math.min(this.n - 1, Math.floor((x + this.half) / this.cell))), Math.max(0, Math.min(this.n - 1, Math.floor((z + this.half) / this.cell)))]; }
   center(i, j) { return [-this.half + (i + 0.5) * this.cell, -this.half + (j + 0.5) * this.cell]; }
   walkable(i, j) { return i >= 0 && j >= 0 && i < this.n && j < this.n && this.cost[j * this.n + i] < Infinity; }
