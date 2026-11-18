@@ -259,7 +259,7 @@ export class Game {
     }
   }
   computeAim() {
-    if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; return; }
+    if (this.debugAim) { this.aimPoint.copy(this.debugAim); this.aimTank = null; this.aimDist = this.aimPoint.distanceTo(this.camera.position); return; }
     if (this.lock) {
       const t = this.lock; if (!t.alive || !t.spotted[this.player.team] || !this.player.alive) { this.lock = null; }
       else {
@@ -293,7 +293,10 @@ export class Game {
       if (best <= 1) { hitP = a.clone().lerp(b, best); dist += a.distanceTo(hitP); hitTank = stepTank; hitInfo = stepInfo; }
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
-    if (!hitP) hitP = pos;
+    // no impact inside the 4 s look-ahead (e.g. the hull recoil rock throws the gun ~4° up for ~0.3 s after a shot, or
+    // the gun points at the sky): keep the reticle on the gun's line, but don't report the look-ahead path length
+    // (v·4 s ≈ 3.2 km) as a range — size the circle from the camera aim distance and show no range readout
+    const noHit = !hitP; if (noHit) { hitP = pos; dist = Math.min(dist, Math.max(this.aimDist || 0, 1)); }
     const sp = hitP.clone().project(this.camera); const sx = (sp.x * 0.5 + 0.5) * innerWidth, sy = (-sp.y * 0.5 + 0.5) * innerHeight;
     // dispersion circle in pixels
     // aim circle: shells deviate at most ±dispersion (clipped 2σ gaussian) → project that cone
@@ -303,7 +306,8 @@ export class Game {
     this.reticleRadiusWorld = rW;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
     if (sp.z > 1) { hud.setReticle(-100, -100, 0, '', ''); return; }
-    let state = 'neutral', text = `${Math.round(dist)} m`;
+    this.reticleNoHit = noHit;
+    let state = 'neutral', text = noHit ? '— m' : `${Math.round(dist)} m`;
     if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
       const ev = this.ballistics.evaluate(hitTank, hitInfo, p.shell, dist);
       if (ev.ricochet) { state = 'red'; text = `RICOCHET · ${ev.angle.toFixed(0)}°`; }
