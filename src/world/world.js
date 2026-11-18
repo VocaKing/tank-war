@@ -186,7 +186,7 @@ function waterMaterial(hTex, t, def) {
         { float fn = texture2D(normalMap, p / 2.6 + vec2(uT * 0.03, -uT * 0.02)).r + texture2D(normalMap, p / 7.0 - vec2(uT * 0.012, uT * 0.017)).g;
           float band = 0.5 + 0.5 * sin(wDepth * 22.0 - uT * 1.4 + fn * 3.0);
           float shore = 1.0 - smoothstep(0.03, 0.3, wDepth);
-          wFoam = smoothstep(0.72, 1.0, fn * 0.6 + band * 0.4) * shore * 0.85 * (1.0 - smoothstep(60.0, 220.0, dist)); } }
+          wFoam = smoothstep(0.76, 1.05, fn * 0.6 + band * 0.4) * shore * smoothstep(0.0, 0.035, wDepth) * 0.75 * (1.0 - smoothstep(60.0, 220.0, dist)); } }
         { float ndv = abs(dot(normalize(cameraPosition - vWPw), vec3(0.0, 1.0, 0.0)));
           // depth-based body colour + transparency: clear, sandy-green shallows; dark teal depths; grazing angles stay opaque
           float dk = 1.0 - exp(-wDepth * 0.9);
