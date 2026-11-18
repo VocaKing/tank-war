@@ -370,7 +370,7 @@ function buildAbrams(d) {
       const sx = 1 - 0.03 * (y / 0.74); p.setX(i, p.getX(i) * sx); }
     g.computeVertexNormals(); P.add('turret', 'paint', g); }
   // cheek armour panel joints + bolted top plates over the special-armour cavities
-  for (const s of [-1, 1]) { K.boltRow(P, 'turret', [s * 0.65, 0.58, 1.9], [s * 1.65, 0.62, 1.4], 6, 0.022); K.boltRow(P, 'turret', [s * 0.7, 0.5, 2.05], [s * 1.75, 0.55, 1.58], 6, 0.018); P.add('turret', 'dark', box(0.012, 0.6, 0.02, s * 1.81, 0.36, 0.2)); }
+  for (const s of [-1, 1]) { K.boltRow(P, 'turret', [s * 0.65, 0.58, 1.9], [s * 1.65, 0.62, 1.4], 6, 0.022, 'y', 'weld'); K.boltRow(P, 'turret', [s * 0.7, 0.5, 2.05], [s * 1.75, 0.55, 1.58], 6, 0.018, 'y', 'weld'); P.add('turret', 'dark', box(0.012, 0.6, 0.02, s * 1.81, 0.36, 0.2)); }
   P.add('turret', 'dark', box(0.75, 0.6, 0.2, 0, 0.36, 1.95)); P.add('turret', 'paint', box(0.62, 0.5, 0.35, 0, 0.38, 2.05));
   P.add('turret', 'paint', box(0.65, 0.42, 0.75, 0.95, 0.82, 1.15)); P.add('turret', 'glass', box(0.5, 0.25, 0.03, 0.95, 0.84, 1.53)); // GPS doghouse
   P.add('turret', 'paint', cylY(0.22, 0.35, 12, -0.55, 0.88, -0.6)); P.add('turret', 'paint', box(0.42, 0.35, 0.42, -0.55, 1.15, -0.6)); P.add('turret', 'glass', box(0.3, 0.18, 0.02, -0.55, 1.17, -0.38)); // CITV

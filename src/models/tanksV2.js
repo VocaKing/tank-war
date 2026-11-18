@@ -312,6 +312,13 @@ function chally2(d) {
     for (const z of [bz - 0.4, bz - 1.2]) K.stowageBox(P, 'turret', s * (tw * 0.95 + 0.15), th * 0.5, z, 0.25, th * 0.75, 0.75);
     K.jerrycans(P, 'turret', s * 1.1, 0.05, bz - tl - 0.25, 2, 0);
   }
+  for (const s of [-1, 1]) { // v7 Dorchester: cheek armour panel joints + bolts
+    const a = [s * 1.08, bz + tl], b = [s * tw, bz + tl - 0.75];
+    for (const f of [0.33, 0.66]) { const x = a[0] + (b[0] - a[0]) * f, z = a[1] + (b[1] - a[1]) * f; P.add('turret', 'dark', T(new THREE.BoxGeometry(0.02, th * 0.8, 0.02), x * 0.98, th * 0.45, z + 0.005)); }
+    K.boltRow(P, 'turret', [a[0] * 0.97, th * 0.92, a[1] - 0.04], [b[0] * 0.96, th * 0.92, b[1] - 0.04], 7, 0.02, 'y', 'weld');
+    K.boltRow(P, 'turret', [s * tw * 0.975, th * 0.9, bz + tl - 0.85], [s * tw * 0.975, th * 0.9, bz - 0.1], 6, 0.02, 'x', 'weld');
+    P.add('turret', 'dark', box(0.02, th * 0.75, 0.02, s * tw * 0.99, th * 0.45, bz + 0.0));
+  }
   for (let i = 0; i < 5; i++) P.add('turret', 'metal', box(0.02, 0.4, 0.02, -1.4 + i * 0.7, th * 0.55, bz - tl - 0.4)); P.add('turret', 'metal', box(2.9, 0.03, 0.42, 0, 0.12, bz - tl - 0.2));
   P.add('turret', 'paint', cylY(0.22, 0.42, 14, 0.75, th + 0.2, bz - 0.1)); P.add('turret', 'paint', T(new THREE.SphereGeometry(0.26, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0.75, th + 0.4, bz - 0.1)); P.add('turret', 'glass', box(0.2, 0.15, 0.02, 0.75, th + 0.5, bz + 0.15)); // VS580 commander sight
   P.add('turret', 'paint', box(0.5, 0.35, 0.45, -0.85, th + 0.17, bz + 1.4)); P.add('turret', 'glass', box(0.36, 0.18, 0.02, -0.85, th + 0.2, bz + 1.63));
@@ -347,6 +354,7 @@ function type99a(d) {
     for (let i = 0; i < 4; i++) { const t = i / 4 + 0.12; P.add('turret', 'paint', box(0.32, 0.08, 0.28, s * (0.4 + (tw - 0.4) * t), th * 0.88 + 0.04, bz + tl - 0.7 * t - 0.15 - 0.5 * (1 - t) * 0)); }
     K.smokeDischargers(P, 'turret', s * (tw - 0.15), th + 0.06, bz - 0.2, s * 1.2, 5, 0.1, 0.22, 0.04);
     P.add('turret', 'dark', box(0.18, 0.22, 0.12, s * 1.2, th + 0.11, bz - 1.4)); P.add('turret', 'glass', box(0.12, 0.08, 0.02, s * 1.2, th + 0.14, bz - 1.33)); // laser warning / dazzler
+    sideEra(P, 'turret', s, s * (tw * 0.97 + 0.03), th * 0.12, bz + tl - 1.25, 3, 2, 0.36, 0.3, 0.06); // FY-4 ERA cheek blocks
   }
   P.add('turret', 'paint', cylY(0.2, 0.35, 12, 0.65, th + 0.17, bz - 0.4)); P.add('turret', 'paint', box(0.36, 0.3, 0.4, 0.65, th + 0.48, bz - 0.4)); P.add('turret', 'glass', box(0.26, 0.15, 0.02, 0.65, th + 0.5, bz - 0.19));
   P.add('turret', 'paint', box(0.55, 0.38, 0.45, -0.85, th + 0.19, bz + 0.6)); P.add('turret', 'glass', box(0.4, 0.2, 0.02, -0.85, th + 0.22, bz + 0.83));
@@ -381,6 +389,10 @@ function merkava4(d) {
   for (const s of [-1, 1]) {
     P.add('turret', 'paint', box(0.12, 0.35, 0.45, s * (tw - 0.05), th * 0.75, bz + 0.15)); P.add('turret', 'dark', box(0.02, 0.28, 0.38, s * (tw + 0.01), th * 0.75, bz + 0.15)); // Trophy radar panels
     P.add('turret', 'metal', cylY(0.12, 0.25, 10, s * (tw - 0.25), th + 0.12, bz - 0.4)); // Trophy launcher
+    for (const f of [0.3, 0.62]) { const x = s * (0.35 + (tw - 0.35) * f), z = bz + tl - 1.55 * f; P.add('turret', 'dark', box(0.02, th * 0.7, 0.02, x * 0.93, th * 0.45, z)); } // wedge module seams
+    K.boltRow(P, 'turret', [s * 0.4, th * 0.97, bz + tl - 0.1], [s * tw * 0.86, th * 0.97, bz + tl - 1.5], 8, 0.022, 'y', 'weld');
+    for (const z of [bz - 0.25, bz - 1.0]) P.add('turret', 'dark', box(0.02, th * 0.7, 0.02, s * tw * 0.93, th * 0.45, z)); // side module seams
+    K.boltRow(P, 'turret', [s * tw * 0.88, th * 0.93, bz + tl - 1.65], [s * tw * 0.88, th * 0.93, bz - tl + 0.5], 8, 0.02, 'x', 'weld');
     K.smokeDischargers(P, 'turret', s * (tw - 0.3), th + 0.04, bz - 1.1, s * 1.3, 5, 0.09, 0.22, 0.04);
     for (let i = 0; i < 4; i++) P.add('turret', 'metal', box(0.02, 0.3, 0.02, s * (tw + 0.1), th * 0.5, bz - 1.8 + i * 0.35));
   }
