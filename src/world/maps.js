@@ -11,8 +11,8 @@ export const MAPS = [
     desc: 'Rolling bocage farmland cut by a river, with a stone village and church at its heart. Dense hedgerows give superb concealment; three bridges and a ford are the key crossings.',
     seed: 1944, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 48, azimuth: 205 }, turbidity: 3.5, rayleigh: 1.4, fog: { color: 0xbcc8d2, density: 0.0011 }, exposure: 0.62,
-    hdri: { file: 'kloofendal_48d_partly_cloudy_puresky', sunDir: [0.555, 0.742, 0.377], sunE: [4.35, 4.38, 3.98], horizon: [0.445, 0.479, 0.582], exposure: 1.0, fogDensity: 0.0009 },
-    layers: { A: 'leafy_grass', B: 'forest_ground_04', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.8, 0.93, 0.62], tintB: [0.9, 0.85, 0.75] },
+    hdri: { file: 'kloofendal_48d_partly_cloudy_puresky', sunDir: [0.555, 0.742, 0.377], sunE: [4.35, 4.38, 3.98], horizon: [0.445, 0.479, 0.582], exposure: 0.82, fogDensity: 0.0009 },
+    layers: { A: 'leafy_grass', B: 'forest_ground_04', C: 'aerial_rocks_02', D: 'gravel_road', tintA: [0.64, 0.86, 0.52], tintB: [0.9, 0.85, 0.75] },
     farColor: [0.36, 0.42, 0.26],
     generate(mb) {
       const r = mb.rng;

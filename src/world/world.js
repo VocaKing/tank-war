@@ -4,7 +4,7 @@ import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { MapBuilder } from './mapgen.js';
 import { MAP_BY_ID } from './maps.js';
 import { buildStructures } from './buildings.js';
-import { Vegetation, windUniform } from './vegetation.js';
+import { Vegetation, windUniform, sunU } from './vegetation.js';
 import { Grass } from './grass.js';
 import { pbrTex, waterNormalTexture, setTexQuality } from './textures.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
@@ -17,14 +17,15 @@ function terrainMaterial(def) {
   const U = {
     tA: { value: pbrTex(L.A, 'diff') }, tB: { value: pbrTex(L.B, 'diff') }, tC: { value: pbrTex(L.C, 'diff') }, tD: { value: pbrTex(L.D, 'diff') },
     nA: { value: pbrTex(L.A, 'nor') }, nB: { value: pbrTex(L.B, 'nor') }, nC: { value: pbrTex(L.C, 'nor') }, nD: { value: pbrTex(L.D, 'nor') },
+    aA: { value: pbrTex(L.A, 'arm') }, aB: { value: pbrTex(L.B, 'arm') }, aC: { value: pbrTex(L.C, 'arm') }, aD: { value: pbrTex(L.D, 'arm') },
     tintA: { value: new THREE.Vector3(...L.tintA) }, tintB: { value: new THREE.Vector3(...L.tintB) },
   };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; varying vec4 vSplat; varying vec3 vWP;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD; uniform vec3 tintA, tintB; varying vec4 vSplat; varying vec3 vWP;
+      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD, aA, aB, aC, aD; uniform vec3 tintA, tintB; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN; float tAO = 1.0;
       vec3 sampleL(sampler2D t, vec2 uv, float far) { vec3 a = texture2D(t, uv).rgb; vec3 b = texture2D(t, uv * 0.173).rgb; return mix(a, (a + b) * 0.5, far); }`)
       .replace('#include <map_fragment>', `
         float camD = length(vWP - cameraPosition); float far = smoothstep(25.0, 140.0, camD);
@@ -33,12 +34,18 @@ function terrainMaterial(def) {
         // macro breakup so layer borders are not smooth gradients
         float br = texture2D(tC, vWP.xz / 41.0).r; float br2 = texture2D(tA, vWP.xz / 133.0).g;
         w.y *= 0.55 + br * 0.9; w.x *= 0.8 + br2 * 0.4;
+        // v5: steep slopes expose bedrock regardless of the painted splat
+        vec3 wn = normalize(vWN); float steep = smoothstep(0.28, 0.55, 1.0 - wn.y); w.z += steep * 2.5 * (1.0 - w.w); w.xy *= 1.0 - steep * 0.85;
         vec3 cA = sampleL(tA, uv, far) * tintA, cB = sampleL(tB, uv * 1.1, far) * tintB, cC = sampleL(tC, uvr, far), cD = sampleL(tD, uvd, far);
+        vec3 bw = pow(abs(wn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
+        if (steep > 0.01) { cC = texture2D(tC, vWP.zy / 6.0).rgb * bw.x + cC * bw.y + texture2D(tC, vWP.xy / 6.0).rgb * bw.z; }
+        vec3 rA = texture2D(aA, uv).rgb, rB = texture2D(aB, uv * 1.1).rgb, rC = texture2D(aC, uvr).rgb, rD = texture2D(aD, uvd).rgb;
         // height blending: each texture's luminance acts as its height map, giving natural interlocking transitions
         vec4 hgt = vec4(dot(cA, vec3(0.33)), dot(cB, vec3(0.33)), dot(cC, vec3(0.33)), dot(cD, vec3(0.33))) * 0.6 + w * 1.4;
         float hmax = max(max(hgt.x, hgt.y), max(hgt.z, hgt.w)) - 0.18;
         vec4 hb = max(hgt - hmax, 0.0) * step(0.001, w); w = hb / (hb.x + hb.y + hb.z + hb.w + 1e-4);
         vec3 col = cA * w.x + cB * w.y + cC * w.z + cD * w.w;
+        float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0)); tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
         col *= 0.82 + 0.36 * texture2D(tB, vWP.xz / 97.0).g;
         col *= mix(0.92, 1.06, smoothstep(0.2, 0.8, texture2D(tA, vWP.xz / 260.0).r));
         // v4 patchwork: large irregular parcels (fields / meadows / dry patches) tint the ground layer differently
@@ -49,6 +56,8 @@ function terrainMaterial(def) {
           col *= mix(vec3(1.0), pt, w.x * 0.85);
         }
         diffuseColor.rgb *= col;`)
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(tRough, 0.95, far * 0.5);')
+      .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= tAO; reflectedLight.indirectSpecular *= tAO * tAO; reflectedLight.directDiffuse *= mix(1.0, tAO, 0.5);')
       .replace('#include <normal_fragment_maps>', `
         {
           vec3 nm = (texture2D(nA, uv).xyz * w.x + texture2D(nB, uv * 1.1).xyz * w.y + texture2D(nC, uvr).xyz * w.z + texture2D(nD, uvd).xyz * w.w) * 2.0 - 1.0;
@@ -58,7 +67,7 @@ function terrainMaterial(def) {
           normal = normalize(T * nm.x + Bt * nm.y + normal * nm.z);
         }`);
   };
-  m.customProgramCacheKey = () => 'terrain4';
+  m.customProgramCacheKey = () => 'terrain5';
   return m;
 }
 
@@ -155,6 +164,7 @@ export class World {
     Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 800 });
     sun.shadow.bias = -0.00025; sun.shadow.normalBias = this.shadowTexel * 1.6; if (H && H.overcast) sun.shadow.radius = 6; else sun.shadow.radius = 2;
     scene.add(sun); scene.add(sun.target); this.sun = sun;
+    sunU.uSunDir.value.copy(this.sunDir); sunU.uSunCol.value.copy(sun.color).multiplyScalar(sun.intensity);
     const hemi = new THREE.HemisphereLight(0xbfd4ff, new THREE.Color(...def.farColor).multiplyScalar(1.2), 0.7); scene.add(hemi); this.hemi = hemi;
     this.hdrLoaded = !H; this.exposure = H ? H.exposure : null;
     if (H) this._loadHdri(renderer, H, quality);

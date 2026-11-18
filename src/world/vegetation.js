@@ -8,6 +8,18 @@ import { RNG } from '../util.js';
 
 export const windUniform = { value: 0 };
 export function setWindTime(t) { windUniform.value = t; }
+// v5: shared sun uniforms for leaf/blade translucency (set by World)
+export const sunU = { uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(3, 3, 3) } };
+// two-sided foliage lighting: keep the (spherical / up) normals on back faces instead of flipping them, and add
+// sub-surface translucency when looking towards the sun through leaves.
+export function foliageShading(sh, base = 0.05, back = 0.45, tipExpr = '1.0') {
+  Object.assign(sh.uniforms, sunU);
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSunDir; uniform vec3 uSunCol;')
+    .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal);')
+    .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+      { vec3 Lv = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz); float tr = pow(max(dot(-normalize(vViewPosition), Lv), 0.0), 4.0);
+        reflectedLight.directDiffuse += diffuseColor.rgb * uSunCol * (${base.toFixed(3)} + ${back.toFixed(3)} * tr) * (${tipExpr}); }`);
+}
 
 function foliageMaterial(tex, color = 0xffffff, sway = 1) {
   const m = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.85, metalness: 0, color });
@@ -23,8 +35,9 @@ function foliageMaterial(tex, color = 0xffffff, sway = 1) {
         float ph = ip.x * 0.07 + ip.z * 0.05;
         transformed.x += sin(uWind * 1.3 + ph + position.y * 0.3) * 0.012 * hgt * ${sway.toFixed(2)};
         transformed.z += cos(uWind * 1.1 + ph * 1.3) * 0.009 * hgt * ${sway.toFixed(2)};`);
+    foliageShading(sh, 0.04, 0.5);
   };
-  m.customProgramCacheKey = () => 'foliage' + sway;
+  m.customProgramCacheKey = () => 'foliage5' + sway;
   return m;
 }
 

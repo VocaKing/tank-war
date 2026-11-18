@@ -3,6 +3,7 @@
 // grass splat layer; no grass on roads, water, buildings or rock. Wind sway in the vertex shader.
 import * as THREE from 'three';
 import { OCC } from './mapgen.js';
+import { foliageShading } from './vegetation.js';
 
 const PRESETS = {
   village: { layer: 0, dens: 1.0, col: [0.62, 0.68, 0.42], col2: [0.8, 0.74, 0.46], h: 0.55 },
@@ -10,10 +11,11 @@ const PRESETS = {
   desert: { layer: 1, dens: 0.16, col: [1.15, 0.95, 0.62], col2: [0.95, 0.8, 0.5], h: 0.45 },
 };
 function bladeTexture() {
-  const W = 128, H = 128; const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
-  for (let i = 0; i < 46; i++) {
-    const x = 6 + Math.random() * (W - 12), h = H * (0.45 + Math.random() * 0.55), lean = (Math.random() - 0.5) * 34, w = 2 + Math.random() * 3;
-    const l = 20 + Math.random() * 22; g.fillStyle = `hsl(${65 + Math.random() * 35},${28 + Math.random() * 22}%,${l}%)`;
+  const W = 256, H = 256; const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  for (let i = 0; i < 90; i++) {
+    const x = 10 + Math.random() * (W - 20), h = H * (0.4 + Math.random() * 0.6), lean = (Math.random() - 0.5) * 70, w = 2.5 + Math.random() * 4;
+    const l = 26 + Math.random() * 22; const hue = 68 + Math.random() * 34, sat = 30 + Math.random() * 25;
+    const gr = g.createLinearGradient(0, H, 0, H - h); gr.addColorStop(0, `hsl(${hue},${sat}%,${l * 0.6}%)`); gr.addColorStop(0.7, `hsl(${hue},${sat}%,${l}%)`); gr.addColorStop(1, `hsl(${hue - 12},${sat * 0.7}%,${l * 1.15}%)`); g.fillStyle = gr;
     g.beginPath(); g.moveTo(x - w, H); g.quadraticCurveTo(x + lean * 0.3, H - h * 0.6, x + lean, H - h); g.quadraticCurveTo(x + lean * 0.3 + w * 0.3, H - h * 0.6, x + w, H); g.fill();
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
@@ -39,9 +41,12 @@ export class Grass {
           vec3 ip = instanceMatrix[3].xyz; float ph = ip.x * 0.31 + ip.z * 0.23;
           float d = length(ip.xz - cameraPosition.xz); float fade = 1.0 - smoothstep(uR * 0.7, uR, d);
           transformed.y *= fade;
-          transformed.x += sin(uWind * 2.1 + ph) * 0.12 * position.y; transformed.z += cos(uWind * 1.7 + ph) * 0.08 * position.y;`);
+          float gust = 0.6 + 0.4 * sin(uWind * 0.35 + ip.x * 0.02 + ip.z * 0.015);
+          transformed.x += sin(uWind * 2.1 + ph) * 0.13 * position.y * position.y * gust; transformed.z += cos(uWind * 1.7 + ph) * 0.09 * position.y * position.y * gust;`);
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= mix(0.42, 1.08, smoothstep(0.0, 0.8, vMapUv.y));');
+      foliageShading(sh, 0.06, 0.6, 'vMapUv.y');
     };
-    mat.customProgramCacheKey = () => 'grass';
+    mat.customProgramCacheKey = () => 'grass5';
     const max = Math.ceil((Math.PI * R * R) / (this.spacing * this.spacing) * 1.05);
     this.mesh = new THREE.InstancedMesh(geo, mat, max); this.mesh.count = 0; this.mesh.frustumCulled = false; this.mesh.receiveShadow = true; this.mesh.castShadow = false;
     this.colors = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.mesh.instanceColor = this.colors;

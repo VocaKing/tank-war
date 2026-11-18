@@ -21,7 +21,7 @@ for (const map of maps) {
     await shot(NAME[map]);
   }
   if (only.includes('terrain')) {
-    const r = await view(`for (let k = 0; k < 400; k++) { const x = p.x + Math.sin(k) * (30 + k), z = p.z + Math.cos(k) * (30 + k); if (W.colGrid.query(x, z, 12).length || W.veg.treeGrid.query(x, z, 10).length) continue; const s = W.mb.splat ? 0 : 0; const h = k * 0.7; look(x, hy(x, z) + 1.7, z, x + Math.sin(h) * 9, hy(x + Math.sin(h) * 9, z + Math.cos(h) * 9), z + Math.cos(h) * 9); return [x | 0, z | 0]; } return 'none';`);
+    const r = await view(`for (let k = 0; k < 400; k++) { const x = p.x + Math.sin(k) * (30 + k), z = p.z + Math.cos(k) * (30 + k); if (W.colGrid.query(x, z, 12).length || W.veg.treeGrid.query(x, z, 10).length || W.veg.bushAt(x, z, 6)) continue; const s = W.mb.splat ? 0 : 0; const h = k * 0.7; look(x, hy(x, z) + 1.7, z, x + Math.sin(h) * 9, hy(x + Math.sin(h) * 9, z + Math.cos(h) * 9), z + Math.cos(h) * 9); return [x | 0, z | 0]; } return 'none';`);
     console.log('terrain', r); await shot(NAME[map] + '_terrain_closeup');
   }
   if (only.includes('building')) {
@@ -33,13 +33,13 @@ for (const map of maps) {
   if (only.includes('water')) {
     const r = await view(`const L = W.mb.lakes[0]; const R = W.mb.rivers.find((r) => !r.dry);
       let cx, cz, wl, rad; if (L) { cx = L.x; cz = L.z; wl = L.wl; rad = L.r; } else if (R) { const q = R.pts[Math.floor(R.pts.length / 2)]; cx = q[0]; cz = q[1]; wl = q[2]; rad = R.width; } else return 'nowater';
-      for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; const x = cx + Math.sin(a) * (rad + 14), z = cz + Math.cos(a) * (rad + 14); if (W.veg.treeGrid.query(x, z, 5).length) continue; look(x, Math.max(hy(x, z), wl) + 2.5, z, cx, wl, cz, 60); return [cx | 0, cz | 0, !!L]; } return 'blocked';`);
+      for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; const x = cx + Math.sin(a) * (rad + 14), z = cz + Math.cos(a) * (rad + 14); if (W.veg.treeGrid.query(x, z, 5).length || W.veg.bushAt(x, z, 4)) continue; look(x, Math.max(hy(x, z), wl) + 2.5, z, cx, wl, cz, 60); return [cx | 0, cz | 0, !!L]; } return 'blocked';`);
     console.log('water', r); await shot(NAME[map] + '_water');
   }
   if (only.includes('ground')) {
     // ground-level, looking across the sun so shadows of tanks/trees read clearly
-    const r = await view(`const s = W.sunDir; const tk = g.tanks.find((t) => t.team === 0 && t !== g.player) || g.player; const q = tk.pos; const sa = Math.atan2(s.x, s.z) + Math.PI * 0.6;
-      const x = q.x + Math.sin(sa) * 11, z = q.z + Math.cos(sa) * 11; look(x, hy(x, z) + 1.6, z, q.x, hy(q.x, q.z) + 1.2, q.z, 60); return [q.x | 0, q.z | 0];`);
+    const r = await view(`const s = W.sunDir; const sa = Math.atan2(s.x, s.z) + Math.PI * 0.6; for (const tk of g.tanks) { const q = tk.pos;
+      for (let k = 0; k < 64; k++) { const a = sa + k * 0.4, d = 11 + (k % 4) * 3; const x = q.x + Math.sin(a) * d, z = q.z + Math.cos(a) * d; let bad = W.colGrid.query(x, z, 3).length > 0; for (let u = 0; u <= 1 && !bad; u += 0.2) { const qx = x + (q.x - x) * u, qz = z + (q.z - z) * u; if (W.veg.treeGrid.query(qx, qz, 4).length || W.veg.bushAt(qx, qz, 3)) bad = true; } if (bad) continue; look(x, hy(x, z) + 1.6, z, q.x, hy(q.x, q.z) + 1.2, q.z, 60); return [q.x | 0, q.z | 0, k]; } } return 'none';`);
     console.log('ground', r); await shot(NAME[map] + '_shadows_ground');
   }
   await page.close();
