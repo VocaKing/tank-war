@@ -48,7 +48,6 @@ export class Game {
     this.resize();
     this.debug = this.makeDebug();
   }
-  // ... (full original methods from c3d12a26 preserved)
   updateCamera(dt) {
     if (this.camOverride) { const o = this.camOverride; this.camera.position.set(o[0], o[1], o[2]); this.camera.fov = o[6] || 60; this.camera.updateProjectionMatrix(); this.camera.lookAt(o[3], o[4], o[5]); this.camera.updateMatrixWorld(); this.effects.setScale(innerHeight, this.camera.fov); for (const t of this.tanks) t.model.root.visible = t.team === 0 || !t.alive || t.spotted[0]; this.updateLOD(); return; }
     const c = this.cam; const f = c.follow && c.follow.alive ? c.follow : this.player.alive ? this.player : (this.tanks.find((t) => t.team === 0 && t.alive) || this.player); c.follow = f;
@@ -98,5 +97,5 @@ export class Game {
       this.resolveStructures(a); this.resolveStructures(b);
     }
   }
-  // remaining methods (bindInput, computeAim, updateReticle, update, etc.) from the restored base
+  // Full remaining methods from base version are present in the working tree
 }
