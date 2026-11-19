@@ -15,17 +15,17 @@ export class Menu {
   render() {
     this.root.innerHTML = `
       <div class="brand"><h1>STEEL FRONT</h1><span>3D Tank War · v3.0</span></div>
-      <div class="toolbar" style="display:flex;gap:8px;padding:8px;background:#1a1c16;border-bottom:1px solid #3a3c32;position:sticky;top:0;z-index:10;">
+      <div class="toolbar">
         <button class="tbl-btn" id="m-custom">Custom Mode</button>
         <button class="tbl-btn" id="m-armor">Armor Preview</button>
-        <button class="tbl-btn" id="m-table">📊 Compare</button>
+        <button class="tbl-btn" id="m-table">Compare</button>
       </div>
-      <div class="tanklist" style="max-height:42vh;overflow-y:auto;padding:8px;padding-bottom:120px;">
+      <div class="tanklist">
         ${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}
       </div>
       <div class="stats" id="m-stats"></div>
-      <div class="bottom" style="position:relative;z-index:5;">
-        <div class="maps">${MAPS.map((m) => `<button class="mcard" data-id="${m.id}"><b>${m.name}</b><small>${m.subtitle}</small></button>`).join('')}</div>
+      <div class="bottom">
+        <div class="maps" id="m-maps" style="display:none">${MAPS.map((m) => `<button class="mcard" data-id="${m.id}"><b>${m.name}</b><small>${m.subtitle}</small></button>`).join('')}</div>
         <div class="go">
           <label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
           <label class="aa-opt"><input type="checkbox" id="m-aa"> Aim assist</label>
@@ -36,7 +36,11 @@ export class Menu {
       <div class="overlay" id="m-tbl"></div><div class="overlay" id="m-lo"></div>`;
     this.root.querySelectorAll('.tcard').forEach((b) => (b.onclick = () => this.select(b.dataset.id)));
     this.root.querySelectorAll('.mcard').forEach((b) => (b.onclick = () => this.selectMap(b.dataset.id)));
-    this.root.querySelector('#m-battle').onclick = () => this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items(), aimAssist: localStorage.getItem('tw_aa') !== '0' });
+    this.root.querySelector('#m-battle').onclick = () => {
+      const maps = this.root.querySelector('#m-maps');
+      if (maps.style.display === 'none') { maps.style.display = 'flex'; this.root.querySelector('#m-battle').textContent = 'CONFIRM'; return; }
+      this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items(), aimAssist: localStorage.getItem('tw_aa') !== '0' });
+    };
     this.custom = new CustomMode(this.root, (mods) => this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items(), aimAssist: localStorage.getItem('tw_aa') !== '0', custom: mods }));
     this.root.querySelector('#m-custom').onclick = () => this.custom.show(this.tank);
     this.root.querySelector('#m-armor').onclick = () => { if (this.garage && this.garage.setArmorMode) this.garage.setArmorMode(true); };
@@ -45,11 +49,10 @@ export class Menu {
     const q = this.root.querySelector('#m-q'); q.value = this.quality; q.onchange = () => { this.quality = q.value; localStorage.setItem('tw_q', this.quality); };
     const aa = this.root.querySelector('#m-aa'); aa.checked = localStorage.getItem('tw_aa') !== '0'; aa.onchange = () => localStorage.setItem('tw_aa', aa.checked ? '1' : '0');
   }
-  select(id) { this.tank = id; localStorage.setItem('tw_tank', id); const t = TANK_BY_ID[id]; if (this.garage && t) this.garage.show(t); this.root.querySelectorAll('.tcard').forEach((b) => b.classList.toggle('sel', b.dataset.id === id)); this.summary(); }
+  select(id) { this.tank = id; localStorage.setItem('tw_tank', id); const t = TANK_BY_ID[id]; if (this.garage && t) this.garage.show(t); this.root.querySelectorAll('.tcard').forEach((b) => b.classList.toggle('sel', b.dataset.id === id)); }
   selectMap(id) { this.map = id; localStorage.setItem('tw_map', id); this.root.querySelectorAll('.mcard').forEach((b) => b.classList.toggle('sel', b.dataset.id === id)); }
   loadout() { return null; }
   items() { return []; }
-  summary() {}
   showLoadout() {}
   showTable() {}
 }
