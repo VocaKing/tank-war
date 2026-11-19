@@ -1,7 +1,6 @@
 // Tank specifications with special abilities assigned
-// Overspeed → light / mobile tanks
-// Stabilize → tactical modern tanks
-// Self-destruct → heavy tanks (gives enemies time to escape)
+// Magazines can be assigned to multiple tanks with different sizes
+// Intra-magazine reload is <= 1.5 seconds
 
 export const TANKS = [
   {
@@ -20,6 +19,7 @@ export const TANKS = [
     paint: { base: '#4a4b2e', camo: null, accent: '#3a3b24', pattern: 'solid', fade: 16, rough: 0.78 },
     desc: 'Late-war Sherman with the long 76 mm M1A2 gun, HVSS suspension and wet ammo stowage. Fast-firing and reliable, but thin side armor.',
     overspeed: { mult: 1.4, duration: 8, cooldown: 28 },
+    magazine: { size: 2, intraReload: 1.2, fullReload: 9 },
   },
   {
     id: 't34', tier: 1, cls: 'Medium', name: 'T-34-85 (1944)', short: 'T-34-85', nation: 'USSR', era: 'WWII', year: 1944,
@@ -37,6 +37,7 @@ export const TANKS = [
     paint: { base: '#4b5631', camo: null, accent: '#3d4728', pattern: 'solid', fade: 18, rough: 0.8 },
     desc: 'Mass-produced Soviet medium tank with superbly sloped armor, wide tracks and an 85 mm ZiS-S-53. Agile, cramped, and hard-hitting.',
     scan: { cooldown: 25, maxTargets: 3, range: 380 },
+    magazine: { size: 4, intraReload: 1.3, fullReload: 14 },
   },
   {
     id: 'm1a2', tier: 4, cls: 'MBT', name: 'M1A2 Abrams', short: 'M1A2', nation: 'USA', era: 'Modern', year: 1992,
@@ -53,10 +54,9 @@ export const TANKS = [
     ],
     paint: { base: '#b5a07a', camo: null, accent: '#9c8963', pattern: 'solid', fade: 10, rough: 0.7 },
     desc: 'Modern US MBT: 1,500 hp gas turbine, DU composite armor, CITV hunter-killer sight with thermals, and the 120 mm M256 smoothbore. Fast in both directions.',
-    magazine: { size: 3, intraReload: 1.8, fullReload: 12 },
+    magazine: { size: 3, intraReload: 1.4, fullReload: 12 },
     stabilize: { duration: 7, cooldown: 22 },
   },
-  // Heavy tanks (Tiger, IS-2, etc.) should receive selfDestruct: { radius: 14 } when the full roster is restored
 ];
 
 export const TANK_BY_ID = Object.fromEntries(TANKS.map((t) => [t.id, t]));
