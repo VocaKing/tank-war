@@ -58,11 +58,3 @@ export function updateSuspension(model, dt, speed, groundY) {
     model._lastOff = off;
   }
 }
-function updateLinks(model) {
-  // placeholder – original link update logic preserved if present in full source
-}
-export function createTankModel(spec) {
-  return buildV2(spec);
-}
-export function burnModel(model) {}
-export function addHitMark(model, pos, normal) {}
