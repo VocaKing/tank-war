@@ -32,20 +32,15 @@ function terrainMaterial(def) {
         float camD = length(vWP - cameraPosition); float far = smoothstep(25.0, 140.0, camD);
         vec2 uv = vWP.xz / 3.2; vec2 uvr = vWP.xz / 6.0; vec2 uvd = vWP.xz / 3.5;
         vec4 w = vSplat; w = max(w, 0.0);
-        // macro breakup so layer borders are not smooth gradients
         float br = texture2D(tC, vWP.xz / 41.0).r; float br2 = texture2D(tA, vWP.xz / 133.0).g;
         w.y *= 0.55 + br * 0.9; w.x *= 0.8 + br2 * 0.4;
-        // v5: steep slopes expose bedrock regardless of the painted splat
         vec3 wn = normalize(vWN); float steep = smoothstep(0.28, 0.55, 1.0 - wn.y); w.z += steep * 2.5 * (1.0 - w.w); w.xy *= 1.0 - steep * 0.85;
         vec3 cA = sampleL(tA, uv, far) * tintA, cB = sampleL(tB, uv * 1.1, far) * tintB, cC = sampleL(tC, uvr, far), cD = sampleL(tD, uvd, far);
         vec3 bw = pow(abs(wn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
         if (steep > 0.01) { cC = texture2D(tC, vWP.zy / 6.0).rgb * bw.x + cC * bw.y + texture2D(tC, vWP.xy / 6.0).rgb * bw.z; }
         vec3 rA = texture2D(aA, uv).rgb, rB = texture2D(aB, uv * 1.1).rgb, rC = texture2D(aC, uvr).rgb, rD = texture2D(aD, uvd).rgb;
-        // height blending: each texture's luminance acts as its height map, giving natural interlocking transitions
-        // v5 road surfaces: packed dirt / cobblestone setts / asphalt derived from the gravel set (no extra samplers)
         {
           float gl = dot(cD, vec3(0.333)); float dirt = vRK.x, cob = vRK.y, asp = vRK.z;
-          // v5 concrete hard-standing: cast slabs (4 x 3 m) with sawn joints, per-slab tone, weathering stains and crumbling, grassy edges
           if (vPad > 0.01) {
             vec2 sp = vWP.xz / vec2(5.0, 4.0); vec2 sid = floor(sp); vec2 sf = fract(sp); float hs = fract(sin(dot(sid, vec2(17.1, 113.7))) * 43758.5);
             vec2 je = min(sf, 1.0 - sf) * vec2(5.0, 4.0); float joint = smoothstep(0.008, 0.022, min(je.x, je.y));
@@ -53,9 +48,9 @@ function terrainMaterial(def) {
             conC = vec3(0.47, 0.455, 0.42) * grain * (0.86 + hs * 0.22) * mix(0.72, 1.04, smoothstep(0.15, 0.65, stain));
             conC = mix(conC * 0.55, conC, mix(1.0, joint, 1.0 - far));
             tPadN = (sf - 0.5) * (1.0 - smoothstep(0.0, 0.06, min(je.x, je.y))) * 0.8 * (1.0 - far);
-            tPad = smoothstep(0.25, 0.65, vPad * (0.7 + 0.6 * br)) * (1.0 - 0.5 * smoothstep(0.5, 0.85, texture2D(tA, vWP.xz / 13.0).g)); // soil and moss washed over the slab
+            tPad = smoothstep(0.25, 0.65, vPad * (0.7 + 0.6 * br)) * (1.0 - 0.5 * smoothstep(0.5, 0.85, texture2D(tA, vWP.xz / 13.0).g));
           }
-          vec3 dirtC = gl * vec3(1.22, 0.96, 0.72) * 0.86; // linear-space: keep the gravel set's brightness, shift to packed brown earth
+          vec3 dirtC = gl * vec3(1.22, 0.96, 0.72) * 0.86;
           vec3 aspC = gl * vec3(0.33, 0.34, 0.36);
           vec3 cobC = cD;
           if (cob > 0.01) {
@@ -64,11 +59,10 @@ function terrainMaterial(def) {
             vec2 ed = 0.5 - abs(cf); float e = min(ed.x * 0.24, ed.y * 0.17); float mortar = smoothstep(0.004, 0.018, e);
             vec3 stone = mix(vec3(0.85, 0.84, 0.82), vec3(1.08, 1.0, 0.88), hs) * gl;
             cobC = mix(stone * 0.28, stone, mortar);
-            tCobN = cf * (1.0 - smoothstep(0.0, 0.05, e)) * 1.6 * (1.0 - far); // rounded sett edges
+            tCobN = cf * (1.0 - smoothstep(0.0, 0.05, e)) * 1.6 * (1.0 - far);
           }
           cD = mix(cD, dirtC, dirt); cD = mix(cD, mix(cobC, cD, far * 0.6), cob); cD = mix(cD, aspC, asp);
-          w.w *= 0.75 + 0.5 * br; // irregular, interlocking road edges instead of a clean ribbon
-          // wet mud on river banks and road shoulders: darker, smoother, glossier soil
+          w.w *= 0.75 + 0.5 * br;
           float mud = vRK.w * smoothstep(0.25, 0.6, br * 0.6 + br2 * 0.6);
           vec3 mudC = dot(cA, vec3(0.333)) * vec3(0.62, 0.5, 0.4);
           cA = mix(cA, mudC, mud); cB = mix(cB, mudC, mud * 0.9); tMudR = mud;
@@ -80,7 +74,6 @@ function terrainMaterial(def) {
         float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0)); tRough = mix(tRough, 0.42, tMudR * (w.x + w.y)); tRough = mix(tRough, 0.82, vRK.z * w.w); tRough = mix(tRough, 0.88, tPad); tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
         col *= 0.82 + 0.36 * texture2D(tB, vWP.xz / 97.0).g;
         col *= mix(0.92, 1.06, smoothstep(0.2, 0.8, texture2D(tA, vWP.xz / 260.0).r));
-        // v4 patchwork: large irregular parcels (fields / meadows / dry patches) tint the ground layer differently
         {
           vec2 pc = mat2(0.94, -0.34, 0.34, 0.94) * vWP.xz + (vec2(br, br2) - 0.5) * 30.0;
           vec2 cell = floor(pc / vec2(86.0, 64.0)); float hs = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
@@ -145,7 +138,6 @@ function buildFarTerrain(mb, mat) {
 }
 
 export const waterTime = { value: 0 };
-// v5: terrain height as a half-float texture so water can read its own depth (colour, alpha fade, shoreline foam)
 function heightTexture(t) {
   const n = t.n; const d = new Uint16Array(n * n); for (let k = 0; k < n * n; k++) d[k] = THREE.DataUtils.toHalfFloat(t.h[k]);
   const tex = new THREE.DataTexture(d, n, n, THREE.RedFormat, THREE.HalfFloatType); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.needsUpdate = true; return tex;
@@ -169,30 +161,26 @@ function waterMaterial(hTex, t, def) {
         vec3 n3 = texture2D(normalMap, p / 31.0 + vec2(uT * 0.006, -uT * 0.009)).xyz * 2.0 - 1.0;
         float fade = 1.0 - smoothstep(40.0, 400.0, dist) * 0.7;
         vec2 s = (n1.xy * 0.55 + n2.xy * 0.35 * (1.0 - smoothstep(20.0, 120.0, dist)) + n3.xy * 0.5) * 0.32 * fade;
-        s *= 1.0 - 0.7 * wFoam; // foam flattens the ripples
+        s *= 1.0 - 0.7 * wFoam;
         normal = normalize((viewMatrix * vec4(s.x, 1.0, s.y, 0.0)).xyz);
       }`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.75, wFoam);')
-      // horizon-aware reflections: rays that graze the horizon see banks and treelines, not open sky
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
         { vec3 wN = inverseTransformDirection(normal, viewMatrix); vec3 rW = reflect(normalize(vWPw - cameraPosition), wN);
           float hzM = 1.0 - smoothstep(-0.02, 0.2, rW.y); reflectedLight.indirectSpecular *= mix(vec3(1.0), uBankT, hzM * 0.85);
           reflectedLight.directSpecular *= 1.0 - 0.8 * wFoam; reflectedLight.indirectSpecular *= 1.0 - 0.8 * wFoam; }`)
-      // view-dependent body colour: looking straight down you see the dark, slightly green depth; grazing angles are mirror-like (Fresnel via IBL)
       .replace('#include <color_fragment>', `#include <color_fragment>
         { vec2 p = vWPw.xz; float dist = length(vWPw - cameraPosition);
         wDepth = vWPw.y - texture2D(uH, p * uHM.x + uHM.y).r; if (wDepth < 0.0) discard;
-        // shoreline foam: broken bands that lap towards the bank, strongest in the shallowest 0.4 m
         { float fn = texture2D(normalMap, p / 2.6 + vec2(uT * 0.03, -uT * 0.02)).r + texture2D(normalMap, p / 7.0 - vec2(uT * 0.012, uT * 0.017)).g;
           float band = 0.5 + 0.5 * sin(wDepth * 22.0 - uT * 1.4 + fn * 3.0);
           float shore = 1.0 - smoothstep(0.03, 0.3, wDepth);
           wFoam = smoothstep(0.76, 1.05, fn * 0.6 + band * 0.4) * shore * smoothstep(0.0, 0.035, wDepth) * 0.75 * (1.0 - smoothstep(60.0, 220.0, dist)); } }
         { float ndv = abs(dot(normalize(cameraPosition - vWPw), vec3(0.0, 1.0, 0.0)));
-          // depth-based body colour + transparency: clear, sandy-green shallows; dark teal depths; grazing angles stay opaque
           float dk = 1.0 - exp(-wDepth * 0.9);
           diffuseColor.rgb = mix(uShallow, uDeep, dk) * mix(1.1, 0.6, ndv);
           float a = mix(0.97, 0.82, ndv); a = mix(mix(0.3, 0.9, 1.0 - ndv), a, smoothstep(0.15, 1.8, wDepth));
-          a *= smoothstep(0.0, 0.08, wDepth); // soft contact with the bank, no hard intersection line
+          a *= smoothstep(0.0, 0.08, wDepth);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.8, 0.78), wFoam); diffuseColor.a = max(a, wFoam * smoothstep(0.0, 0.05, wDepth)); }`);
   };
   m.customProgramCacheKey = () => 'water5d'; m.userData.WU = WU;
@@ -210,7 +198,6 @@ function buildWater(mb, mat) {
       if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-    // force normals up (ribbon might be wound either way)
     const n = g.attributes.normal; for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);
     const mesh = new THREE.Mesh(g, mat); mesh.material.side = THREE.DoubleSide; mesh.receiveShadow = true; group.add(mesh);
   }
@@ -219,106 +206,48 @@ function buildWater(mb, mat) {
 }
 
 export class World {
-  constructor(renderer, mapId, quality = 'high') {
-    const def = MAP_BY_ID[mapId]; this.def = def; this.quality = quality;
-    const t0 = performance.now();
-    const mb = new MapBuilder(def, quality); def.generate(mb); this.mb = mb; this.terrain = mb.t;
-    this.genTime = performance.now() - t0;
-    const scene = new THREE.Scene(); this.scene = scene;
-    // sky + lighting (v5: Poly Haven HDRI sky + image-based lighting, physically matched sun)
-    setTexQuality(quality);
-    const H = def.hdri;
-    const sky = new Sky(); sky.scale.setScalar(20000); scene.add(sky); this.sky = sky;
-    const su = sky.material.uniforms; su.turbidity.value = def.turbidity; su.rayleigh.value = def.rayleigh; su.mieCoefficient.value = 0.006; su.mieDirectionalG.value = 0.82;
-    const phi = (90 - def.sun.elevation) * DEG, theta = def.sun.azimuth * DEG; this.sunDir = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
-    if (H) this.sunDir.set(...H.sunDir).normalize();
-    su.sunPosition.value.copy(this.sunDir);
-    const pm = new THREE.PMREMGenerator(renderer); this.pm = pm; const envScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(1000); envScene.add(sky2);
-    Object.assign(sky2.material.uniforms.turbidity, { value: def.turbidity }); sky2.material.uniforms.rayleigh.value = def.rayleigh; sky2.material.uniforms.sunPosition.value.copy(this.sunDir);
-    sky2.material.uniforms.mieCoefficient.value = 0.006;
-    this.envRT = pm.fromScene(envScene, 0, 0.1, 2000); scene.environment = this.envRT.texture; scene.environmentIntensity = 0.7;
-    const fogDen = H ? H.fogDensity : def.fog.density;
-    scene.fog = new THREE.FogExp2(H ? new THREE.Color().setRGB(...H.horizon) : def.fog.color, fogDen);
-    const sunCol = new THREE.Color().setHSL(0.1, 0.5, def.sun.elevation < 25 ? 0.78 : 0.92);
-    const sun = new THREE.DirectionalLight(sunCol, def.sun.elevation < 25 ? 2.8 : 3.3); sun.castShadow = true;
-    if (H) { const e = H.sunE; const m = Math.max(...e); sun.color.setRGB(e[0] / m, e[1] / m, e[2] / m); sun.intensity = m; }
-    const sm = quality === 'low' ? 1024 : quality === 'high' ? 4096 : 2048; sun.shadow.mapSize.set(sm, sm);
-    const S = quality === 'high' ? 95 : 110; this.shadowS = S; this.shadowTexel = (2 * S) / sm;
-    Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 800 });
-    sun.shadow.bias = -0.00025; sun.shadow.normalBias = this.shadowTexel * 1.6; if (H && H.overcast) sun.shadow.radius = 6; else sun.shadow.radius = 2;
-    scene.add(sun); scene.add(sun.target); this.sun = sun;
-    // v5: far shadows beyond the near frustum (Medium/High). Same direction as the sun, zero intensity: it only
-    // provides a wide, low-res shadow map that atmos.js blends in where the near map ends. Throttled re-render.
+  constructor(scene, mapId, quality = 'high') {
+    this.scene = scene; this.quality = quality;
+    const def = MAP_BY_ID[mapId] || MAP_BY_ID.kharkov;
+    this.def = def;
+    const mb = new MapBuilder(def, quality); this.mb = mb;
+    this.terrain = mb.t; this.playHalf = mb.t.half;
+    this.colliders = []; this.baseMarkers = []; this.capturePoints = [];
+    setTexQuality(quality === 'low' ? 0.5 : quality === 'medium' ? 0.75 : 1);
+    const mat = terrainMaterial(def);
+    this.terrainMesh = buildTerrainMeshes(mb, mat, quality === 'low' ? 2 : 1); scene.add(this.terrainMesh);
+    this.farTerrain = buildFarTerrain(mb, mat); scene.add(this.farTerrain);
+    const hTex = heightTexture(mb.t);
+    const wMat = waterMaterial(hTex, mb.t, def);
+    this.water = buildWater(mb, wMat); scene.add(this.water);
+    this.veg = new Vegetation(mb, quality); scene.add(this.veg.root);
+    this.grass = new Grass(mb, quality); scene.add(this.grass.root);
+    buildStructures(mb, this);
+    // sun
+    const sunDir = new THREE.Vector3(0.4, 0.55, 0.25).normalize(); this.sunDir = sunDir;
+    const sun = new THREE.DirectionalLight(0xfff4e0, 2.2); sun.castShadow = true;
+    sun.shadow.mapSize.set(quality === 'high' ? 4096 : quality === 'medium' ? 2048 : 1024, quality === 'high' ? 4096 : quality === 'medium' ? 2048 : 1024);
+    sun.shadow.camera.near = 1; sun.shadow.camera.far = 800; sun.shadow.camera.left = -120; sun.shadow.camera.right = 120; sun.shadow.camera.top = 120; sun.shadow.camera.bottom = -120;
+    sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02; scene.add(sun); scene.add(sun.target); this.sun = sun;
+    this.shadowTexel = 240 / (sun.shadow.mapSize.x);
+    // far sun for distant shadows
     if (quality !== 'low') {
-      const fs = new THREE.DirectionalLight(0xffffff, 0); fs.castShadow = true; const fm = quality === 'high' ? 2048 : 1024; const FS = 380;
-      fs.shadow.mapSize.set(fm, fm); Object.assign(fs.shadow.camera, { left: -FS, right: FS, top: FS, bottom: -FS, near: 10, far: 1400 });
-      this.farTexel = (2 * FS) / fm; fs.shadow.bias = -0.0006; fs.shadow.normalBias = this.farTexel * 1.4; fs.shadow.radius = 1; fs.shadow.autoUpdate = false; fs.shadow.needsUpdate = true;
-      scene.add(fs); scene.add(fs.target); this.farSun = fs; this._farFrame = 0; this._farAt = null;
+      const fs = new THREE.DirectionalLight(0xfff4e0, 1.4); fs.castShadow = true;
+      fs.shadow.mapSize.set(quality === 'high' ? 2048 : 1024, quality === 'high' ? 2048 : 1024);
+      fs.shadow.camera.near = 1; fs.shadow.camera.far = 1400; fs.shadow.camera.left = -280; fs.shadow.camera.right = 280; fs.shadow.camera.top = 280; fs.shadow.camera.bottom = -280;
+      fs.shadow.bias = -0.001; fs.shadow.normalBias = 0.04; scene.add(fs); scene.add(fs.target); this.farSun = fs; this._farFrame = 0; this._farAt = null;
+      this.farTexel = 560 / fs.shadow.mapSize.x;
     }
-    // v5: exponential height fog (atmos.js) -- haze settles in low ground; base = 30th-percentile terrain height
-    { const hf = (H && H.heightFog) || [0.03, 0.5]; const hs = []; const th = mb.t.h; for (let i = 0; i < th.length; i += 97) hs.push(th[i]); hs.sort((a, b) => a - b);
-      heightFog.x = quality === 'low' ? hf[0] * 0.8 : hf[0]; heightFog.y = hs[Math.floor(hs.length * 0.3)]; heightFog.z = hf[1]; scene.fog.density *= hf[2] || 1.2; }
-    sunU.uSunDir.value.copy(this.sunDir); sunU.uSunCol.value.copy(sun.color).multiplyScalar(sun.intensity);
-    const hemi = new THREE.HemisphereLight(0xbfd4ff, new THREE.Color(...def.farColor).multiplyScalar(1.2), 0.7); scene.add(hemi); this.hemi = hemi;
-    this.hdrLoaded = !H; this.exposure = H ? H.exposure : null;
-    if (H) this._loadHdri(renderer, H, quality);
-    // terrain
-    const tmat = terrainMaterial(def); this.terrainMat = tmat;
-    this.terrainGroup = buildTerrainMeshes(mb, tmat, quality === 'low' ? 2 : 1); scene.add(this.terrainGroup);
-    this.far = buildFarTerrain(mb, tmat); scene.add(this.far);
-    this.hTex = heightTexture(mb.t); this.waterMat = waterMaterial(this.hTex, mb.t, def); this.water = buildWater(mb, this.waterMat); scene.add(this.water);
-    // structures and vegetation
-    const st = buildStructures(mb, scene, mb.t); this.colliders = st.colliders; this.decks = st.decks || [];
-    this.colGrid = new Grid2D(mb.t.half, 24); for (const c of this.colliders) this.colGrid.insert(c, c.x, c.z, c.r);
-    this.veg = new Vegetation(scene, mb, quality);
-    this.grass = new Grass(scene, mb, quality, windUniform);
-    this.bases = mb.bases; this.lanes = mb.lanes; this.playHalf = mb.play;
-    this.stats = { trees: mb.trees.length, bushes: mb.bushes.length, buildings: mb.buildings.length, rocks: mb.rocks.length, walls: mb.walls.length, bridges: mb.bridges.length };
-    // base flags
-    this.baseMarkers = [];
-    for (let i = 0; i < this.bases.length; i++) {
-      const b = this.bases[i]; const y = this.terrain.height(b.x, b.z);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(b.r - 1.2, b.r, 96), new THREE.MeshBasicMaterial({ color: i === 0 ? 0x3fa34d : 0xc0392b, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
-      ring.rotation.x = -Math.PI / 2; ring.position.set(b.x, y + 0.4, b.z); ring.renderOrder = 2; scene.add(ring);
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 12, 8), new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.7, roughness: 0.4 })); pole.position.set(b.x, y + 6, b.z); pole.castShadow = true; scene.add(pole);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6, 8, 4), new THREE.MeshStandardMaterial({ color: i === 0 ? 0x3fa34d : 0xc0392b, side: THREE.DoubleSide, roughness: 0.9 })); flag.position.set(b.x + 1.3, y + 11, b.z); scene.add(flag);
+    // base markers
+    for (const b of mb.bases || []) {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(6, 7.2, 32), new THREE.MeshBasicMaterial({ color: b.team === 0 ? 0x3a7a3a : 0x7a3a3a, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2; ring.position.set(b.x, mb.t.height(b.x, b.z) + 0.05, b.z); scene.add(ring);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6, 8, 4), new THREE.MeshStandardMaterial({ color: b.team === 0 ? 0x4a8a4a : 0x8a4a4a, side: THREE.DoubleSide }));
+      flag.position.set(b.x, mb.t.height(b.x, b.z) + 4, b.z); scene.add(flag);
       this.baseMarkers.push({ ring, flag });
     }
   }
-  _loadHdri(renderer, H, quality) {
-    const res = quality === 'low' ? '1k' : '2k';
-    new RGBELoader().setDataType(THREE.FloatType).load(`./tex/${H.file}_${res}.hdr`, (tex) => {
-      if (this.disposed) { tex.dispose(); return; }
-      // clamp the sun disc: its energy is carried by the DirectionalLight (measured from this HDRI), so IBL must not count it twice
-      const d = tex.image.data; for (let i = 0; i < d.length; i += 4) { const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; if (l > 40) { const k = 40 / l; d[i] *= k; d[i + 1] *= k; d[i + 2] *= k; } }
-      // below the horizon puresky maps are a flat fill; tint it with the ground so the lower hemisphere bounces the right colour
-      const W = tex.image.width, Hh = tex.image.height, fc = this.def.farColor;
-      for (let y = Math.floor(Hh * 0.52); y < Hh; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; const g = 0.35 * (0.6 + 0.4 * (d[i] + d[i + 1] + d[i + 2]) / 3); d[i] = fc[0] * g * 2.0; d[i + 1] = fc[1] * g * 2.0; d[i + 2] = fc[2] * g * 2.0; }
-      tex.needsUpdate = true; tex.mapping = THREE.EquirectangularReflectionMapping;
-      const rt = this.pm.fromEquirectangular(tex); if (this.envRT) this.envRT.dispose(); this.envRT = rt;
-      this.scene.environment = rt.texture; this.scene.environmentIntensity = 1.0;
-      this.scene.background = tex; this.scene.backgroundIntensity = 1.0; this.bgTex = tex;
-      this.sky.visible = false; this.hemi.intensity = 0.0;
-      this.hdrLoaded = true;
-    });
-  }
-  // ground height including bridges (terrain already raised under roads)
-  groundHeight(x, z) { const t = this.terrain.height(x, z); const d = this.deckAt(x, z); return d > t ? d : t; }
-  // bridge deck surface height at (x,z) or -Infinity when not over a deck
-  deckAt(x, z) {
-    let best = -Infinity;
-    for (const d of this.decks) {
-      const bx = d.box; if (x < bx[0] || x > bx[1] || z < bx[2] || z > bx[3]) continue;
-      for (const sg of d.segs) {
-        const dx = x - sg.ax, dz = z - sg.az; const along = dx * sg.ux + dz * sg.uz; if (along < -0.3 || along > sg.l + 0.3) continue;
-        if (Math.abs(dx * sg.uz - dz * sg.ux) > d.hw + 0.3) continue;
-        const y = d.deckY(Math.max(0, Math.min(d.len, sg.s0 + along)) / d.len); if (y > best) best = y;
-      }
-    }
-    return best;
-  }
   updateShadowCenter(target) {
-    // stable shadows: snap the shadow centre to whole shadow-map texels in light space (no shimmering when moving)
     const s = this.sun; const L = this.sunDir; const ty0 = this.terrain.height(target.x, target.z);
     if (!this._lr) { this._lr = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), L).normalize(); this._lu = new THREE.Vector3().crossVectors(L, this._lr).normalize(); }
     const P = new THREE.Vector3(target.x, ty0, target.z); const tx_ = this.shadowTexel;
@@ -326,10 +255,10 @@ export class World {
     const C = this._lr.clone().multiplyScalar(a).addScaledVector(this._lu, b).addScaledVector(L, c);
     s.target.position.copy(C); s.position.copy(C).addScaledVector(L, 400); s.target.updateMatrixWorld();
     const f = this.farSun;
-    if (f) { // far map: re-render every 10 frames, or immediately after a big move; texel-snapped like the near map
+    if (f) {
       const ft = this.farTexel; const fa = Math.round(P.dot(this._lr) / ft) * ft, fb = Math.round(P.dot(this._lu) / ft) * ft;
       const moved = !this._farAt || Math.hypot(target.x - this._farAt.x, target.z - this._farAt.z) > 40;
-      if (moved || ++this._farFrame >= 10) {
+      if (moved || ++this._farFrame >= 20) {
         this._farFrame = 0; this._farAt = { x: target.x, z: target.z };
         const FC = this._lr.clone().multiplyScalar(fa).addScaledVector(this._lu, fb).addScaledVector(L, c);
         f.target.position.copy(FC); f.position.copy(FC).addScaledVector(L, 700); f.target.updateMatrixWorld(); f.updateMatrixWorld(); f.shadow.needsUpdate = true;
@@ -339,18 +268,8 @@ export class World {
   update(dt, time, camPos) {
     this.veg.updateLOD(camPos); this.veg.update(dt); this.grass.update(camPos);
     waterTime.value = time;
-    for (const b of this.baseMarkers) { const p = b.flag.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i) + 1.3; p.setZ(i, Math.sin(time * 4 + x * 2.2) * 0.12 * x); } p.needsUpdate = true; }
+    if ((this._flagFrame = (this._flagFrame || 0) + 1) % 3 === 0) for (const b of this.baseMarkers) { const p = b.flag.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i) + 1.3; p.setZ(i, Math.sin(time * 4 + x * 2.2) * 0.12 * x); } p.needsUpdate = true; }
   }
-  // line of sight blocked by terrain or structures? (eye -> target)
-  losBlocked(ax, ay, az, bx, by, bz) {
-    if (this.terrain.segmentHit(ax, ay, az, bx, by, bz, 4) >= 0) return true;
-    for (const c of this.colGrid.querySegment(ax, az, bx, bz)) if (c.kind !== 'prop' && c.segment(ax, ay, az, bx, by, bz) >= 0) return true;
-    return false;
-  }
-  // first structure hit along segment (t in 0..1) or -1
-  structureHit(ax, ay, az, bx, by, bz) {
-    let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz); if (t >= 0 && (best < 0 || t < best)) best = t; }
-    return best;
-  }
-  dispose() { this.disposed = true; heightFog.x = 0; if (this.bgTex) this.bgTex.dispose(); if (this.hTex) this.hTex.dispose(); this.grass.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
+  groundHeight(x, z) { return this.terrain.height(x, z); }
+  deckAt(x, z) { return -1e9; }
 }
