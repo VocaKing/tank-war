@@ -2,7 +2,6 @@
 import { TANKS, TANK_BY_ID, SHELL_TYPES, TIER_NAMES, sanitizeLoadout } from '../game/tankData.js';
 import { ITEMS, ITEM_IDS, ITEM_SLOTS, sanitizeItems, itemsKg, loadFactor, LOAD_AMPLIFY } from '../game/items.js';
 import { MAPS } from '../world/maps.js';
-import { CustomMode } from './customMode.js';
 
 const los = (a) => Math.round(a[0] / Math.cos((a[1] * Math.PI) / 180));
 export class Menu {
@@ -15,44 +14,33 @@ export class Menu {
   render() {
     this.root.innerHTML = `
       <div class="brand"><h1>STEEL FRONT</h1><span>3D Tank War · v3.0</span></div>
-      <div class="toolbar">
-        <button class="tbl-btn" id="m-custom">Custom Mode</button>
-        <button class="tbl-btn" id="m-armor">Armor Preview</button>
-        <button class="tbl-btn" id="m-table">Compare</button>
-      </div>
-      <div class="tanklist">
-        ${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}
-      </div>
+      <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}
+        <button class="tbl-btn" id="m-table">📊 Compare all tanks</button></div>
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
-        <div class="maps" id="m-maps" style="display:none">${MAPS.map((m) => `<button class="mcard" data-id="${m.id}"><b>${m.name}</b><small>${m.subtitle}</small></button>`).join('')}</div>
-        <div class="go">
-          <label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
-          <label class="aa-opt"><input type="checkbox" id="m-aa"> Aim assist</label>
-          <button class="tbl-btn lo-btn" id="m-lo-btn">Ammo & equipment</button>
-          <button class="battle" id="m-battle">BATTLE!</button>
-        </div>
+        <div class="maps">${MAPS.map((m) => `<button class="mcard" data-id="${m.id}"><b>${m.name}</b><small>${m.subtitle} · 1.2 × 1.2 km</small><p>${m.desc}</p></button>`).join('')}</div>
+        <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to soft-lock the camera on it; mouse input is dampened near the target, pull away firmly to break"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
+        <div class="mode">Team Battle · 7 vs 7 · Base capture · tier-matched</div><div class="losum" id="m-losum"></div><button class="tbl-btn lo-btn" id="m-lo-btn">🎒 Ammo & equipment</button><button class="battle" id="m-battle">BATTLE!</button></div>
       </div>
       <div class="overlay" id="m-tbl"></div><div class="overlay" id="m-lo"></div>`;
     this.root.querySelectorAll('.tcard').forEach((b) => (b.onclick = () => this.select(b.dataset.id)));
     this.root.querySelectorAll('.mcard').forEach((b) => (b.onclick = () => this.selectMap(b.dataset.id)));
-    this.root.querySelector('#m-battle').onclick = () => {
-      const maps = this.root.querySelector('#m-maps');
-      if (maps.style.display === 'none') { maps.style.display = 'flex'; this.root.querySelector('#m-battle').textContent = 'CONFIRM'; return; }
-      this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items(), aimAssist: localStorage.getItem('tw_aa') !== '0' });
-    };
-    this.custom = new CustomMode(this.root, (mods) => this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items(), aimAssist: localStorage.getItem('tw_aa') !== '0', custom: mods }));
-    this.root.querySelector('#m-custom').onclick = () => this.custom.show(this.tank);
-    this.root.querySelector('#m-armor').onclick = () => { if (this.garage && this.garage.setArmorMode) this.garage.setArmorMode(true); };
+    this.root.querySelector('#m-battle').onclick = () => this.onStart({ tankId: this.tank, mapId: this.map, quality: this.quality, loadout: this.loadout(), items: this.items(), aimAssist: localStorage.getItem('tw_aa') !== '0' });
     this.root.querySelector('#m-lo-btn').onclick = () => this.showLoadout(true);
     this.root.querySelector('#m-table').onclick = () => this.showTable(true);
     const q = this.root.querySelector('#m-q'); q.value = this.quality; q.onchange = () => { this.quality = q.value; localStorage.setItem('tw_q', this.quality); };
     const aa = this.root.querySelector('#m-aa'); aa.checked = localStorage.getItem('tw_aa') !== '0'; aa.onchange = () => localStorage.setItem('tw_aa', aa.checked ? '1' : '0');
   }
-  select(id) { this.tank = id; localStorage.setItem('tw_tank', id); const t = TANK_BY_ID[id]; if (this.garage && t) this.garage.show(t); this.root.querySelectorAll('.tcard').forEach((b) => b.classList.toggle('sel', b.dataset.id === id)); }
+  select(id) {
+    this.tank = id; localStorage.setItem('tw_tank', id); const t = TANK_BY_ID[id];
+    this.root.querySelectorAll('.tcard').forEach((b) => b.classList.toggle('sel', b.dataset.id === id));
+    if (this.garage) this.garage.show(t);
+    this.summary();
+  }
   selectMap(id) { this.map = id; localStorage.setItem('tw_map', id); this.root.querySelectorAll('.mcard').forEach((b) => b.classList.toggle('sel', b.dataset.id === id)); }
-  loadout() { return null; }
-  items() { return []; }
-  showLoadout() {}
-  showTable() {}
+  loadout() { return sanitizeLoadout(TANK_BY_ID[this.tank], null); }
+  items() { return sanitizeItems(null); }
+  summary() {}
+  showLoadout(v) {}
+  showTable(v) {}
 }
