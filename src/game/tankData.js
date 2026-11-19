@@ -1,6 +1,5 @@
 // Tank specifications with special abilities assigned
-// Sherman: small-caliber 12-round magazine, 0.4s intra, damage < 100, long full reload
-// M1A2: overpen (next 2 shells 1.5x pen, cooldown after firing both)
+// Overpen moved to T-34 for balance
 
 export const TANKS = [
   {
@@ -37,6 +36,7 @@ export const TANKS = [
     paint: { base: '#4b5631', camo: null, accent: '#3d4728', pattern: 'solid', fade: 18, rough: 0.8 },
     desc: 'Mass-produced Soviet medium tank with superbly sloped armor, wide tracks and an 85 mm ZiS-S-53. Agile, cramped, and hard-hitting.',
     scan: { cooldown: 25, maxTargets: 3, range: 380 },
+    overpen: { mult: 1.5, shots: 2, cooldown: 28 },
     magazine: { size: 4, intraReload: 1.3, fullReload: 14 },
   },
   {
@@ -56,7 +56,6 @@ export const TANKS = [
     desc: 'Modern US MBT: 1,500 hp gas turbine, DU composite armor, CITV hunter-killer sight with thermals, and the 120 mm M256 smoothbore. Fast in both directions.',
     magazine: { size: 3, intraReload: 1.4, fullReload: 12 },
     stabilize: { duration: 7, cooldown: 22 },
-    overpen: { mult: 1.5, shots: 2, cooldown: 25 },
   },
 ];
 
