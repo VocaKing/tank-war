@@ -1,4 +1,4 @@
-// Special abilities: magazine, scan, self-destruct, stabilize, overspeed
+// Special abilities: magazine, scan, self-destruct, stabilize, overspeed, overpen
 export class Abilities {
   constructor(tank) {
     this.tank = tank;
@@ -7,10 +7,12 @@ export class Abilities {
     this.selfDestruct = tank.spec.selfDestruct || null;
     this.stabilize = tank.spec.stabilize || null;
     this.overspeed = tank.spec.overspeed || null;
+    this.overpen = tank.spec.overpen || null;
     this.magLeft = this.magazine ? this.magazine.size : 0;
-    this.scanCd = 0; this.stabCd = 0; this.speedCd = 0;
+    this.scanCd = 0; this.stabCd = 0; this.speedCd = 0; this.overpenCd = 0;
     this.scanRevealed = [];
     this.stabUntil = 0; this.speedUntil = 0;
+    this.overpenLeft = 0;
   }
   canFire() {
     if (this.magazine) return this.magLeft > 0;
@@ -45,6 +47,17 @@ export class Abilities {
     this.stabCd = this.stabilize.cooldown;
     return true;
   }
+  tryOverpen() {
+    if (!this.overpen || this.overpenCd > 0 || this.overpenLeft > 0) return false;
+    this.overpenLeft = this.overpen.shots;
+    return true;
+  }
+  consumeOverpen() {
+    if (this.overpenLeft <= 0) return 1;
+    this.overpenLeft--;
+    if (this.overpenLeft === 0) this.overpenCd = this.overpen.cooldown || 20;
+    return this.overpen.mult;
+  }
   tryOverspeed() {
     if (!this.overspeed || this.speedCd > 0) return false;
     this.speedUntil = this.tank.game.time + this.overspeed.duration;
@@ -57,6 +70,7 @@ export class Abilities {
     if (this.scanCd > 0) this.scanCd -= dt;
     if (this.stabCd > 0) this.stabCd -= dt;
     if (this.speedCd > 0) this.speedCd -= dt;
+    if (this.overpenCd > 0) this.overpenCd -= dt;
     const now = this.tank.game.time;
     this.scanRevealed = this.scanRevealed.filter((r) => now < r.until);
   }
