@@ -220,7 +220,7 @@ export class Vegetation {
     this.playerBush = b;
     if (b) {
       setScale(b, false);
-      if (!this.ghostMats[b.type]) this.ghostMats[b.type] = this.mats[b.type].map((m) => { const c = m.clone(); c.transparent = true; c.opacity = 0.55; c.depthWrite = false; c.alphaTest = 0.3; return c; });
+      if (!this.ghostMats[b.type]) this.ghostMats[b.type] = this.mats[b.type].map((m) => { const c = m.clone(); c.transparent = true; c.opacity = 0.65; c.depthWrite = false; c.alphaTest = 0.15; return c; });
       const mesh = new THREE.Mesh(this.geos[b.type][0], this.ghostMats[b.type]); mesh.matrixAutoUpdate = false; mesh.matrix.copy(b.matrix); this.group.add(mesh); this.ghostBush = mesh;
     }
   }
