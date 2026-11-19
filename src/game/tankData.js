@@ -1,6 +1,4 @@
-// Tank specifications with special abilities assigned
-// Each tank has at most one special mechanism
-
+// Each tank has exactly one special ability
 export const TANKS = [
   {
     id: 'sherman', tier: 1, cls: 'Medium', name: 'M4A3E8 Sherman "Easy Eight"', short: 'M4A3E8', nation: 'USA', era: 'WWII', year: 1944,
@@ -16,7 +14,7 @@ export const TANKS = [
       { name: 'M42A1 HE', type: 'HE', caliber: 76, pen: 12, velocity: 800, damage: 95, count: 20 },
     ],
     paint: { base: '#4a4b2e', camo: null, accent: '#3a3b24', pattern: 'solid', fade: 16, rough: 0.78 },
-    desc: 'Late-war Sherman with the long 76 mm M1A2 gun, HVSS suspension and wet ammo stowage. Fast-firing and reliable, but thin side armor.',
+    desc: 'Late-war Sherman.',
     overspeed: { mult: 1.4, duration: 8, cooldown: 28 },
   },
   {
@@ -33,7 +31,7 @@ export const TANKS = [
       { name: 'O-365K HE', type: 'HE', caliber: 85, pen: 15, velocity: 793, damage: 290, count: 15 },
     ],
     paint: { base: '#4b5631', camo: null, accent: '#3d4728', pattern: 'solid', fade: 18, rough: 0.8 },
-    desc: 'Mass-produced Soviet medium tank with superbly sloped armor, wide tracks and an 85 mm ZiS-S-53. Agile, cramped, and hard-hitting.',
+    desc: 'T-34-85.',
     scan: { cooldown: 25, maxTargets: 3, range: 380 },
   },
   {
@@ -50,11 +48,10 @@ export const TANKS = [
       { name: 'M908 HE-OR-T', type: 'HE', caliber: 120, pen: 50, velocity: 1410, damage: 800, count: 8 },
     ],
     paint: { base: '#b5a07a', camo: null, accent: '#9c8963', pattern: 'solid', fade: 10, rough: 0.7 },
-    desc: 'Modern US MBT: 1,500 hp gas turbine, DU composite armor, CITV hunter-killer sight with thermals, and the 120 mm M256 smoothbore. Fast in both directions.',
+    desc: 'M1A2 Abrams.',
     stabilize: { duration: 7, cooldown: 22 },
   },
 ];
-
 export const TANK_BY_ID = Object.fromEntries(TANKS.map((t) => [t.id, t]));
 export function sanitizeLoadout(spec, loadout) { return loadout || spec.shells.map((s) => s.count); }
 export function npcLoadout(spec, r) { return spec.shells.map((s) => s.count); }
