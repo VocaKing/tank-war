@@ -41,9 +41,7 @@ export class Tank {
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
-  // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
   baseDispersion() { let d = this.spec.dispersion / 100; if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
-  // current dispersion-circle radius (radians); every shell lands inside this cone
   dispersion() { return this.baseDispersion() * this.bloom; }
   placeAt(x, z, heading) {
     this.pos.set(x, this.game.world.groundHeight(x, z), z); this.heading = heading; this.turretYaw = 0; this.updateGround(1, true); this.syncModel();
@@ -72,7 +70,7 @@ export class Tank {
     const od = this.equip.active('overdrive'); const lf = this.equip.factor;
     const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1);
     let target = mobile ? thr * vmax * slopeF * waterF * terrF : 0;
-    if (uphill > 0.75) target = Math.min(target, 0) - 0.5; // too steep: slide back
+    if (uphill > 0.75) target = Math.min(target, 0) - 0.5;
     const accel = clamp(ptw * 0.075, 0.6, 2.2) * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
     const braking = Math.sign(target) !== Math.sign(this.speed) || Math.abs(target) < Math.abs(this.speed);
     this.speed = approach(this.speed, target, (braking ? (mobile ? 3.0 : 6) : accel) * dt);
@@ -85,25 +83,44 @@ export class Tank {
     const nfx = Math.sin(this.heading), nfz = Math.cos(this.heading);
     const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += nfx * this.speed * dt; this.pos.z += nfz * this.speed * dt;
+    // inter-tank collision: heavier tanks can push lighter ones
+    for (const o of this.game.tanks) {
+      if (o === this || !o.alive) continue;
+      const dx = o.pos.x - this.pos.x, dz = o.pos.z - this.pos.z;
+      const dist = Math.hypot(dx, dz);
+      const minD = (this.spec.dims.W + o.spec.dims.W) * 0.48;
+      if (dist < minD && dist > 0.01) {
+        const push = (minD - dist) * 0.6;
+        const massR = this.spec.mass / (this.spec.mass + o.spec.mass);
+        const nx = dx / dist, nz = dz / dist;
+        o.pos.x += nx * push * (1 - massR);
+        o.pos.z += nz * push * (1 - massR);
+        this.pos.x -= nx * push * massR;
+        this.pos.z -= nz * push * massR;
+        const relV = this.speed - o.speed;
+        if (relV > 0.5 && this.spec.mass > o.spec.mass * 1.15) {
+          o.speed += relV * 0.25 * massR;
+          this.speed *= 0.92;
+        }
+      }
+    }
     // knock trees
     const kn = W.veg.knock(this.pos.x + nfx * d.L * 0.42, this.pos.z + nfz * d.L * 0.42, d.W * 0.5, nfx * Math.sign(this.speed), nfz * Math.sign(this.speed), this.speed);
     if (kn) { this.speed *= 0.82; if (this.isPlayer) this.game.audio.impact(this.pos, 'ground'); }
     this.vel.set((this.pos.x - ox) / Math.max(dt, 1e-4), 0, (this.pos.z - oz) / Math.max(dt, 1e-4));
-    // running gear animation
     const half = d.W / 2; updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
-    updateSuspension(this.model, dt, this.speed, this.pos.y); // v9 cosmetic hull heave
+    updateSuspension(this.model, dt, this.speed, this.pos.y);
     this.moved += Math.abs(this.speed) * dt;
     this.updateTurret(dt);
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
     this.recoil = Math.max(0, this.recoil - dt * 1.2);
-    // hull rocking spring (firing / braking)
     const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
     this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
   }
   updateTurret(dt) {
     const s = this.spec; const aim = this.input.aim; const gunW = this.model.gun.getWorldPosition(_v);
     const dx = aim.x - gunW.x, dy = aim.y - gunW.y, dz = aim.z - gunW.z; const R = Math.hypot(dx, dz);
-    if (!Number.isFinite(dx + dy + dz)) return; // ignore an invalid aim point instead of poisoning the turret state
+    if (!Number.isFinite(dx + dy + dz)) return;
     const th = ballisticAngle(this.shell.velocity, R, dy);
     _v2.set((dx / (R || 1)) * Math.cos(th), Math.sin(th), (dz / (R || 1)) * Math.cos(th));
     _q.copy(this.quat).invert(); _v2.applyQuaternion(_q);
@@ -114,8 +131,6 @@ export class Tank {
     this.gunPitch = approach(this.gunPitch, clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG), s.gunSpeed * DEG * dt);
     this.aimError = Math.abs(wrapAngle(yawT - this.turretYaw)) + Math.abs(clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG) - this.gunPitch);
     const stab = s.stabilizer; const aimT = this.aimTime();
-    // aim bloom: hull speed, hull rotation and turret traverse widen the circle (stabilisers damp it); it then
-    // shrinks back exponentially (≈95 % converged after aimTime seconds) while the tank holds still
     const disturb = 1 + Math.abs(this.speed) * 0.15 * stab + Math.abs(this.turnRate) * 1.5 * stab + this.yawRate * 2.0 * stab;
     if (disturb > this.bloom) this.bloom += (disturb - this.bloom) * Math.min(1, dt * 8);
     this.bloom = 1 + (this.bloom - 1) * Math.exp((-dt * 3.0) / aimT); this.bloom = Math.min(this.bloom, Tank.MAX_BLOOM);
@@ -142,7 +157,6 @@ export class Tank {
     if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
     const g = this.game; const sh = this.shell; const m = this.model;
     const muzzle = m.muzzle.getWorldPosition(_v3); const dir = _v4.set(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
-    // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
     const disp = this.dispersion(); const up = _v5.set(0, Math.abs(dir.y) < 0.95 ? 1 : 0, 0);
     const a = _v.copy(dir).cross(up).normalize(), b = _v2.copy(dir).cross(a).normalize();
     let gx = g.rng.gauss() / 2.2, gy = g.rng.gauss() / 2.2; const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
@@ -161,14 +175,11 @@ export class Tank {
     if (i === this.shellIdx || !this.spec.shells[i] || this.ammo[i] <= 0) return;
     this.shellIdx = i; this.reloadLeft = Math.max(this.reloadLeft, this.reloadTime() * (this.reloadLeft > 0 ? 1 : 0.85));
   }
-  // ----- hit testing -----
-  // segment (world) vs hull and turret boxes; returns {t, part, face, local, n}
   rayTest(a, b) {
     const la = _v.copy(a).applyMatrix4(this.inv), lb = _v2.copy(b).applyMatrix4(this.inv);
     let best = null;
     const hb = this.hullBox; const h = slab(la, lb, -hb.x, hb.x, hb.y0, hb.y1, -hb.z, hb.z);
     if (h) best = { t: h.t, part: 'hull', axis: h.axis, sign: h.sign };
-    // turret local
     const tp = this.model.turret.position; const c = Math.cos(this.turretYaw), s = Math.sin(this.turretYaw);
     const ta = new THREE.Vector3(la.x - tp.x, la.y - tp.y, la.z - tp.z), tb = new THREE.Vector3(lb.x - tp.x, lb.y - tp.y, lb.z - tp.z);
     const rot = (p) => { const x = p.x * c - p.z * s, z = p.x * s + p.z * c; p.x = x; p.z = z; return p; }; rot(ta); rot(tb);
@@ -178,10 +189,9 @@ export class Tank {
     const A = best.part === 'hull' ? la : ta, B = best.part === 'hull' ? lb : tb;
     best.local = new THREE.Vector3().lerpVectors(A, B, best.t); best.ldir = new THREE.Vector3().subVectors(B, A).normalize();
     best.face = best.axis === 1 ? (best.sign > 0 ? 'top' : 'bottom') : best.axis === 2 ? (best.sign > 0 ? 'front' : 'rear') : 'side'; best.sideSign = best.axis === 0 ? best.sign : 0;
-    best.wa = a; best.wb = b; this._lastRay = best; // v9: world segment, used only for cosmetic hit marks (see Game.lastTankHit)
+    best.wa = a; best.wb = b; this._lastRay = best;
     return best;
   }
-  // effective armour for a hit (from rayTest) and a shell; dist = shell travel
   armorAt(hit, shellSpec, typeInfo) {
     const A = this.spec.armor; const [arm, zone] = armorZone(this.spec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
     let n = _v3;
@@ -199,11 +209,9 @@ export class Tank {
     if (hullSide && hit.local.y < zoneLowerSideY(this.spec.dims)) { tracks = true; eff += 20; }
     const overmatch = shellSpec.caliber > tmm * 3;
     const ricochet = !typeInfo.he && angle > typeInfo.ricochet && !overmatch;
-    // world normal (for ricochet reflection)
     const nw = _v4.copy(n); if (hit.part === 'turret') nw.applyAxisAngle(_v5.set(0, 1, 0), this.turretYaw); nw.applyQuaternion(this.quat);
     return { eff, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
   }
-  // ----- damage -----
   damage(amount, attacker, cause) {
     if (!this.alive || amount <= 0) return;
     amount = Math.min(amount, this.hp); this.hp -= amount; this.stats.received += amount; this.lastDamagedAt = this.game.time;
@@ -218,7 +226,6 @@ export class Tank {
     g.effects.explosion(p, true); g.audio.impact(p, 'explosion');
     g.effects.addBurner(this.model.root, new THREE.Vector3(0, this.spec.dims.hullH + 0.3, -this.spec.dims.L * 0.25), 45, 1);
     if (cause === 'ammo') {
-      // turret blown off
       const t = this.model.turret; const wp = t.getWorldPosition(new THREE.Vector3()); const wq = t.getWorldQuaternion(new THREE.Quaternion());
       this.turretGone = true; g.scene.attach(t); t.position.copy(wp); t.quaternion.copy(wq);
       g.flying.push({ obj: t, v: new THREE.Vector3((Math.random() - 0.5) * 6, 14 + Math.random() * 8, (Math.random() - 0.5) * 6), w: new THREE.Vector3((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 4), t: 0 });
@@ -226,7 +233,6 @@ export class Tank {
     if (attacker && attacker !== this && attacker.team !== this.team) attacker.stats.kills++;
     g.onKill(attacker, this, cause);
   }
-  // apply a resolved hit (penetration or HE blast) with module & crew effects
   applyPenetration(hit, shellSpec, attacker, dmg) {
     const g = this.game; const r = g.rng; const msgs = [];
     const L = this.spec.dims.L; const lz = hit.local.z;
@@ -240,18 +246,20 @@ export class Tank {
       if ((hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
       if (this.spec.ammoRack.turretBustle && hit.face === 'rear' && r.next() < 0.4) { this.damage(this.hp + 1, attacker, 'ammo'); return ['AMMO RACK DETONATED']; }
     }
-    // crew casualties
-    const crewHit = r.next() < 0.35; if (crewHit) { const role = this.crew[r.int(0, this.crew.length - 1)]; if (role.alive) { role.alive = false; msgs.push(role.role + ' killed'); } }
     this.damage(dmg, attacker, 'pen');
     return msgs;
   }
-  breakTracks() { if (this.modules.tracks < 1) return; this.modules.tracks = 0; this.trackRepair = 8 + Math.random() * 6; if (this.isPlayer) this.game.hud.message('Tracks destroyed', '#ff8a80'); }
-  markHit(penetrated) { if (this._lastRay) addHitMark(this.model, this._lastRay.wa, this._lastRay.wb, penetrated); }
+  breakTracks() { this.modules.tracks = 0; this.trackRepair = 12 + Math.random() * 8; }
 }
-
 function slab(a, b, x0, x1, y0, y1, z0, z1) {
-  const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z; let tmin = 0, tmax = 1, axis = -1, sign = 0;
-  const clip = (o, d, lo, hi, ax) => { if (Math.abs(d) < 1e-9) return o >= lo && o <= hi; const t0 = (lo - o) / d, t1 = (hi - o) / d; const s = d > 0 ? 1 : -1; if (t0 > t1) { const t = t0; t0 = t1; t1 = t; } if (t0 > tmin) { tmin = t0; axis = ax; sign = s; } if (t1 < tmax) tmax = t1; return tmin <= tmax; };
-  if (!clip(a.x, dx, x0, x1, 0) || !clip(a.y, dy, y0, y1, 1) || !clip(a.z, dz, z0, z1, 2)) return null;
+  let tmin = 0, tmax = 1, axis = 0, sign = 1;
+  for (let i = 0; i < 3; i++) {
+    const d = b.getComponent(i) - a.getComponent(i), o = a.getComponent(i), min = i === 0 ? x0 : i === 1 ? y0 : z0, max = i === 0 ? x1 : i === 1 ? y1 : z1;
+    if (Math.abs(d) < 1e-9) { if (o < min || o > max) return null; continue; }
+    let t1 = (min - o) / d, t2 = (max - o) / d; let s = 1; if (t1 > t2) { [t1, t2] = [t2, t1]; s = -1; }
+    if (t1 > tmin) { tmin = t1; axis = i; sign = s; }
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return null;
+  }
   return { t: tmin, axis, sign };
 }
