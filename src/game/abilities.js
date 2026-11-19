@@ -18,6 +18,19 @@ export class Abilities {
     this.speedUntil = 0;
     this.overpenLeft = 0;
     this.scanRevealed = [];
+    this.resetForBattle();
+  }
+  // All active abilities are ready at match start — never spawn on cooldown
+  resetForBattle() {
+    this.scanCd = 0;
+    this.stabCd = 0;
+    this.speedCd = 0;
+    this.overpenCd = 0;
+    this.stabUntil = 0;
+    this.speedUntil = 0;
+    this.overpenLeft = 0;
+    this.scanRevealed = [];
+    if (this.magazine) this.magLeft = this.magazine.size;
   }
   get kind() {
     if (this.magazine) return 'magazine';
