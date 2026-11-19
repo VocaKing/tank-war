@@ -9,6 +9,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 33.7, power: 450, maxSpeed: 48, reverseSpeed: 12, hullTraverse: 32, turretTraverse: 24, gunSpeed: 5,
     gunDepression: 10, gunElevation: 25, hp: 900, viewRange: 380, reload: 6.0, aimTime: 2.2, dispersion: 0.44, stabilizer: 0.6,
+    overspeed: { mult: 1.45, duration: 8, cooldown: 30 },
     dims: { L: 5.9, W: 2.99, hullH: 1.9, clearance: 0.43, trackW: 0.58, turretZ: 0.35, turretL: 2.3, turretW: 2.0, turretH: 0.85, gunLen: 4.2 },
     armor: {
       hull: { front: [63.5, 47], side: [38, 0], rear: [38, 10], top: [19, 0], bottom: [13, 0] },
@@ -29,6 +30,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
     mass: 57, power: 700, maxSpeed: 40, reverseSpeed: 8, hullTraverse: 22, turretTraverse: 7, gunSpeed: 4,
     gunDepression: 8, gunElevation: 15, hp: 1300, viewRange: 400, reload: 8.5, aimTime: 2.3, dispersion: 0.4, stabilizer: 1.0,
+    selfDestruct: { radius: 18 },
     dims: { turretBoxZ: -0.15, L: 6.32, W: 3.56, hullH: 1.95, clearance: 0.47, trackW: 0.72, turretZ: 0.15, turretL: 2.95, turretW: 2.5, turretH: 0.85, gunLen: 5.0 },
     armor: {
       hull: { front: [100, 9], side: [80, 0], rear: [80, 9], top: [25, 0], bottom: [25, 0] },
@@ -49,6 +51,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 32, power: 500, maxSpeed: 54, reverseSpeed: 8, hullTraverse: 30, turretTraverse: 25, gunSpeed: 4,
     gunDepression: 5, gunElevation: 22, hp: 850, viewRange: 340, reload: 7.5, aimTime: 2.5, dispersion: 0.46, stabilizer: 1.0,
+    scan: { cooldown: 24, maxTargets: 3, range: 400 },
     dims: { L: 6.1, W: 3.0, hullH: 1.65, clearance: 0.4, trackW: 0.5, turretZ: 0.6, turretL: 2.45, turretW: 2.15, turretH: 0.85, gunLen: 4.65 },
     armor: {
       hull: { front: [45, 60], side: [45, 40], rear: [45, 45], top: [20, 0], bottom: [20, 0] },
@@ -69,6 +72,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 44.5, power: 840, maxSpeed: 60, reverseSpeed: 6, hullTraverse: 35, turretTraverse: 24, gunSpeed: 6,
     gunDepression: 6, gunElevation: 14, hp: 1500, viewRange: 420, reload: 7.1, aimTime: 2, dispersion: 0.35, stabilizer: 0.35,
+    magazine: { size: 4, intraReload: 1.2, fullReload: 9.5 },
     dims: { L: 6.86, W: 3.59, hullH: 1.5, clearance: 0.47, trackW: 0.58, turretZ: 0.35, turretL: 2.6, turretW: 2.3, turretH: 0.75, gunLen: 6.0 },
     armor: {
       // RHA-equivalent vs KE. Composite upper glacis (~200 mm LOS-adj @68°), cast turret w/ "super-Dorchester"-style insert.
@@ -90,6 +94,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62, power: 1500, maxSpeed: 67, reverseSpeed: 40, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 10, gunElevation: 20, hp: 1800, viewRange: 500, reload: 6.0, aimTime: 1.5, dispersion: 0.22, stabilizer: 0.2,
+    stabilize: { duration: 7, cooldown: 22 },
     dims: { turretBoxZ: -0.15, L: 7.93, W: 3.66, hullH: 1.55, clearance: 0.48, trackW: 0.64, turretZ: -0.25, turretL: 4.3, turretW: 3.4, turretH: 0.8, gunLen: 5.3 },
     armor: {
       // RHA-equivalent vs KE (DU-reinforced Chobham-type composite on frontal arc)
@@ -112,6 +117,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
     mass: 44.8, power: 700, maxSpeed: 46, reverseSpeed: 10, hullTraverse: 30, turretTraverse: 18, gunSpeed: 5,
     gunDepression: 8, gunElevation: 18, hp: 1150, viewRange: 400, reload: 7.0, aimTime: 2.3, dispersion: 0.41, stabilizer: 1.0,
+    overpen: { shots: 2, mult: 1.35, cooldown: 35 },
     dims: { L: 6.87, W: 3.42, hullH: 1.98, clearance: 0.56, trackW: 0.66, turretZ: 0.15, turretL: 2.6, turretW: 2.05, turretH: 0.85, gunLen: 5.6, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [80, 55], side: [50, 29], rear: [40, 30], top: [16, 0], bottom: [16, 0] },

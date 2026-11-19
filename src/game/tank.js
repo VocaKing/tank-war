@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
 import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
+import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
 
 export const GRAVITY = 9.81;
@@ -19,6 +20,7 @@ export class Tank {
   static MAX_BLOOM = 4.5;
   constructor(game, spec, team, name, isPlayer = false, loadout = null, items = null) {
     this.id = NEXT_ID++; this.game = game; this.spec = spec; this.team = team; this.name = name; this.isPlayer = isPlayer;
+    this.abilities = new Abilities(this);
     this.model = createTankModel(spec); game.scene.add(this.model.root);
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0; this.rock = 0; this.rockV = 0;
@@ -70,7 +72,7 @@ export class Tank {
     const ri = T.x2i(this.pos.x), rj = T.x2i(this.pos.z); const onRoad = T.inside(ri, rj) ? T.road[T.idx(ri, rj)] : 0;
     const terrF = 0.78 + 0.22 * Math.min(1, onRoad * 1.5);
     const od = this.equip.active('overdrive'); const lf = this.equip.factor;
-    const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1);
+    const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1) * (this.abilities ? this.abilities.speedMult : 1);
     let target = mobile ? thr * vmax * slopeF * waterF * terrF : 0;
     if (uphill > 0.75) target = Math.min(target, 0) - 0.5; // too steep: slide back
     const accel = clamp(ptw * 0.075, 0.6, 2.2) * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
@@ -94,6 +96,7 @@ export class Tank {
     this.moved += Math.abs(this.speed) * dt;
     this.updateTurret(dt);
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
+    if (this.abilities) this.abilities.update(dt);
     this.recoil = Math.max(0, this.recoil - dt * 1.2);
     // hull rocking spring (firing / braking)
     const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
@@ -118,6 +121,7 @@ export class Tank {
     const disturb = 1 + Math.abs(this.speed) * 0.15 * stab + Math.abs(this.turnRate) * 1.5 * stab + this.yawRate * 2.0 * stab;
     if (disturb > this.bloom) this.bloom += (disturb - this.bloom) * Math.min(1, dt * 8);
     this.bloom = 1 + (this.bloom - 1) * Math.exp((-dt * 3.0) / aimT); this.bloom = Math.min(this.bloom, Tank.MAX_BLOOM);
+    if (this.abilities && this.abilities.isStabilized) this.bloom = Math.min(this.bloom, 1.05);
   }
   updateGround(dt, snap = false) {
     const d = this.spec.dims, W = this.game.world; const T = { height: (x, z) => W.groundHeight(x, z) }; const fx = Math.sin(this.heading), fz = Math.cos(this.heading), rx = Math.cos(this.heading), rz = -Math.sin(this.heading);
@@ -148,14 +152,21 @@ export class Tank {
     this.lastDeviation = Math.hypot(gx, gy) * disp;
     dir.addScaledVector(a, Math.tan(gx * disp)).addScaledVector(b, Math.tan(gy * disp)).normalize();
     const vel = dir.clone().multiplyScalar(sh.velocity).add(this.vel);
-    g.ballistics.spawn(this, sh, muzzle, vel);
+    let fireShell = sh;
+    if (this.abilities && this.abilities.overpenLeft > 0) {
+      const mult = this.abilities.consumeOverpen();
+      fireShell = { ...sh, pen: Math.round(sh.pen * mult) };
+    }
+    g.ballistics.spawn(this, fireShell, muzzle, vel);
     this.ammo[this.shellIdx]--; this.reloadLeft = this.reloadTime(); this.lastFired = time; this.stats.shots++;
+    if (this.abilities) this.abilities.onFire();
     this.bloom = Math.min(Tank.MAX_BLOOM, this.bloom + 1.2 + 1.0 * this.spec.stabilizer); this.recoil = 1;
     this.rockV -= (sh.caliber / 100) * 1.4 * (40 / this.spec.mass) * Math.cos(this.turretYaw);
     g.effects.muzzle(muzzle, dir, sh.caliber); g.audio.gun(muzzle, sh.caliber, this.isPlayer);
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
     return true;
   }
+  tryAbility() { return this.abilities ? this.abilities.tryActivate() : false; }
   selectShell(i) {
     if (i === this.shellIdx || !this.spec.shells[i] || this.ammo[i] <= 0) return;
     this.shellIdx = i; this.reloadLeft = Math.max(this.reloadLeft, this.reloadTime() * (this.reloadLeft > 0 ? 1 : 0.85));

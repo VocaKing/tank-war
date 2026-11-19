@@ -120,6 +120,15 @@ export class AIController {
     this.think -= dt; this.repath -= dt;
     if (t.hp < this.lastHp) { this.lastHp = t.hp; this.recentlyHit = g.time; }
     if (this.think <= 0) {
+      // occasional ability use
+      if (this.t.abilities && this.t.abilities.ready && Math.random() < 0.15) {
+        const k = this.t.abilities.kind;
+        if (k === 'overspeed' && Math.abs(this.t.speed) > 1) this.t.tryAbility();
+        else if (k === 'stabilize' && this.target && this.t.pos.distanceTo(this.target.pos) < 600) this.t.tryAbility();
+        else if (k === 'scan' && !this.target) this.t.tryAbility();
+        else if (k === 'overpen' && this.target && this.bestRatio < 0.9) this.t.tryAbility();
+        else if (k === 'selfDestruct' && this.t.hp < this.t.maxHp * 0.25 && this.target && this.t.pos.distanceTo(this.target.pos) < 25) this.t.tryAbility();
+      }
       this.think = 0.25 + Math.random() * 0.1;
       this.chooseTarget(); this.strategicGoal();
       if (this.target) this.planShot();
