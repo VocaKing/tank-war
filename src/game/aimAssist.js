@@ -19,14 +19,14 @@ import * as THREE from 'three';
 import { clamp, DEG } from '../util.js';
 
 export const AIM_ASSIST = {
-  FOCUS_TOL_PX: 14,      // screen-space tolerance for focus when the ray just misses
-  ACQUIRE_TIME: 0.18,    // s of continuous focus before the lock engages
-  MANUAL_WINDOW: 1.5,    // the player must have moved the mouse within this many s (focus must be "manual")
-  DRAG_MIN: 0.42,        // mouse sensitivity multiplier right at the anchor (≈ 35-50 %)
-  BREAK_PX: 110,         // crosshair pushed this far (screen px) off the anchor → lock breaks
-  FAST_BREAK_PX: 140,    // raw mouse travel (device px) within FAST_WINDOW_MS that breaks the lock instantly
+  FOCUS_TOL_PX: 14,
+  ACQUIRE_TIME: 0.18,
+  MANUAL_WINDOW: 1.5,
+  DRAG_MIN: 0.42,
+  BREAK_PX: 110,
+  FAST_BREAK_PX: 140,
   FAST_WINDOW_MS: 90,
-  RELOCK_COOLDOWN: 1.2,  // s before the same target can be re-locked after a manual break
+  RELOCK_COOLDOWN: 1.2,
 };
 
 const _v = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -39,12 +39,11 @@ export class AimAssist {
     this.blocked = null; this.blockedUntil = 0; this.blockLeft = false; this.raw = []; this.lastBreak = null; this.stats = { locks: 0, breaks: 0 };
   }
   get locked() { return !!this.target; }
+  get sniperFocusBoost() { const g = this.g; return !!(g.cam.sniper && this.focus && this.validTarget(this.focus)); }
   setEnabled(v) { this.enabled = v; if (!v) this.release('off'); }
   pxPerRad() { const c = this.g.camera; return (innerHeight / 2) / Math.tan(c.fov * DEG / 2); }
   offPx() { return Math.hypot(this.off.yaw * Math.cos(this.g.cam.pitch), this.off.pitch) * this.pxPerRad(); }
   dragFactor() { return AIM_ASSIST.DRAG_MIN + (1 - AIM_ASSIST.DRAG_MIN) * smooth(0, AIM_ASSIST.BREAK_PX, this.offPx()); }
-  // mouse look entry point: returns the [dyaw, dpitch] the camera should actually apply (0,0 while locked: the offset
-  // is folded into the tracking instead)
   look(dx, dy, k) {
     const now = performance.now(); this.lastMouse = this.g.time; this.moved = true;
     if (!this.target) return [-dx * k, -dy * k];
@@ -65,18 +64,15 @@ export class AimAssist {
   release(reason) { if (this.target) this.lastRelease = reason; this.target = null; this.off.yaw = this.off.pitch = 0; this.raw.length = 0; }
   breakLock(reason) {
     const t = this.target; if (!t) return;
-    // keep the view exactly where the player pushed it
     this.blocked = t; this.blockedUntil = this.g.time + AIM_ASSIST.RELOCK_COOLDOWN; this.blockLeft = false;
     this.stats.breaks++; this.lastBreak = reason; this.release(reason); this.focusT = 0;
   }
   validTarget(t) { const g = this.g; return t && t.alive && t.team !== g.player.team && t.spotted[g.player.team] && t.model.root.visible; }
-  // before the camera update: steer cam.yaw/pitch so the view passes through the anchor (+ the player's drag offset)
   preCamera() {
     const g = this.g; const p = g.player;
     if (this.target && (!this.enabled || !p.alive || g.ended || !this.validTarget(this.target))) this.release(this.target && !this.target.alive ? 'dead' : 'lost');
     if (!this.target || g.lock || g.debugAim || g.camOverride) return;
     const P = this.anchorWorld(_v); const c = g.cam; const lo = c.sniper ? -0.35 : -0.9, hi = c.sniper ? 0.45 : 0.35;
-    // 2 fixed-point iterations of camPosFor (the chase camera position depends on the view direction)
     let yaw = c.yaw - this.off.yaw, pitch = c.pitch - this.off.pitch;
     for (let i = 0; i < 2; i++) {
       const pos = g.camPosFor(g.camDir(yaw + this.off.yaw, pitch + this.off.pitch), c.sniper); _d.copy(P).sub(pos); if (_d.lengthSq() < 1e-6) break; _d.normalize();
@@ -84,7 +80,6 @@ export class AimAssist {
     }
     c.yaw = yaw + this.off.yaw; c.pitch = clamp(pitch + this.off.pitch, lo, hi);
   }
-  // after computeAim: update focus, (re)anchor and acquisition
   postAim(dt) {
     const g = this.g; let f = null;
     if (g.player.alive && !g.debugAim) {
@@ -96,10 +91,21 @@ export class AimAssist {
     if (f !== this.focus) { this.focusT = 0; if (this.blocked && f !== this.blocked) this.blockLeft = true; }
     this.focus = f; this.focusT += dt;
     if (g.lock && this.target) this.release('gunlock');
+    // Auto-pull in sniper mode when enemy is close in view
+    if (g.cam.sniper && f && this.validTarget(f) && !this.target) {
+      const dist = f.pos.distanceTo(g.player.pos);
+      if (dist < 450 && this.focusT > 0.12) {
+        this.setAnchor(f, f.model.root.localToWorld(new THREE.Vector3(0, f.spec.dims.hullH * 0.62, 0)), 'hull');
+        this.off.yaw = this.off.pitch = 0;
+        this.stats.locks++;
+      }
+    }
     if (!this.enabled || g.lock) { this.moved = false; return; }
     if (this.target) {
-      // a small mouse move that keeps the crosshair on the tank picks a new weak spot
-      if (this.moved && g.aimTank === this.target && g.aimHit) { this.setAnchor(this.target, g.aimPoint, g.aimHit.part); this.off.yaw = this.off.pitch = 0; }
+      if (this.moved && g.aimTank === this.target && g.aimHit) {
+        this.setAnchor(this.target, g.aimPoint, g.aimHit.part);
+        this.off.yaw = this.off.pitch = 0;
+      }
     } else if (f && f !== g.lock && this.focusT >= AIM_ASSIST.ACQUIRE_TIME && g.time - this.lastMouse < AIM_ASSIST.MANUAL_WINDOW) {
       const blocked = f === this.blocked && g.time < this.blockedUntil && !this.blockLeft;
       if (!blocked) {
@@ -111,16 +117,18 @@ export class AimAssist {
     this.moved = false;
   }
   toleranceFocus() {
-    const g = this.g; const cam = g.camera; const o = cam.position; cam.getWorldDirection(_d); const ppr = this.pxPerRad(); let best = null, bestPx = AIM_ASSIST.FOCUS_TOL_PX;
+    const g = this.g; const cam = g.camera; const o = cam.position; cam.getWorldDirection(_d); const ppr = this.pxPerRad();
+    let best = null, bestPx = AIM_ASSIST.FOCUS_TOL_PX;
     for (const t of g.tanks) {
-      if (!this.validTarget(t)) continue; const d = t.spec.dims;
-      _v.set(0, (d.hullH + d.turretH) * 0.5, 0); t.model.root.localToWorld(_v); _v.sub(o); const dist = _v.length(); if (dist < 1) continue;
+      if (!this.validTarget(t)) continue;
+      const d = t.spec.dims; _v.set(0, (d.hullH + d.turretH) * 0.5, 0); t.model.root.localToWorld(_v); _v.sub(o);
+      const dist = _v.length(); if (dist < 1) continue;
       const cosA = clamp(_v.dot(_d) / dist, -1, 1); if (cosA <= 0) continue;
-      const rad = Math.max(d.W, d.hullH + d.turretH) * 0.5; // conservative: the narrow dimension
-      const px = (Math.acos(cosA) - Math.atan(rad / dist)) * ppr; if (px < bestPx) { bestPx = px; best = t; }
+      const rad = Math.max(d.W, d.hullH + d.turretH) * 0.5;
+      const px = (Math.acos(cosA) - Math.atan(rad / dist)) * ppr;
+      if (px < bestPx) { bestPx = px; best = t; }
     }
     return best;
   }
-  // the enemy that should carry the red outline (null = none)
   outlineTarget() { const t = this.focus; return this.validTarget(t) ? t : null; }
 }
