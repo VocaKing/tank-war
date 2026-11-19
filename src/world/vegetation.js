@@ -8,10 +8,7 @@ import { RNG } from '../util.js';
 
 export const windUniform = { value: 0 };
 export function setWindTime(t) { windUniform.value = t; }
-// v5: shared sun uniforms for leaf/blade translucency (set by World)
 export const sunU = { uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(3, 3, 3) } };
-// two-sided foliage lighting: keep the (spherical / up) normals on back faces instead of flipping them, and add
-// sub-surface translucency when looking towards the sun through leaves.
 export function foliageShading(sh, base = 0.05, back = 0.45, tipExpr = '1.0') {
   Object.assign(sh.uniforms, sunU);
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSunDir; uniform vec3 uSunCol;')
@@ -41,11 +38,9 @@ function foliageMaterial(tex, color = 0xffffff, sway = 1) {
   return m;
 }
 
-// --- geometry helpers ---
 function card(w, h, cx, cy, cz, yaw, pitch, center) {
   const g = new THREE.PlaneGeometry(w, h);
   g.rotateX(pitch); g.rotateY(yaw); g.translate(cx, cy, cz);
-  // spherical normals for soft volumetric shading
   const p = g.attributes.position, n = g.attributes.normal; const v = new THREE.Vector3();
   for (let i = 0; i < p.count; i++) { v.set(p.getX(i) - center.x, (p.getY(i) - center.y) * 0.8, p.getZ(i) - center.z).normalize(); n.setXYZ(i, v.x, v.y + 0.25, v.z); }
   return g;
@@ -104,7 +99,6 @@ function palmGeo(lod, r) {
   return withGroups(t, merge(fr));
 }
 function bushGeo(lod, r) {
-  // solid irregular core (blocks line of sight visually) + leaf cards
   let core = new THREE.IcosahedronGeometry(1, lod ? 2 : 3); core.deleteAttribute('uv'); core.deleteAttribute('normal'); core = mergeVertices(core); const p = core.attributes.position;
   const uvs = new Float32Array(p.count * 2);
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const n = 0.8 + 0.12 * Math.sin(x * 5.1 + z * 3.7) * Math.cos(y * 4.3) + 0.06 * Math.sin(x * 13 + y * 11); p.setXYZ(i, x * n * 0.92, Math.max(-0.1, y) * n * 0.82 + 0.12, z * n * 0.92); uvs[i * 2] = (Math.atan2(z, x) / Math.PI + 1) * 2; uvs[i * 2 + 1] = y * 2; }
@@ -114,15 +108,14 @@ function bushGeo(lod, r) {
     cards.push(card(s, s, cx, cy, cz, r.range(0, Math.PI), r.range(-0.9, 0.9), C)); }
   return withGroups(core, merge(cards));
 }
-// v4: several boulder shapes (layered noise, flattened base, strata facets) instead of one shared rock
 function rockGeo(r, v = 0) {
   const g = new THREE.IcosahedronGeometry(1, 3); const p = g.attributes.position;
   const f = [[3.1, 2.7, 3.3, 1.2, 0.7], [2.2, 3.6, 1.8, 1.0, 0.9], [4.0, 1.9, 2.6, 1.45, 0.55], [1.6, 2.2, 4.4, 1.1, 0.8]][v % 4]; const ph = v * 1.7 + 0.3;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     let n = 0.78 + 0.22 * Math.sin(x * f[0] + ph) * Math.sin(y * f[1] + 2 + ph) * Math.sin(z * f[2] + ph) + 0.1 * Math.sin(x * 9 + z * 7 + ph) + 0.05 * Math.sin(x * 17 - y * 13 + z * 11);
-    const strata = Math.round(y * 5) / 5; n *= 1 + (strata - y) * 0.12; // stepped bedding planes
-    let yy = y * n * f[4]; if (yy < -0.25) yy = -0.25 - (yy + 0.25) * 0.15; // flattened, ground-hugging base
+    const strata = Math.round(y * 5) / 5; n *= 1 + (strata - y) * 0.12;
+    let yy = y * n * f[4]; if (yy < -0.25) yy = -0.25 - (yy + 0.25) * 0.15;
     p.setXYZ(i, x * n * f[3], yy, z * n);
   }
   g.computeVertexNormals(); return g;
@@ -153,7 +146,6 @@ export class Vegetation {
     this.geos = {}; for (const k of Object.keys(TYPES)) this.geos[k] = [TYPES[k].geo(0, r), TYPES[k].geo(1, r)];
     this.rockMat = new THREE.MeshStandardMaterial({ map: pbrTex('aerial_rocks_02', 'diff'), normalMap: pbrTex('aerial_rocks_02', 'nor'), roughnessMap: pbrTex('aerial_rocks_02', 'arm'), aoMap: pbrTex('aerial_rocks_02', 'arm'), roughness: 1.0, color: mb.def.id === 'desert' ? 0xd2b48c : 0xaaa49a });
     this.rockGeos = [0, 1, 2, 3].map((v) => rockGeo(r, v));
-    // records
     this.trees = mb.trees.map((t, i) => ({ ...t, id: i, alive: true, fall: 0 }));
     this.bushes = mb.bushes.map((b, i) => ({ ...b, id: i }));
     this.rocks = mb.rocks;
@@ -176,7 +168,6 @@ export class Vegetation {
         ch.meshes[type] = pair; void key;
       }
     }
-    // rocks: single instanced mesh
     if (this.rocks.length) {
       const col = new THREE.Color(); this.rockMeshes = [];
       for (let vv = 0; vv < 4; vv++) {
@@ -187,7 +178,6 @@ export class Vegetation {
       }
       this.rockMesh = this.rockMeshes[0];
     }
-    // ghost bush for the one the player sits in (see-through from inside)
     this.ghostBush = null;
     this.ghostMats = {};
   }
@@ -202,7 +192,6 @@ export class Vegetation {
     for (const b of l) { const d = Math.hypot(b.x - x, b.z - z); if (d < b.r * 0.92 + pad && d < bd) { bd = d; best = b; } }
     return best;
   }
-  // tanks knock down trees they drive into
   knock(x, z, radius, dirX, dirZ, speed) {
     if (Math.abs(speed) < 0.6) return 0; let n = 0;
     for (const t of this.treeGrid.query(x, z, radius + 1)) {
@@ -223,7 +212,6 @@ export class Vegetation {
       if (t.fall >= 1) this.falling.splice(i, 1);
     }
   }
-  // hide the instance the player is inside and show a translucent copy
   setPlayerBush(b) {
     if (this.playerBush === b) return;
     const setScale = (rec, show) => { for (const im of rec.chunk.meshes[rec.type]) { if (show) im.setMatrixAt(rec.idx, rec.matrix); else im.setMatrixAt(rec.idx, new THREE.Matrix4().makeScale(0, 0, 0)); im.instanceMatrix.needsUpdate = true; } };
@@ -232,7 +220,7 @@ export class Vegetation {
     this.playerBush = b;
     if (b) {
       setScale(b, false);
-      if (!this.ghostMats[b.type]) this.ghostMats[b.type] = this.mats[b.type].map((m) => { const c = m.clone(); c.transparent = true; c.opacity = 0.28; c.depthWrite = false; c.alphaTest = 0.3; return c; });
+      if (!this.ghostMats[b.type]) this.ghostMats[b.type] = this.mats[b.type].map((m) => { const c = m.clone(); c.transparent = true; c.opacity = 0.55; c.depthWrite = false; c.alphaTest = 0.3; return c; });
       const mesh = new THREE.Mesh(this.geos[b.type][0], this.ghostMats[b.type]); mesh.matrixAutoUpdate = false; mesh.matrix.copy(b.matrix); this.group.add(mesh); this.ghostBush = mesh;
     }
   }
