@@ -1,6 +1,6 @@
 // Tank specifications with special abilities assigned
-// Magazines can be assigned to multiple tanks with different sizes
-// Intra-magazine reload is <= 1.5 seconds
+// Sherman: small-caliber 12-round magazine, 0.4s intra, damage < 100, long full reload
+// M1A2: overpen (next 2 shells 1.5x pen, cooldown after firing both)
 
 export const TANKS = [
   {
@@ -12,14 +12,14 @@ export const TANKS = [
     armor: { hull: { front: [63.5, 47], side: [38, 0], rear: [38, 10], top: [19, 0], bottom: [13, 0] }, turret: { front: [89, 30], side: [63, 5], rear: [63, 0], top: [25, 0] }, lowerFront: [108, 35], lowerSide: [38, 0], mantlet: [140, 0], era: 0, heatMult: 1.0 },
     engineZone: 'rear', ammoRack: { zMin: -0.6, zMax: 1.4, yMax: 1.0, chance: 0.05 },
     shells: [
-      { name: 'M62 APCBC', type: 'APCBC', caliber: 76, pen: 116, velocity: 792, damage: 185, count: 45 },
-      { name: 'M93 HVAP', type: 'APCR', caliber: 76, pen: 208, velocity: 1036, damage: 165, count: 6 },
-      { name: 'M42A1 HE', type: 'HE', caliber: 76, pen: 12, velocity: 800, damage: 280, count: 20 },
+      { name: 'M62 APCBC', type: 'APCBC', caliber: 76, pen: 116, velocity: 792, damage: 85, count: 45 },
+      { name: 'M93 HVAP', type: 'APCR', caliber: 76, pen: 208, velocity: 1036, damage: 70, count: 6 },
+      { name: 'M42A1 HE', type: 'HE', caliber: 76, pen: 12, velocity: 800, damage: 95, count: 20 },
     ],
     paint: { base: '#4a4b2e', camo: null, accent: '#3a3b24', pattern: 'solid', fade: 16, rough: 0.78 },
     desc: 'Late-war Sherman with the long 76 mm M1A2 gun, HVSS suspension and wet ammo stowage. Fast-firing and reliable, but thin side armor.',
     overspeed: { mult: 1.4, duration: 8, cooldown: 28 },
-    magazine: { size: 2, intraReload: 1.2, fullReload: 9 },
+    magazine: { size: 12, intraReload: 0.4, fullReload: 18 },
   },
   {
     id: 't34', tier: 1, cls: 'Medium', name: 'T-34-85 (1944)', short: 'T-34-85', nation: 'USSR', era: 'WWII', year: 1944,
@@ -56,6 +56,7 @@ export const TANKS = [
     desc: 'Modern US MBT: 1,500 hp gas turbine, DU composite armor, CITV hunter-killer sight with thermals, and the 120 mm M256 smoothbore. Fast in both directions.',
     magazine: { size: 3, intraReload: 1.4, fullReload: 12 },
     stabilize: { duration: 7, cooldown: 22 },
+    overpen: { mult: 1.5, shots: 2, cooldown: 25 },
   },
 ];
 
