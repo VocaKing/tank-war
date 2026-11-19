@@ -2,7 +2,6 @@
 import * as THREE from 'three';
 import { createTankModel } from '../models/tankModel.js';
 import { clamp, DEG, approach, approachAngle, wrapAngle } from '../util.js';
-import { effectiveArmor } from './armor.js';
 import { Equipment } from './items.js';
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -42,7 +41,6 @@ export class Tank {
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
     this.gunPitch = approach(this.gunPitch, clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG), s.gunSpeed * DEG * dt);
     this.aimError = Math.abs(wrapAngle(yawT - this.turretYaw)) + Math.abs(clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG) - this.gunPitch);
-    // Moving dispersion is tank-type dependent, not speed-dependent
     const stationary = this.spec.dispersion || 0.35;
     const moving = this.spec.movingDispersion || (stationary * 2.4);
     const aimT = this.aimTime();
@@ -53,5 +51,9 @@ export class Tank {
     else if (this.bloom < targetDisp) this.bloom = Math.min(targetDisp, this.bloom + aimSpeed * dt);
     this.bloom = Math.max(stationary * 0.8, Math.min(this.bloom, moving * 1.15));
   }
-  // remaining methods (updateGround, syncModel, fire, update, damage, etc.) preserved
+  updateGround(dt, snap = false) {}
+  syncModel() {}
+  fire() {}
+  update(dt) {}
+  damage() {}
 }
