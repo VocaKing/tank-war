@@ -9,7 +9,6 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 33.7, power: 450, maxSpeed: 48, reverseSpeed: 12, hullTraverse: 32, turretTraverse: 24, gunSpeed: 5,
     gunDepression: 10, gunElevation: 25, hp: 900, viewRange: 380, reload: 6.0, aimTime: 2.2, dispersion: 0.44, stabilizer: 0.6,
-    overspeed: { mult: 1.45, duration: 8, cooldown: 30 },
     dims: { L: 5.9, W: 2.99, hullH: 1.9, clearance: 0.43, trackW: 0.58, turretZ: 0.35, turretL: 2.3, turretW: 2.0, turretH: 0.85, gunLen: 4.2 },
     armor: {
       hull: { front: [63.5, 47], side: [38, 0], rear: [38, 10], top: [19, 0], bottom: [13, 0] },
@@ -278,6 +277,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 55, power: 1500, maxSpeed: 70, reverseSpeed: 32, hullTraverse: 40, turretTraverse: 40, gunSpeed: 7,
     gunDepression: 6, gunElevation: 16, hp: 1750, viewRange: 490, reload: 6.5, aimTime: 1.6, dispersion: 0.24, stabilizer: 0.15,
+    overspeed: { mult: 1.45, duration: 8, cooldown: 30 },
     dims: { L: 7.6, W: 3.5, hullH: 1.55, clearance: 0.48, trackW: 0.6, turretZ: -0.1, turretL: 3.6, turretW: 3.3, turretH: 0.75, gunLen: 6.2, turretBoxZ: -0.1 },
     armor: {
       hull: { front: [230, 68], side: [80, 0], rear: [40, 0], top: [40, 0], bottom: [20, 0] },
