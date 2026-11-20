@@ -40,7 +40,7 @@ export class Menu {
     let ban = this.root.querySelector('#m-armor-ban');
     if (this.armorOn) {
       if (!ban) { ban = document.createElement('div'); ban.id = 'm-armor-ban'; ban.className = 'armor-ban'; this.root.appendChild(ban); }
-      ban.innerHTML = '<b>ARMOR PREVIEW</b> · primary shell · 100 m · head-on <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span><span class="lg n">no armor</span> <small>(' + n + ' parts)</small>';
+      const dbg = (this.garage.current && this.garage.current.userData && this.garage.current.userData._armorDebug) || ''; ban.innerHTML = '<b>ARMOR PREVIEW</b> · primary shell · 100 m · head-on <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span><span class="lg n">no armor</span> <small>(' + n + ' parts' + (dbg ? ' · ' + dbg : '') + ')</small>';
       ban.style.display = 'flex';
     } else if (ban) ban.style.display = 'none';
   }

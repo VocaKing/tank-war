@@ -54,16 +54,19 @@ export function applyArmorPreview(model, spec) {
   const A = spec.armor || {};
   model.userData._armorOrig = [];
   let n = 0;
-  model.root.traverse((o) => {
+  let total = 0, meshes = 0, keyed = 0;
+  const root = model.root || model;
+  if (!root || !root.traverse) { model.userData._armorCount = 0; return 0; }
+  root.traverse((o) => {
+    total++;
     if (!o.isMesh) return;
+    meshes++;
     if (o.userData.decal) return;
-    // Skip running gear — only armor plates.
     if (o === model.wheels || o === model.sprockets) return;
     if (model.tracks && model.tracks.includes(o)) return;
     if (model.links && model.links.includes(o)) return;
-    const key = o.userData.matKey;
-    if (key && key !== 'paint' && key !== 'metal' && key !== 'steel') return;
-    if (!key) return;
+    const key = o.userData.matKey || 'paint';
+    keyed++;
     let part = 'hull', face = 'front';
     try { ({ part, face } = zoneOf(o, model)); } catch (e) { /* keep defaults */ }
     const plate = (A[part] && A[part][face]) || A.hull?.front || [0, 0];
@@ -76,6 +79,7 @@ export function applyArmorPreview(model, spec) {
   });
   model.userData._armorApplied = n > 0;
   model.userData._armorCount = n;
+  model.userData._armorDebug = total + '/' + meshes + '/' + keyed;
   model.userData._armorShell = shell.name;
   return n;
 }
