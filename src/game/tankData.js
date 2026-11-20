@@ -32,9 +32,9 @@ export const TANKS = [
     selfDestruct: { radius: 18 },
     dims: { turretBoxZ: -0.15, L: 7.4, W: 4.1, hullH: 1.95, clearance: 0.47, trackW: 0.72, turretZ: 0.15, turretL: 2.95, turretW: 2.5, turretH: 0.85, gunLen: 5.0 },
     armor: {
-      hull: { front: [480, 9], side: [140, 0], rear: [80, 9], top: [25, 0], bottom: [25, 0] },
+      hull: { front: [520, 9], side: [140, 0], rear: [80, 9], top: [16, 0], bottom: [25, 0] },
       turret: { front: [520, 0], side: [150, 0], rear: [80, 0], top: [25, 0] },
-      lowerFront: [100, 24], lowerSide: [60, 0], mantlet: [145, 0], era: 0, heatMult: 1.0,
+      lowerFront: [200, 24], lowerSide: [60, 0], mantlet: [180, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -1.2, zMax: 1.2, yMax: 1.5, chance: 0.06 },
     shells: [
@@ -81,8 +81,8 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: -0.7, zMax: 1.4, yMax: 0.85, chance: 0.18 },
     shells: [
-      { name: '3BM42 "Mango" APFSDS', type: 'APFSDS', caliber: 125, pen: 520, velocity: 1700, damage: 400, count: 22 },
-      { name: '3BK18M HEAT', type: 'HEAT', caliber: 125, pen: 550, velocity: 905, damage: 450, count: 12 },
+      { name: '3BM42 "Mango" APFSDS', type: 'APFSDS', caliber: 125, pen: 300, velocity: 1700, damage: 400, count: 22 },
+      { name: '3BK18M HEAT', type: 'HEAT', caliber: 125, pen: 280, velocity: 905, damage: 450, count: 12 },
       { name: '3OF26 HE-FRAG', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 10 },
     ],
     paint: { base: '#4f5a37', camo: ['#2e2f22', '#7a6c46'], accent: '#3e472b' },
@@ -103,8 +103,8 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: -2.6, zMax: -1.4, yMax: 9, chance: 0.0, turretBustle: true },
     shells: [
-      { name: 'M829A3 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 760, velocity: 1555, damage: 430, count: 22 },
-      { name: 'M830A1 HEAT-MP-T', type: 'HEAT', caliber: 120, pen: 600, velocity: 1410, damage: 460, count: 12 },
+      { name: 'M829A3 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 340, velocity: 1555, damage: 430, count: 22 },
+      { name: 'M830A1 HEAT-MP-T', type: 'HEAT', caliber: 120, pen: 300, velocity: 1410, damage: 460, count: 12 },
       { name: 'M908 HE-OR-T', type: 'HE', caliber: 120, pen: 50, velocity: 1410, damage: 520, count: 8 },
     ],
     paint: { base: '#b8a27a', camo: null, accent: '#9c8963' },
@@ -139,9 +139,9 @@ export const TANKS = [
     gunDepression: 3, gunElevation: 20, hp: 1700, viewRange: 360, reload: 20.0, aimTime: 2.8, dispersion: 0.52, stabilizer: 1.0,
     dims: { L: 7.8, W: 3.7, hullH: 2.1, clearance: 0.42, trackW: 0.65, turretZ: 0.55, turretL: 2.45, turretW: 2.25, turretH: 0.88, gunLen: 5.5, turretBoxZ: 0.05 },
     armor: {
-      hull: { front: [500, 60], side: [150, 15], rear: [60, 49], top: [30, 0], bottom: [20, 0] },
+      hull: { front: [540, 60], side: [150, 15], rear: [60, 49], top: [16, 0], bottom: [20, 0] },
       turret: { front: [540, 20], side: [160, 20], rear: [90, 30], top: [30, 0] },
-      lowerFront: [100, 30], lowerSide: [90, 0], mantlet: [160, 0], era: 0, heatMult: 1.0,
+      lowerFront: [210, 30], lowerSide: [90, 0], mantlet: [190, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -1.6, zMax: 0.8, yMax: 1.0, chance: 0.08 },
     shells: [
@@ -159,9 +159,9 @@ export const TANKS = [
     gunDepression: 10, gunElevation: 20, hp: 1450, viewRange: 390, reload: 10.0, aimTime: 2.5, dispersion: 0.48, stabilizer: 1.0,
     dims: { L: 7.3, W: 4.0, hullH: 2.05, clearance: 0.44, trackW: 0.61, turretZ: 0.3, turretL: 2.75, turretW: 2.35, turretH: 0.85, gunLen: 5.0, turretBoxZ: -0.05 },
     armor: {
-      hull: { front: [460, 46], side: [130, 0], rear: [51, 10], top: [22, 0], bottom: [13, 0] },
+      hull: { front: [500, 46], side: [130, 0], rear: [51, 10], top: [16, 0], bottom: [13, 0] },
       turret: { front: [500, 0], side: [140, 0], rear: [76, 0], top: [25, 0] },
-      lowerFront: [76, 53], lowerSide: [51, 0], mantlet: [114, 0], era: 0, heatMult: 1.0,
+      lowerFront: [190, 53], lowerSide: [51, 0], mantlet: [170, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -0.8, zMax: 1.2, yMax: 0.9, chance: 0.06 },
     shells: [
@@ -185,7 +185,7 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: -0.5, zMax: 2.2, yMax: 1.0, chance: 0.07 },
     shells: [
-      { name: '20 pdr APDS Mk 1', type: 'APDS', caliber: 84, pen: 330, velocity: 1465, damage: 400, count: 20 },
+      { name: '20 pdr APDS Mk 1', type: 'APDS', caliber: 84, pen: 220, velocity: 1465, damage: 400, count: 20 },
       { name: '20 pdr APCBC Mk 3', type: 'APCBC', caliber: 84, pen: 200, velocity: 1020, damage: 420, count: 30 },
       { name: '20 pdr HE Mk 3', type: 'HE', caliber: 84, pen: 20, velocity: 600, damage: 380, count: 15 },
     ],
@@ -205,8 +205,8 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: 0.5, zMax: 2.8, yMax: 1.0, chance: 0.1 },
     shells: [
-      { name: 'DM33 APFSDS-T', type: 'APFSDS', caliber: 105, pen: 420, velocity: 1455, damage: 330, count: 20 },
-      { name: 'DM12 HEAT-MP-T', type: 'HEAT', caliber: 105, pen: 400, velocity: 1174, damage: 360, count: 20 },
+      { name: 'DM33 APFSDS-T', type: 'APFSDS', caliber: 105, pen: 260, velocity: 1455, damage: 330, count: 20 },
+      { name: 'DM12 HEAT-MP-T', type: 'HEAT', caliber: 105, pen: 240, velocity: 1174, damage: 360, count: 20 },
       { name: 'DM512 HESH', type: 'HESH', caliber: 105, pen: 125, velocity: 730, damage: 440, count: 15 },
     ],
     paint: { base: '#4f5638', camo: ['#22231f', '#6a4a32'], accent: '#3e4430' },
@@ -225,8 +225,8 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: 1.4, zMax: 3.0, yMax: 1.0, chance: 0.0, turretBustle: true },
     shells: [
-      { name: 'DM53 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 750, velocity: 1750, damage: 800, count: 22 },
-      { name: 'DM12 HEAT-MP-T', type: 'HEAT', caliber: 120, pen: 620, velocity: 1140, damage: 470, count: 12 },
+      { name: 'DM53 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 340, velocity: 1750, damage: 800, count: 22 },
+      { name: 'DM12 HEAT-MP-T', type: 'HEAT', caliber: 120, pen: 300, velocity: 1140, damage: 470, count: 12 },
       { name: 'DM11 HE-T', type: 'HE', caliber: 120, pen: 60, velocity: 1100, damage: 520, count: 8 },
     ],
     paint: { base: '#4f5638', camo: ['#22231f', '#6a4a32'], accent: '#3e4430' },
@@ -245,8 +245,8 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: -0.8, zMax: 0.9, yMax: 0.75, chance: 0.15 },
     shells: [
-      { name: '3BM60 Svinets-2 APFSDS', type: 'APFSDS', caliber: 125, pen: 660, velocity: 1660, damage: 420, count: 22 },
-      { name: '3BK31 tandem HEAT', type: 'HEAT', caliber: 125, pen: 750, velocity: 905, damage: 460, count: 10 },
+      { name: '3BM60 Svinets-2 APFSDS', type: 'APFSDS', caliber: 125, pen: 330, velocity: 1660, damage: 420, count: 22 },
+      { name: '3BK31 tandem HEAT', type: 'HEAT', caliber: 125, pen: 310, velocity: 905, damage: 460, count: 10 },
       { name: '3OF26 HE-FRAG', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 10 },
     ],
     paint: { base: '#59613d', camo: ['#7a7552', '#30352a'], accent: '#454c30' },
@@ -265,9 +265,9 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: -0.5, zMax: 1.5, yMax: 0.9, chance: 0.05 },
     shells: [
-      { name: 'L27A1 CHARM 3 APFSDS', type: 'APFSDS', caliber: 120, pen: 650, velocity: 1650, damage: 430, count: 18 },
+      { name: 'L27A1 CHARM 3 APFSDS', type: 'APFSDS', caliber: 120, pen: 320, velocity: 1650, damage: 430, count: 18 },
       { name: 'L31A7 HESH', type: 'HESH', caliber: 120, pen: 170, velocity: 670, damage: 520, count: 12 },
-      { name: 'L23A1 APFSDS', type: 'APFSDS', caliber: 120, pen: 480, velocity: 1535, damage: 400, count: 10 },
+      { name: 'L23A1 APFSDS', type: 'APFSDS', caliber: 120, pen: 280, velocity: 1535, damage: 400, count: 10 },
     ],
     paint: { base: '#c2a77a', camo: null, accent: '#a88f63' },
     desc: 'British MBT with second-generation Chobham ("Dorchester") armor and the rifled 120 mm L30A1 – the only NATO tank still firing HESH. Exceptionally well protected.',
@@ -286,8 +286,8 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: -0.8, zMax: 0.9, yMax: 0.75, chance: 0.14 },
     shells: [
-      { name: 'DTW-125 II APFSDS', type: 'APFSDS', caliber: 125, pen: 700, velocity: 1780, damage: 420, count: 22 },
-      { name: 'DTP-125 HEAT', type: 'HEAT', caliber: 125, pen: 650, velocity: 900, damage: 460, count: 10 },
+      { name: 'DTW-125 II APFSDS', type: 'APFSDS', caliber: 125, pen: 330, velocity: 1780, damage: 420, count: 22 },
+      { name: 'DTP-125 HEAT', type: 'HEAT', caliber: 125, pen: 300, velocity: 900, damage: 460, count: 10 },
       { name: 'DTB-125 HE', type: 'HE', caliber: 125, pen: 40, velocity: 850, damage: 560, count: 8 },
     ],
     paint: { base: '#6b7046', camo: ['#3c4229', '#8c8a62'], accent: '#555a38', pattern: 'digital' },
@@ -306,8 +306,8 @@ export const TANKS = [
     },
     engineZone: 'front', ammoRack: { zMin: -3.6, zMax: -1.5, yMax: 1.0, chance: 0.06 },
     shells: [
-      { name: 'M338 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 650, velocity: 1700, damage: 430, count: 20 },
-      { name: 'M339 HEAT-MP', type: 'HEAT', caliber: 120, pen: 600, velocity: 1300, damage: 460, count: 12 },
+      { name: 'M338 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 320, velocity: 1700, damage: 430, count: 20 },
+      { name: 'M339 HEAT-MP', type: 'HEAT', caliber: 120, pen: 290, velocity: 1300, damage: 460, count: 12 },
       { name: 'M329 APAM HE', type: 'HE', caliber: 120, pen: 50, velocity: 1400, damage: 520, count: 10 },
     ],
     paint: { base: '#8d8a72', camo: null, accent: '#75725c' },
