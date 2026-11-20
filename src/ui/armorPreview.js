@@ -1,5 +1,5 @@
-// Garage armor preview: recolors the current tank with the same penetration palette
-// used in-battle. Primary kinetic shell, 100 m, head-on.
+// Garage armor preview: forces a plain material onto the tank so the pen colors are visible
+// even though the normal paint uses a custom camo shader.
 import * as THREE from 'three';
 import { SHELL_TYPES, PEN_RNG } from '../game/tankData.js';
 
@@ -35,40 +35,49 @@ function zoneOf(mesh, model) {
     if (p === model.turret || p === model.gun) { part = 'turret'; break; }
     p = p.parent;
   }
-  const box = new THREE.Box3().setFromObject(mesh);
-  const c = box.getCenter(new THREE.Vector3());
-  const local = (part === 'turret' ? model.turret : model.body).worldToLocal(c.clone());
+  // Use the mesh's own bounding box center in parent-local space (avoids world-matrix issues).
+  mesh.geometry.computeBoundingBox();
+  const bb = mesh.geometry.boundingBox;
+  const c = bb ? bb.getCenter(new THREE.Vector3()) : new THREE.Vector3();
   let face = 'side';
-  if (local.y > (part === 'turret' ? 0.4 : 1.4)) face = 'top';
-  else if (local.z > 0.4) face = 'front';
-  else if (local.z < -0.4) face = 'rear';
+  if (c.y > (part === 'turret' ? 0.35 : 1.3)) face = 'top';
+  else if (c.z > 0.3) face = 'front';
+  else if (c.z < -0.3) face = 'rear';
   return { part, face };
 }
 
 export function applyArmorPreview(model, spec) {
-  if (!model || !spec) return false;
-  if (model.userData._armorApplied) return true;
+  if (!model || !spec) return 0;
+  if (model.userData._armorApplied) return model.userData._armorCount || 1;
   const shell = (spec.shells || []).find((s) => !['HE', 'HESH'].includes(s.type)) || spec.shells?.[0];
-  if (!shell) return false;
+  if (!shell) return 0;
   const A = spec.armor || {};
   model.userData._armorOrig = [];
   let n = 0;
   model.root.traverse((o) => {
     if (!o.isMesh) return;
     if (o.userData.decal) return;
+    // Skip running gear — only armor plates.
+    if (o === model.wheels || o === model.sprockets) return;
+    if (model.tracks && model.tracks.includes(o)) return;
+    if (model.links && model.links.includes(o)) return;
     const key = o.userData.matKey;
     if (key && key !== 'paint' && key !== 'metal' && key !== 'steel') return;
-    if (!key && o !== model.wheels && o !== model.sprockets) return;
-    const { part, face } = zoneOf(o, model);
+    if (!key) return;
+    let part = 'hull', face = 'front';
+    try { ({ part, face } = zoneOf(o, model)); } catch (e) { /* keep defaults */ }
     const plate = (A[part] && A[part][face]) || A.hull?.front || [0, 0];
     const col = penColor(plate, shell);
     model.userData._armorOrig.push({ mesh: o, mat: o.material });
-    o.material = new THREE.MeshBasicMaterial({ color: col });
+    const mat = new THREE.MeshBasicMaterial({ color: col, toneMapped: false });
+    o.material = mat;
+    o.material.needsUpdate = true;
     n++;
   });
   model.userData._armorApplied = n > 0;
+  model.userData._armorCount = n;
   model.userData._armorShell = shell.name;
-  return n > 0;
+  return n;
 }
 
 export function clearArmorPreview(model) {
@@ -76,4 +85,5 @@ export function clearArmorPreview(model) {
   for (const { mesh, mat } of model.userData._armorOrig || []) if (mesh) mesh.material = mat;
   model.userData._armorOrig = [];
   model.userData._armorApplied = false;
+  model.userData._armorCount = 0;
 }
