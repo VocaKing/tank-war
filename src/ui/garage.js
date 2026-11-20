@@ -28,6 +28,26 @@ export class Garage {
     const rim = new THREE.DirectionalLight(0x9fb8ff, 1.2); rim.position.set(-8, 4, -6); this.scene.add(rim);
     this.scene.add(new THREE.HemisphereLight(0xcfd8e0, 0x2a2622, 0.5));
     const spot = new THREE.SpotLight(0xffe2b8, 40, 30, 0.6, 0.6); spot.position.set(0, 12, 0); spot.target = this.turntable; this.scene.add(spot);
+    this._bindDrag();
+  }
+  _bindDrag() {
+    const el = this.renderer.domElement;
+    const start = (e) => {
+      if (e.target !== el) return;
+      this.drag = { x: e.clientX, y: e.clientY, a: this.angle, h: this.hMul || 1 };
+      el.setPointerCapture?.(e.pointerId);
+    };
+    const move = (e) => {
+      if (!this.drag) return;
+      const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
+      this.angle = this.drag.a - dx * 0.008;
+      this.hMul = Math.max(0.45, Math.min(2.2, this.drag.h + dy * 0.004));
+    };
+    const end = () => { this.drag = null; };
+    el.addEventListener('pointerdown', start);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
   }
   show(spec) {
     if (!this.models[spec.id]) this.models[spec.id] = createTankModel(spec, { links: true });
