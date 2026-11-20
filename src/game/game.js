@@ -73,7 +73,7 @@ export class Game {
         const isPlayer = team === 0 && i === 0;
         const spec = TANK_BY_ID[id]; const lo = isPlayer ? sanitizeLoadout(spec, this.opts.loadout) : npcLoadout(spec, r); const items = isPlayer ? sanitizeItems(this.opts.items || DEFAULT_ITEMS) : (r.next() < 0.5 ? ['repair', 'extinguisher', 'medkit'] : r.next() < 0.5 ? ['repair', 'medkit', 'reload'] : ['repair', 'extinguisher', 'smoke']);
         const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer, lo, items);
-        let x = base.x + fx * 22 + px * (i - 3) * 13 + r.range(-2, 2), z = base.z + fz * 22 + pz * (i - 3) * 13 + r.range(-2, 2);
+        let x = base.x + fx * (18 + (i % 3) * 16) + px * ((i - 3) * 22 + r.range(-6, 6)) + r.range(-8, 8), z = base.z + fz * (18 + (i % 3) * 16) + pz * ((i - 3) * 22 + r.range(-6, 6)) + r.range(-8, 8);
         const [ci, cj] = this.nav.nearestWalkable(...this.nav.toCell(x, z)); [x, z] = this.nav.center(ci, cj);
         t.placeAt(x, z, Math.atan2(fx, fz)); t.input.aim.set(x + fx * 300, t.pos.y + 2, z + fz * 300);
         this.tanks.push(t);
@@ -255,7 +255,7 @@ export class Game {
       this.resolveStructures(t);
       for (const off of [-d.L * 0.3, 0, d.L * 0.3]) {
         const cx = t.pos.x + fx * off, cz = t.pos.z + fz * off;
-        for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) { if (rk.s < 1.6) continue; const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.85; if (dd < R && dd > 0.01) { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.95; } }
+        for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) { if (rk.s < 2.4) continue; const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.85; if (dd < R && dd > 0.01) { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.95; } }
       }
       const H = W.playHalf - 4; if (Math.abs(t.pos.x) > H) { t.pos.x = Math.sign(t.pos.x) * H; t.speed *= 0.8; } if (Math.abs(t.pos.z) > H) { t.pos.z = Math.sign(t.pos.z) * H; t.speed *= 0.8; }
     }

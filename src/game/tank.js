@@ -77,7 +77,7 @@ export class Tank {
     const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1) * (this.abilities ? this.abilities.speedMult : 1);
     let target = mobile ? thr * vmax * slopeF * waterF * terrF : 0;
     if (uphill > 0.75) target = Math.min(target, 0) - 0.5; // too steep: slide back
-    const accel = clamp(ptw * 0.075, 0.6, 2.2) * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
+    const light = s.cls === 'Light' ? 2.4 : 1; const accel = clamp(ptw * 0.075, 0.6, 2.2) * light * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
     const braking = Math.sign(target) !== Math.sign(this.speed) || Math.abs(target) < Math.abs(this.speed);
     this.speed = approach(this.speed, target, (braking ? (mobile ? 3.0 : 6) : accel) * dt);
     const vmaxF = (s.maxSpeed / 3.6) * lf;

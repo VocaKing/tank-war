@@ -7,7 +7,7 @@ export const TANKS = [
   {
     id: 'sherman', tier: 1, cls: 'Light', name: 'M4A3E8 Sherman "Easy Eight"', short: 'M4A3E8', nation: 'USA', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
-    mass: 33.7, power: 450, maxSpeed: 88, reverseSpeed: 22, hullTraverse: 48, turretTraverse: 38, gunSpeed: 7,
+    mass: 33.7, power: 900, maxSpeed: 88, reverseSpeed: 22, hullTraverse: 70, turretTraverse: 50, gunSpeed: 9,
     gunDepression: 10, gunElevation: 25, hp: 900, viewRange: 380, reload: 6.0, aimTime: 2.2, dispersion: 0.44, stabilizer: 0.6,
     dims: { L: 5.9, W: 2.99, hullH: 1.9, clearance: 0.43, trackW: 0.58, turretZ: 0.35, turretL: 2.3, turretW: 2.0, turretH: 0.85, gunLen: 4.2 },
     armor: {
@@ -48,7 +48,7 @@ export const TANKS = [
   {
     id: 't34', tier: 1, cls: 'Light', name: 'T-34-85 (1944)', short: 'T-34-85', nation: 'USSR', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
-    mass: 32, power: 500, maxSpeed: 96, reverseSpeed: 18, hullTraverse: 50, turretTraverse: 40, gunSpeed: 7,
+    mass: 32, power: 1000, maxSpeed: 96, reverseSpeed: 18, hullTraverse: 75, turretTraverse: 55, gunSpeed: 9,
     gunDepression: 5, gunElevation: 22, hp: 850, viewRange: 340, reload: 7.5, aimTime: 2.5, dispersion: 0.46, stabilizer: 1.0,
     scan: { cooldown: 24, maxTargets: 3, range: 400 },
     dims: { L: 6.1, W: 3.0, hullH: 1.65, clearance: 0.4, trackW: 0.5, turretZ: 0.6, turretL: 2.45, turretW: 2.15, turretH: 0.85, gunLen: 4.65 },
@@ -159,9 +159,9 @@ export const TANKS = [
     gunDepression: 10, gunElevation: 20, hp: 1450, viewRange: 390, reload: 10.0, aimTime: 2.5, dispersion: 0.48, stabilizer: 1.0,
     dims: { L: 7.3, W: 4.0, hullH: 2.05, clearance: 0.44, trackW: 0.61, turretZ: 0.3, turretL: 2.75, turretW: 2.35, turretH: 0.85, gunLen: 5.0, turretBoxZ: -0.05 },
     armor: {
-      hull: { front: [500, 46], side: [130, 0], rear: [51, 10], top: [16, 0], bottom: [13, 0] },
-      turret: { front: [500, 0], side: [140, 0], rear: [76, 0], top: [25, 0] },
-      lowerFront: [190, 53], lowerSide: [51, 0], mantlet: [170, 0], era: 0, heatMult: 1.0,
+      hull: { front: [520, 46], side: [280, 0], rear: [51, 10], top: [16, 0], bottom: [13, 0] },
+      turret: { front: [540, 0], side: [300, 0], rear: [76, 0], top: [25, 0] },
+      lowerFront: [360, 53], lowerSide: [200, 0], mantlet: [300, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -0.8, zMax: 1.2, yMax: 0.9, chance: 0.06 },
     shells: [
