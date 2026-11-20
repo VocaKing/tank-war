@@ -14,8 +14,8 @@ export class Menu {
   render() {
     this.root.innerHTML = `
       <div class="brand"><h1>STEEL FRONT</h1><span>3D Tank War · v3.0</span></div>
-      <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}
-        <button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
+      <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}</div>
+      <div class="menutools"><button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
         <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to soft-lock the camera on it; mouse input is dampened near the target, pull away firmly to break"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
