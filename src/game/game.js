@@ -255,7 +255,12 @@ export class Game {
       this.resolveStructures(t);
       for (const off of [-d.L * 0.3, 0, d.L * 0.3]) {
         const cx = t.pos.x + fx * off, cz = t.pos.z + fz * off;
-        for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) { if (rk.s < 2.4) continue; const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.85; if (dd < R && dd > 0.01) { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.95; } }
+        for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) {
+          const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.7;
+          if (dd >= R || dd < 0.01) continue;
+          if (rk.s < 2.4) { const lift = rk.s * 0.55 * (1 - dd / R); if (lift > (t._rockLift || 0)) t._rockLift = lift; t.speed *= 0.985; }
+          else { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.9; }
+        }
       }
       const H = W.playHalf - 4; if (Math.abs(t.pos.x) > H) { t.pos.x = Math.sign(t.pos.x) * H; t.speed *= 0.8; } if (Math.abs(t.pos.z) > H) { t.pos.z = Math.sign(t.pos.z) * H; t.speed *= 0.8; }
     }

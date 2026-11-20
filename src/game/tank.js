@@ -132,7 +132,7 @@ export class Tank {
     const hl = T.height(this.pos.x + rx * wx, this.pos.z + rz * wx), hr = T.height(this.pos.x - rx * wx, this.pos.z - rz * wx);
     const hc = T.height(this.pos.x, this.pos.z);
     const pitchT = -Math.atan2(hf - hb, lx * 2), rollT = Math.atan2(hl - hr, wx * 2);
-    const yT = Math.max((hf + hb) / 2, (hl + hr) / 2, hc) - 0.02;
+    const yT = Math.max((hf + hb) / 2, (hl + hr) / 2, hc) - 0.02 + (this._rockLift || 0); this._rockLift = 0;
     const k = snap ? 1 : Math.min(1, dt * 9);
     this.pitch += (pitchT - this.pitch) * k; this.roll += (rollT - this.roll) * k; this.groundY = yT;
     if (snap || yT > this.pos.y) this.pos.y = yT; else this.pos.y += (yT - this.pos.y) * Math.min(1, dt * 14);
