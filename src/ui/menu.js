@@ -33,15 +33,15 @@ export class Menu {
   }
   toggleArmor() {
     this.armorOn = !this.armorOn;
-    if (this.garage && this.garage.setArmorMode) this.garage.setArmorMode(this.armorOn);
+    try { if (this.garage && this.garage.setArmorMode) this.garage.setArmorMode(this.armorOn); } catch (e) { console.warn('armor preview', e); }
     const btn = this.root.querySelector('#m-armor');
-    if (btn) btn.classList.toggle('sel', this.armorOn);
-    const s = this.root.querySelector('#m-stats');
-    if (s && this.armorOn) {
-      let leg = s.querySelector('.armor-leg');
-      if (!leg) { leg = document.createElement('div'); leg.className = 'armor-leg'; s.appendChild(leg); }
-      leg.innerHTML = '<b>Armor Preview</b> · primary shell @ 100 m, head-on<br><span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span><span class="lg n">no armor</span>';
-    } else if (s) { const leg = s.querySelector('.armor-leg'); if (leg) leg.remove(); }
+    if (btn) { btn.classList.toggle('sel', this.armorOn); btn.textContent = this.armorOn ? '🛡️ Armor Preview ON' : '🛡️ Armor Preview'; }
+    let ban = this.root.querySelector('#m-armor-ban');
+    if (this.armorOn) {
+      if (!ban) { ban = document.createElement('div'); ban.id = 'm-armor-ban'; ban.className = 'armor-ban'; this.root.appendChild(ban); }
+      ban.innerHTML = '<b>ARMOR PREVIEW</b> · primary shell · 100 m · head-on <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span><span class="lg n">no armor</span>';
+      ban.style.display = 'flex';
+    } else if (ban) ban.style.display = 'none';
   }
   showMapSelect(v) {
     const o = this.root.querySelector('#m-maps'); if (!v) { o.style.display = 'none'; return; }

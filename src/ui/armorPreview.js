@@ -1,76 +1,79 @@
-// Garage armor preview: colors the current tank model with the same penetration palette
-// used in-battle (green = will pen, yellow = may pen, red = no pen / ricochet, grey = no armor).
-// Uses the tank's primary kinetic shell at 100 m, head-on. Does not modify model generation.
+// Garage armor preview: recolors the current tank with the same penetration palette
+// used in-battle. Primary kinetic shell, 100 m, head-on.
 import * as THREE from 'three';
 import { SHELL_TYPES, PEN_RNG } from '../game/tankData.js';
 
 const DEG = Math.PI / 180;
-const GREEN = new THREE.Color(0x3dbe55);
-const YELLOW = new THREE.Color(0xe3b54a);
-const ORANGE = new THREE.Color(0xe07a30);
-const RED = new THREE.Color(0xd0453a);
-const GREY = new THREE.Color(0x6a6e72);
+const C = {
+  g: new THREE.Color(0x2ecc40),
+  y: new THREE.Color(0xf1c40f),
+  o: new THREE.Color(0xe67e22),
+  r: new THREE.Color(0xe74c3c),
+  n: new THREE.Color(0x7f8c8d),
+};
 
-function los(th, slope) { return th / Math.max(0.08, Math.cos(slope * DEG)); }
+function los(th, slope) { return th / Math.max(0.08, Math.cos((slope || 0) * DEG)); }
 
-// Approximate penetration color for a plate against a shell at 100 m, 0° impact (head-on).
 export function penColor(plate, shell) {
-  if (!plate || !shell) return GREY;
-  const [th, slope] = plate;
-  if (!th || th <= 0) return GREY;
+  if (!plate || !shell) return C.n;
+  const th = plate[0];
+  if (!th || th <= 0) return C.n;
   const type = SHELL_TYPES[shell.type] || SHELL_TYPES.APCBC;
-  if (type.he && !type.heat && !type.hesh) return GREY;
-  const eff = los(th, slope || 0);
-  const pen = shell.pen;
-  const minPen = pen * (1 - PEN_RNG);
-  const maxPen = pen * (1 + PEN_RNG);
-  if (minPen >= eff) return GREEN;
-  if (maxPen < eff) return RED;
-  const t = (eff - minPen) / Math.max(1, maxPen - minPen);
-  return t < 0.5 ? YELLOW.clone().lerp(ORANGE, t * 2) : ORANGE.clone().lerp(RED, (t - 0.5) * 2);
+  if (type.he && !type.heat && !type.hesh) return C.n;
+  const eff = los(th, plate[1]);
+  const pen = shell.pen || 0;
+  const lo = pen * (1 - PEN_RNG), hi = pen * (1 + PEN_RNG);
+  if (lo >= eff) return C.g;
+  if (hi < eff) return C.r;
+  const t = (eff - lo) / Math.max(1, hi - lo);
+  return t < 0.5 ? C.y.clone().lerp(C.o, t * 2) : C.o.clone().lerp(C.r, (t - 0.5) * 2);
 }
 
-// Classify a mesh as hull/turret + face based on its local bounding box center.
-function classify(mesh, model) {
-  const isTurret = mesh.parent === model.turret || (mesh.parent && mesh.parent.parent === model.turret);
+function zoneOf(mesh, model) {
+  let p = mesh.parent, part = 'hull';
+  while (p) {
+    if (p === model.turret || p === model.gun) { part = 'turret'; break; }
+    p = p.parent;
+  }
   const box = new THREE.Box3().setFromObject(mesh);
   const c = box.getCenter(new THREE.Vector3());
-  // convert to the relevant local space
-  const local = isTurret ? model.turret.worldToLocal(c.clone()) : model.root.worldToLocal(c.clone());
-  const absX = Math.abs(local.x), y = local.y, z = local.z;
+  const local = (part === 'turret' ? model.turret : model.body).worldToLocal(c.clone());
   let face = 'side';
-  if (y > (isTurret ? 0.55 : 1.55)) face = 'top';
-  else if (z > 0.6) face = 'front';
-  else if (z < -0.6) face = 'rear';
-  else if (absX > 0.4) face = 'side';
-  else face = 'top';
-  return { part: isTurret ? 'turret' : 'hull', face };
+  if (local.y > (part === 'turret' ? 0.4 : 1.4)) face = 'top';
+  else if (local.z > 0.4) face = 'front';
+  else if (local.z < -0.4) face = 'rear';
+  return { part, face };
 }
 
 export function applyArmorPreview(model, spec) {
-  if (!model || !spec || model.userData._armorApplied) return;
-  const shell = (spec.shells || []).find((s) => s.type !== 'HE' && s.type !== 'HESH') || spec.shells?.[0];
-  if (!shell) return;
-  const A = spec.armor;
+  if (!model || !spec) return false;
+  if (model.userData._armorApplied) return true;
+  const shell = (spec.shells || []).find((s) => !['HE', 'HESH'].includes(s.type)) || spec.shells?.[0];
+  if (!shell) return false;
+  const A = spec.armor || {};
   model.userData._armorOrig = [];
+  let n = 0;
   model.root.traverse((o) => {
-    if (!o.isMesh || o.userData.decal) return;
+    if (!o.isMesh) return;
+    if (o.userData.decal) return;
     const key = o.userData.matKey;
-    if (key && key !== 'paint' && key !== 'metal') return;
-    const { part, face } = classify(o, model);
-    const plate = A[part]?.[face] || A.hull.front;
+    if (key && key !== 'paint' && key !== 'metal' && key !== 'steel') return;
+    if (!key && o !== model.wheels && o !== model.sprockets) return;
+    const { part, face } = zoneOf(o, model);
+    const plate = (A[part] && A[part][face]) || A.hull?.front || [0, 0];
     const col = penColor(plate, shell);
     model.userData._armorOrig.push({ mesh: o, mat: o.material });
-    const m = new THREE.MeshStandardMaterial({ color: col, roughness: 0.55, metalness: 0.15 });
-    o.material = m;
+    o.material = new THREE.MeshBasicMaterial({ color: col });
+    n++;
   });
-  model.userData._armorApplied = true;
+  model.userData._armorApplied = n > 0;
   model.userData._armorShell = shell.name;
+  return n > 0;
 }
 
 export function clearArmorPreview(model) {
   if (!model || !model.userData._armorApplied) return;
-  for (const { mesh, mat } of model.userData._armorOrig || []) mesh.material = mat;
+  for (const { mesh, mat } of model.userData._armorOrig || []) if (mesh) mesh.material = mat;
   model.userData._armorOrig = [];
   model.userData._armorApplied = false;
 }

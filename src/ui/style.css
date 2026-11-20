@@ -147,3 +147,10 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .armor-leg .lg.y{background:#e3b54a;color:#111}
 .armor-leg .lg.r{background:#d0453a;color:#fff}
 .armor-leg .lg.n{background:#6a6e72;color:#fff}
+
+.armor-ban{position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:40;display:none;align-items:center;gap:8px;background:rgba(12,14,16,.9);border:1px solid var(--acc);border-radius:6px;padding:8px 14px;font-size:13px;pointer-events:none}
+.armor-ban .lg{display:inline-block;padding:2px 8px;border-radius:3px;font-weight:700;margin-left:4px}
+.armor-ban .lg.g{background:#2ecc40;color:#111}
+.armor-ban .lg.y{background:#f1c40f;color:#111}
+.armor-ban .lg.r{background:#e74c3c;color:#fff}
+.armor-ban .lg.n{background:#7f8c8d;color:#fff}
