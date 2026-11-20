@@ -1,6 +1,5 @@
-// Garage armor preview: recolors the tank with penetration colors.
-// The model object from createTankModel is a plain {root, body, turret, ...}, not an Object3D,
-// so state is stored on model.root.userData.
+// Garage armor preview. Models merge all hull paint into one mesh (same for turret/gun),
+// so a per-mesh material can only be one color. We color vertices by local position instead.
 import * as THREE from 'three';
 import { SHELL_TYPES, PEN_RNG } from '../game/tankData.js';
 
@@ -30,20 +29,21 @@ export function penColor(plate, shell) {
   return t < 0.5 ? C.y.clone().lerp(C.o, t * 2) : C.o.clone().lerp(C.r, (t - 0.5) * 2);
 }
 
-function zoneOf(mesh, model) {
-  let p = mesh.parent, part = 'hull';
-  while (p) {
-    if (p === model.turret || p === model.gun) { part = 'turret'; break; }
-    p = p.parent;
+// Classify a vertex (local to the mesh, which is in hull or turret space) into a face.
+function faceOf(x, y, z, isTurret) {
+  const ax = Math.abs(x);
+  if (isTurret) {
+    if (y > 0.45) return 'top';
+    if (z > 0.25 && z >= ax) return 'front';
+    if (z < -0.2 && -z >= ax * 0.6) return 'rear';
+    return 'side';
   }
-  mesh.geometry.computeBoundingBox();
-  const bb = mesh.geometry.boundingBox;
-  const c = bb ? bb.getCenter(new THREE.Vector3()) : new THREE.Vector3();
-  let face = 'side';
-  if (c.y > (part === 'turret' ? 0.35 : 1.3)) face = 'top';
-  else if (c.z > 0.3) face = 'front';
-  else if (c.z < -0.3) face = 'rear';
-  return { part, face };
+  // hull: +z front, -z rear, high y top, large |x| side
+  if (y > 1.45) return 'top';
+  if (z > 0.4 && z > ax) return 'front';
+  if (z < -0.4 && -z > ax * 0.5) return 'rear';
+  if (ax > 0.6) return 'side';
+  return y > 1.0 ? 'top' : 'side';
 }
 
 export function applyArmorPreview(model, spec) {
@@ -53,27 +53,41 @@ export function applyArmorPreview(model, spec) {
   const shell = (spec.shells || []).find((s) => !['HE', 'HESH'].includes(s.type)) || spec.shells?.[0];
   if (!shell) return 0;
   const A = spec.armor || {};
+  const colors = {
+    hull: { front: penColor(A.hull?.front, shell), side: penColor(A.hull?.side, shell), rear: penColor(A.hull?.rear, shell), top: penColor(A.hull?.top, shell) },
+    turret: { front: penColor(A.turret?.front, shell), side: penColor(A.turret?.side, shell), rear: penColor(A.turret?.rear, shell), top: penColor(A.turret?.top, shell) },
+  };
   ud._armorOrig = [];
-  let n = 0;
+  let n = 0, verts = 0;
   model.root.traverse((o) => {
-    if (!o.isMesh) return;
-    if (o.userData.decal) return;
+    if (!o.isMesh || o.userData.decal) return;
     if (o === model.wheels || o === model.sprockets) return;
     if (model.tracks && model.tracks.includes(o)) return;
     if (model.links && model.links.includes(o)) return;
     const key = o.userData.matKey;
     if (key && key !== 'paint' && key !== 'metal' && key !== 'steel') return;
     if (!key) return;
-    let part = 'hull', face = 'front';
-    try { ({ part, face } = zoneOf(o, model)); } catch (e) { /* keep defaults */ }
-    const plate = (A[part] && A[part][face]) || A.hull?.front || [0, 0];
-    const col = penColor(plate, shell);
-    ud._armorOrig.push({ mesh: o, mat: o.material });
-    o.material = new THREE.MeshBasicMaterial({ color: col, toneMapped: false });
+    let isTurret = false, p = o.parent;
+    while (p) { if (p === model.turret || p === model.gun) { isTurret = true; break; } p = p.parent; }
+    const part = isTurret ? 'turret' : 'hull';
+    const pos = o.geometry.attributes.position;
+    if (!pos) return;
+    const arr = new Float32Array(pos.count * 3);
+    const pal = colors[part];
+    for (let i = 0; i < pos.count; i++) {
+      const face = faceOf(pos.getX(i), pos.getY(i), pos.getZ(i), isTurret);
+      const c = pal[face] || pal.front;
+      arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b;
+      verts++;
+    }
+    ud._armorOrig.push({ mesh: o, mat: o.material, colorAttr: o.geometry.getAttribute('color') });
+    o.geometry.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+    o.material = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
     n++;
   });
   ud._armorApplied = n > 0;
   ud._armorCount = n;
+  ud._armorVerts = verts;
   ud._armorShell = shell.name;
   return n;
 }
@@ -82,7 +96,12 @@ export function clearArmorPreview(model) {
   if (!model || !model.root) return;
   const ud = model.root.userData;
   if (!ud._armorApplied) return;
-  for (const { mesh, mat } of ud._armorOrig || []) if (mesh) mesh.material = mat;
+  for (const { mesh, mat, colorAttr } of ud._armorOrig || []) {
+    if (!mesh) continue;
+    mesh.material = mat;
+    if (colorAttr) mesh.geometry.setAttribute('color', colorAttr);
+    else mesh.geometry.deleteAttribute('color');
+  }
   ud._armorOrig = [];
   ud._armorApplied = false;
   ud._armorCount = 0;
