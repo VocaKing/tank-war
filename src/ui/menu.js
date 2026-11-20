@@ -33,15 +33,20 @@ export class Menu {
   }
   toggleArmor() {
     this.armorOn = !this.armorOn;
-    let n = 0;
-    try { if (this.garage && this.garage.setArmorMode) n = this.garage.setArmorMode(this.armorOn) || 0; } catch (e) { console.warn('armor preview', e); }
+    this.refreshArmor();
+  }
+  refreshArmor() {
+    let info = { n: 0, pen: 0 };
+    try { if (this.garage && this.garage.setArmorMode) info = this.garage.setArmorMode(this.armorOn, this.refPen) || info; } catch (e) { console.warn('armor preview', e); }
+    if (info && info.pen) this.refPen = info.pen;
     const btn = this.root.querySelector('#m-armor');
     if (btn) { btn.classList.toggle('sel', this.armorOn); btn.textContent = this.armorOn ? '🛡️ Armor Preview ON' : '🛡️ Armor Preview'; }
     let ban = this.root.querySelector('#m-armor-ban');
     if (this.armorOn) {
       if (!ban) { ban = document.createElement('div'); ban.id = 'm-armor-ban'; ban.className = 'armor-ban'; this.root.appendChild(ban); }
-      const dbg = (this.garage.current && this.garage.current.userData && this.garage.current.userData._armorDebug) || ''; ban.innerHTML = '<b>ARMOR PREVIEW</b> · primary shell · 100 m · head-on <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span><span class="lg n">no armor</span> <small>(' + n + ' parts' + (dbg ? ' · ' + dbg : '') + ')</small>';
+      ban.innerHTML = '<b>ARMOR PREVIEW</b> · vs ' + (this.refPen || '?') + ' mm <button data-d="-30">−</button><button data-d="30">+</button> <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span>';
       ban.style.display = 'flex';
+      ban.querySelectorAll('button').forEach((b) => (b.onclick = () => { this.refPen = Math.max(40, (this.refPen || 100) + +b.dataset.d); if (this.garage) this.garage.refPen = this.refPen; this.refreshArmor(); }));
     } else if (ban) ban.style.display = 'none';
   }
   showMapSelect(v) {

@@ -1,5 +1,6 @@
-// Garage armor preview. Models merge all hull paint into one mesh (same for turret/gun),
-// so a per-mesh material can only be one color. We color vertices by local position instead.
+// Garage armor preview. Models merge hull/turret paint into a few meshes, so we color
+// vertices by local normal + position. Reference pen is chosen so the hull front is
+// borderline (yellow); sides and rear then show as green, thick plates as red.
 import * as THREE from 'three';
 import { SHELL_TYPES, PEN_RNG } from '../game/tankData.js';
 
@@ -12,16 +13,10 @@ const C = {
   n: new THREE.Color(0x7f8c8d),
 };
 
-function los(th, slope) { return th / Math.max(0.08, Math.cos((slope || 0) * DEG)); }
+function los(th, slope) { return (th || 0) / Math.max(0.08, Math.cos((slope || 0) * DEG)); }
 
-export function penColor(plate, shell) {
-  if (!plate || !shell) return C.n;
-  const th = plate[0];
-  if (!th || th <= 0) return C.n;
-  const type = SHELL_TYPES[shell.type] || SHELL_TYPES.APCBC;
-  if (type.he && !type.heat && !type.hesh) return C.n;
-  const eff = los(th, plate[1]);
-  const pen = shell.pen || 0;
+export function penColorFor(eff, pen) {
+  if (!eff || eff <= 0) return C.n;
   const lo = pen * (1 - PEN_RNG), hi = pen * (1 + PEN_RNG);
   if (lo >= eff) return C.g;
   if (hi < eff) return C.r;
@@ -29,56 +24,59 @@ export function penColor(plate, shell) {
   return t < 0.5 ? C.y.clone().lerp(C.o, t * 2) : C.o.clone().lerp(C.r, (t - 0.5) * 2);
 }
 
-// Classify a vertex (local to the mesh, which is in hull or turret space) into a face.
-function faceOf(x, y, z, isTurret) {
-  const ax = Math.abs(x);
+// Face from local normal (dominant) and position. +z = front.
+function faceOf(nx, ny, nz, x, y, z, isTurret) {
+  const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+  if (ay > 0.7 && ny > 0) return 'top';
+  if (az >= ax && az >= ay) return nz > 0 ? 'front' : 'rear';
+  if (ax >= ay) return 'side';
+  // fallback by position
   if (isTurret) {
-    if (y > 0.45) return 'top';
-    if (z > 0.25 && z >= ax) return 'front';
-    if (z < -0.2 && -z >= ax * 0.6) return 'rear';
+    if (y > 0.4) return 'top';
+    if (z > 0.2) return 'front';
+    if (z < -0.15) return 'rear';
     return 'side';
   }
-  // hull: +z front, -z rear, high y top, large |x| side
-  if (y > 1.45) return 'top';
-  if (z > 0.4 && z > ax) return 'front';
-  if (z < -0.4 && -z > ax * 0.5) return 'rear';
-  if (ax > 0.6) return 'side';
-  return y > 1.0 ? 'top' : 'side';
+  if (y > 1.4) return 'top';
+  if (z > 0.3) return 'front';
+  if (z < -0.3) return 'rear';
+  return 'side';
 }
 
-export function applyArmorPreview(model, spec) {
-  if (!model || !spec || !model.root) return 0;
+export function applyArmorPreview(model, spec, refPen) {
+  if (!model || !spec || !model.root) return { n: 0, pen: 0 };
   const ud = model.root.userData;
-  if (ud._armorApplied) return ud._armorCount || 1;
-  const shell = (spec.shells || []).find((s) => !['HE', 'HESH'].includes(s.type)) || spec.shells?.[0];
-  if (!shell) return 0;
+  // Allow re-apply when the reference pen changes.
+  if (ud._armorApplied && ud._armorRef === refPen) return { n: ud._armorCount || 1, pen: refPen };
+  if (ud._armorApplied) clearArmorPreview(model);
   const A = spec.armor || {};
-  const colors = {
-    hull: { front: penColor(A.hull?.front, shell), side: penColor(A.hull?.side, shell), rear: penColor(A.hull?.rear, shell), top: penColor(A.hull?.top, shell) },
-    turret: { front: penColor(A.turret?.front, shell), side: penColor(A.turret?.side, shell), rear: penColor(A.turret?.rear, shell), top: penColor(A.turret?.top, shell) },
+  const frontLOS = los(A.hull?.front?.[0], A.hull?.front?.[1]);
+  const pen = refPen || Math.round(frontLOS * 0.9) || 100;
+  const plates = {
+    hull: { front: los(A.hull?.front?.[0], A.hull?.front?.[1]), side: los(A.hull?.side?.[0], A.hull?.side?.[1]), rear: los(A.hull?.rear?.[0], A.hull?.rear?.[1]), top: los(A.hull?.top?.[0], A.hull?.top?.[1]) },
+    turret: { front: los(A.turret?.front?.[0], A.turret?.front?.[1]), side: los(A.turret?.side?.[0], A.turret?.side?.[1]), rear: los(A.turret?.rear?.[0], A.turret?.rear?.[1]), top: los(A.turret?.top?.[0], A.turret?.top?.[1]) },
   };
   ud._armorOrig = [];
-  let n = 0, verts = 0;
+  let n = 0;
   model.root.traverse((o) => {
     if (!o.isMesh || o.userData.decal) return;
     if (o === model.wheels || o === model.sprockets) return;
     if (model.tracks && model.tracks.includes(o)) return;
     if (model.links && model.links.includes(o)) return;
     const key = o.userData.matKey;
-    if (key && key !== 'paint' && key !== 'metal' && key !== 'steel') return;
-    if (!key) return;
+    if (!key || (key !== 'paint' && key !== 'metal' && key !== 'steel')) return;
     let isTurret = false, p = o.parent;
     while (p) { if (p === model.turret || p === model.gun) { isTurret = true; break; } p = p.parent; }
     const part = isTurret ? 'turret' : 'hull';
     const pos = o.geometry.attributes.position;
+    const nrm = o.geometry.attributes.normal;
     if (!pos) return;
     const arr = new Float32Array(pos.count * 3);
-    const pal = colors[part];
+    const pal = plates[part];
     for (let i = 0; i < pos.count; i++) {
-      const face = faceOf(pos.getX(i), pos.getY(i), pos.getZ(i), isTurret);
-      const c = pal[face] || pal.front;
+      const face = faceOf(nrm ? nrm.getX(i) : 0, nrm ? nrm.getY(i) : 1, nrm ? nrm.getZ(i) : 0, pos.getX(i), pos.getY(i), pos.getZ(i), isTurret);
+      const c = penColorFor(pal[face] || pal.front, pen);
       arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b;
-      verts++;
     }
     ud._armorOrig.push({ mesh: o, mat: o.material, colorAttr: o.geometry.getAttribute('color') });
     o.geometry.setAttribute('color', new THREE.BufferAttribute(arr, 3));
@@ -87,9 +85,8 @@ export function applyArmorPreview(model, spec) {
   });
   ud._armorApplied = n > 0;
   ud._armorCount = n;
-  ud._armorVerts = verts;
-  ud._armorShell = shell.name;
-  return n;
+  ud._armorRef = pen;
+  return { n, pen };
 }
 
 export function clearArmorPreview(model) {
@@ -105,4 +102,5 @@ export function clearArmorPreview(model) {
   ud._armorOrig = [];
   ud._armorApplied = false;
   ud._armorCount = 0;
+  ud._armorRef = 0;
 }

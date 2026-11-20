@@ -37,11 +37,12 @@ export class Garage {
     this.spec = spec;
     if (this.armorMode) this.setArmorMode(true);
   }
-  setArmorMode(on) {
+  setArmorMode(on, refPen) {
     this.armorMode = !!on;
-    if (!this.current || !this.spec) return 0;
-    if (on) return applyArmorPreview(this.current, this.spec);
-    clearArmorPreview(this.current); return 0;
+    if (refPen) this.refPen = refPen;
+    if (!this.current || !this.spec) return { n: 0, pen: 0 };
+    if (on) return applyArmorPreview(this.current, this.spec, this.refPen);
+    clearArmorPreview(this.current); return { n: 0, pen: 0 };
   }
   resize(w, h) { this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
   render(dt) {
