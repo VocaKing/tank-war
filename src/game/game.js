@@ -309,16 +309,15 @@ export class Game {
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
     if (!hitP) hitP = pos;
-    // centre the circle on the focus (screen centre / aim point), not on the ballistic impact
-    const focus = this.aimPoint; const sp = focus.clone().project(this.camera);
-    const sx = (sp.x * 0.5 + 0.5) * innerWidth, sy = (-sp.y * 0.5 + 0.5) * innerHeight;
+    // focus is the crosshair: always screen centre, never a projected world point
+    const sx = innerWidth * 0.5, sy = innerHeight * 0.5; const focus = this.aimPoint;
     // radius from current dispersion (base * bloom): moving widens it, holding still shrinks it
     const cone = p.dispersion(); const rW = Math.tan(cone) * Math.max(dist, 1);
     const dc = Math.max(0.5, this.camera.position.distanceTo(focus));
     const radPx = (rW / dc) / Math.tan(this.camera.fov * DEG / 2) * (innerHeight / 2);
     this.reticleRadiusWorld = rW;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
-    if (sp.z > 1) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    if (!Number.isFinite(sx)) { hud.setReticle(-100, -100, 0, '', ''); return; }
     let state = 'neutral', text = `${Math.round(dist)} m`;
     if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
       const ev = this.ballistics.evaluate(hitTank, hitInfo, p.shell, dist);
