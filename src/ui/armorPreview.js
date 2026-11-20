@@ -43,16 +43,18 @@ function faceOf(nx, ny, nz, x, y, z, isTurret) {
   return 'side';
 }
 
-export function applyArmorPreview(model, spec, refPen) {
+export function applyArmorPreview(model, spec, shellOrPen) {
   if (!model || !spec || !model.root) return { n: 0, pen: 0 };
   const ud = model.root.userData;
   // Allow re-apply when the reference pen changes.
-  if (ud._armorApplied && ud._armorRef === refPen) return { n: ud._armorCount || 1, pen: refPen };
+  const shell = shellOrPen && shellOrPen.pen ? shellOrPen : null;
+  const refKey = shell ? shell.name + shell.pen : shellOrPen;
+  if (ud._armorApplied && ud._armorRef === refKey) return { n: ud._armorCount || 1, pen: shell ? shell.pen : shellOrPen, shell: shell && shell.name };
   if (ud._armorApplied) clearArmorPreview(model);
   const A = spec.armor || {};
   const frontLOS = los(A.hull?.front?.[0], A.hull?.front?.[1]);
   const sideLOS = los(A.hull?.side?.[0], A.hull?.side?.[1]);
-  const pen = refPen || Math.round((frontLOS + sideLOS) / 2) || 80;
+  const pen = shell ? shell.pen : (shellOrPen || Math.round((frontLOS + sideLOS) / 2) || 80);
   const plates = {
     hull: { front: los(A.hull?.front?.[0], A.hull?.front?.[1]), side: los(A.hull?.side?.[0], A.hull?.side?.[1]), rear: los(A.hull?.rear?.[0], A.hull?.rear?.[1]), top: los(A.hull?.top?.[0], A.hull?.top?.[1]) },
     turret: { front: los(A.turret?.front?.[0], A.turret?.front?.[1]), side: los(A.turret?.side?.[0], A.turret?.side?.[1]), rear: los(A.turret?.rear?.[0], A.turret?.rear?.[1]), top: los(A.turret?.top?.[0], A.turret?.top?.[1]) },
@@ -86,8 +88,8 @@ export function applyArmorPreview(model, spec, refPen) {
   });
   ud._armorApplied = n > 0;
   ud._armorCount = n;
-  ud._armorRef = pen;
-  return { n, pen };
+  ud._armorRef = refKey;
+  return { n, pen, shell: shell && shell.name };
 }
 
 export function clearArmorPreview(model) {

@@ -155,3 +155,5 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .armor-ban .lg.y{background:#f1c40f;color:#111}
 .armor-ban .lg.r{background:#e74c3c;color:#fff}
 .armor-ban .lg.n{background:#7f8c8d;color:#fff}
+
+.armor-ban select{background:#1a1c1e;color:#eee;border:1px solid #555;border-radius:4px;padding:3px 6px;font:inherit}

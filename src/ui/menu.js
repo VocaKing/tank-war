@@ -33,20 +33,31 @@ export class Menu {
   }
   toggleArmor() {
     this.armorOn = !this.armorOn;
+    if (this.armorOn && !this.atkTank) this.atkTank = this.tank;
     this.refreshArmor();
   }
+  atkShell() {
+    const t = TANK_BY_ID[this.atkTank] || TANK_BY_ID[this.tank];
+    if (!t) return null;
+    const i = Math.min(this.atkShellIdx || 0, t.shells.length - 1);
+    return t.shells[i];
+  }
   refreshArmor() {
+    const shell = this.atkShell();
     let info = { n: 0, pen: 0 };
-    try { if (this.garage && this.garage.setArmorMode) info = this.garage.setArmorMode(this.armorOn, this.refPen) || info; } catch (e) { console.warn('armor preview', e); }
-    if (info && info.pen) this.refPen = info.pen;
+    try { if (this.garage && this.garage.setArmorMode) info = this.garage.setArmorMode(this.armorOn, shell) || info; } catch (e) { console.warn('armor preview', e); }
     const btn = this.root.querySelector('#m-armor');
     if (btn) { btn.classList.toggle('sel', this.armorOn); btn.textContent = this.armorOn ? '🛡️ Armor Preview ON' : '🛡️ Armor Preview'; }
     let ban = this.root.querySelector('#m-armor-ban');
     if (this.armorOn) {
       if (!ban) { ban = document.createElement('div'); ban.id = 'm-armor-ban'; ban.className = 'armor-ban'; this.root.appendChild(ban); }
-      ban.innerHTML = '<b>ARMOR PREVIEW</b> · vs ' + (this.refPen || '?') + ' mm <button data-d="-30">−</button><button data-d="30">+</button> <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span>';
+      const atk = TANK_BY_ID[this.atkTank] || TANK_BY_ID[this.tank];
+      const tanks = TANKS.map((t) => `<option value="${t.id}" ${t.id === atk.id ? 'selected' : ''}>${t.short}</option>`).join('');
+      const shells = atk.shells.map((s, i) => `<option value="${i}" ${i === (this.atkShellIdx || 0) ? 'selected' : ''}>${s.name} · ${s.type} · ${s.pen} mm</option>`).join('');
+      ban.innerHTML = `<b>ARMOR PREVIEW</b> vs <select id="av-tank">${tanks}</select> <select id="av-shell">${shells}</select> <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span>`;
       ban.style.display = 'flex';
-      ban.querySelectorAll('button').forEach((b) => (b.onclick = () => { this.refPen = Math.max(40, (this.refPen || 100) + +b.dataset.d); if (this.garage) this.garage.refPen = this.refPen; this.refreshArmor(); }));
+      ban.querySelector('#av-tank').onchange = (e) => { this.atkTank = e.target.value; this.atkShellIdx = 0; this.refreshArmor(); };
+      ban.querySelector('#av-shell').onchange = (e) => { this.atkShellIdx = +e.target.value; this.refreshArmor(); };
     } else if (ban) ban.style.display = 'none';
   }
   showMapSelect(v) {
