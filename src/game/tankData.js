@@ -5,9 +5,9 @@
 
 export const TANKS = [
   {
-    id: 'sherman', tier: 1, cls: 'Medium', name: 'M4A3E8 Sherman "Easy Eight"', short: 'M4A3E8', nation: 'USA', era: 'WWII', year: 1944,
+    id: 'sherman', tier: 1, cls: 'Light', name: 'M4A3E8 Sherman "Easy Eight"', short: 'M4A3E8', nation: 'USA', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
-    mass: 33.7, power: 450, maxSpeed: 40, reverseSpeed: 10, hullTraverse: 28, turretTraverse: 24, gunSpeed: 5,
+    mass: 33.7, power: 450, maxSpeed: 62, reverseSpeed: 16, hullTraverse: 40, turretTraverse: 32, gunSpeed: 6,
     gunDepression: 10, gunElevation: 25, hp: 900, viewRange: 380, reload: 6.0, aimTime: 2.2, dispersion: 0.44, stabilizer: 0.6,
     dims: { L: 5.9, W: 2.99, hullH: 1.9, clearance: 0.43, trackW: 0.58, turretZ: 0.35, turretL: 2.3, turretW: 2.0, turretH: 0.85, gunLen: 4.2 },
     armor: {
@@ -46,9 +46,9 @@ export const TANKS = [
     desc: 'The legendary heavy tank. Thick, mostly flat armor and the precise 8.8 cm KwK 36 – but heavy, slow and with a sluggish hydraulic turret traverse.',
   },
   {
-    id: 't34', tier: 1, cls: 'Medium', name: 'T-34-85 (1944)', short: 'T-34-85', nation: 'USSR', era: 'WWII', year: 1944,
+    id: 't34', tier: 1, cls: 'Light', name: 'T-34-85 (1944)', short: 'T-34-85', nation: 'USSR', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
-    mass: 32, power: 500, maxSpeed: 44, reverseSpeed: 7, hullTraverse: 26, turretTraverse: 25, gunSpeed: 4,
+    mass: 32, power: 500, maxSpeed: 68, reverseSpeed: 12, hullTraverse: 42, turretTraverse: 34, gunSpeed: 6,
     gunDepression: 5, gunElevation: 22, hp: 850, viewRange: 340, reload: 7.5, aimTime: 2.5, dispersion: 0.46, stabilizer: 1.0,
     scan: { cooldown: 24, maxTargets: 3, range: 400 },
     dims: { L: 6.1, W: 3.0, hullH: 1.65, clearance: 0.4, trackW: 0.5, turretZ: 0.6, turretL: 2.45, turretW: 2.15, turretH: 0.85, gunLen: 4.65 },
@@ -67,7 +67,7 @@ export const TANKS = [
     desc: 'Mass-produced Soviet medium tank with superbly sloped armor, wide tracks and an 85 mm ZiS-S-53. Agile, cramped, and hard-hitting.',
   },
   {
-    id: 't72', tier: 3, cls: 'MBT', name: 'T-72B (1985)', short: 'T-72B', nation: 'USSR', era: 'Cold War', year: 1985,
+    id: 't72', tier: 3, cls: 'Medium', name: 'T-72B (1985)', short: 'T-72B', nation: 'USSR', era: 'Cold War', year: 1985,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 44.5, power: 840, maxSpeed: 60, reverseSpeed: 6, hullTraverse: 35, turretTraverse: 24, gunSpeed: 6,
     gunDepression: 6, gunElevation: 14, hp: 1500, viewRange: 420, reload: 7.1, aimTime: 2, dispersion: 0.35, stabilizer: 0.35,
@@ -89,7 +89,7 @@ export const TANKS = [
     desc: 'Cold War Soviet MBT with a 125 mm smoothbore fed by a carousel autoloader, Kontakt-1 ERA and a very low silhouette. Poor reverse speed.',
   },
   {
-    id: 'm1a2', tier: 4, cls: 'MBT', name: 'M1A2 Abrams', short: 'M1A2', nation: 'USA', era: 'Modern', year: 1992,
+    id: 'm1a2', tier: 4, cls: 'Medium', name: 'M1A2 Abrams', short: 'M1A2', nation: 'USA', era: 'Modern', year: 1992,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62, power: 1500, maxSpeed: 67, reverseSpeed: 40, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 10, gunElevation: 20, hp: 1800, viewRange: 500, reload: 6.0, aimTime: 1.5, dispersion: 0.22, stabilizer: 0.2,
@@ -193,7 +193,7 @@ export const TANKS = [
     desc: 'The archetypal post-war British MBT: thick cast turret, Meteor V12, side skirts and the excellent 20-pounder firing APDS, with an early Metadyne stabiliser.',
   },
   {
-    id: 'leo1', tier: 3, cls: 'MBT', name: 'Leopard 1A5', short: 'Leopard 1A5', nation: 'West Germany', era: 'Cold War', year: 1987,
+    id: 'leo1', tier: 3, cls: 'Medium', name: 'Leopard 1A5', short: 'Leopard 1A5', nation: 'West Germany', era: 'Cold War', year: 1987,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 42.4, power: 830, maxSpeed: 65, reverseSpeed: 25, hullTraverse: 36, turretTraverse: 30, gunSpeed: 6,
     gunDepression: 9, gunElevation: 20, hp: 1250, viewRange: 450, reload: 6.5, aimTime: 1.8, dispersion: 0.32, stabilizer: 0.3,
@@ -213,7 +213,7 @@ export const TANKS = [
     desc: 'Mobility over armor: the 105 mm L7A3, EMES 18 fire control with thermal sight and a fast 830 hp MTU diesel. Spaced-armor turret, very thin hull.',
   },
   {
-    id: 'leo2a6', tier: 4, cls: 'MBT', name: 'Leopard 2A6', short: 'Leopard 2A6', nation: 'Germany', era: 'Modern', year: 2001,
+    id: 'leo2a6', tier: 4, cls: 'Medium', name: 'Leopard 2A6', short: 'Leopard 2A6', nation: 'Germany', era: 'Modern', year: 2001,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62.3, power: 1500, maxSpeed: 68, reverseSpeed: 31, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 9, gunElevation: 20, hp: 1850, viewRange: 510, reload: 6.0, aimTime: 1.5, dispersion: 0.2, stabilizer: 0.15,
@@ -225,7 +225,7 @@ export const TANKS = [
     },
     engineZone: 'rear', ammoRack: { zMin: 1.4, zMax: 3.0, yMax: 1.0, chance: 0.0, turretBustle: true },
     shells: [
-      { name: 'DM53 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 750, velocity: 1750, damage: 440, count: 22 },
+      { name: 'DM53 APFSDS-T', type: 'APFSDS', caliber: 120, pen: 750, velocity: 1750, damage: 800, count: 22 },
       { name: 'DM12 HEAT-MP-T', type: 'HEAT', caliber: 120, pen: 620, velocity: 1140, damage: 470, count: 12 },
       { name: 'DM11 HE-T', type: 'HE', caliber: 120, pen: 60, velocity: 1100, damage: 520, count: 8 },
     ],
@@ -233,7 +233,7 @@ export const TANKS = [
     desc: 'Arrowhead spaced add-on armor over the turret front, the long 120 mm L55 smoothbore and a 1,500 hp V12. Bustle ammunition with blow-out panels.',
   },
   {
-    id: 't90m', tier: 4, cls: 'MBT', name: 'T-90M Proryv', short: 'T-90M', nation: 'Russia', era: 'Modern', year: 2017,
+    id: 't90m', tier: 4, cls: 'Medium', name: 'T-90M Proryv', short: 'T-90M', nation: 'Russia', era: 'Modern', year: 2017,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 46.5, power: 1130, maxSpeed: 60, reverseSpeed: 12, hullTraverse: 38, turretTraverse: 40, gunSpeed: 7,
     gunDepression: 6, gunElevation: 14, hp: 1650, viewRange: 470, reload: 6.5, aimTime: 1.7, dispersion: 0.25, stabilizer: 0.2,
@@ -253,7 +253,7 @@ export const TANKS = [
     desc: 'Latest T-90: Relikt ERA (effective against long rods and HEAT), new welded turret with bustle and slat armor, Kalina FCS. Low profile, autoloader carousel under the turret.',
   },
   {
-    id: 'chally2', tier: 4, cls: 'MBT', name: 'Challenger 2', short: 'Challenger 2', nation: 'UK', era: 'Modern', year: 1998,
+    id: 'chally2', tier: 4, cls: 'Medium', name: 'Challenger 2', short: 'Challenger 2', nation: 'UK', era: 'Modern', year: 1998,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62.5, power: 1200, maxSpeed: 59, reverseSpeed: 56, hullTraverse: 34, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 10, gunElevation: 20, hp: 1900, viewRange: 500, reload: 6.5, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
@@ -273,7 +273,7 @@ export const TANKS = [
     desc: 'British MBT with second-generation Chobham ("Dorchester") armor and the rifled 120 mm L30A1 – the only NATO tank still firing HESH. Exceptionally well protected.',
   },
   {
-    id: 'type99a', tier: 4, cls: 'MBT', name: 'Type 99A (ZTZ-99A)', short: 'Type 99A', nation: 'China', era: 'Modern', year: 2011,
+    id: 'type99a', tier: 4, cls: 'Medium', name: 'Type 99A (ZTZ-99A)', short: 'Type 99A', nation: 'China', era: 'Modern', year: 2011,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 55, power: 1500, maxSpeed: 70, reverseSpeed: 32, hullTraverse: 40, turretTraverse: 40, gunSpeed: 7,
     gunDepression: 6, gunElevation: 16, hp: 1750, viewRange: 490, reload: 6.5, aimTime: 1.6, dispersion: 0.24, stabilizer: 0.15,
@@ -294,7 +294,7 @@ export const TANKS = [
     desc: 'China\'s top MBT: arrowhead ERA-clad turret, 1,500 hp diesel, laser dazzler and a 125 mm autoloaded smoothbore. Fast, flat and modern, in digital camouflage.',
   },
   {
-    id: 'merkava4', tier: 4, cls: 'MBT', name: 'Merkava Mk.4', short: 'Merkava 4', nation: 'Israel', era: 'Modern', year: 2004,
+    id: 'merkava4', tier: 4, cls: 'Medium', name: 'Merkava Mk.4', short: 'Merkava 4', nation: 'Israel', era: 'Modern', year: 2004,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 65, power: 1500, maxSpeed: 64, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
@@ -365,7 +365,7 @@ export function penAtRange(shell, dist) {
 
 // Penetration RNG (uniform ±): a roll of pen × (1 ± PEN_RNG) is compared with effective armour.
 export const PEN_RNG = 0.08;
-export const TIER_NAMES = ['', 'WWII mediums', 'Late-war heavies', 'Cold War', 'Modern MBTs'];
+export const TIER_NAMES = ['', 'Lights', 'Heavies', 'Mediums', 'Modern mediums'];
 // Effective armour model shared by hit resolution, AI, HUD and the armour-view shader.
 // part: 'hull'|'turret', face: 'front'|'side'|'rear'|'top'|'bottom', local: hit point in part space.
 export function armorZone(spec, part, face, local) {
