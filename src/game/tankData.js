@@ -32,8 +32,8 @@ export const TANKS = [
     selfDestruct: { radius: 18 },
     dims: { turretBoxZ: -0.15, L: 7.4, W: 4.1, hullH: 1.95, clearance: 0.47, trackW: 0.72, turretZ: 0.15, turretL: 2.95, turretW: 2.5, turretH: 0.85, gunLen: 5.0 },
     armor: {
-      hull: { front: [180, 9], side: [100, 0], rear: [80, 9], top: [25, 0], bottom: [25, 0] },
-      turret: { front: [200, 0], side: [100, 0], rear: [80, 0], top: [25, 0] },
+      hull: { front: [480, 9], side: [140, 0], rear: [80, 9], top: [25, 0], bottom: [25, 0] },
+      turret: { front: [520, 0], side: [150, 0], rear: [80, 0], top: [25, 0] },
       lowerFront: [100, 24], lowerSide: [60, 0], mantlet: [145, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -1.2, zMax: 1.2, yMax: 1.5, chance: 0.06 },
@@ -69,15 +69,15 @@ export const TANKS = [
   {
     id: 't72', tier: 3, cls: 'Medium', name: 'T-72B (1985)', short: 'T-72B', nation: 'USSR', era: 'Cold War', year: 1985,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
-    mass: 44.5, power: 840, maxSpeed: 60, reverseSpeed: 6, hullTraverse: 35, turretTraverse: 24, gunSpeed: 6,
+    mass: 44.5, power: 840, maxSpeed: 52, reverseSpeed: 6, hullTraverse: 35, turretTraverse: 24, gunSpeed: 6,
     gunDepression: 6, gunElevation: 14, hp: 1500, viewRange: 420, reload: 7.1, aimTime: 2, dispersion: 0.35, stabilizer: 0.35,
     magazine: { size: 4, intraReload: 1.2, fullReload: 9.5 },
     dims: { L: 6.86, W: 3.59, hullH: 1.5, clearance: 0.47, trackW: 0.58, turretZ: 0.35, turretL: 2.6, turretW: 2.3, turretH: 0.75, gunLen: 6.0 },
     armor: {
       // RHA-equivalent vs KE. Composite upper glacis (~200 mm LOS-adj @68°), cast turret w/ "super-Dorchester"-style insert.
-      hull: { front: [200, 68], side: [80, 0], rear: [45, 0], top: [40, 0], bottom: [20, 0] },
-      turret: { front: [460, 30], side: [220, 25], rear: [80, 0], top: [45, 0] },
-      lowerFront: [80, 60], lowerSide: [70, 0], mantlet: [250, 0], skirt: 30, era: 250, heatMult: 1.15,  // Kontakt-1 ERA: extra protection vs HEAT on frontal arc
+      hull: { front: [300, 68], side: [80, 0], rear: [45, 0], top: [16, 0], bottom: [20, 0] },
+      turret: { front: [340, 30], side: [160, 25], rear: [80, 0], top: [16, 0] },
+      lowerFront: [110, 60], lowerSide: [70, 0], mantlet: [140, 0], skirt: 30, era: 250, heatMult: 1.15,  // Kontakt-1 ERA: extra protection vs HEAT on frontal arc
     },
     engineZone: 'rear', ammoRack: { zMin: -0.7, zMax: 1.4, yMax: 0.85, chance: 0.18 },
     shells: [
@@ -91,15 +91,15 @@ export const TANKS = [
   {
     id: 'm1a2', tier: 4, cls: 'Medium', name: 'M1A2 Abrams', short: 'M1A2', nation: 'USA', era: 'Modern', year: 1992,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
-    mass: 62, power: 1500, maxSpeed: 67, reverseSpeed: 40, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
+    mass: 62, power: 1500, maxSpeed: 58, reverseSpeed: 30, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 10, gunElevation: 20, hp: 1800, viewRange: 500, reload: 6.0, aimTime: 1.5, dispersion: 0.22, stabilizer: 0.2,
     stabilize: { duration: 7, cooldown: 22 },
     dims: { turretBoxZ: -0.15, L: 7.93, W: 3.66, hullH: 1.55, clearance: 0.48, trackW: 0.64, turretZ: -0.25, turretL: 4.3, turretW: 3.4, turretH: 0.8, gunLen: 5.3 },
     armor: {
       // RHA-equivalent vs KE (DU-reinforced Chobham-type composite on frontal arc)
-      hull: { front: [560, 20], side: [90, 0], rear: [35, 0], top: [40, 0], bottom: [25, 0] },
-      turret: { front: [820, 25], side: [250, 0], rear: [80, 0], top: [50, 0] },
-      lowerFront: [180, 30], lowerSide: [70, 0], mantlet: [380, 0], skirt: 70, era: 0, heatMult: 1.5,
+      hull: { front: [400, 20], side: [90, 0], rear: [35, 0], top: [16, 0], bottom: [25, 0] },
+      turret: { front: [460, 25], side: [180, 0], rear: [80, 0], top: [16, 0] },
+      lowerFront: [160, 30], lowerSide: [70, 0], mantlet: [200, 0], skirt: 70, era: 0, heatMult: 1.5,
     },
     engineZone: 'rear', ammoRack: { zMin: -2.6, zMax: -1.4, yMax: 9, chance: 0.0, turretBustle: true },
     shells: [
@@ -114,14 +114,14 @@ export const TANKS = [
   {
     id: 'panther', tier: 2, cls: 'Medium', name: 'Panzerkampfwagen V Panther Ausf. G', short: 'Panther', nation: 'Germany', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
-    mass: 44.8, power: 700, maxSpeed: 38, reverseSpeed: 8, hullTraverse: 26, turretTraverse: 18, gunSpeed: 5,
+    mass: 44.8, power: 700, maxSpeed: 42, reverseSpeed: 8, hullTraverse: 26, turretTraverse: 18, gunSpeed: 5,
     gunDepression: 8, gunElevation: 18, hp: 1150, viewRange: 400, reload: 7.0, aimTime: 2.3, dispersion: 0.41, stabilizer: 1.0,
     overpen: { shots: 2, mult: 1.35, cooldown: 35 },
     dims: { L: 6.87, W: 3.42, hullH: 1.98, clearance: 0.56, trackW: 0.66, turretZ: 0.15, turretL: 2.6, turretW: 2.05, turretH: 0.85, gunLen: 5.6, turretBoxZ: 0.0 },
     armor: {
-      hull: { front: [60, 55], side: [40, 29], rear: [35, 30], top: [14, 0], bottom: [14, 0] },
-      turret: { front: [80, 11], side: [40, 25], rear: [40, 25], top: [14, 0] },
-      lowerFront: [60, 55], lowerSide: [40, 0], mantlet: [100, 0], era: 0, heatMult: 1.0,
+      hull: { front: [160, 55], side: [50, 29], rear: [40, 30], top: [12, 0], bottom: [14, 0] },
+      turret: { front: [180, 11], side: [55, 25], rear: [45, 25], top: [12, 0] },
+      lowerFront: [90, 55], lowerSide: [40, 0], mantlet: [100, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -1.0, zMax: 1.0, yMax: 1.25, chance: 0.07 },
     shells: [
@@ -139,8 +139,8 @@ export const TANKS = [
     gunDepression: 3, gunElevation: 20, hp: 1700, viewRange: 360, reload: 20.0, aimTime: 2.8, dispersion: 0.52, stabilizer: 1.0,
     dims: { L: 7.8, W: 3.7, hullH: 2.1, clearance: 0.42, trackW: 0.65, turretZ: 0.55, turretL: 2.45, turretW: 2.25, turretH: 0.88, gunLen: 5.5, turretBoxZ: 0.05 },
     armor: {
-      hull: { front: [220, 60], side: [110, 15], rear: [60, 49], top: [30, 0], bottom: [20, 0] },
-      turret: { front: [180, 20], side: [110, 20], rear: [90, 30], top: [30, 0] },
+      hull: { front: [500, 60], side: [150, 15], rear: [60, 49], top: [30, 0], bottom: [20, 0] },
+      turret: { front: [540, 20], side: [160, 20], rear: [90, 30], top: [30, 0] },
       lowerFront: [100, 30], lowerSide: [90, 0], mantlet: [160, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -1.6, zMax: 0.8, yMax: 1.0, chance: 0.08 },
@@ -159,8 +159,8 @@ export const TANKS = [
     gunDepression: 10, gunElevation: 20, hp: 1450, viewRange: 390, reload: 10.0, aimTime: 2.5, dispersion: 0.48, stabilizer: 1.0,
     dims: { L: 7.3, W: 4.0, hullH: 2.05, clearance: 0.44, trackW: 0.61, turretZ: 0.3, turretL: 2.75, turretW: 2.35, turretH: 0.85, gunLen: 5.0, turretBoxZ: -0.05 },
     armor: {
-      hull: { front: [170, 46], side: [90, 0], rear: [51, 10], top: [22, 0], bottom: [13, 0] },
-      turret: { front: [170, 0], side: [90, 0], rear: [76, 0], top: [25, 0] },
+      hull: { front: [460, 46], side: [130, 0], rear: [51, 10], top: [22, 0], bottom: [13, 0] },
+      turret: { front: [500, 0], side: [140, 0], rear: [76, 0], top: [25, 0] },
       lowerFront: [76, 53], lowerSide: [51, 0], mantlet: [114, 0], era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -0.8, zMax: 1.2, yMax: 0.9, chance: 0.06 },
@@ -175,13 +175,13 @@ export const TANKS = [
   {
     id: 'centurion', tier: 3, cls: 'Medium', name: 'Centurion Mk 3', short: 'Centurion', nation: 'UK', era: 'Cold War', year: 1948,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
-    mass: 49, power: 650, maxSpeed: 30, reverseSpeed: 8, hullTraverse: 26, turretTraverse: 30, gunSpeed: 5,
+    mass: 49, power: 650, maxSpeed: 36, reverseSpeed: 8, hullTraverse: 26, turretTraverse: 30, gunSpeed: 5,
     gunDepression: 10, gunElevation: 20, hp: 1350, viewRange: 410, reload: 6.0, aimTime: 2, dispersion: 0.36, stabilizer: 0.5,
     dims: { L: 7.6, W: 3.39, hullH: 1.95, clearance: 0.51, trackW: 0.61, turretZ: 0.35, turretL: 3.1, turretW: 2.6, turretH: 0.85, gunLen: 5.5, turretBoxZ: -0.2 },
     armor: {
-      hull: { front: [55, 57], side: [40, 12], rear: [32, 0], top: [22, 0], bottom: [15, 0] },
-      turret: { front: [100, 15], side: [60, 20], rear: [60, 0], top: [22, 0] },
-      lowerFront: [76, 46], lowerSide: [51, 0], mantlet: [152, 0], skirt: 40, era: 0, heatMult: 1.0,
+      hull: { front: [170, 57], side: [55, 12], rear: [38, 0], top: [14, 0], bottom: [15, 0] },
+      turret: { front: [190, 15], side: [70, 20], rear: [60, 0], top: [14, 0] },
+      lowerFront: [95, 46], lowerSide: [51, 0], mantlet: [110, 0], skirt: 40, era: 0, heatMult: 1.0,
     },
     engineZone: 'rear', ammoRack: { zMin: -0.5, zMax: 2.2, yMax: 1.0, chance: 0.07 },
     shells: [
@@ -195,13 +195,13 @@ export const TANKS = [
   {
     id: 'leo1', tier: 3, cls: 'Medium', name: 'Leopard 1A5', short: 'Leopard 1A5', nation: 'West Germany', era: 'Cold War', year: 1987,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
-    mass: 42.4, power: 830, maxSpeed: 65, reverseSpeed: 25, hullTraverse: 36, turretTraverse: 30, gunSpeed: 6,
+    mass: 42.4, power: 830, maxSpeed: 55, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 30, gunSpeed: 6,
     gunDepression: 9, gunElevation: 20, hp: 1250, viewRange: 450, reload: 6.5, aimTime: 1.8, dispersion: 0.32, stabilizer: 0.3,
     dims: { L: 7.09, W: 3.37, hullH: 1.62, clearance: 0.44, trackW: 0.55, turretZ: 0.1, turretL: 3.4, turretW: 2.6, turretH: 0.82, gunLen: 5.7, turretBoxZ: -0.25 },
     armor: {
-      hull: { front: [70, 60], side: [35, 0], rear: [25, 0], top: [25, 0], bottom: [15, 0] },
-      turret: { front: [190, 35], side: [60, 30], rear: [60, 0], top: [30, 0] },
-      lowerFront: [70, 55], lowerSide: [25, 0], mantlet: [200, 0], skirt: 40, era: 0, heatMult: 1.35,
+      hull: { front: [200, 60], side: [40, 0], rear: [25, 0], top: [14, 0], bottom: [15, 0] },
+      turret: { front: [220, 35], side: [60, 30], rear: [60, 0], top: [14, 0] },
+      lowerFront: [100, 55], lowerSide: [25, 0], mantlet: [120, 0], skirt: 40, era: 0, heatMult: 1.35,
     },
     engineZone: 'rear', ammoRack: { zMin: 0.5, zMax: 2.8, yMax: 1.0, chance: 0.1 },
     shells: [
@@ -215,13 +215,13 @@ export const TANKS = [
   {
     id: 'leo2a6', tier: 4, cls: 'Medium', name: 'Leopard 2A6', short: 'Leopard 2A6', nation: 'Germany', era: 'Modern', year: 2001,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
-    mass: 62.3, power: 1500, maxSpeed: 68, reverseSpeed: 31, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
+    mass: 62.3, power: 1500, maxSpeed: 56, reverseSpeed: 24, hullTraverse: 40, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 9, gunElevation: 20, hp: 1850, viewRange: 510, reload: 6.0, aimTime: 1.5, dispersion: 0.2, stabilizer: 0.15,
     dims: { L: 7.72, W: 3.75, hullH: 1.58, clearance: 0.54, trackW: 0.635, turretZ: -0.35, turretL: 4.1, turretW: 3.45, turretH: 0.8, gunLen: 6.6, turretBoxZ: -0.1 },
     armor: {
-      hull: { front: [590, 20], side: [100, 0], rear: [40, 0], top: [40, 0], bottom: [25, 0] },
-      turret: { front: [920, 0], side: [270, 0], rear: [70, 0], top: [50, 0] },
-      lowerFront: [400, 25], lowerSide: [80, 0], mantlet: [380, 0], skirt: 150, era: 0, heatMult: 1.5,
+      hull: { front: [410, 20], side: [100, 0], rear: [40, 0], top: [16, 0], bottom: [25, 0] },
+      turret: { front: [480, 0], side: [190, 0], rear: [70, 0], top: [16, 0] },
+      lowerFront: [180, 25], lowerSide: [80, 0], mantlet: [220, 0], skirt: 150, era: 0, heatMult: 1.5,
     },
     engineZone: 'rear', ammoRack: { zMin: 1.4, zMax: 3.0, yMax: 1.0, chance: 0.0, turretBustle: true },
     shells: [
@@ -235,13 +235,13 @@ export const TANKS = [
   {
     id: 't90m', tier: 4, cls: 'Medium', name: 'T-90M Proryv', short: 'T-90M', nation: 'Russia', era: 'Modern', year: 2017,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
-    mass: 46.5, power: 1130, maxSpeed: 60, reverseSpeed: 12, hullTraverse: 38, turretTraverse: 40, gunSpeed: 7,
+    mass: 46.5, power: 1130, maxSpeed: 50, reverseSpeed: 10, hullTraverse: 38, turretTraverse: 40, gunSpeed: 7,
     gunDepression: 6, gunElevation: 14, hp: 1650, viewRange: 470, reload: 6.5, aimTime: 1.7, dispersion: 0.25, stabilizer: 0.2,
     dims: { L: 6.86, W: 3.78, hullH: 1.5, clearance: 0.47, trackW: 0.58, turretZ: 0.3, turretL: 3.2, turretW: 3.0, turretH: 0.75, gunLen: 6.0, turretBoxZ: -0.25 },
     armor: {
-      hull: { front: [220, 68], side: [80, 0], rear: [40, 0], top: [40, 0], bottom: [20, 0] },
-      turret: { front: [550, 30], side: [300, 25], rear: [70, 0], top: [50, 0] },
-      lowerFront: [100, 60], lowerSide: [70, 0], mantlet: [300, 0], skirt: 250, era: 500, eraKE: 220, heatMult: 1.15,
+      hull: { front: [340, 68], side: [80, 0], rear: [40, 0], top: [16, 0], bottom: [20, 0] },
+      turret: { front: [420, 30], side: [180, 25], rear: [70, 0], top: [16, 0] },
+      lowerFront: [140, 60], lowerSide: [70, 0], mantlet: [180, 0], skirt: 250, era: 500, eraKE: 220, heatMult: 1.15,
     },
     engineZone: 'rear', ammoRack: { zMin: -0.8, zMax: 0.9, yMax: 0.75, chance: 0.15 },
     shells: [
@@ -255,13 +255,13 @@ export const TANKS = [
   {
     id: 'chally2', tier: 4, cls: 'Medium', name: 'Challenger 2', short: 'Challenger 2', nation: 'UK', era: 'Modern', year: 1998,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
-    mass: 62.5, power: 1200, maxSpeed: 59, reverseSpeed: 56, hullTraverse: 34, turretTraverse: 36, gunSpeed: 7,
+    mass: 62.5, power: 1200, maxSpeed: 50, reverseSpeed: 40, hullTraverse: 34, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 10, gunElevation: 20, hp: 1900, viewRange: 500, reload: 6.5, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
     dims: { L: 8.33, W: 3.52, hullH: 1.62, clearance: 0.5, trackW: 0.635, turretZ: -0.3, turretL: 4.2, turretW: 3.45, turretH: 0.85, gunLen: 6.6, turretBoxZ: -0.25 },
     armor: {
-      hull: { front: [560, 20], side: [90, 0], rear: [40, 0], top: [40, 0], bottom: [25, 0] },
-      turret: { front: [770, 10], side: [320, 0], rear: [80, 0], top: [50, 0] },
-      lowerFront: [350, 20], lowerSide: [80, 0], mantlet: [400, 0], skirt: 200, era: 0, heatMult: 1.5,
+      hull: { front: [420, 20], side: [90, 0], rear: [40, 0], top: [16, 0], bottom: [25, 0] },
+      turret: { front: [440, 10], side: [200, 0], rear: [80, 0], top: [16, 0] },
+      lowerFront: [170, 20], lowerSide: [80, 0], mantlet: [210, 0], skirt: 200, era: 0, heatMult: 1.5,
     },
     engineZone: 'rear', ammoRack: { zMin: -0.5, zMax: 1.5, yMax: 0.9, chance: 0.05 },
     shells: [
@@ -275,14 +275,14 @@ export const TANKS = [
   {
     id: 'type99a', tier: 4, cls: 'Medium', name: 'Type 99A (ZTZ-99A)', short: 'Type 99A', nation: 'China', era: 'Modern', year: 2011,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
-    mass: 55, power: 1500, maxSpeed: 70, reverseSpeed: 32, hullTraverse: 40, turretTraverse: 40, gunSpeed: 7,
+    mass: 55, power: 1500, maxSpeed: 58, reverseSpeed: 24, hullTraverse: 40, turretTraverse: 40, gunSpeed: 7,
     gunDepression: 6, gunElevation: 16, hp: 1750, viewRange: 490, reload: 6.5, aimTime: 1.6, dispersion: 0.24, stabilizer: 0.15,
     overspeed: { mult: 1.45, duration: 8, cooldown: 30 },
     dims: { L: 7.6, W: 3.5, hullH: 1.55, clearance: 0.48, trackW: 0.6, turretZ: -0.1, turretL: 3.6, turretW: 3.3, turretH: 0.75, gunLen: 6.2, turretBoxZ: -0.1 },
     armor: {
-      hull: { front: [230, 68], side: [80, 0], rear: [40, 0], top: [40, 0], bottom: [20, 0] },
-      turret: { front: [700, 0], side: [300, 15], rear: [70, 0], top: [50, 0] },
-      lowerFront: [120, 55], lowerSide: [70, 0], mantlet: [350, 0], skirt: 150, era: 400, eraKE: 150, heatMult: 1.25,
+      hull: { front: [360, 68], side: [80, 0], rear: [40, 0], top: [16, 0], bottom: [20, 0] },
+      turret: { front: [430, 0], side: [180, 15], rear: [70, 0], top: [16, 0] },
+      lowerFront: [150, 55], lowerSide: [70, 0], mantlet: [190, 0], skirt: 150, era: 400, eraKE: 150, heatMult: 1.25,
     },
     engineZone: 'rear', ammoRack: { zMin: -0.8, zMax: 0.9, yMax: 0.75, chance: 0.14 },
     shells: [
@@ -296,13 +296,13 @@ export const TANKS = [
   {
     id: 'merkava4', tier: 4, cls: 'Medium', name: 'Merkava Mk.4', short: 'Merkava 4', nation: 'Israel', era: 'Modern', year: 2004,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
-    mass: 65, power: 1500, maxSpeed: 64, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 36, gunSpeed: 7,
+    mass: 65, power: 1500, maxSpeed: 52, reverseSpeed: 16, hullTraverse: 36, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 0.23, stabilizer: 0.15,
     dims: { L: 7.6, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 6.0, turretBoxZ: 0.0 },
     armor: {
-      hull: { front: [560, 30], side: [100, 0], rear: [80, 0], top: [40, 0], bottom: [30, 0] },
-      turret: { front: [800, 20], side: [320, 10], rear: [100, 0], top: [60, 0] },
-      lowerFront: [300, 30], lowerSide: [80, 0], mantlet: [330, 0], skirt: 200, era: 0, heatMult: 1.45,
+      hull: { front: [390, 30], side: [100, 0], rear: [80, 0], top: [16, 0], bottom: [30, 0] },
+      turret: { front: [450, 20], side: [190, 10], rear: [100, 0], top: [16, 0] },
+      lowerFront: [160, 30], lowerSide: [80, 0], mantlet: [200, 0], skirt: 200, era: 0, heatMult: 1.45,
     },
     engineZone: 'front', ammoRack: { zMin: -3.6, zMax: -1.5, yMax: 1.0, chance: 0.06 },
     shells: [
