@@ -137,3 +137,11 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .mapacts{display:flex;gap:12px;justify-content:flex-end}
 .mapacts button{margin:0}
 .mapacts .battle{padding:12px 28px;font-size:18px}
+
+.tbl-btn.sel{border-color:var(--acc);background:rgba(60,48,20,.8)}
+.armor-leg{margin-top:10px;font-size:12px;line-height:1.5}
+.armor-leg .lg{display:inline-block;margin:4px 6px 0 0;padding:2px 8px;border-radius:3px;font-weight:700}
+.armor-leg .lg.g{background:#3dbe55;color:#111}
+.armor-leg .lg.y{background:#e3b54a;color:#111}
+.armor-leg .lg.r{background:#d0453a;color:#fff}
+.armor-leg .lg.n{background:#6a6e72;color:#fff}

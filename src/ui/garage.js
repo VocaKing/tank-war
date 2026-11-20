@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createTankModel } from '../models/tankModel.js';
+import { applyArmorPreview, clearArmorPreview } from './armorPreview.js';
 import { pbrTex } from '../world/textures.js';
 
 export class Garage {
@@ -12,7 +13,7 @@ export class Garage {
     this.scene.fog = new THREE.Fog(0x1b1d1f, 18, 45);
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
     this.models = {};
-    this.angle = 0.6; this.current = null; this.drag = null;
+    this.angle = 0.6; this.current = null; this.drag = null; this.armorMode = false;
     const pm = new THREE.PMREMGenerator(renderer);
     new RGBELoader().load('./tex/studio_1k.hdr', (hdr) => { hdr.mapping = THREE.EquirectangularReflectionMapping; this.scene.environment = pm.fromEquirectangular(hdr).texture; this.scene.environmentIntensity = 0.55; hdr.dispose(); });
     const floorTex = pbrTex('gravel_road', 'diff', 6), floorN = pbrTex('gravel_road', 'nor', 6);
@@ -34,6 +35,13 @@ export class Garage {
     this.current = this.models[spec.id]; this.turntable.add(this.current.root);
     this.current.turret.rotation.y = 0.0; this.current.gun.rotation.x = -0.04;
     this.spec = spec;
+    if (this.armorMode) this.setArmorMode(true);
+  }
+  setArmorMode(on) {
+    this.armorMode = !!on;
+    if (!this.current || !this.spec) return;
+    if (on) applyArmorPreview(this.current, this.spec);
+    else clearArmorPreview(this.current);
   }
   resize(w, h) { this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
   render(dt) {

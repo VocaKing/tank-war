@@ -15,7 +15,7 @@ export class Menu {
     this.root.innerHTML = `
       <div class="brand"><h1>STEEL FRONT</h1><span>3D Tank War · v3.0</span></div>
       <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}
-        <button class="tbl-btn" id="m-table">📊 Compare all tanks</button></div>
+        <button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
         <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to soft-lock the camera on it; mouse input is dampened near the target, pull away firmly to break"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
@@ -26,9 +26,22 @@ export class Menu {
     this.root.querySelector('#m-battle').onclick = () => this.showMapSelect(true);
     this.root.querySelector('#m-lo-btn').onclick = () => this.showLoadout(true);
     this.root.querySelector('#m-table').onclick = () => this.showTable(true);
+    this.root.querySelector('#m-armor').onclick = () => this.toggleArmor();
     const q = this.root.querySelector('#m-q'); q.value = this.quality; q.onchange = () => { this.quality = q.value; localStorage.setItem('tw_q', q.value); };
     const aa = this.root.querySelector('#m-aa'); aa.checked = localStorage.getItem('tw_aa') !== '0'; aa.onchange = () => localStorage.setItem('tw_aa', aa.checked ? '1' : '0');
     this.selectMap(this.map);
+  }
+  toggleArmor() {
+    this.armorOn = !this.armorOn;
+    if (this.garage && this.garage.setArmorMode) this.garage.setArmorMode(this.armorOn);
+    const btn = this.root.querySelector('#m-armor');
+    if (btn) btn.classList.toggle('sel', this.armorOn);
+    const s = this.root.querySelector('#m-stats');
+    if (s && this.armorOn) {
+      let leg = s.querySelector('.armor-leg');
+      if (!leg) { leg = document.createElement('div'); leg.className = 'armor-leg'; s.appendChild(leg); }
+      leg.innerHTML = '<b>Armor Preview</b> · primary shell @ 100 m, head-on<br><span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span><span class="lg n">no armor</span>';
+    } else if (s) { const leg = s.querySelector('.armor-leg'); if (leg) leg.remove(); }
   }
   showMapSelect(v) {
     const o = this.root.querySelector('#m-maps'); if (!v) { o.style.display = 'none'; return; }
