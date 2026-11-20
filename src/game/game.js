@@ -309,9 +309,14 @@ export class Game {
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
     if (!hitP) hitP = pos;
-    // focus is the crosshair: canvas centre, not window centre
+    // centre on the gun's aim point: where the barrel is pointing, projected to screen
     const cv = this.renderer.domElement.getBoundingClientRect();
-    const sx = cv.width * 0.5, sy = cv.height * 0.5; const focus = this.aimPoint;
+    const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3());
+    const gdir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(new THREE.Quaternion()));
+    const aimAt = muzzle.clone().addScaledVector(gdir, Math.max(dist, 20));
+    const sp = aimAt.project(this.camera);
+    const sx = (sp.x * 0.5 + 0.5) * cv.width, sy = (-sp.y * 0.5 + 0.5) * cv.height;
+    const focus = aimAt;
     // radius from current dispersion; divide by tan(fov/2) so zoom enlarges the circle in proportion
     const cone = p.dispersion(); const rW = Math.tan(cone) * Math.max(dist, 1);
     const dc = Math.max(0.5, this.camera.position.distanceTo(focus));
