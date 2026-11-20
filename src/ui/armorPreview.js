@@ -51,7 +51,8 @@ export function applyArmorPreview(model, spec, refPen) {
   if (ud._armorApplied) clearArmorPreview(model);
   const A = spec.armor || {};
   const frontLOS = los(A.hull?.front?.[0], A.hull?.front?.[1]);
-  const pen = refPen || Math.round(frontLOS * 0.9) || 100;
+  const sideLOS = los(A.hull?.side?.[0], A.hull?.side?.[1]);
+  const pen = refPen || Math.round((frontLOS + sideLOS) / 2) || 80;
   const plates = {
     hull: { front: los(A.hull?.front?.[0], A.hull?.front?.[1]), side: los(A.hull?.side?.[0], A.hull?.side?.[1]), rear: los(A.hull?.rear?.[0], A.hull?.rear?.[1]), top: los(A.hull?.top?.[0], A.hull?.top?.[1]) },
     turret: { front: los(A.turret?.front?.[0], A.turret?.front?.[1]), side: los(A.turret?.side?.[0], A.turret?.side?.[1]), rear: los(A.turret?.rear?.[0], A.turret?.rear?.[1]), top: los(A.turret?.top?.[0], A.turret?.top?.[1]) },

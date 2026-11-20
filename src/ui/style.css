@@ -148,7 +148,8 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .armor-leg .lg.r{background:#d0453a;color:#fff}
 .armor-leg .lg.n{background:#6a6e72;color:#fff}
 
-.armor-ban{position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:40;display:none;align-items:center;gap:8px;background:rgba(12,14,16,.9);border:1px solid var(--acc);border-radius:6px;padding:8px 14px;font-size:13px;pointer-events:none}
+.armor-ban{position:absolute;left:50%;top:70px;transform:translateX(-50%);z-index:50;display:none;align-items:center;gap:8px;background:rgba(12,14,16,.95);border:2px solid var(--acc);border-radius:8px;padding:10px 16px;font-size:14px;pointer-events:auto;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+.armor-ban button{pointer-events:auto;background:#2a2c2e;color:#eee;border:1px solid #666;border-radius:4px;padding:2px 10px;cursor:pointer}
 .armor-ban .lg{display:inline-block;padding:2px 8px;border-radius:3px;font-weight:700;margin-left:4px}
 .armor-ban .lg.g{background:#2ecc40;color:#111}
 .armor-ban .lg.y{background:#f1c40f;color:#111}
