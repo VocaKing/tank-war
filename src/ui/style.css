@@ -25,7 +25,7 @@ small{opacity:.7}
 table.armor{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}table.armor td,table.armor th{border-bottom:1px solid var(--line);padding:3px 4px;text-align:center}
 .shells div{font-size:12px;margin:3px 0}.shells small{display:block}
 .misc{font-size:11px;opacity:.7;margin-top:6px}
-.bottom{position:absolute;left:24px;right:24px;bottom:18px;display:flex;gap:16px;align-items:stretch}
+.bottom{position:absolute;left:24px;right:24px;bottom:18px;display:flex;gap:16px;align-items:stretch;justify-content:flex-end}
 .maps{display:flex;gap:10px;flex:1}
 .mcard{flex:1;background:var(--panel);border:1px solid var(--line);color:#eee;text-align:left;padding:10px 14px;border-radius:6px;backdrop-filter:blur(6px)}
 .mcard b{font-size:15px;display:block}.mcard small{font-size:11px}.mcard p{font-size:11.5px;margin:6px 0 0;opacity:.8;line-height:1.35}
@@ -128,3 +128,12 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .assist{display:none;position:absolute;left:50%;top:calc(50% + 34px);transform:translateX(-50%);font-size:11px;font-weight:700;letter-spacing:.08em;padding:1px 7px;border-radius:3px;background:rgba(0,0,0,.5);color:#ff5a48;border:1px solid rgba(255,70,50,.7);pointer-events:none;white-space:nowrap}
 .assist small{font-weight:600;color:#ffb0a6;margin-left:4px}.assist.gun{color:#ffd84a;border-color:rgba(255,216,74,.7)}
 .aa-opt{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:6px}
+
+/* map selection screen */
+.mapbox{min-width:min(92vw,980px);max-width:96vw;text-align:left}
+.mapbox h2{margin:0 0 14px;letter-spacing:2px;text-transform:uppercase}
+.mapgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:18px}
+.mapgrid .mcard{min-height:120px}
+.mapacts{display:flex;gap:12px;justify-content:flex-end}
+.mapacts button{margin:0}
+.mapacts .battle{padding:12px 28px;font-size:18px}
