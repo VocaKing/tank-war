@@ -309,12 +309,13 @@ export class Game {
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
     if (!hitP) hitP = pos;
-    // focus is the crosshair: always screen centre, never a projected world point
-    const sx = innerWidth * 0.5, sy = innerHeight * 0.5; const focus = this.aimPoint;
-    // radius from current dispersion (base * bloom): moving widens it, holding still shrinks it
+    // focus is the crosshair: canvas centre, not window centre
+    const cv = this.renderer.domElement.getBoundingClientRect();
+    const sx = cv.width * 0.5, sy = cv.height * 0.5; const focus = this.aimPoint;
+    // radius from current dispersion; divide by tan(fov/2) so zoom enlarges the circle in proportion
     const cone = p.dispersion(); const rW = Math.tan(cone) * Math.max(dist, 1);
     const dc = Math.max(0.5, this.camera.position.distanceTo(focus));
-    const radPx = (rW / dc) / Math.tan(this.camera.fov * DEG / 2) * (innerHeight / 2);
+    const radPx = (rW / dc) / Math.tan(this.camera.fov * DEG / 2) * (cv.height / 2);
     this.reticleRadiusWorld = rW;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
     if (!Number.isFinite(sx)) { hud.setReticle(-100, -100, 0, '', ''); return; }

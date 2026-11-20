@@ -120,7 +120,7 @@ export class Tank {
     const stab = s.stabilizer; const aimT = this.aimTime();
     // aim bloom: hull speed, hull rotation and turret traverse widen the circle (stabilisers damp it); it then
     // shrinks back exponentially (≈95 % converged after aimTime seconds) while the tank holds still
-    const disturb = 1 + Math.abs(this.speed) * 0.15 * stab + Math.abs(this.turnRate) * 1.5 * stab + this.yawRate * 2.0 * stab;
+    const disturb = Math.min(Tank.MAX_BLOOM, 1 + Math.abs(this.speed) * 0.15 * stab + Math.abs(this.turnRate) * 1.5 * stab + this.yawRate * 2.0 * stab);
     if (disturb > this.bloom) this.bloom += (disturb - this.bloom) * Math.min(1, dt * 8);
     this.bloom = 1 + (this.bloom - 1) * Math.exp((-dt * 3.0) / aimT); this.bloom = Math.min(this.bloom, Tank.MAX_BLOOM);
     if (this.abilities && this.abilities.isStabilized) this.bloom = Math.min(this.bloom, 1.05);
