@@ -247,7 +247,8 @@ function is2(d) {
   // Fixed bow DT ball mount on the right side of the glacis.
   P.add('hull', 'paint', T(new THREE.SphereGeometry(1, 20, 14), 0.55, 1.14, hl - 0.45, 0, 0, 0, 0.135, 0.115, 0.10));
   P.add('hull', 'dark', cylZ(0.024, 0.24, 10, 0.55, 1.14, hl - 0.30));
-  K.headlight(P, 'hull', -1.18, fy + 0.16, hl - 0.28, true);
+  // Twin guarded headlights, mounted symmetrically on the forward fenders.
+  for (const side of [-1, 1]) K.headlight(P, 'hull', side * 1.18, fy + 0.16, hl - 0.28, true);
 
   // Front tow eyes and their reinforced mounting pads.
   for (const side of [-1, 1]) {
@@ -258,11 +259,20 @@ function is2(d) {
   // Four external cylindrical fuel tanks, two on each rear hull side; their mounts sit outside the hull side plate.
   for (const side of [-1, 1]) {
     for (const z of [-2.50, -1.43]) {
-      P.add('hull', 'paint', cylZ(0.19, 0.90, 24, side * 1.34, fy + 0.04, z));
-      for (const dz of [-0.34, 0.34]) {
-        P.add('hull', 'metal', T(new THREE.TorusGeometry(0.194, 0.014, 6, 24), side * 1.34, fy + 0.04, z + dz));
+      const tankY = fy + 0.16;
+      P.add('hull', 'paint', cylZ(0.19, 0.90, 24, side * 1.34, tankY, z));
+      // Retaining bands, end rims and a raised filler cap make the four rear
+      // auxiliary tanks read as separate external cylinders above the tracks.
+      for (const dz of [-0.36, 0, 0.36]) {
+        P.add('hull', 'metal', T(new THREE.TorusGeometry(0.194, dz === 0 ? 0.018 : 0.014, 6, 24), side * 1.34, tankY, z + dz));
       }
-      P.add('hull', 'metal', cylY(0.045, 0.045, 12, side * 1.34, fy + 0.23, z));
+      for (const dz of [-0.45, 0.45]) P.add('hull', 'metal', cylZ(0.145, 0.025, 20, side * 1.34, tankY, z + dz));
+      P.add('hull', 'metal', cylY(0.045, 0.055, 12, side * 1.34, tankY + 0.19, z + 0.30));
+      // Two short cradles support each tank on the rear hull side.
+      for (const dz of [-0.27, 0.27]) {
+        P.add('hull', 'metal', box(0.10, 0.10, 0.08, side * 1.34, fy + 0.015, z + dz));
+        P.add('hull', 'metal', box(0.30, 0.035, 0.07, side * 1.22, fy + 0.035, z + dz));
+      }
     }
     K.exhaust(P, 'hull', side * 0.55, 1.28, -hl - 0.08, 'ww2', 0.09, 0.42);
     K.towCable(P, 'hull', side * 1.05, H - 0.08, -2.35, 0.72);
@@ -306,9 +316,9 @@ function is2(d) {
   K.hatch(P, 'turret', 0.55, th * 0.94, bz - 0.42, 0.27);
   K.periscope(P, 'turret', -0.30, th * 0.94, bz + 0.22, 0, 0.85);
 
-  // Rear-facing DT ball mount on the left rear turret wall.
-  P.add('turret', 'paint', T(new THREE.SphereGeometry(1, 16, 12), -0.58, 0.42, bz - tl * 0.98, 0, 0, 0, 0.12, 0.11, 0.10));
-  K.mg(P, 'turret', -0.58, 0.42, bz - tl * 0.98, Math.PI, 'dt');
+  // Rear-facing DT ball mount on the right half of the turret bustle.
+  P.add('turret', 'paint', T(new THREE.SphereGeometry(1, 16, 12), 0.58, 0.42, bz - tl * 0.98, 0, 0, 0, 0.12, 0.11, 0.10));
+  K.mg(P, 'turret', 0.58, 0.42, bz - tl * 0.98, Math.PI, 'dt');
   K.liftHooks(P, 'turret', [[-0.86, th * 0.82, bz + 0.72], [0.86, th * 0.82, bz + 0.72]]);
 
   // D-25T 122 mm gun, shaped cast mantlet and double-baffle muzzle brake.
