@@ -10,7 +10,13 @@ import './ui/mobile.css';
 const canvas = document.getElementById('gl'); const ui = document.getElementById('ui');
 const params = new URLSearchParams(location.search);
 const mobile = isMobile(); if (mobile) document.body.classList.add('mobile-mode');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: 'high-performance' });
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: 'high-performance' }); }
+catch(e) {
+  ui.innerHTML='<div style="pointer-events:auto;padding:24px"><h2>3D graphics unavailable</h2><p>当前设备未能启动 WebGL。仍可编辑坦克平衡配置。</p><button id="fallback-balance">游戏平衡编辑器</button></div>';
+  document.getElementById('fallback-balance').onclick=()=>import('./ui/balanceEditor.js');
+  throw e;
+}
 renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 0.85 : params.get('q') === 'low' ? 1 : 1.5));
 renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9; renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -20,7 +26,12 @@ const garage = new Garage(renderer); garage.resize(innerWidth, innerHeight);
 let game = null; let mode = 'menu';
 const loading = document.createElement('div'); loading.className = 'loading'; loading.innerHTML = '<div><h2>Generating battlefield…</h2><p>Sculpting 1.4 km of terrain, planting forests, building villages</p><div class="spin"></div></div>'; ui.appendChild(loading);
 const menu = new Menu(ui, garage, start, openBalance);
-if (mobile) { if (!localStorage.getItem('tw_q')) { menu.quality='low'; menu.root.querySelector('#m-q').value='low'; } const hint=document.createElement('div');hint.className='mobile-garage-hint';hint.textContent='触屏模式 · 滑动模型旋转 · 战斗建议横屏';menu.root.prepend(hint); }
+if (mobile) { if (!localStorage.getItem('tw_q')) { menu.quality='low'; menu.root.querySelector('#m-q').value='low'; } const hint=document.createElement('div');hint.className='mobile-garage-hint';hint.textContent='触屏模式 · 滑动模型旋转 · 战斗建议横屏';menu.root.prepend(hint);
+ const inspect=document.createElement('button');inspect.className='mobile-inspect';inspect.textContent='全屏查看 3D 模型';menu.root.append(inspect);
+ const back=document.createElement('button');back.className='mobile-inspect-back';back.textContent='返回车库';back.hidden=true;ui.append(back);
+ inspect.onclick=()=>{menu.show(false);back.hidden=false;};
+ back.onclick=()=>{back.hidden=true;menu.show(true);};
+ }
 async function openBalance() {
   if (mode !== 'menu') return;
   mode = 'balance';
