@@ -39,9 +39,20 @@ function gear(o) {
 const trackTop = (g) => Math.max(...[...g.wheels, ...g.sprockets, ...g.idlers, ...g.rollers].map((c) => c.y + c.r)) + 0.075;
 function decalsSide(kind, text, part, x, y, z, s) { return [{ kind, text, part, pos: [x, y, z], ry: Math.PI / 2, s }, { kind, text, part, pos: [-x, y, z], ry: -Math.PI / 2, s }]; }
 function turretBody(P, poly, h, sx, sz, cz, y0 = 0) { P.add('turret', 'paint', taper(topExtrude(poly, h, y0, 0.03, 1), y0, y0 + h, sx, sz, cz)); }
-function deckGrilles(P, x0, x1, y, z0, z1, n) { P.add('hull', 'dark', box(x1 - x0, 0.02, z1 - z0, (x0 + x1) / 2, y + 0.005, (z0 + z1) / 2)); for (let i = 0; i < n; i++) P.add('hull', 'paint', box(x1 - x0, 0.035, 0.04, (x0 + x1) / 2, y + 0.02, z0 + ((z1 - z0) * (i + 0.5)) / n)); }
+function deckGrilles(P,x0,x1,y,z0,z1,n){
+  const w=Math.abs(x1-x0), l=Math.abs(z1-z0), x=(x0+x1)/2, z=(z0+z1)/2;
+  P.add('hull','dark',box(w,0.02,l,x,y+0.005,z));
+  for(let i=0;i<n;i++)P.add('hull','paint',box(w,0.045,0.035,x,y+0.03,z0+(z1-z0)*(i+0.5)/n,0.28));
+  for(const edge of [x0,x1])P.add('hull','paint',box(0.04,0.035,l,edge,y+0.029,z));
+  for(const edge of [z0,z1])P.add('hull','paint',box(w,0.035,0.04,x,y+0.029,edge));
+  for(const edge of [x0,x1])for(const ez of [z0,z1])P.add('hull','metal',cylY(0.017,0.018,6,edge,y+0.05,ez));
+}
 function chainCurtain(P, x0, x1, y, z, n = 18, len = 0.42) {
-  for (let i = 0; i < n; i++) { const x = x0 + ((x1 - x0) * i) / (n - 1); P.add('turret', 'metal', cylY(0.012, len, 4, x, y - len / 2, z)); P.add('turret', 'metal', T(new THREE.SphereGeometry(0.055, 8, 6), x, y - len - 0.03, z)); }
+  for (let i = 0; i < n; i++) { const x = x0 + ((x1 - x0) * i) / (n - 1); for(let k=0;k<6;k++) {
+      const g=new THREE.TorusGeometry(len/12,0.008,5,10);
+      g.scale(0.60,1,1);
+      P.add('turret','metal',T(g,x,y-len*(k+0.5)/6,z,0,k%2*Math.PI/2,0));
+    } P.add('turret', 'metal', T(new THREE.SphereGeometry(0.055, 8, 6), x, y - len - 0.03, z)); }
   P.add('turret', 'metal', box(x1 - x0 + 0.1, 0.04, 0.04, (x0 + x1) / 2, y, z));
 }
 function torsionArms(P, inner, g, c) { for (const s of [-1, 1]) K.suspensionArms(P, s * (inner / 2 + 0.06), g.wheels.filter((w, i) => !w.xo || i % 2 === 0), c + 0.12, s); }
@@ -64,7 +75,10 @@ function panther(d) {
   deckGrilles(P, -0.8, 0.8, H, -hl + 0.5, -hl + 1.7, 7); for (const s of [-1, 1]) deckGrilles(P, s * 0.85, s * 1.15, H, -hl + 0.6, -hl + 1.6, 4);
   P.add('hull', 'paint', cylY(0.25, 0.08, 14, 0, H + 0.04, -hl + 2.2));
   for (const s of [-1, 1]) { K.exhaust(P, 'hull', s * 0.42, H - 0.15, -hl - 0.08, 'ww2', 0.1, 0.7); K.stowageBox(P, 'hull', s * 1.0, H - 0.6, -hl - 0.15, 0.55, 0.38, 0.28); }
-  P.add('hull', 'metal', cylY(0.08, 0.5, 10, 0, H - 0.45, -hl - 0.1));
+  P.add('hull','metal',cylY(0.08,0.5,10,0,H-0.45,-hl-0.1));
+  // Panther fan-cover rim and radial grille on the existing round cover.
+  P.add('hull','metal',T(new THREE.TorusGeometry(0.23,0.018,6,24),0,H+0.085,-hl+2.2,Math.PI/2,0,0));
+  for(let i=0;i<8;i++)P.add('hull','dark',box(0.025,0.012,0.40,0,H+0.086,-hl+2.2,0,i*Math.PI/8));
   K.spareLinks(P, 'hull', 0.0, c + 0.55, -hl - 0.03, 3, d.trackW, 0.15, 0, -Math.PI / 2);
   for (const s of [-1, 1]) { K.towCable(P, 'hull', s * 1.25, H - 0.12, -1.6, 1.4, 0.0); K.tools(P, 'hull', s * 0.95, H, 0.2, s); }
   K.skirt(P, 1.74, fy + 0.04, -hl + 0.55, hl - 0.75, 0.55, 6, 0.012); K.skirt(P, -1.74, fy + 0.04, -hl + 0.55, hl - 0.75, 0.55, 6, 0.012);
@@ -100,6 +114,10 @@ function is2(d) {
     K.exhaust(P, 'hull', s * 0.55, 1.3, -hl - 0.1, 'ww2', 0.09, 0.4);
     K.towCable(P, 'hull', s * 1.05, H - 0.05, -2.4, 0.8);
   }
+  for(const side of [-1,1]) {
+    for(const z of [-1.9,-1.3])P.add('hull','metal',T(new THREE.TorusGeometry(0.174,0.014,6,20),side*1.28,fy+0.18,z,0,0,0));
+    P.add('hull','metal',cylY(0.04,0.04,10,side*1.28,fy+0.37,-1.6));
+  }
   K.tools(P, 'hull', 1.3, fy + 0.02, 1.9, 1);
   deckGrilles(P, -0.7, 0.7, H, -hl + 0.5, -hl + 1.6, 6); P.add('hull', 'paint', box(1.6, 0.06, 0.5, 0, H + 0.02, -hl + 2.1));
   K.spareLinks(P, 'hull', -0.4, 1.15, hl - 0.25, 3, d.trackW, 0.16, 0, -60 * DEG);
@@ -129,7 +147,8 @@ function pershing(d) {
   for (const s of [-1, 1]) { K.headlight(P, 'hull', s * 1.3, fy + 0.12, hl - 0.15); K.hatch(P, 'hull', s * 0.6, H, hl - 1.45, 0.27, { periscope: true }); P.add('hull', 'paint', box(0.06, 0.32, d.L * 0.92, s * (d.W / 2 + 0.01), fy - 0.15, 0)); }
   for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.12, 10, s * 0.9, c + 0.3, hl - 0.15));
   deckGrilles(P, -1.1, 1.1, H, -hl + 0.35, -hl + 1.75, 9);
-  P.add('hull', 'paint', box(2.2, 0.35, 0.1, 0, 1.25, -hl - 0.08)); for (const s of [-1, 1]) P.add('hull', 'metal', box(0.5, 0.28, 0.1, s * 0.6, 1.25, -hl - 0.15));
+  P.add('hull','paint',box(2.2,0.35,0.1,0,1.25,-hl-0.08));
+  for(const side of [-1,1])for(let i=0;i<4;i++)P.add('hull','metal',box(0.36,0.022,0.055,side*0.65,1.12+i*0.075,-hl-0.155)); for (const s of [-1, 1]) P.add('hull', 'metal', box(0.5, 0.28, 0.1, s * 0.6, 1.25, -hl - 0.15));
   K.tools(P, 'hull', 0.0, H, -hl + 2.6, 1); K.towCable(P, 'hull', 1.4, fy + 0.04, -2.0, 1.0); K.jerrycans(P, 'hull', -1.45, fy, -2.4, 3, Math.PI / 2);
   K.stowageBox(P, 'hull', -1.4, fy + 0.18, 0.6, 0.45, 0.34, 1.0);
   // cast turret with bustle
@@ -368,7 +387,10 @@ function merkava4(d) {
   }
   // front engine deck grilles on the long glacis (rotated)
   for (let i = 0; i < 6; i++) P.add('hull', 'dark', T(new THREE.BoxGeometry(2.2, 0.03, 0.08), 0, 1.15 + i * 0.08, hl - 0.4 - i * 0.29, -0.24, 0, 0));
-  P.add('hull', 'paint', box(1.1, 0.95, 0.06, 0, 1.05, -hl - 0.02)); P.add('hull', 'metal', box(0.06, 0.2, 0.05, 0.45, 1.05, -hl - 0.06)); // rear door
+  P.add('hull', 'paint', box(1.1, 0.95, 0.06, 0, 1.05, -hl - 0.02)); P.add('hull','metal',box(0.06,0.2,0.05,0.45,1.05,-hl-0.06));
+  // Rear double-door outline and hinge knuckles.
+  P.add('hull','dark',box(0.017,0.92,0.012,0,1.05,-hl-0.057));
+  for(const side of [-1,1])for(const y of [0.75,1.35])P.add('hull','metal',cylY(0.035,0.18,10,side*0.54,y,-hl-0.07));
   K.towCable(P, 'hull', 0.0, H + 0.03, -2.6, -1.0); K.hatchRect(P, 'hull', -0.75, H - 0.15, hl - 2.7, 0.55, 0.5); K.periscope(P, 'hull', -0.75, H - 0.1, hl - 2.45, 0, 0.9);
   // long wedge turret with chain curtain
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0, th = d.turretH;

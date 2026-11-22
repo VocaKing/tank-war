@@ -18,11 +18,17 @@ export function boltRow(P, part, a, b, n, r = 0.017, axis = 'y', mat = 'paint') 
 // round hatch with hinge + handle (lies on a horizontal plane at y)
 export function hatch(P, part, x, y, z, r = 0.3, opts = {}) {
   const ry = opts.ry || 0;
-  P.add(part, 'paint', cylY(r + 0.04, 0.05, 20, x, y, z)); // ring
-  P.add(part, 'paint', cylY(r, 0.07, 20, x, y + 0.04, z)); // lid
+  P.add(part, 'paint', cylY(r + 0.04, 0.05, 32, x, y, z)); // ring
+  P.add(part, 'paint', cylY(r, 0.055, 32, x, y + 0.04, z)); // lid
   P.add(part, 'paint', cylY(r * 0.55, 0.02, 16, x, y + 0.085, z)); // dome
   const [hx, hz] = rot(0, -r * 0.95, ry); P.add(part, 'metal', T(new THREE.CylinderGeometry(0.035, 0.035, r * 0.9, 8), x + hx, y + 0.07, z + hz, 0, ry, Math.PI / 2)); // hinge
   const [gx, gz] = rot(0, r * 0.55, ry); P.add(part, 'metal', T(new THREE.TorusGeometry(0.06, 0.012, 4, 10, Math.PI), x + gx, y + 0.09, z + gz, 0, ry, 0)); // handle
+  // Recessed seam and shaped hinge ears, not painted-on lines.
+  P.add(part, 'dark', T(new THREE.TorusGeometry(r+0.008,0.008,6,32),x,y+0.018,z,Math.PI/2,0,0));
+  for(const side of [-1,1]) {
+    const [ex,ez]=rot(side*r*0.44,-r*0.95,ry);
+    P.add(part,'paint',box(0.055,0.04,0.085,x+ex,y+0.055,z+ez,0,ry));
+  }
   if (opts.periscope) periscope(P, part, x + rot(0, r * 0.1, ry)[0], y + 0.1, z + rot(0, r * 0.1, ry)[1], ry);
 }
 // rectangular hatch
@@ -105,10 +111,16 @@ export function exhaust(P, part, x, y, z, style = 'ww2', r = 0.11, len = 0.55) {
 export function stowageBox(P, part, x, y, z, w, h, d, ry = 0) {
   P.add(part, 'paint', box(w, h, d, x, y, z, 0, ry));
   P.add(part, 'paint', box(w + 0.03, 0.03, d + 0.03, x, y + h / 2 - 0.04, z, 0, ry)); // lid lip
+  // Separate lid seam and hinge cylinders.
+  for (const side of [-1,1]) {
+    const [sx,sz]=rot(side*w*0.3,-d/2,ry);
+    P.add(part,'metal',T(new THREE.CylinderGeometry(0.018,0.018,0.10,8),x+sx,y+h/2-0.035,z+sz,0,ry,Math.PI/2));
+  }
   const [lx, lz] = rot(0, d / 2 + 0.01, ry); P.add(part, 'metal', box(0.06, 0.08, 0.02, x + lx, y + h / 2 - 0.08, z + lz, 0, ry)); // latch
 }
 export function headlight(P, part, x, y, z, guard = true) {
-  P.add(part, 'metal', cylZ(0.085, 0.12, 12, x, y, z)); P.add(part, 'glass', cylZ(0.07, 0.015, 12, x, y, z + 0.065));
+  P.add(part, 'metal', cylZ(0.085, 0.12, 12, x, y, z)); P.add(part,'glass',cylZ(0.07,0.015,24,x,y,z+0.065));
+  P.add(part,'metal',T(new THREE.TorusGeometry(0.074,0.009,6,24),x,y,z+0.07,0,0,0));
   if (guard) for (const a of [-0.6, 0, 0.6]) P.add(part, 'metal', T(new THREE.TorusGeometry(0.11, 0.01, 4, 10, Math.PI), x, y, z + 0.02, 0, 0, a * 0.2));
   P.add(part, 'metal', box(0.04, 0.12, 0.04, x, y - 0.1, z - 0.04));
 }
@@ -120,7 +132,20 @@ export function grabRail(P, part, a, b, h = 0.07, r = 0.012) {
 }
 export function antenna(P, part, x, y, z, h = 2.2) { P.add(part, 'dark', cylY(0.05, 0.12, 8, x, y + 0.06, z)); P.add(part, 'metal', cylY(0.006, h, 4, x, y + h / 2, z, 0.012)); }
 export function jerrycans(P, part, x, y, z, n = 2, ry = 0) {
-  for (let i = 0; i < n; i++) { const [ox, oz] = rot((i - (n - 1) / 2) * 0.19, 0, ry); P.add(part, 'canvas', box(0.17, 0.46, 0.34, x + ox, y + 0.23, z + oz, 0, ry)); P.add(part, 'metal', box(0.04, 0.05, 0.12, x + ox, y + 0.48, z + oz, 0, ry)); }
+  for (let i = 0; i < n; i++) { const [ox, oz] = rot((i - (n - 1) / 2) * 0.19, 0, ry); P.add(part,'paint',box(0.17,0.42,0.34,x+ox,y+0.21,z+oz,0,ry));
+    const [cx,cz]=rot(0,0.108,ry);
+    P.add(part,'metal',cylY(0.035,0.035,10,x+ox+cx,y+0.44,z+oz+cz));
+    // Open handle with two feet, pressed reinforcing ribs on broad faces.
+    for(const dz of [-0.085,0.025]){
+      const [hx,hz]=rot(0,dz,ry);
+      P.add(part,'paint',box(0.045,0.06,0.028,x+ox+hx,y+0.445,z+oz+hz,0,ry));
+    }
+    const [hx,hz]=rot(0,-0.03,ry);
+    P.add(part,'paint',box(0.045,0.025,0.14,x+ox+hx,y+0.475,z+oz+hz,0,ry));
+    for(const side of [-1,1]) for(const a of [-0.58,0.58]){
+      const [rx,rz]=rot(side*0.088,0,ry);
+      P.add(part,'paint',box(0.012,0.30,0.023,x+ox+rx,y+0.21,z+oz+rz,a,ry));
+    } }
 }
 // grid of ERA bricks covering a quad: origin o, u/v axis vectors (unit) and sizes; normal = cross(u, v)
 export function eraGrid(P, part, o, u, v, nu, nv, su, sv, t = 0.07, gap = 0.02, mat = 'paint') {

@@ -89,20 +89,30 @@ export function burntMaterial() { return sharedMats().burnt; }
 // ---------- Running gear ----------
 // Unit road wheel (radius 1, width 1 along x) – dual tyres with a central guide-horn gap.
 // type: 'disc' (dished steel disc), 'spoked' (cast spokes), 'modern' (aluminium, lightening holes), 'steel' (all-steel, no rubber)
-function wheelGeometry(paintHex, type = 'disc') {
+function wheelGeometry(paintHex, type = 'disc', id = '') {
   const col = new THREE.Color(paintHex); const rub = new THREE.Color(0x181817); const hub = new THREE.Color(paintHex).multiplyScalar(0.72); const dark = new THREE.Color(0x0e0e0e); const metal = new THREE.Color(0x4a4843);
   const parts = [];
   const paintC = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
-  const lx = (pts, seg = 16) => { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg); g.rotateZ(-Math.PI / 2); return g; }; // axis -> +x
+  const lx = (pts, seg = 24) => { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg); g.rotateZ(-Math.PI / 2); return g; }; // axis -> +x
   const s = 1; const m = (pts) => pts;
   const tyre = type === 'steel' ? metal : rub;
   paintC(lx(m([[0.86, 0.06], [0.97, 0.07], [1.0, 0.12], [1.0, 0.42], [0.97, 0.47], [0.86, 0.48]])), tyre);
-  paintC(lx(m([[0.86, 0.48], [0.8, 0.46], [type === 'modern' ? 0.62 : 0.5, 0.4], [0.24, 0.43], [0.2, 0.5], [0.0, 0.5]])), col);
-  paintC(lx(m([[0.0, 0.06], [0.86, 0.06]])), hub);
+  // Distinct raised rims and inset web. Spoked wheels use an open annular web.
+  paintC(lx([[0.86,0.48],[0.82,0.50],[0.76,0.50],[0.73,0.44],[0.70,0.43]]),col);
+  if(type==='spoked'){
+    paintC(lx([[0.70,0.43],[0.70,0.18],[0.78,0.18]]),col);
+    paintC(lx([[0,0.50],[0.20,0.50],[0.26,0.43],[0.26,0.13],[0,0.13]]),hub);
+  }else{
+    const inset=type==='modern'?0.62:0.50;
+    paintC(lx([[0.70,0.43],[inset,0.34],[0.29,0.34],[0.24,0.43],[0.20,0.50],[0,0.50]]),col);
+    paintC(lx([[0.67,0.437],[0.65,0.447],[0.63,0.437]]),col);
+  }
+  if(type!=='spoked') paintC(lx([[0,0.06],[0.86,0.06]]),hub);
   paintC(cylX(0.17, 0.08, 10, s * 0.52, 0, 0), hub); // hub cap
-  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; paintC(cylX(0.03, 0.04, 5, s * 0.5, Math.cos(a) * 0.3, Math.sin(a) * 0.3), metal); } // wheel nuts
+  const nuts=({sherman:8,tiger:8,panther:8,t34:6,is2:6,pershing:8,centurion:8,leo1:8,leo2a6:8,t72:8,t90m:8,m1a2:8,chally2:8,merkava4:8,type99a:8})[id]||6;
+  for(let i=0;i<nuts;i++){const a=i/nuts*Math.PI*2;paintC(cylX(0.03,0.045,6,0.48,Math.cos(a)*0.27,Math.sin(a)*0.27),metal);} // wheel nuts
   if (type === 'modern') for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + 0.3; paintC(cylX(0.09, 0.03, 8, s * 0.43, Math.cos(a) * 0.55, Math.sin(a) * 0.55), dark); }
-  if (type === 'spoked') for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; paintC(T(new THREE.BoxGeometry(0.1, 0.1, 0.55), s * 0.44, Math.cos(a) * 0.5, Math.sin(a) * 0.5, a, 0, 0), col.clone().multiplyScalar(0.85)); paintC(cylX(0.08, 0.02, 8, s * 0.42, Math.cos(a + 0.4) * 0.56, Math.sin(a + 0.4) * 0.56), dark); }
+  if(type==='spoked') for(let i=0;i<6;i++){const a=i/6*Math.PI*2;paintC(T(new THREE.BoxGeometry(0.20,0.52,0.13),0.35,Math.cos(a)*0.48,Math.sin(a)*0.48,a,0,0),col);}
   if (type === 'disc' || type === 'steel') for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; paintC(cylX(0.024, 0.03, 5, s * 0.47, Math.cos(a) * 0.72, Math.sin(a) * 0.72), metal); }
   // mirror for the inner tyre
   const half = parts.length; const mir = new THREE.Matrix4().makeScale(-1, 1, 1);
@@ -190,6 +200,12 @@ function buildSherman(d) {
   P.add('turret', 'metal', cylY(0.012, 1.8, 4, -0.6, 1.6, -0.8)); // antenna
   P.add('turret', 'dark', cylZ(0.022, 1.1, 6, 0.42, 1.12, 0.1)); P.add('turret', 'metal', box(0.12, 0.2, 0.25, 0.42, 1.05, -0.3)); // .50 cal
   P.add('turret', 'metal', box(0.08, 0.12, 0.2, 0.32, 0.82, 0.62)); // periscope
+  // Easy Eight: reinforced HVSS spring ends and exposed horizontal shock bodies.
+  for(const side of [-1,1])for(const z of [-1.8,-0.35,1.1]){
+    const x=side*(hw-0.31);
+    P.add('hull','paint',cylZ(0.075,0.59,16,x,0.64,z));
+    for(const dz of [-0.24,0.24])P.add('hull','metal',cylZ(0.085,0.055,12,x,0.64,z+dz));
+  }
   // gun 76 mm M1A2
   P.add('gun', 'paint', lathe([[0.001, -0.3], [0.13, -0.3], [0.13, 0.2], [0.09, 0.3], [0.068, 0.4], [0.058, 3.9], [0.07, 3.92], [0.085, 3.95], [0.085, 4.2], [0.04, 4.2], [0.001, 4.2]], 18));
   P.add('gun', 'dark', box(0.03, 0.06, 0.2, 0.0, 0, 4.08));
@@ -228,6 +244,35 @@ function buildTiger(d) {
   P.add('turret', 'paint', box(0.6, 0.06, 0.7, 0.55, 0.87, -0.3)); P.add('turret', 'dark', cylY(0.12, 0.1, 8, 0.0, 0.88, 0.25));
   P.add('turret', 'metal', cylY(0.012, 2.0, 4, -1.2, 1.7, -2.0));
   P.add('gun', 'paint', lathe([[0.001, -0.25], [0.18, -0.25], [0.18, 0.35], [0.1, 0.45], [0.09, 1.2], [0.08, 2.6], [0.075, 4.6], [0.135, 4.62], [0.135, 4.75], [0.09, 4.77], [0.09, 4.82], [0.135, 4.84], [0.135, 5.0], [0.045, 5.0], [0.001, 5.0]], 18));
+  // Tiger I prototype: visual-only fittings, merged by existing Parts pipeline.
+  for (const side of [-1, 1]) {
+    const x = side * 1.53;
+    // Segmented side fender strips and fasteners.
+    for (let i = 0; i < 6; i++) {
+      const z = -2.45 + i * 0.96;
+      P.add('hull', 'paint', box(0.11, 0.034, 0.93, x, 1.03, z));
+      P.add('hull', 'metal', box(0.035, 0.06, 0.045, x, 1.065, z - 0.42));
+    }
+    // Hatch rims, hinges and grab handles.
+    P.add('hull', 'metal', cylY(0.315, 0.025, 24, side * 0.8, 1.956, 1.95));
+    P.add('hull', 'paint', box(0.22, 0.07, 0.08, side * 0.8, 2.005, 1.72));
+    P.add('hull', 'metal', box(0.18, 0.026, 0.03, side * 0.8, 2.065, 2.05));
+    for (const dx of [-0.075, 0.075]) P.add('hull', 'metal', box(0.026, 0.065, 0.03, side * 0.8 + dx, 2.035, 2.05));
+    // Exhaust heat shield fasteners and dark open outlet.
+    for (const y of [1.25, 1.65]) for (const dx of [-0.12, 0.12]) P.add('hull', 'metal', cylZ(0.022, 0.018, 6, side * 0.5 + dx, y, -3.307));
+    P.add('hull', 'dark', cylY(0.075, 0.018, 16, side * 0.5, 1.732, -3.15));
+    // Rear turret bin hinges and latches.
+    P.add('turret', 'metal', box(0.09, 0.13, 0.025, side * 0.58, 0.55, -2.005));
+    P.add('turret', 'paint', box(0.12, 0.04, 0.08, side * 0.58, 0.665, -1.75));
+  }
+  // Engine deck grille cross braces and small service fasteners.
+  for (const x of [-0.72, 0, 0.72]) P.add('hull', 'paint', box(0.045, 0.035, 1.08, x, 2.01, -1.95));
+  for (const x of [-0.92, 0.92]) for (let i = 0; i < 5; i++) P.add('hull', 'metal', cylY(0.024, 0.018, 6, x, 1.962, -1.4 - i * 0.27));
+  // Commander's cupola lid and loader hatch hinges.
+  P.add('turret', 'paint', cylY(0.33, 0.055, 24, -0.6, 1.16, -0.85));
+  P.add('turret', 'metal', box(0.18, 0.065, 0.08, -0.6, 1.19, -1.12));
+  for (const x of [0.37, 0.73]) P.add('turret', 'paint', box(0.09, 0.065, 0.12, x, 0.92, -0.59));
+  P.add('turret', 'metal', box(0.17, 0.035, 0.04, 0.55, 0.945, -0.08));
   const wheels = []; for (let i = 0; i < 8; i++) wheels.push({ z: -2.25 + i * 0.6, y: 0.45, r: 0.4, w: 0.18, xo: i % 2 ? 0.2 : -0.12 });
   for (let i = 0; i < 8; i++) wheels.push({ z: -2.25 + i * 0.6, y: 0.45, r: 0.4, w: 0.18, xo: i % 2 ? -0.12 : 0.2 });
   return {
@@ -247,6 +292,11 @@ function buildT34(d) {
   P.add('hull', 'metal', cylZ(0.1, 0.12, 10, -1.05, 1.15, 2.6, 0.1, -0.5));
   // external fuel tanks, engine deck, exhausts, spare tracks
   for (const s of [-1, 1]) for (const z of [-1.0, -2.0]) P.add('hull', 'paint', cylZ(0.2, 0.8, 14, s * 1.28, 1.25, z));
+  // T-34 external cylindrical fuel tanks with circumferential retaining straps.
+  for(const side of [-1,1])for(const z of [-1,-2]){
+    for(const dz of [-0.30,0.30]) P.add('hull','metal',T(new THREE.TorusGeometry(0.203,0.014,6,24),side*1.28,1.25,z+dz,0,0,0));
+    P.add('hull','paint',cylY(0.045,0.045,12,side*1.28,1.455,z));
+  }
   P.add('hull', 'dark', box(1.2, 0.03, 1.1, 0, 1.67, -1.4)); for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.3, 10, s * 0.55, 1.15, -3.0, 0.08, 0.6));
   P.add('hull', 'metal', box(1.5, 0.05, 0.4, 0, 1.6, -2.6, 0.45));
   P.add('hull', 'wood', cylX(0.1, 2.0, 8, 0, 1.4, -3.05));
@@ -277,6 +327,9 @@ function buildT72(d) {
   P.add('hull', 'wood', cylX(0.14, 2.6, 10, 0, 1.6, -3.3)); for (const s of [-1, 1]) P.add('hull', 'paint', cylX(0.29, 0.92, 16, s * 0.62, 1.15, -3.55));
   P.add('hull', 'dark', box(2.0, 0.02, 1.5, 0, 1.51, -2.2)); for (let i = 0; i < 8; i++) P.add('hull', 'paint', box(2.0, 0.035, 0.05, 0, 1.53, -1.55 - i * 0.18));
   P.add('hull', 'paint', box(0.6, 0.06, 0.45, 0, 1.52, 1.75)); P.add('hull', 'glass', box(0.12, 0.05, 0.03, 0, 1.53, 2.0));
+  // T-72 external rear fuel drum rims and retention straps.
+  for(const side of [-1,1])for(const dx of [-0.32,0.32])
+    P.add('hull','metal',T(new THREE.TorusGeometry(0.292,0.013,6,24),side*0.62+dx,1.15,-3.55,0,Math.PI/2,0));
   // Kontakt-1 ERA on glacis (rotated to plate slope 68°)
   const gl = 21.8 * DEG; for (let r = 0; r < 2; r++) for (let i = 0; i < 7; i++) { const t = 0.2 + r * 0.32; const z = 3.43 - t * 1.5, y = 0.92 + t * 0.58; P.add('hull', 'paint', box(0.3, 0.08, 0.26, -1.0 + i * 0.33, y + 0.05, z, gl)); }
   P.add('hull', 'metal', box(2.2, 0.06, 0.12, 0, 1.05, 3.12, gl)); // splash guard
@@ -319,6 +372,11 @@ function buildAbrams(d) {
   P.add('hull', 'dark', box(2.6, 0.55, 0.05, 0, 1.1, -3.98)); for (let i = 0; i < 6; i++) P.add('hull', 'metal', box(2.6, 0.03, 0.06, 0, 0.88 + i * 0.09, -4.0));
   P.add('hull', 'dark', box(2.8, 0.02, 2.0, 0, 1.53, -2.6)); for (let i = 0; i < 10; i++) P.add('hull', 'paint', box(2.8, 0.03, 0.06, 0, 1.55, -1.7 - i * 0.19));
   P.add('hull', 'paint', box(0.7, 0.05, 0.5, 0, 1.43, 2.1, 0.2)); for (let i = 0; i < 3; i++) P.add('hull', 'glass', box(0.12, 0.05, 0.03, -0.18 + i * 0.18, 1.45, 2.38, 0.2));
+  // M1 removable skirt panels: visible joints and recessed hinge brackets.
+  for(const side of [-1,1])for(const z of [-3.2,-2.3,-1.4,-0.5,0.4,1.3,2.4,3.25]){
+    P.add('hull','dark',box(0.010,0.48,0.018,side*(z>1.7?1.855:1.84),0.93,z));
+    P.add('hull','paint',box(0.04,0.08,0.13,side*(z>1.7?1.86:1.845),1.16,z));
+  }
   // turret: angular faceted wedge with bustle
   const tp = [[0.95, 2.05], [1.72, 0.55], [1.72, -1.2], [1.55, -2.3], [-1.55, -2.3], [-1.72, -1.2], [-1.72, 0.55], [-0.95, 2.05]];
   P.add('turret', 'paint', taper(topExtrude(tp, 0.72, 0, 0.03, 1), 0, 0.72, 0.95, 0.97));
@@ -370,7 +428,7 @@ const EXTRAS = {
     K.tools(P, 'hull', 0.9, 1.95, 1.4, 1); K.tools(P, 'hull', -0.9, 1.95, 1.4, -1);
     K.cupola(P, 'turret', -0.6, 0.83, -0.85, 0.33, 0.24, 7, 'ww2'); K.mg(P, 'turret', -0.6, 1.25, -0.85, 0, 'mg34');
     K.liftHooks(P, 'turret', [[-0.9, 0.86, 0.4], [0.9, 0.86, 0.4], [0, 0.86, -1.3]]);
-    Object.assign(b, { wheelType: 'steel', cast: 0.3, castTurret: 0.35 });
+    Object.assign(b, { wheelType: 'disc', cast: 0.3, castTurret: 0.35 });
   },
   t72(P, d, b) {
     K.tools(P, 'hull', -1.45, 1.07, 1.8, -1); K.towCable(P, 'hull', 1.15, 1.52, -2.9, -1.0);
@@ -390,14 +448,25 @@ const EXTRAS = {
 // ---------- Template + instance ----------
 const templates = {};
 // one track link (shoe + grouser + guide horns + pins + optional rubber pad); outer side is -y (see placement)
-function linkGeometry(w, pitch, th, modern) {
+function linkGeometry(w, pitch, th, id) {
+  const rubberPad=['sherman','pershing','centurion','leo1','leo2a6','m1a2','chally2','merkava4','type99a'].includes(id);
+  const eastern=['t34','is2','t72','t90m'].includes(id);
   const parts = [];
   const add = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   const steel = new THREE.Color(0x5b5750), dark = new THREE.Color(0x2c2a27), rub = new THREE.Color(0x151514), shiny = new THREE.Color(0x8a857c);
   add(box(w, th * 0.6, pitch * 0.82, 0, 0, 0), steel);
   add(box(w * 0.94, th * 0.5, pitch * 0.18, 0, -th * 0.45, 0), shiny); // grouser (outer, -y)
-  if (modern) for (const s of [-1, 1]) add(box(w * 0.4, th * 0.45, pitch * 0.6, s * w * 0.26, -th * 0.42, pitch * 0.05), rub); // rubber pads
-  for (const s of [-1, 1]) add(box(0.05, th * 1.6, pitch * 0.42, s * w * 0.07, th * 0.95, 0), steel); // guide horns (inner, +y)
+  if (rubberPad) for (const s of [-1,1]) {
+    add(box(w*0.38,th*0.55,pitch*0.62,s*w*0.25,-th*0.45,0),rub);
+    add(box(w*0.39,th*0.18,pitch*0.68,s*w*0.25,-th*0.22,0),steel);
+  } else {
+    // Raised steel chevrons/crossbars rather than rubber pads.
+    for(const s of [-1,1]) add(T(new THREE.BoxGeometry(w*0.43,th*0.40,pitch*0.13),s*w*0.24,-th*0.40,-pitch*0.09,0,s*(eastern?0.28:0.13),0),shiny);
+  }
+  for(const x of eastern?[0]:[-w*0.08,w*0.08]){
+    const horn=new THREE.CylinderGeometry(0.022,0.05,th*1.5,4);
+    add(T(horn,x,th*0.9,0,0,Math.PI/4,0),steel);
+  }
   for (const z of [-1, 1]) add(cylX(th * 0.32, w * 1.04, 6, 0, 0, z * pitch * 0.43), dark); // pins / end connectors
   for (const s of [-1, 1]) add(box(0.04, th * 0.7, pitch * 0.25, s * w * 0.52, 0, pitch * 0.42), dark);
   return mergeGeometries(parts);
@@ -429,9 +498,47 @@ function finishDetails(P, d, b, spec) {
   }
   P.add('hull', 'metal', box(0.16, 0.12, 0.18, 0, d.clearance + 0.3, -hl + 0.02)); P.add('hull', 'metal', cylY(0.03, 0.18, 8, 0, d.clearance + 0.3, -hl - 0.06));
 }
+// Fine roof fittings: sample actual painted surfaces so details follow each hull form.
+function refineRoofDetails(P, spec) {
+  if (spec.id === 'tiger') return;
+  const modern = ['m1a2','chally2','leo2a6','merkava4','type99a','t90m','t72'].includes(spec.id);
+  const rounded = ['sherman','t34','is2','pershing','centurion','t72','t90m'].includes(spec.id);
+  const ray = new THREE.Raycaster();
+  const down = new THREE.Vector3(0,-1,0);
+  for (const part of ['hull','turret']) {
+    const surfaces = P.b[part + '|paint'];
+    if (!surfaces || !surfaces.length) continue;
+    const g = mergeGeometries(surfaces);
+    if (!g) continue;
+    g.computeBoundingBox();
+    const bounds = g.boundingBox;
+    const mat = new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+    const mesh = new THREE.Mesh(g,mat);
+    const width = bounds.max.x - bounds.min.x, length = bounds.max.z - bounds.min.z;
+    const roof = (x,z) => {
+      ray.set(new THREE.Vector3(x,bounds.max.y+1,z),down);
+      const hit = ray.intersectObject(mesh,false)[0];
+      return hit && hit.face && hit.face.normal.y > 0.8 ? hit.point.y : null;
+    };
+    // Low-profile fasteners along deck or turret roof edges, adapted to actual surfaces.
+    for (const side of [-1,1]) {
+      const x = (bounds.min.x+bounds.max.x)/2 + side*width*(part==='hull'?0.34:rounded?0.23:0.32);
+      const count = part==='hull' ? (modern?8:5) : (modern?5:3);
+      for(let i=0;i<count;i++){
+        const z=bounds.min.z+length*(0.20+0.60*(i+0.5)/count);
+        const y=roof(x,z);
+        if(y===null) continue;
+        const radius=modern?0.019:0.024;
+        P.add(part,'paint',cylY(radius*1.4,0.012,8,x,y+0.006,z));
+        P.add(part,'metal',cylY(radius,0.014,6,x,y+0.016,z));
+      }
+    }
+    g.dispose(); mat.dispose();
+  }
+}
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
-  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec);
+  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
@@ -442,12 +549,12 @@ function getTemplate(spec) {
   const trackCircles = [...b.wheels.map((w) => ({ z: w.z, y: w.y, r: w.r })), ...b.sprockets, ...b.idlers, ...b.rollers.filter((r) => !r.free)];
   const pitch = d.trackPitch || (spec.era === 'WWII' ? 0.15 : 0.18);
   const track = trackGeometry(trackCircles, d.trackW, 0.075, pitch);
-  const wheelGeo = wheelGeometry(spec.paint.base, b.wheelType || (b.wheels[0].spoked ? 'spoked' : spec.era === 'WWII' ? 'disc' : 'modern'));
+  const wheelGeo = wheelGeometry(spec.paint.base, b.wheelType || (b.wheels[0].spoked ? 'spoked' : spec.era === 'WWII' ? 'disc' : 'modern'), spec.id);
   const sprocketGeo = sprocketGeometry(spec.paint.base);
   const wheelGeoLo = wheelGeometryLo(spec.paint.base);
   const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.25 });
   const nLinks = Math.round(track.length / pitch);
-  const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.era !== 'WWII');
+  const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.id);
   const linkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.45 });
   templates[spec.id] = { b, geo, paint, paintT, paintG, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch };
   return templates[spec.id];
