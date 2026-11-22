@@ -7,6 +7,7 @@
 //   yellow → orange = may penetrate (more orange = less likely)        grey = no armour behind (gun, wheels)
 import * as THREE from 'three';
 import { SHELL_TYPES, PEN_RNG, zoneLowerFrontY, zoneLowerSideY } from './tankData.js';
+import { impactDrop, MIN_INCIDENCE_COS } from './combatMath.js';
 
 const FACE_KEYS = ['front', 'side', 'rear', 'top', 'bottom'];
 const GLSL = /* glsl */`
@@ -18,7 +19,8 @@ uniform vec2 avArm[12]; // 0-4 hull f,s,r,t,b  5 lowerFront 6 lowerSide  7-10 tu
 uniform vec4 avZone; // lowerFrontY, lowerSideY, mantletHalfW, turretH
 uniform vec4 avMods; // heatMult, eraHEAT, eraKE, skirt
 uniform vec4 avShell; // pen@100, falloff, caliber, ricochetDeg
-uniform vec4 avShell2; // normalizeDeg, heat, he, rng
+uniform vec4 avShell2; // reserved, heat, he, rng
+uniform float avVelocity;
 varying vec3 vAvW;
 // returns (tEntry, axis, sign); axis < 0 => miss
 vec3 avSlab(vec3 a, vec3 b, vec3 lo, vec3 hi) {
@@ -43,7 +45,15 @@ vec4 armorColor(vec3 W) {
   vec3 t = avTurOn > 0.5 ? avSlab(ta, tb, vec3(-avTurBox.x, avTurBox.y, avTurBox.w - avTurL), vec3(avTurBox.x, avTurBox.z, avTurBox.w + avTurL)) : vec3(2.0, -1.0, 0.0);
   bool turret = t.y >= 0.0 && (h.y < 0.0 || t.x < h.x);
   vec3 hit = turret ? t : h; if (hit.y < 0.0) return vec4(-1.0);
-  vec3 A = turret ? ta : a, B = turret ? tb : b; vec3 L = mix(A, B, hit.x); vec3 ld = normalize(B - A);
+  vec3 A = turret ? ta : a, B = turret ? tb : b; vec3 L = mix(A, B, hit.x);
+  // Use the predicted impact point, not the visible fitting behind the plate.
+  vec3 delta = (W + dirW * 2.5 - avMuzzle) * hit.x;
+  float d2 = dot(delta, delta);
+  float u = avVelocity * avVelocity - 9.81 * delta.y;
+  float disc = u*u - 9.81*9.81*d2;
+  if (disc >= 0.0 && u > 0.0) delta.y -= 9.81*d2/max(1e-6,u+sqrt(disc));
+  vec3 ld = normalize((avInv * vec4(delta, 0.0)).xyz);
+  if (turret) ld = avRotY(ld,avTur.w);
   int face; // 0 front 1 side 2 rear 3 top 4 bottom
   if (hit.y > 1.5) face = hit.z > 0.0 ? 0 : 2; else if (hit.y > 0.5) face = hit.z > 0.0 ? 3 : 4; else face = 1;
   vec2 arm; int idx = face;
@@ -58,19 +68,19 @@ vec4 armorColor(vec3 W) {
   float sl = radians(arm.y); vec3 n;
   if (face == 0) n = vec3(0.0, sin(sl), cos(sl)); else if (face == 2) n = vec3(0.0, sin(sl), -cos(sl));
   else if (face == 1) n = vec3(hit.z * cos(sl), sin(sl), 0.0); else n = vec3(0.0, face == 3 ? 1.0 : -1.0, 0.0);
-  float cosA = -dot(ld, n); float ang = cosA <= 0.0 ? 89.5 : degrees(acos(clamp(cosA, -1.0, 1.0)));
-  float na = max(0.0, ang - avShell2.x);
-  float eff = arm.x / max(0.05, cos(radians(na)));
+  float cosA = clamp(abs(dot(ld,n)),0.0,1.0);
+  float ang = degrees(acos(cosA));
+  float eff = arm.x / max(${MIN_INCIDENCE_COS.toExponential()},cosA);
   bool heat = avShell2.y > 0.5, he = avShell2.z > 0.5;
   if (heat) { eff *= avMods.x; if (face == 0) eff += avMods.y; if (!turret && face == 1) eff += avMods.w; }
   else if (!he && face == 0) eff += avMods.z;
   if (!turret && face == 1 && L.y < avZone.y) eff += 20.0;
   bool ric = !he && ang > avShell.w && !(avShell.z > arm.x * 3.0);
-  float dist = length(W - avMuzzle);
+  float dist = sqrt(d2);
   float pen = avShell.x * max(0.35, 1.0 - avShell.y * max(0.0, dist - 100.0) / 1000.0);
   float pmin = pen * (1.0 - avShell2.w), pmax = pen * (1.0 + avShell2.w);
   vec3 col;
-  if (ric || eff >= pmax) col = vec3(0.86, 0.12, 0.08);
+  if (ric || eff > pmax) col = vec3(0.86, 0.12, 0.08);
   else if (eff <= pmin) col = vec3(0.16, 0.82, 0.22);
   else { float p = (pmax - eff) / (pmax - pmin); col = mix(vec3(1.0, 0.42, 0.05), vec3(1.0, 0.86, 0.12), p); }
   return vec4(col, float(idx));
@@ -115,7 +125,7 @@ export class ArmorView {
       avInv: { value: new THREE.Matrix4() }, avMuzzle: { value: new THREE.Vector3() }, avTur: { value: new THREE.Vector4() },
       avHull: { value: new THREE.Vector4() }, avTurBox: { value: new THREE.Vector4() }, avTurL: { value: 1 }, avTurOn: { value: 1 },
       avArm: { value: Array.from({ length: 12 }, () => new THREE.Vector2()) }, avZone: { value: new THREE.Vector4() },
-      avMods: { value: new THREE.Vector4() }, avShell: { value: new THREE.Vector4() }, avShell2: { value: new THREE.Vector4() },
+      avMods: { value: new THREE.Vector4() }, avShell: { value: new THREE.Vector4() }, avShell2: { value: new THREE.Vector4() }, avVelocity: { value: 1 },
     };
     const s = t.spec, A = s.armor, dd = s.dims;
     FACE_KEYS.forEach((k, i) => u.avArm.value[i].set(...(A.hull[k] || A.hull.bottom)));
@@ -155,7 +165,7 @@ export class ArmorView {
       const d = this.ensure(t); this.setOn(t, true); const u = d.u;
       u.avInv.value.copy(t.inv); u.avMuzzle.value.copy(muzzle);
       const tp = t.model.turret.position; u.avTur.value.set(tp.x, tp.y, tp.z, t.turretYaw); u.avTurOn.value = t.turretGone ? 0 : 1;
-      u.avShell.value.set(sh.pen, ty.falloff, sh.caliber, ty.ricochet); u.avShell2.value.set(ty.normalize || 0, ty.heat ? 1 : 0, ty.he ? 1 : 0, PEN_RNG);
+      u.avShell.value.set(sh.pen, ty.falloff, sh.caliber, ty.ricochet); u.avShell2.value.set(0, ty.heat ? 1 : 0, ty.he ? 1 : 0, PEN_RNG); u.avVelocity.value = sh.velocity;
     }
   }
   // CPU mirror of the shader classification (used by tests and the HUD legend)
@@ -163,10 +173,15 @@ export class ArmorView {
     const g = this.game, p = g.player; const muzzle = p.model.muzzle.getWorldPosition(new THREE.Vector3());
     const dir = worldPoint.clone().sub(muzzle).normalize(); const end = worldPoint.clone().addScaledVector(dir, 2.5);
     const hit = target.rayTest(muzzle, end); if (!hit) return { cls: 'none' };
-    const dist = muzzle.distanceTo(worldPoint); const ev = g.ballistics.evaluate(target, hit, p.shell, dist);
+    const delta = end.clone().sub(muzzle).multiplyScalar(hit.t);
+    const dist = delta.length();
+    delta.y -= impactDrop(delta.lengthSq(), delta.y, p.shell.velocity);
+    hit.ldir.copy(delta).transformDirection(target.inv);
+    if (hit.part === 'turret') hit.ldir.applyAxisAngle(new THREE.Vector3(0,1,0),-target.turretYaw);
+    const ev = g.ballistics.evaluate(target, hit, p.shell, dist);
     const pmin = ev.pen * (1 - PEN_RNG), pmax = ev.pen * (1 + PEN_RNG);
-    const cls = ev.ricochet || ev.eff >= pmax ? 'red' : ev.eff <= pmin ? 'green' : 'yellow';
-    return { cls, eff: Math.round(ev.eff), pen: Math.round(ev.pen), part: hit.part, face: hit.face, zone: ev.zone, angle: Math.round(ev.angle), ricochet: ev.ricochet };
+    const cls = ev.ricochet || ev.eff > pmax ? 'red' : ev.eff <= pmin ? 'green' : 'yellow';
+    return { cls, los: ev.los, eff: Math.round(ev.eff), pen: Math.round(ev.pen), part: hit.part, face: hit.face, zone: ev.zone, angle: Math.round(ev.angle), ricochet: ev.ricochet };
   }
   dispose() { for (const t of this.data.keys()) this.setOn(t, false); }
   overlayCount(t) { const d = this.data.get(t); return d && d.ov ? d.ov.filter((o) => o.visible).length : 0; }
