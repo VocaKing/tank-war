@@ -18,3 +18,6 @@ See CREDITS.md for licenses.
 - **Reticle.** The dispersion circle is projected at the real impact distance in both third-person and sniper view. Fixed a bug where the reticle disappeared while reloading.
 - **Tanks.** Weathering (rain streaks, paint chipping), plus tail-light clusters, rubber mud flaps, fender brackets, track tensioners, tow shackles, a tow pintle and a rear infantry phone on modern tanks.
 - **Maps.** Building colour variation for walls, shutters/doors and roofs. Four boulder shapes with bedding strata and tint variety. Per-instance tree and bush tint. Field patchwork on the terrain.
+
+## Balance editor
+Open `?balance=1` on the same game origin. Modify tank values, save, then reload the game. The local profile applies to both player and NPC tanks. Export `balanceDefaults.json` to back up or publish; to change defaults for all players, replace `src/game/balanceDefaults.json` in the repository and rebuild/deploy. Existing local profiles can be reset to the published defaults. No tokens or server access are required for local editing. Run `node tools_balance.mjs` to check data initialization and refresh behavior.
