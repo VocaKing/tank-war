@@ -103,7 +103,7 @@ function panther(d) {
   const gz = bz + tl - 0.1;
   P.add('gun', 'paint', cylX(0.38, 1.25, 20, 0, -0.02, 0.05)); P.add('gun', 'paint', box(1.25, 0.25, 0.3, 0, -0.32, 0.05)); P.add('gun', 'dark', box(0.1, 0.07, 0.04, 0.38, 0.12, 0.43));
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.07, brake: { type: 'double', r: 0.105, len: 0.42 } });
-  return { P, ...g, wheelType: 'disc', cast: 0.35, castTurret: 0.4, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, gz], decals: [...decalsSide('cross', '', 'turret', tw * 0.9 + 0.05, 0.42, bz - 0.4, 0.42), ...decalsSide('text', '211', 'turret', tw * 0.9 + 0.05, 0.42, bz + 0.25, 0.5)] };
+  return { P, ...g, wheelType: 'single', cast: 0.35, castTurret: 0.4, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, gz], decals: [...decalsSide('cross', '', 'turret', tw * 0.9 + 0.05, 0.42, bz - 0.4, 0.42), ...decalsSide('text', '211', 'turret', tw * 0.9 + 0.05, 0.42, bz + 0.25, 0.5)] };
 }
 
 function is2(d) {
@@ -133,10 +133,13 @@ function is2(d) {
   }
 
   // Two cylindrical auxiliary fuel drums on the rear hull sides (not rectangular side bins).
+  // Four auxiliary fuel tanks: two cylindrical drums along each rear hull side.
   for (const side of [-1, 1]) {
-    P.add('hull', 'paint', cylZ(0.17, 0.95, 18, side * 1.48, fy + 0.04, -1.62));
-    for (const z of [-2.02, -1.22]) P.add('hull', 'metal', T(new THREE.TorusGeometry(0.174, 0.014, 6, 24), side * 1.48, fy + 0.04, z));
-    P.add('hull', 'metal', cylY(0.04, 0.045, 10, side * 1.48, fy + 0.23, -1.62));
+    for (const z of [-2.50, -1.43]) {
+      P.add('hull', 'paint', cylZ(0.17, 0.90, 18, side * 1.48, fy + 0.04, z));
+      for (const dz of [-0.34, 0.34]) P.add('hull', 'metal', T(new THREE.TorusGeometry(0.174, 0.014, 6, 24), side * 1.48, fy + 0.04, z + dz));
+      P.add('hull', 'metal', cylY(0.04, 0.045, 10, side * 1.48, fy + 0.23, z));
+    }
     K.exhaust(P, 'hull', side * 0.55, 1.28, -hl - 0.08, 'ww2', 0.09, 0.42);
     K.towCable(P, 'hull', side * 1.05, H - 0.08, -2.35, 0.72);
   }
@@ -149,19 +152,19 @@ function is2(d) {
   // Broad, rounded cast IS-2 turret with the characteristic wide gun shield.
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0, th = d.turretH;
   const poly = superEllipse(tw, tl * 0.88, tl * 1.04, 2.35, 64, (x, z) => [
-    x * (z > 0.35 ? 1 - (z - 0.35) * 0.10 : 1), z,
+    x * (x > 0 ? 0.94 : 1.0) * (z > 0.35 ? 1 - (z - 0.35) * 0.10 : 1), z,
   ]).map(([x, z]) => [x, z + bz]);
   turretBody(P, poly, th * 0.96, 0.84, 0.89, bz);
 
   // Commander cupola and loader's hatch are separate roof fittings; DShK is mounted
   // on the commander's cupola on this late-production 1944 configuration.
   K.cupola(P, 'turret', 0.56, th * 0.93, bz - 0.48, 0.30, 0.25, 6, 'ww2');
-  K.mg(P, 'turret', 0.56, th + 0.28, bz - 0.48, 0, 'dshk');
+  K.mg(P, 'turret', 0.56, th + 0.28, bz - 0.78, 0, 'dshk');
   K.hatch(P, 'turret', -0.48, th * 0.95, bz - 0.45, 0.26);
   K.periscope(P, 'turret', -0.34, th * 0.95, bz + 0.18, 0, 0.85);
   // Rear-facing DT machine gun in the turret bustle.
-  P.add('turret', 'paint', T(new THREE.SphereGeometry(0.105, 14, 10), 0, 0.42, bz - tl * 0.98));
-  K.mg(P, 'turret', 0, 0.42, bz - tl * 0.98, Math.PI, 'mg34');
+  P.add('turret', 'paint', T(new THREE.SphereGeometry(0.105, 14, 10), -0.58, 0.42, bz - tl * 0.98));
+  K.mg(P, 'turret', -0.58, 0.42, bz - tl * 0.98, Math.PI, 'dt');
   K.liftHooks(P, 'turret', [[-0.82, th * 0.82, bz + 0.72], [0.82, th * 0.82, bz + 0.72]]);
   K.grabRail(P, 'turret', [-1.02, 0.42, bz - 0.15], [-1.02, 0.42, bz + 0.38], 0.0);
   K.grabRail(P, 'turret', [1.02, 0.42, bz - 0.15], [1.02, 0.42, bz + 0.38], 0.0);
