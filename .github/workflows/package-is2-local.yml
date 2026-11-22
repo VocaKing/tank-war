@@ -1,0 +1,32 @@
+name: Package IS-2 local Windows Blender scripts
+on:
+  push:
+    branches:
+      - blender/is2-model1944-level2
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/package-is2-local.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify scripts exist
+        run: |
+          python3 -m py_compile tools/blender/is2_model1944_blockout.py
+          test -s tools/blender/build-is2-windows.ps1
+          test -s tools/blender/build-is2-windows.cmd
+      - name: Upload local build tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: is2-windows-local-build-source
+          path: |
+            tools/blender/is2_model1944_blockout.py
+            tools/blender/build-is2-windows.ps1
+            tools/blender/build-is2-windows.cmd
+          if-no-files-found: error
