@@ -8,6 +8,7 @@ import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, tap
 import { buildV2 } from './tanksV2.js';
 import * as K from './kit.js';
 import { gunMount, hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
+export { THREE };
 
 // ---------- Materials ----------
 let NOISE_TEX = null;
