@@ -88,6 +88,11 @@ try {
   assert.equal(tank.idlersPerSide,1,tank.id+' must have one idler per side');
   assert.equal(tank.driveSprocketsPerSide,1,tank.id+' must have one drive sprocket per side');
  }
+ const expectedReturnRollers={sherman:3,t34:0,tiger:0,panther:0,is2:3,pershing:5,centurion:6,t72:3,leo1:4,m1a2:2,chally2:4,leo2a6:4,merkava4:4,type99a:3,t90m:3};
+ for(const tank of result.report){
+  assert.equal(tank.returnRollersPerSide,expectedReturnRollers[tank.id],tank.id+' has an incorrect return-roller count');
+  assert.ok(Math.abs(tank.rendered.width-tank.specDims.width)<0.45,tank.id+' track / hull width envelope is too far from the reference width');
+ }
  const tiger=result.report.find(t=>t.id==='tiger');
  assert.equal(tiger.roadWheelStationsPerSide,24,'Tiger I must show 24 individual interleaved road wheels per side');
  const is2=result.report.find(t=>t.id==='is2');
