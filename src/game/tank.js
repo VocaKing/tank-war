@@ -120,8 +120,10 @@ export class Tank {
     const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
     const prev = this.turretYaw; this.turretYaw = wrapAngle(approachAngle(this.turretYaw, yawT, rate * dt));
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
-    this.gunPitch = approach(this.gunPitch, clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG), s.gunSpeed * DEG * dt);
-    this.aimError = Math.abs(wrapAngle(yawT - this.turretYaw)) + Math.abs(clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG) - this.gunPitch);
+    const minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
+    const desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
+    this.gunPitch=clamp(approach(this.gunPitch,desiredPitch,s.gunSpeed*DEG*dt),minPitch,s.gunElevation*DEG);
+    this.aimError=Math.abs(wrapAngle(yawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
     // Constant and symmetric rate from fully aimed to maximum bloom.
     // Turning in place is motion too; small numerical residuals are ignored.
     const moving = Math.abs(this.speed) > 0.001 || Math.abs(this.turnRate) > 0.001;
@@ -143,7 +145,7 @@ export class Tank {
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
-    m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.gun.position.z = (m.gun.userData.z0 ??= m.gun.position.z) - this.recoil * 0.45;
+    m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
   tryFire(time) {
