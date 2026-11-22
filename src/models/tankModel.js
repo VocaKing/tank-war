@@ -319,6 +319,28 @@ function buildT34(d) {
     decals: [{ kind: 'redstar', part: 'turret', pos: [0.95, 0.4, -0.15], ry: Math.PI / 2 + 0.2, s: 0.45 }, { kind: 'redstar', part: 'turret', pos: [-0.95, 0.4, -0.15], ry: -Math.PI / 2 - 0.2, s: 0.45 }, { kind: 'text', text: '24', part: 'turret', pos: [0.93, 0.42, -0.75], ry: Math.PI / 2 + 0.25, s: 0.5 }],
   };
 }
+function cutTurretGunPort(geometry, center, radius) {
+  const src=geometry.index?geometry.toNonIndexed():geometry;
+  const p=src.attributes.position,keep=[];
+  for(let i=0;i<p.count;i+=3){
+    const x=(p.getX(i)+p.getX(i+1)+p.getX(i+2))/3-center[0];
+    const y=(p.getY(i)+p.getY(i+1)+p.getY(i+2))/3-center[1];
+    const z=(p.getZ(i)+p.getZ(i+1)+p.getZ(i+2))/3-center[2];
+    if(x*x+y*y+z*z<radius*radius)continue;
+    keep.push(i,i+1,i+2);
+  }
+  const out=new THREE.BufferGeometry();
+  for(const [name,a] of Object.entries(src.attributes)){
+    const arr=new Float32Array(keep.length*a.itemSize);
+    for(let j=0;j<keep.length;j++)for(let k=0;k<a.itemSize;k++)arr[j*a.itemSize+k]=a.array[keep[j]*a.itemSize+k];
+    out.setAttribute(name,new THREE.BufferAttribute(arr,a.itemSize,a.normalized));
+  }
+  out.computeBoundingBox();out.computeBoundingSphere();
+  if(src!==geometry)src.dispose();
+  geometry.dispose();
+  return out;
+}
+
 function buildT72(d) {
   const P = new Parts(); const hw = d.W / 2;
   P.add('hull', 'paint', sideExtrude([[-3.35, 0.5], [3.1, 0.5], [3.45, 0.62], [3.43, 0.92], [1.93, 1.5], [-3.32, 1.5], [-3.45, 1.2]], 2.3, 0, 0.02));
@@ -337,14 +359,18 @@ function buildT72(d) {
   P.add('hull', 'metal', box(2.2, 0.06, 0.12, 0, 1.05, 3.12, gl)); // splash guard
   for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.1, 10, s * 0.95, 1.05, 3.3));
   // turret dome
-  const dome = new THREE.SphereGeometry(1, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, 0.72, 1.28);
+  let dome = new THREE.SphereGeometry(1, 96, 48, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, 0.72, 1.28);
   { const p = dome.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getZ(i) > 0.4) p.setZ(i, 0.4 + (p.getZ(i) - 0.4) * 0.85); } dome.computeVertexNormals(); }
+  // Remove a real circular aperture at the forward trunnion; the mantlet ring
+  // and breech pass through this opening instead of intersecting the cast dome.
+  dome = cutTurretGunPort(dome,[0,0.34,1.019],0.285);
   P.add('turret', 'paint', dome); P.add('turret', 'paint', cylY(1.12, 0.12, 32, 0, 0.0, 0, 1.15));
   // ERA on turret arc
   for (let r = 0; r < 2; r++) for (let a = -70; a <= 70; a += 14) { if (Math.abs(a) < 12) continue; const ar = a * DEG; const rr = r ? 0.96 : 1.12;
     P.add('turret', 'paint', box(0.27, 0.2, 0.09, Math.sin(ar) * rr * 1.08, 0.2 + r * 0.25, Math.cos(ar) * rr * 1.12 + 0.05, -0.25 - r * 0.3, ar)); }
   for (let i = 0; i < 6; i++) P.add('turret', 'paint', box(0.27, 0.08, 0.22, -0.6 + i * 0.24 + (i > 2 ? 0.2 : -0.2), 0.68, 0.55, 0.15));
-  P.add('gun','paint',box(0.6,0.48,0.3,0,-0.02,0.20));
+  const t72Mantlet=lathe([[0.205,-0.18],[0.29,-0.18],[0.325,-0.09],[0.31,0.03],[0.27,0.16],[0.235,0.25],[0.205,0.25]],32);
+  t72Mantlet.translate(0,-0.02,0.16); P.add('gun','paint',t72Mantlet);
   P.add('turret', 'paint', cylY(0.32, 0.2, 16, 0.45, 0.76, -0.2)); P.add('turret', 'metal', box(0.12, 0.16, 0.7, 0.45, 1.0, 0.0)); P.add('turret', 'dark', cylZ(0.022, 1.2, 6, 0.45, 1.0, 0.5)); // NSVT
   P.add('turret', 'paint', cylY(0.28, 0.1, 14, -0.45, 0.72, -0.25)); P.add('turret', 'metal', box(0.3, 0.3, 0.32, -0.55, 0.78, 0.38)); P.add('turret', 'glass', box(0.22, 0.14, 0.02, -0.55, 0.8, 0.55));
   P.add('turret', 'metal', box(0.3, 0.3, 0.3, 0.72, 0.45, 0.95)); P.add('turret', 'glass', cylZ(0.12, 0.02, 14, 0.72, 0.45, 1.11)); // Luna IR light
@@ -356,7 +382,7 @@ function buildT72(d) {
   return {
     P, wheels: [-2.55, -1.62, -0.69, 0.24, 1.17, 2.1].map((z) => ({ z, y: 0.4, r: 0.375, w: 0.46 })),
     sprockets: [{ z: -3.15, y: 0.62, r: 0.33 }], idlers: [{ z: 2.95, y: 0.56, r: 0.31 }], rollers: [-1.6, 0.0, 1.5].map((z) => ({ z, y: 0.98, r: 0.075 })),
-    turretPos: [0, 1.5, d.turretZ], gunPos: [0, 0.34, 1.05], gunMountZ: 1.05,
+    turretPos: [0, 1.5, d.turretZ], gunPos: [0, 0.34, 1.05], gunMountZ: 1.05, gunMountNoCollar: true,
     decals: [{ kind: 'text', text: '214', part: 'turret', pos: [-0.85, 0.42, -0.6], ry: -Math.PI / 2 - 0.5, s: 0.5 }, { kind: 'text', text: '214', part: 'turret', pos: [0.85, 0.42, -0.6], ry: Math.PI / 2 + 0.5, s: 0.5 }],
   };
 }
