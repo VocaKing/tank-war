@@ -189,17 +189,21 @@ for side in (-1, 1):
 # Put turret and its fittings into a single parent empty, preserving gun pivot.
 turret_root = bpy.data.objects.new("Turret_Root", None)
 bpy.context.collection.objects.link(turret_root)
-for ob in list(bpy.context.scene.objects):
-    if ob.name.startswith(("Turret_", "Commander_", "Cupola_", "D25T_cast_mantlet")):
-        ob.parent = turret_root
 turret_root.location = (0.0, 0.0, 1.62)
+for ob in list(bpy.context.scene.objects):
+    if ob.name.startswith(("Turret_", "Commander_", "Cupola_", "D25T_cast_mantlet")) or ob == pivot:
+        world = ob.matrix_world.copy()
+        ob.parent = turret_root
+        ob.matrix_world = world
 
 # Organize root and export GLB
 root = bpy.data.objects.new("IS2_Model1944_Root", None)
 bpy.context.collection.objects.link(root)
 for ob in list(bpy.context.scene.objects):
     if ob != root and ob.parent is None:
+        world = ob.matrix_world.copy()
         ob.parent = root
+        ob.matrix_world = world
 root["variant"] = "IS-2 Model 1944"
 root["units"] = "meters"
 root["forward_axis"] = "+Y (Blender source); convert to +Z in Three.js import adapter"
