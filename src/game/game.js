@@ -17,6 +17,7 @@ import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 import { Post } from '../render/post.js';
 import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
+import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, dispersionPixels } from './combatMath.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
 function _segDist(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceTo(p); }
@@ -43,6 +44,7 @@ export class Game {
     this.keys = {}; this.mouseDown = false; this.aimPoint = new THREE.Vector3();
     this.hud = new HUD(uiRoot, this);
     this.bindInput();
+    if (isMobile()) this.touch = new TouchControls(this);
     if (this.quality === 'high' && !opts.noPost) { try { this.post = new Post(renderer, this.scene, this.camera); } catch (e) { console.warn('post-processing disabled', e); this.post = null; } }
     try { this.outline = new Outline(renderer, this.quality); } catch (e) { console.warn('outline disabled', e); this.outline = null; }
     this.resize();
@@ -100,6 +102,7 @@ export class Game {
     });
     on(window, 'keyup', (e) => { this.keys[e.code] = false; if (e.code === 'Tab') this.hud.scoreboard(false); });
     on(c, 'mousedown', (e) => {
+      if (this.touch && e.sourceCapabilities?.firesTouchEvents) return;
       this.audio.init(); this.audio.resume();
       if (this.paused || this.ended) return;
       if (document.pointerLockElement !== c) { c.requestPointerLock?.(); }
@@ -182,7 +185,7 @@ export class Game {
     }
     return false;
   }
-  setPaused(v) { if (this.ended) return; this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
+  setPaused(v) { if (this.ended) return; this.touch?.clear(); this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
   exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
   resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); if (this.post) this.post.resize(innerWidth, innerHeight); if (this.outline) this.outline.resize(); }
   onKill(attacker, victim, cause) {
@@ -203,9 +206,10 @@ export class Game {
     const p = this.player; const k = this.keys;
     if (!p.alive || this.ended) { p.input.throttle = 0; p.input.steer = 0; return; }
     p.input.throttle = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0); p.input.steer = (k.KeyA ? 1 : 0) - (k.KeyD ? 1 : 0);
+    if (this.touch) { p.input.throttle = clamp(p.input.throttle + this.touch.throttle,-1,1); p.input.steer = clamp(p.input.steer + this.touch.steer,-1,1); }
     if (k.Space) { p.input.throttle = 0; p.speed *= 0.9; }
     p.input.aim.copy(this.aimPoint);
-    if (this.mouseDown) p.tryFire(this.time);
+    if (this.mouseDown || this.touch?.firing) p.tryFire(this.time);
   }
   updateCapture(dt) {
     for (let i = 0; i < 2; i++) {
@@ -360,6 +364,7 @@ export class Game {
     for (const t of this.tanks) { if (!t.model.links) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
   }
   update(dt) {
+    this.touch?.update();
     if (this.paused) return;
     dt = Math.min(dt, 0.05); this.time += dt; setWindTime(this.time);
     this.updatePlayerInput();
@@ -398,6 +403,7 @@ export class Game {
     if (this.outline && !this.camOverride) this.outline.render(this.assist.outlineTarget(), this.camera);
   }
   dispose() {
+    this.touch?.dispose();
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
     this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
