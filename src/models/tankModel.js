@@ -90,7 +90,7 @@ function sharedMats() {
 export function burntMaterial() { return sharedMats().burnt; }
 
 // ---------- Running gear ----------
-// Unit road wheel (radius 1, width 1 along x) – dual tyres with a central guide-horn gap.
+// Unit road wheel (radius 1, width 1 along x); most builders use paired wheel discs, while 'single' is for German interleaved wheels.
 // type: 'disc' (dished steel disc), 'spoked' (cast spokes), 'modern' (aluminium, lightening holes), 'steel' (all-steel, no rubber)
 function wheelGeometry(paintHex, type = 'disc', id = '') {
   const col = new THREE.Color(paintHex); const rub = new THREE.Color(0x181817); const hub = new THREE.Color(paintHex).multiplyScalar(0.72); const dark = new THREE.Color(0x0e0e0e); const metal = new THREE.Color(0x4a4843);
@@ -289,10 +289,10 @@ function buildTiger(d) {
   P.add('turret', 'metal', box(0.18, 0.065, 0.08, -0.6, 1.19, -1.12));
   for (const x of [0.37, 0.73]) P.add('turret', 'paint', box(0.09, 0.065, 0.12, x, 0.92, -0.59));
   P.add('turret', 'metal', box(0.17, 0.035, 0.04, 0.55, 0.945, -0.08));
-  // Late Tiger I running gear: 24 steel road wheels per side in three interleaved rows.
+  // Early Tiger I running gear: 24 rubber-tyred road wheels per side in three interleaved rows.
   const wheels = [];
   for (let row = 0; row < 3; row++) for (let i = 0; i < 8; i++) {
-    wheels.push({ z: -2.15 + i * 0.6 + (row === 1 ? 0.3 : 0), y: 0.45, r: 0.4, w: 0.17, xo: [-0.19, 0, 0.19][row] });
+    wheels.push({ z: -2.15 + i * 0.6 + (row === 1 ? 0.3 : 0), y: 0.45, r: 0.4, w: 0.22, xo: [-0.19, 0, 0.19][row] });
   }
   return {
     P, wheels, sprockets: [{ z: 2.75, y: 0.8, r: 0.42 }], idlers: [{ z: -2.88, y: 0.7, r: 0.3 }], rollers: [], wheelType: 'single',
