@@ -228,6 +228,35 @@ function buildTiger(d) {
   P.add('turret', 'paint', box(0.6, 0.06, 0.7, 0.55, 0.87, -0.3)); P.add('turret', 'dark', cylY(0.12, 0.1, 8, 0.0, 0.88, 0.25));
   P.add('turret', 'metal', cylY(0.012, 2.0, 4, -1.2, 1.7, -2.0));
   P.add('gun', 'paint', lathe([[0.001, -0.25], [0.18, -0.25], [0.18, 0.35], [0.1, 0.45], [0.09, 1.2], [0.08, 2.6], [0.075, 4.6], [0.135, 4.62], [0.135, 4.75], [0.09, 4.77], [0.09, 4.82], [0.135, 4.84], [0.135, 5.0], [0.045, 5.0], [0.001, 5.0]], 18));
+  // Tiger I prototype: visual-only fittings, merged by existing Parts pipeline.
+  for (const side of [-1, 1]) {
+    const x = side * 1.53;
+    // Segmented side fender strips and fasteners.
+    for (let i = 0; i < 6; i++) {
+      const z = -2.45 + i * 0.96;
+      P.add('hull', 'paint', box(0.11, 0.034, 0.93, x, 1.03, z));
+      P.add('hull', 'metal', box(0.035, 0.06, 0.045, x, 1.065, z - 0.42));
+    }
+    // Hatch rims, hinges and grab handles.
+    P.add('hull', 'metal', cylY(0.315, 0.025, 24, side * 0.8, 1.956, 1.95));
+    P.add('hull', 'paint', box(0.22, 0.07, 0.08, side * 0.8, 2.005, 1.72));
+    P.add('hull', 'metal', box(0.18, 0.026, 0.03, side * 0.8, 2.065, 2.05));
+    for (const dx of [-0.075, 0.075]) P.add('hull', 'metal', box(0.026, 0.065, 0.03, side * 0.8 + dx, 2.035, 2.05));
+    // Exhaust heat shield fasteners and dark open outlet.
+    for (const y of [1.25, 1.65]) for (const dx of [-0.12, 0.12]) P.add('hull', 'metal', cylZ(0.022, 0.018, 6, side * 0.5 + dx, y, -3.307));
+    P.add('hull', 'dark', cylY(0.075, 0.018, 16, side * 0.5, 1.732, -3.15));
+    // Rear turret bin hinges and latches.
+    P.add('turret', 'metal', box(0.09, 0.13, 0.025, side * 0.58, 0.55, -2.005));
+    P.add('turret', 'paint', box(0.12, 0.04, 0.08, side * 0.58, 0.665, -1.75));
+  }
+  // Engine deck grille cross braces and small service fasteners.
+  for (const x of [-0.72, 0, 0.72]) P.add('hull', 'paint', box(0.045, 0.035, 1.08, x, 2.01, -1.95));
+  for (const x of [-0.92, 0.92]) for (let i = 0; i < 5; i++) P.add('hull', 'metal', cylY(0.024, 0.018, 6, x, 1.962, -1.4 - i * 0.27));
+  // Commander's cupola lid and loader hatch hinges.
+  P.add('turret', 'paint', cylY(0.33, 0.055, 24, -0.6, 1.16, -0.85));
+  P.add('turret', 'metal', box(0.18, 0.065, 0.08, -0.6, 1.19, -1.12));
+  for (const x of [0.37, 0.73]) P.add('turret', 'paint', box(0.09, 0.065, 0.12, x, 0.92, -0.59));
+  P.add('turret', 'metal', box(0.17, 0.035, 0.04, 0.55, 0.945, -0.08));
   const wheels = []; for (let i = 0; i < 8; i++) wheels.push({ z: -2.25 + i * 0.6, y: 0.45, r: 0.4, w: 0.18, xo: i % 2 ? 0.2 : -0.12 });
   for (let i = 0; i < 8; i++) wheels.push({ z: -2.25 + i * 0.6, y: 0.45, r: 0.4, w: 0.18, xo: i % 2 ? -0.12 : 0.2 });
   return {
