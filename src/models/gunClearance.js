@@ -28,7 +28,7 @@ export function gunMount(P,b,spec,lathe){
  const raw=Object.entries(P.b).filter(([k])=>k.startsWith('turret|')).flatMap(([,v])=>v);
  const original=b.gunPos[2],front=centralFront(raw);
  // Reserve a little space in front of the turret for the moving gun tube.
- const pivot=Math.max(original,Number.isFinite(front)?front+0.12:original);
+ const pivot=Number.isFinite(b.gunMountZ)?b.gunMountZ:Math.max(original,Number.isFinite(front)?front+0.12:original);
  const shift=pivot-original;
  b.gunPos=[b.gunPos[0],b.gunPos[1],pivot];
  // Integrate the trunnion support into the armor, no floating gap or exposed rod
