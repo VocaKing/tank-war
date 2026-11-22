@@ -24,6 +24,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node tools_muzzle_geometry.mjs
       - run: npm run build
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
