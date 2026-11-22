@@ -51,7 +51,7 @@ export const cylZ = (r, len, seg, x, y, z, r2 = r, rx = 0) => T(new THREE.Cylind
 // side profile [[z,y]...] extruded across x
 export function sideExtrude(profile, width, x = 0, bevel = 0.02) {
   const s = new THREE.Shape(profile.map(([z, y]) => new THREE.Vector2(z, y)));
-  const g = new THREE.ExtrudeGeometry(s, { depth: width - bevel * 2, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 1, curveSegments: 4 });
+  const g = new THREE.ExtrudeGeometry(s, { depth: width - bevel * 2, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2, curveSegments: 8 });
   g.rotateY(-Math.PI / 2); g.translate(width / 2 - bevel + x, 0, 0); return g;
 }
 // top-view polygon [[x,z]...] extruded vertically
@@ -73,7 +73,7 @@ export function taper(g, y0, y1, sx, sz = sx, cz = 0) {
   g.computeVertexNormals(); return g;
 }
 export function lathe(profile, seg = 20) { // profile [[r, z]] -> revolve around z
-  const g = new THREE.LatheGeometry(profile.map(([r, z]) => new THREE.Vector2(r, z)), seg);
+  const g = new THREE.LatheGeometry(profile.map(([r, z]) => new THREE.Vector2(r, z)), Math.max(32,seg));
   g.rotateX(Math.PI / 2); return g;
 }
 export function superEllipse(rx, rzF, rzR, n = 2.6, seg = 40, fn) {
