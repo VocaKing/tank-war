@@ -178,20 +178,80 @@ export function barrel(P, part, len, opts = {}) {
   const ev = opts.evac;
   if (ev) { pr.push([r0 * 0.92 + (r1 - r0 * 0.92) * (ev.z - ev.len / 2) / end, ev.z - ev.len / 2 - 0.04], [ev.r, ev.z - ev.len / 2 + 0.06], [ev.r, ev.z + ev.len / 2 - 0.1], [r0 * 0.9 + (r1 - r0 * 0.9) * (ev.z + ev.len / 2) / end, ev.z + ev.len / 2]); }
   pr.push([r1, end], [r1 * 1.08, end + 0.01]);
-  if (!opts.brake) pr.push([r1 * 1.08, len], [r1 * 0.6, len], [0.001, len]); else pr.push([r1 * 0.6, end + 0.02], [0.001, end + 0.02]);
-  P.add(part, opts.mat || 'paint', lathe(pr, 18));
+  if (!opts.brake) pr.push([r1 * 1.08, len], [r1 * 0.72, len], [0.001, len]); else pr.push([r1 * 1.08, end + 0.01], [r1 * 0.72, end + 0.01], [0.001, end + 0.01]);
+  P.add(part, opts.mat || 'paint', lathe(pr, 32));
   if (opts.sleeve) { const n = opts.sleeve; for (let i = 1; i < n; i++) { const z = 0.4 + (end - 0.6) * (i / n); if (ev && Math.abs(z - ev.z) < ev.len / 2 + 0.1) continue; const rr = r0 + (r1 - r0) * (z / end); P.add(part, 'metal', cylZ(rr * 1.18, 0.05, 16, 0, 0, z)); } }
   if (opts.brake) {
     const b = opts.brake; const z0 = end; const rb = b.r;
     if (b.type === 'double') {
-      P.add(part, 'paint', lathe([[0.001, z0], [rb, z0], [rb, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.55], [rb, z0 + b.len * 0.55], [rb, z0 + b.len], [r1 * 0.7, z0 + b.len], [0.001, z0 + b.len]], 16));
-      for (const f of [0.45, 0.8]) for (const s of [-1, 1]) P.add(part, 'dark', box(0.03, rb * 1.3, b.len * 0.18, s * rb * 0.98, 0, z0 + b.len * f));
+      P.add(part, 'paint', lathe([[0.001, z0], [rb, z0], [rb, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.55], [rb, z0 + b.len * 0.55], [rb, z0 + b.len], [rb * 0.72, z0 + b.len], [0.001, z0 + b.len]], 32));
+      for (const f of [0.45, 0.8]) for (const side of [-1, 1]) P.add(part, 'dark', box(0.03, rb * 1.3, b.len * 0.18, side * rb * 0.98, 0, z0 + b.len * f));
     } else if (b.type === 'single') {
-      P.add(part, 'paint', box(rb * 2.2, rb * 1.5, b.len, 0, 0, z0 + b.len / 2)); for (const s of [-1, 1]) P.add(part, 'dark', box(0.02, rb * 1.1, b.len * 0.6, s * rb * 1.11, 0, z0 + b.len / 2));
-    } else { P.add(part, 'paint', cylZ(rb, b.len, 16, 0, 0, z0 + b.len / 2)); for (let i = 0; i < 4; i++) P.add(part, 'dark', cylX(0.025, rb * 2.05, 6, 0, 0, z0 + b.len * (0.25 + i * 0.17))); }
+      const hole = Math.min(0.065, rb * 0.58), outerX = rb * 1.1, outerY = rb * 0.75;
+      const barY = Math.max(0.018, outerY - hole), barX = Math.max(0.018, outerX - hole);
+      P.add(part, 'paint', box(outerX * 2, barY, b.len, 0, hole + barY / 2, z0 + b.len / 2));
+      P.add(part, 'paint', box(outerX * 2, barY, b.len, 0, -hole - barY / 2, z0 + b.len / 2));
+      P.add(part, 'paint', box(barX, hole * 2, b.len, hole + barX / 2, 0, z0 + b.len / 2));
+      P.add(part, 'paint', box(barX, hole * 2, b.len, -hole - barX / 2, 0, z0 + b.len / 2));
+      for (const side of [-1, 1]) P.add(part, 'dark', box(0.02, rb * 1.1, b.len * 0.6, side * rb * 1.11, 0, z0 + b.len / 2));
+    } else {
+      const bore = Math.min(0.065, rb * 0.62);
+      P.add(part, 'paint', lathe([[bore, z0], [rb, z0], [rb, z0 + b.len], [bore, z0 + b.len]], 32));
+      for (const f of [0.25, 0.45, 0.65, 0.85]) for (const side of [-1, 1]) P.add(part, 'dark', box(0.035, 0.055, 0.08, side * rb * 0.9, 0, z0 + b.len * f));
+    }
   }
   if (opts.mrs) { P.add(part, 'metal', box(0.07, 0.07, 0.1, 0, r1 * 1.4, len - 0.12)); }
 }
+
+// Convert the terminal face of each assembled gun into a real open muzzle.
+// The inner liner and recessed dark chamber make the bore visible from front and
+// oblique views; the outer cap triangles are removed rather than painted black.
+export function hollowMuzzle(P, opts = {}) {
+  const entries=Object.entries(P.b).filter(([key])=>key.startsWith('barrel|'));
+  const parts=entries.flatMap(([,list])=>list);
+  if(!parts.length)return null;
+  let muzzleZ=-Infinity;
+  for(const g of parts){g.computeBoundingBox();muzzleZ=Math.max(muzzleZ,g.boundingBox.max.z);}
+  let outer=0,removed=0;
+  for(const g of parts){
+    const p=g.attributes.position;
+    const near=[];
+    for(let i=0;i<p.count;i++)if(Math.abs(p.getZ(i)-muzzleZ)<1e-4)near.push(Math.hypot(p.getX(i),p.getY(i)));
+    if(near.length)outer=Math.max(outer,...near);
+    const keep=[];
+    for(let i=0;i<p.count;i+=3){
+      const cap=Math.abs(p.getZ(i)-muzzleZ)<1e-4&&Math.abs(p.getZ(i+1)-muzzleZ)<1e-4&&Math.abs(p.getZ(i+2)-muzzleZ)<1e-4;
+      if(cap){removed++;continue;}
+      keep.push(i,i+1,i+2);
+    }
+    if(keep.length!==p.count){
+      const out=new THREE.BufferGeometry();
+      for(const [name,a] of Object.entries(g.attributes)){
+        const arr=new Float32Array(keep.length*a.itemSize);
+        for(let j=0;j<keep.length;j++)for(let k=0;k<a.itemSize;k++)arr[j*a.itemSize+k]=a.array[keep[j]*a.itemSize+k];
+        out.setAttribute(name,new THREE.BufferAttribute(arr,a.itemSize,a.normalized));
+      }
+      out.computeBoundingBox();out.computeBoundingSphere();
+      const at=parts.indexOf(g);if(at>=0)parts[at]=out;
+      g.dispose();
+    }
+  }
+  if(!(outer>0.035))return {muzzleZ,outer,bore:0,removed};
+  const bore=Math.max(0.028,Math.min(opts.boreRadius??0.067,outer*0.68));
+  const depth=Math.max(0.28,Math.min(0.46,outer*4.2));
+  const wall=new THREE.CylinderGeometry(bore,bore,depth,32,1,true).rotateX(Math.PI/2);
+  wall.translate(0,0,muzzleZ-depth/2);
+  P.add('barrel','bore',wall);
+  const chamber=new THREE.CircleGeometry(bore*0.97,32);
+  chamber.translate(0,0,muzzleZ-depth+0.018);
+  P.add('barrel','bore',chamber);
+  const lip=Math.max(0.006,Math.min(0.012,(outer-bore)*0.3));
+  const rim=new THREE.TorusGeometry((outer+bore)/2,lip,8,36);
+  rim.translate(0,0,muzzleZ-lip);
+  P.add('barrel','metal',rim);
+  return {muzzleZ,outer,bore,depth,removed};
+}
+
 // road-wheel arm / hub pieces on the hull side between wheel and hull (torsion bar style)
 export function suspensionArms(P, x, wheels, yHull, side, mat = 'metal') {
   for (const w of wheels) { const zx = w.z + 0.18 * side * 0; P.add('hull', mat, T(new THREE.BoxGeometry(0.08, 0.1, 0.42), x, (w.y + yHull) / 2, zx + 0.12, 0.6, 0, 0)); P.add('hull', mat, cylX(0.07, 0.14, 8, x - side * 0.04, yHull, zx + 0.3)); }
