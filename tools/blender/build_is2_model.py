@@ -430,7 +430,7 @@ def build_model():
     # Main hull side silhouette, extruded to real width. Front slope is about 60 deg from vertical.
     profile = [
         (-3.385, 0.48), (-3.385, 1.58), (-3.02, 1.88),
-        (0.99, 1.88), (3.10, 0.66), (3.10, 0.48)
+        (1.27, 1.88), (3.385, 0.66), (3.385, 0.48)
     ]
     hull = extruded_yz_profile("HULL_CAST_AND_ROLLED_SHELL", profile, 1.405, cast, hull_coll)
     parent_keep_world(hull, hull_root)
@@ -440,9 +440,9 @@ def build_model():
     parent_keep_world(belly, hull_root)
 
     # Upper deck and cast nose transitions.
-    deck = add_box("ENGINE_AND_FIGHTING_COMPARTMENT_DECK", (0, -0.96, 1.83), (2.74, 4.10, 0.16), olive, hull_coll, 0.04)
+    deck = add_box("ENGINE_AND_FIGHTING_COMPARTMENT_DECK", (0, -0.87, 1.83), (2.74, 4.28, 0.16), olive, hull_coll, 0.04)
     parent_keep_world(deck, hull_root)
-    nose = add_box("CAST_NOSE_EDGE", (0, 2.93, 0.72), (2.70, 0.25, 0.22), cast, hull_coll, 0.04)
+    nose = add_box("CAST_NOSE_EDGE", (0, 3.27, 0.72), (2.70, 0.25, 0.22), cast, hull_coll, 0.04)
     parent_keep_world(nose, hull_root)
 
     # Driver vision slit lies on the late sloped nose, not in a large stepped-hull hatch.
@@ -474,14 +474,14 @@ def build_model():
     parent_keep_world(mantlet, turret_root)
     gun_breech = add_cylinder("D25T_BREECH", (0, 1.25, 2.30), 0.19, 0.48, dark, turret_coll, "Y", 48, 0.012)
     parent_keep_world(gun_breech, gun_pivot)
-    barrel = add_cylinder("D25T_BARREL", (0, 3.87, 2.30), 0.082, 4.78, olive, turret_coll, "Y", 48, 0.008)
+    barrel = add_cylinder("D25T_BARREL", (0, 3.79, 2.30), 0.082, 4.72, olive, turret_coll, "Y", 48, 0.008)
     parent_keep_world(barrel, gun_pivot)
     barrel_collar = add_cylinder("D25T_BARREL_ROOT_COLLAR", (0, 1.60, 2.30), 0.118, 0.28, cast, turret_coll, "Y", 48, 0.008)
     parent_keep_world(barrel_collar, gun_pivot)
-    muzzle = add_cylinder("D25T_MUZZLE_BRAKE", (0, 6.30, 2.30), 0.135, 0.42, cast, turret_coll, "Y", 48, 0.012)
+    muzzle = add_cylinder("D25T_MUZZLE_BRAKE", (0, 6.235, 2.30), 0.135, 0.42, cast, turret_coll, "Y", 48, 0.012)
     parent_keep_world(muzzle, gun_pivot)
     for side in (-1, 1):
-        port = add_box("MUZZLE_BRAKE_SIDE_PORT", (side * 0.122, 6.30, 2.30), (0.025, 0.25, 0.10),
+        port = add_box("MUZZLE_BRAKE_SIDE_PORT", (side * 0.122, 6.235, 2.30), (0.025, 0.25, 0.10),
                        dark, turret_coll, 0.008)
         parent_keep_world(port, gun_pivot)
 
@@ -492,16 +492,16 @@ def build_model():
     parent_keep_world(sight, turret_root)
 
     # Commander cupola on the left rear; loader's hatch to the right.
-    cupola = add_cylinder("COMMANDER_CUPOLA", (-0.57, -0.70, 2.66), 0.405, 0.24, cast, turret_coll, "Z", 56, 0.018)
-    cupola_ring = add_torus("COMMANDER_CUPOLA_RING", (-0.57, -0.70, 2.79), 0.36, 0.025, dark, turret_coll)
-    cupola_hatch = add_cylinder("COMMANDER_HATCH_LID", (-0.57, -0.70, 2.80), 0.31, 0.045, olive, turret_coll)
+    cupola = add_cylinder("COMMANDER_CUPOLA", (-0.57, -0.70, 2.63), 0.405, 0.24, cast, turret_coll, "Z", 56, 0.018)
+    cupola_ring = add_torus("COMMANDER_CUPOLA_RING", (-0.57, -0.70, 2.75), 0.36, 0.025, dark, turret_coll)
+    cupola_hatch = add_cylinder("COMMANDER_HATCH_LID", (-0.57, -0.70, 2.7525), 0.31, 0.045, olive, turret_coll)
     parent_keep_world(cupola, turret_root)
     parent_keep_world(cupola_ring, turret_root)
     parent_keep_world(cupola_hatch, turret_root)
     for i in range(6):
         a = 2 * PI * i / 6
         slot = add_box("CUPOLA_VISION_BLOCK", (-0.57 + math.cos(a) * 0.365,
-                        -0.70 + math.sin(a) * 0.365, 2.70), (0.085, 0.025, 0.045),
+                        -0.70 + math.sin(a) * 0.365, 2.67), (0.085, 0.025, 0.045),
                        glass, turret_coll, 0.004, rotation=(0, 0, a))
         parent_keep_world(slot, turret_root)
 
@@ -581,13 +581,13 @@ def build_model():
     for side in (-1, 1):
         for i, y in enumerate((-2.72, -1.82), 1):
             tank = add_cylinder("AUX_FUEL_TANK_%s_%02d" % ("L" if side < 0 else "R", i),
-                                (side * 1.13, y, 1.57), 0.18, 0.78, olive, detail_coll, "Y", 48, 0.012)
+                                (side * 1.20, y, 1.99), 0.18, 0.78, olive, detail_coll, "Y", 48, 0.012)
             parent_keep_world(tank, hull_root)
             for dy in (-0.30, 0.30):
                 band = add_torus("AUX_TANK_RETAINING_BAND",
-                                 (side * 1.13, y + dy, 1.57), 0.18, 0.014, steel, detail_coll, "Y")
+                                 (side * 1.20, y + dy, 1.99), 0.18, 0.014, steel, detail_coll, "Y")
                 parent_keep_world(band, hull_root)
-            cap = add_cylinder("AUX_TANK_FILLER_CAP", (side * 1.13, y + 0.22, 1.75),
+            cap = add_cylinder("AUX_TANK_FILLER_CAP", (side * 1.20, y + 0.22, 2.17),
                                0.045, 0.035, dark, detail_coll, "Z", 24, 0.003)
             parent_keep_world(cap, hull_root)
 
@@ -639,6 +639,11 @@ def build_model():
                             (0.08, 0.15, 0.12), dark, detail_coll, 0.008)
             parent_keep_world(spare, hull_root)
 
+    # Raise the hull/turret above the running gear to preserve the published ground clearance.
+    # The track contact plane is z=0.42 m; hull bottom then sits at 0.86 m (0.44 m clearance).
+    hull_root.location.z += 0.38
+    turret_root.location.z += 0.38
+
     # Asset metadata used by the integration and audit scripts.
     root["vehicle"] = "IS-2"
     root["variant"] = "Late-1944 ChKZ production configuration"
@@ -670,7 +675,7 @@ def build_model():
 def create_render_rig(out_dir):
     rig = ensure_collection("RENDER_RIG")
     floor_mat = material("Preview floor", (0.055, 0.065, 0.06), 0.0, 0.95, 0, 0)
-    floor = add_box("PREVIEW_GROUND", (0, 0, -0.10), (30, 30, 0.15), floor_mat, rig, 0.02)
+    floor = add_box("PREVIEW_GROUND", (0, 0, 0.32), (30, 30, 0.15), floor_mat, rig, 0.02)
     # Workbench render uses studio lighting and material colors; cameras are orthographic.
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_WORKBENCH"
@@ -688,7 +693,7 @@ def create_render_rig(out_dir):
     scene.render.resolution_y = 900
     scene.render.resolution_percentage = 100
     scene.render.film_transparent = False
-    target = Vector((0, 0.35, 1.35))
+    target = Vector((0, 0.35, 1.78))
     views = {
         "front": (Vector((0, 12, 2.4)), 4.8),
         "front3q": (Vector((9.5, 10.5, 7.0)), 11.8),
