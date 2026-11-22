@@ -1,0 +1,40 @@
+name: Tank model audit
+
+on:
+  push:
+    branches:
+      - models/real-world-vehicle-corrections
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'src/models/**'
+      - 'src/game/tankData.js'
+      - 'tools_visual_tank_audit.mjs'
+      - '.github/workflows/model-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  model-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node tools_muzzle_geometry.mjs
+      - run: node tools_visual_tank_audit.mjs
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tank-model-audit
+          path: tank-audit-output/
+          if-no-files-found: warn
+          retention-days: 7
