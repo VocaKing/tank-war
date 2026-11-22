@@ -37,7 +37,7 @@ try {
    const size=all.getSize(new THREE.Vector3()),bs=body.getSize(new THREE.Vector3()),ts=turret.getSize(new THREE.Vector3());
    return {spec,model,bounds:all,center:all.getCenter(new THREE.Vector3()),size:{length:+size.z.toFixed(2),width:+size.x.toFixed(2),height:+size.y.toFixed(2)},body:{length:+bs.z.toFixed(2),width:+bs.x.toFixed(2),height:+bs.y.toFixed(2)},turret:{length:+ts.z.toFixed(2),width:+ts.x.toFixed(2),height:+ts.y.toFixed(2)}};
   });
-  const report=models.map(x=>({id:x.spec.id,short:x.spec.short,specDims:{hullLength:x.spec.dims.L,width:x.spec.dims.W,hullH:x.spec.dims.hullH,turretH:x.spec.dims.turretH},rendered:x.size,body:x.body,turret:x.turret,gunLen:x.spec.dims.gunLen,muzzle:x.model.muzzleInfo,gunClearance:x.model.gunClearance,gunMountNoCollar:x.model.gunMountNoCollar,roadWheelStationsPerSide:x.model.roadWheelStationsPerSide,idlersPerSide:x.model.idlersPerSide,returnRollersPerSide:x.model.returnRollersPerSide,driveSprocketsPerSide:x.model.driveSprocketsPerSide}));
+  const report=models.map(x=>({id:x.spec.id,short:x.spec.short,specDims:{hullLength:x.spec.dims.L,width:x.spec.dims.W,hullH:x.spec.dims.hullH,turretH:x.spec.dims.turretH,trackWidth:x.spec.dims.trackW},rendered:x.size,body:x.body,turret:x.turret,gunLen:x.spec.dims.gunLen,trackPitch:x.model.pitch,trackLinksPerSide:x.model.trackLinksPerSide,muzzle:x.model.muzzleInfo,gunClearance:x.model.gunClearance,gunMountNoCollar:x.model.gunMountNoCollar,roadWheelStationsPerSide:x.model.roadWheelStationsPerSide,roadWheelDiscsPerSide:x.model.roadWheelDiscsPerSide,roadWheelDiameter:x.model.roadWheelDiameter,frontIdlerDiameter:x.model.frontIdlerDiameter,driveSprocketTeethPerSide:x.model.driveSprocketTeethPerSide,auxiliaryFuelTanks:x.model.auxiliaryFuelTanks,headlights:x.model.headlights,rearDTMountX:x.model.rearDTMountX,roadWheelStarIndentations:x.model.roadWheelStarIndentations,turretLeftWallAngleFromVertical:x.model.turretLeftWallAngleFromVertical,turretRightWallAngleFromVertical:x.model.turretRightWallAngleFromVertical,glacisAngleFromVertical:x.model.glacisAngleFromVertical,idlersPerSide:x.model.idlersPerSide,returnRollersPerSide:x.model.returnRollersPerSide,driveSprocketsPerSide:x.model.driveSprocketsPerSide}));
   const webgl=document.createElement('canvas'),renderer=new THREE.WebGLRenderer({canvas:webgl,antialias:true,alpha:false,preserveDrawingBuffer:true});
   renderer.setPixelRatio(1);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor(0x1a242c,1);renderer.autoClear=false;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a242c);
@@ -46,11 +46,19 @@ try {
   const fill=new THREE.DirectionalLight(0x9cb7d1,1.2);fill.position.set(-8,5,-5);scene.add(fill);
   const draw=(entry,width,height,view)=>{
    scene.add(entry.model.root);entry.model.root.updateMatrixWorld(true);
-   const aspect=width/height,largest=Math.max(entry.size.length,entry.size.width,entry.size.height);
-   const span=largest*1.38;
+   const aspect=width/height;
+   // Frame each orthographic view around the dimensions that are actually
+   // visible from that direction; the previous length-based front framing
+   // made the nose, turret face and suspension details too small to inspect.
+   const span=view==='front'||view==='rear'
+    ? Math.max(entry.size.width,entry.size.height)*1.05
+    : view==='top'
+     ? entry.size.length*1.10
+     : Math.max(entry.size.length,entry.size.height)*1.05;
    const camera=new THREE.OrthographicCamera(-span*aspect/2,span*aspect/2,span/2,-span/2,0.1,100);
    const c=entry.center;
-   const v=view==='side'?[12,4,0.4]:view==='front'?[0,4,13]:[9,6,11];
+   const v=view==='side'?[12,4,0.4]:view==='opposite'?[-12,4,0.4]:view==='front'?[0,4,13]:view==='rear'?[0,4,-13]:view==='top'?[0,16,0.01]:[9,6,11];
+   if(view==='top')camera.up.set(0,0,-1);
    camera.position.set(c.x+v[0],c.y+v[1],c.z+v[2]);camera.lookAt(c.x,c.y+0.08,c.z);camera.updateProjectionMatrix();
    renderer.setSize(width,height,false);renderer.setViewport(0,0,width,height);renderer.setScissor(0,0,width,height);renderer.setScissorTest(true);renderer.clear(true,true,true);renderer.render(scene,camera);
    scene.remove(entry.model.root);
@@ -63,9 +71,9 @@ try {
    g.drawImage(draw(models[i],cellW,cellH-30,'three'),x,y);
    g.fillStyle='#e7edf4';g.font='bold 17px system-ui';g.fillText(models[i].spec.short,x+10,y+cellH-9);
   }
-  const is2=models.find(x=>x.spec.id==='is2'),views=['three','side','front'],tileW=720,tileH=540,detail=document.createElement('canvas');detail.width=tileW*3;detail.height=tileH+32;
+  const is2=models.find(x=>x.spec.id==='is2'),views=['three','side','opposite','front','rear','top'],labels=['FRONT 3/4','RIGHT SIDE','LEFT SIDE','FRONT','REAR','TOP'],tileW=640,tileH=480,detail=document.createElement('canvas');detail.width=tileW*views.length;detail.height=tileH+32;
   const dctx=detail.getContext('2d');dctx.fillStyle='#111820';dctx.fillRect(0,0,detail.width,detail.height);
-  for(let i=0;i<views.length;i++){dctx.drawImage(draw(is2,tileW,tileH,views[i]),i*tileW,0);dctx.fillStyle='#e7edf4';dctx.font='bold 16px system-ui';dctx.fillText(['FRONT 3/4','SIDE','FRONT'][i],i*tileW+10,tileH+23);}
+  for(let i=0;i<views.length;i++){dctx.drawImage(draw(is2,tileW,tileH,views[i]),i*tileW,0);dctx.fillStyle='#e7edf4';dctx.font='bold 16px system-ui';dctx.fillText(labels[i],i*tileW+10,tileH+23);}
   renderer.dispose();
   return {report,grid:grid.toDataURL('image/jpeg',0.66).split(',')[1],is2:detail.toDataURL('image/jpeg',0.7).split(',')[1]};
  });
@@ -98,6 +106,19 @@ try {
  const is2=result.report.find(t=>t.id==='is2');
  assert.equal(is2.specDims.hullLength,6.77);
  assert.equal(is2.specDims.width,3.09);
+ assert.ok(Math.abs(is2.roadWheelDiameter-0.55)<1e-6,'IS-2 road wheels must be 550 mm in diameter');
+ assert.equal(is2.roadWheelStationsPerSide,6,'IS-2 must have six road-wheel stations per side');
+ assert.equal(is2.roadWheelDiscsPerSide,12,'IS-2 must have six twin road-wheel pairs per side');
+ assert.ok(Math.abs(is2.frontIdlerDiameter-0.55)<1e-6,'IS-2 front idler must match the 550 mm road-wheel diameter');
+ assert.equal(is2.trackLinksPerSide,86,'IS-2 tracks must contain 86 links per side');
+ assert.equal(is2.driveSprocketTeethPerSide,14,'IS-2 drive sprocket must use 14-tooth rims');
+ assert.equal(is2.auxiliaryFuelTanks,4,'IS-2 must have four external auxiliary fuel tanks');
+ assert.equal(is2.headlights,2,'IS-2 must have two guarded headlights');
+ assert.ok(Math.abs(is2.rearDTMountX-0.58)<1e-6,'IS-2 rear DT ball mount must be on the right half of the turret bustle');
+ assert.equal(is2.roadWheelStarIndentations,12,'IS-2 cast road wheels must show twelve star indentations');
+ assert.ok(Math.abs(is2.turretLeftWallAngleFromVertical-4)<0.2,'IS-2 left turret wall must remain nearly vertical');
+ assert.ok(Math.abs(is2.turretRightWallAngleFromVertical-20)<0.2,'IS-2 right turret wall must slope by about 20 degrees');
+ assert.ok(Math.abs(is2.glacisAngleFromVertical-60)<0.2,'IS-2 Model 1944 upper glacis must be 60 degrees from vertical');
  console.log('VISUAL_AUDIT_REPORT='+JSON.stringify(result.report));
  console.log('VISUAL_AUDIT_GRID='+result.grid);
  console.log('VISUAL_AUDIT_IS2='+result.is2);
