@@ -46,8 +46,27 @@ export function gunMount(P,b,spec,lathe){
   g.computeBoundingBox();const q=g.boundingBox;
   if(q&&q.max.y>minY)b.gunHullBoxes.push([q.min.x,q.max.x,q.min.z,q.max.z,q.max.y]);
  }
+ // Preserve the original neutral muzzle reach where possible after moving
+ // the trunnion forward. Keep the chamber and mantlet connection unscaled.
+ const tubes=Object.entries(P.b).filter(([k])=>k.startsWith('barrel|')).flatMap(([,v])=>v);
+ let originalEnd=0;
+ for(const g of tubes){g.computeBoundingBox();originalEnd=Math.max(originalEnd,g.boundingBox.max.z);}
+ const shoulder=0.65;
+ const factor=originalEnd>shoulder?Math.max(0.78,(originalEnd-shoulder-shift)/(originalEnd-shoulder)):1;
+ for(const g of tubes){
+  const a=g.attributes.position;
+  for(let i=0;i<a.count;i++)if(a.getZ(i)>shoulder)a.setZ(i,shoulder+(a.getZ(i)-shoulder)*factor);
+  a.needsUpdate=true;
+  // Transform original smooth normals analytically instead of flat-shading the tube.
+  const n=g.attributes.normal;
+  if(n)for(let i=0;i<n.count;i++)if(a.getZ(i)>shoulder){
+   const x=n.getX(i),y=n.getY(i),z=n.getZ(i)/factor,l=Math.hypot(x,y,z)||1;n.setXYZ(i,x/l,y/l,z/l);
+  }
+  if(n)n.needsUpdate=true;
+  g.computeBoundingBox();g.computeBoundingSphere();
+ }
  let end=0,rad=0;
- for(const [key,parts] of Object.entries(P.b))if(key.startsWith('barrel|'))for(const g of parts){
+ for(const g of tubes){
   g.computeBoundingBox();end=Math.max(end,g.boundingBox.max.z);
   const a=g.attributes.position;
   for(let i=0;i<a.count;i++)rad=Math.max(rad,Math.hypot(a.getX(i),a.getY(i)));
