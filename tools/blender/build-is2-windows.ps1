@@ -35,6 +35,11 @@ if (-not $blenderExe) {
     exit 1
 }
 
+# Remove stale preview frames to keep the return ZIP specific to this build.
+$renderDir = Join-Path $repoRoot 'artifacts\is2-model1944'
+if (Test-Path -LiteralPath $renderDir) {
+    Get-ChildItem -LiteralPath $renderDir -Filter '*.png' -File | Remove-Item -Force
+}
 $env:IS2_FAST_PREVIEW = if ($Full) { '0' } else { '1' }
 $mode = if ($Full) { 'FULL (five 1200x900 images)' } else { 'FAST (one 720x540 image)' }
 Write-Host "Blender: $blenderExe"
@@ -59,6 +64,15 @@ try {
     Write-Host "GLB:     $glb"
     Write-Host "BLEND:   $blend"
     Write-Host "Preview: $preview"
+    $sendBack = Join-Path $repoRoot 'IS2_SEND_BACK.zip'
+    $renders = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'artifacts\is2-model1944') -Filter '*.png' -File |
+        Select-Object -ExpandProperty FullName)
+    # Include all current renders. Delete old PNGs before quick mode to avoid stale images.
+    $filesToSend = @($glb, $blend) + $renders
+    Compress-Archive -LiteralPath $filesToSend -DestinationPath $sendBack -Force
+    Write-Host ''
+    Write-Host 'UPLOAD THIS ZIP IN CHAT:' -ForegroundColor Green
+    Write-Host "  $sendBack" -ForegroundColor Green
     Invoke-Item -LiteralPath (Split-Path $preview)
 } finally {
     Pop-Location
