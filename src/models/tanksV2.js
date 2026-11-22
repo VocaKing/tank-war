@@ -106,9 +106,9 @@ function panther(d) {
   return { P, ...g, wheelType: 'single', cast: 0.35, castTurret: 0.4, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, gz], decals: [...decalsSide('cross', '', 'turret', tw * 0.9 + 0.05, 0.42, bz - 0.4, 0.42), ...decalsSide('text', '211', 'turret', tw * 0.9 + 0.05, 0.42, bz + 0.25, 0.5)] };
 }
 
-function is2CastLoft(poly, h, cz = 0, y0 = 0) {
-  // IS-2 Model 1944 cast turret: the left wall is noticeably steeper than
-  // the right wall. The upper rings therefore contract asymmetrically.
+function is2CastLoft(poly, h, cz = 0, y0 = 0, wallAngles = { left: 4, right: 20 }) {
+  // IS-2 Model 1944 cast turret: the left wall is nearly vertical while the
+  // right wall draws inward by about 20 degrees toward the roof.
   let p = poly.slice();
   let area = 0;
   for (let i = 0; i < p.length; i++) {
@@ -117,18 +117,24 @@ function is2CastLoft(poly, h, cz = 0, y0 = 0) {
   }
   if (area < 0) p.reverse();
   const n = p.length, positions = [], uv = [], idx = [];
-  // [height, left-side scale, right-side scale, front scale, rear-bustle scale]
+  const leftMaxX = Math.max(1e-6, ...p.filter(([x]) => x < 0).map(([x]) => Math.abs(x)));
+  const rightMaxX = Math.max(1e-6, ...p.filter(([x]) => x > 0).map(([x]) => x));
+  const wallBase = 0.22;
+  // [height, lower left scale, lower right scale, front scale, rear-bustle scale]
   const rings = [
     [0.00, 0.92, 0.92, 0.94, 0.96],
     [0.07, 0.98, 0.97, 0.98, 0.99],
     [0.22, 1.00, 1.00, 1.00, 1.00],
-    [0.46, 1.00, 0.95, 0.96, 1.01],
-    [0.70, 0.99, 0.75, 0.89, 1.00],
-    [0.88, 0.98, 0.68, 0.83, 0.98],
-    [0.97, 0.97, 0.66, 0.81, 0.96],
-    [1.00, 0.96, 0.65, 0.80, 0.95],
+    [0.46, 1.00, 1.00, 0.96, 1.01],
+    [0.70, 1.00, 1.00, 0.89, 1.00],
+    [0.88, 1.00, 1.00, 0.83, 0.98],
+    [0.97, 1.00, 1.00, 0.81, 0.96],
+    [1.00, 1.00, 1.00, 0.80, 0.95],
   ];
-  for (const [v, left, right, front, rear] of rings) {
+  for (const [v, leftBase, rightBase, front, rear] of rings) {
+    const rise = Math.max(0, v - wallBase) * h;
+    const left = v <= wallBase ? leftBase : 1 - Math.tan(wallAngles.left * DEG) * rise / leftMaxX;
+    const right = v <= wallBase ? rightBase : 1 - Math.tan(wallAngles.right * DEG) * rise / rightMaxX;
     for (const [x, z] of p) {
       const sx = x < 0 ? left : right;
       const sz = z > cz ? front : rear;
@@ -216,7 +222,7 @@ function is2(d) {
     n: 6, z0: -2.05, z1: 2.05, r: 0.275, w: 0.50,
     rollers: [-1.5, 0.0, 1.5], ry: 0.91, rr: 0.085,
     spr: { z: -hl + 0.35, y: 0.76, r: 0.33 },
-    idl: { z: hl - 0.32, y: 0.70, r: 0.30 },
+    idl: { z: hl - 0.32, y: 0.70, r: 0.275 },
   });
   const fy = trackTop(g);
 
@@ -284,7 +290,8 @@ function is2(d) {
   ];
   const turretCurve = new THREE.CatmullRomCurve3(turretControl.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, 'catmullrom', 0.22);
   const poly = turretCurve.getPoints(96).slice(0, -1).map(v => [v.x, v.z + bz]);
-  P.add('turret', 'paint', is2CastLoft(poly, th * 0.96, bz));
+  const turretWallAngles = { left: 4, right: 20 };
+  P.add('turret', 'paint', is2CastLoft(poly, th * 0.96, bz, 0, turretWallAngles));
   // Cast front cheeks blend the gun shield into the turret nose instead of
   // leaving a cylindrical gun collar on an otherwise featureless drum.
   for (const side of [-1, 1]) {
@@ -311,7 +318,11 @@ function is2(d) {
   return {
     P, ...g, wheelType: 'disc', cast: 0.45, castTurret: 0.95,
     roadWheelDiameter: g.wheels[0].r * 2,
+    frontIdlerDiameter: g.idlers[0].r * 2,
+    driveSprocketTeeth: 14,
     glacisAngleFromVertical: Math.atan2(upperGlacisRun, H - (c + 0.46)) / DEG,
+    turretLeftWallAngleFromVertical: turretWallAngles.left,
+    turretRightWallAngleFromVertical: turretWallAngles.right,
     turretPos: [0, H, d.turretZ], gunPos: [0, 0.46, bz + tl * 0.93],
     decals: [],
   };
