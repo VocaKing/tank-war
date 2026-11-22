@@ -42,6 +42,10 @@ export class Tank {
     this.inv = new THREE.Matrix4(); this.equip = new Equipment(this, items);
   }
   get shell() { return this.spec.shells[this.shellIdx]; }
+  get previewShell() {
+    const sh = this.shell;
+    return this.abilities?.overpenLeft > 0 ? { ...sh, pen: Math.round(sh.pen * (this.abilities.overpen.mult || 1.35)) } : sh;
+  }
   crewAlive(role) { const c = this.crew.find((m) => m.role === role); return c ? c.alive : true; }
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
@@ -163,7 +167,8 @@ export class Tank {
     g.ballistics.spawn(this, fireShell, muzzle, vel);
     this.ammo[this.shellIdx]--; this.reloadLeft = this.reloadTime(); this.lastFired = time; this.stats.shots++;
     if (this.abilities) this.abilities.onFire();
-    this.bloom = Math.min(Tank.MAX_BLOOM, this.bloom + 1.2 + 1.0 * this.spec.stabilizer); this.recoil = 1;
+    // Firing retains visual recoil, but does not inject a jump into the linear dispersion curve.
+    this.recoil = 1;
     this.rockV -= (sh.caliber / 100) * 1.4 * (40 / this.spec.mass) * Math.cos(this.turretYaw);
     g.effects.muzzle(muzzle, dir, sh.caliber); g.audio.gun(muzzle, sh.caliber, this.isPlayer);
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
