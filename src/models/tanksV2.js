@@ -91,7 +91,8 @@ function panther(d) {
   K.antenna(P, 'hull', 1.0, H, -hl + 0.5, 1.9);
   // turret: narrow-fronted, steeply sloped sides
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0;
-  turretBody(P, [[-tw, bz - tl + 0.1], [tw, bz - tl + 0.1], [tw, bz + tl - 0.55], [tw * 0.62, bz + tl - 0.1], [-tw * 0.62, bz + tl - 0.1], [-tw, bz + tl - 0.55]], d.turretH, 0.76, 0.93, bz);
+  const turretOutline = superEllipse(tw, tl * 0.86, tl * 1.02, 2.55, 64, (x, z) => [x * (z > 0.25 ? 1 - (z - 0.25) * 0.12 : 1), z]).map(([x, z]) => [x, z + bz]);
+  turretBody(P, turretOutline, d.turretH, 0.82, 0.92, bz);
   K.cupola(P, 'turret', -0.52, d.turretH, bz - 0.55, 0.33, 0.27, 7, 'ww2');
   K.mg(P, 'turret', -0.52, d.turretH + 0.42, bz - 0.55, 0, 'mg34');
   K.hatch(P, 'turret', 0.42, d.turretH, bz - 0.2, 0.26); K.periscope(P, 'turret', 0.42, d.turretH, bz + 0.25, 0, 0.8);
@@ -202,8 +203,13 @@ function pershing(d) {
   K.hatch(P, 'turret', -0.5, d.turretH, bz - 0.35, 0.27); K.periscope(P, 'turret', -0.45, d.turretH, bz + 0.35, 0, 0.8);
   K.antenna(P, 'turret', -0.8, d.turretH * 0.8, bz - 1.2, 2.2); K.stowageBox(P, 'turret', 0, 0.35, bz - 1.75, 1.6, 0.35, 0.3);
   K.liftHooks(P, 'turret', [[-0.85, d.turretH * 0.8, bz + 0.5], [0.85, d.turretH * 0.8, bz + 0.5]]);
-  P.add('gun', 'paint', box(1.05, 0.62, 0.3, 0, 0, 0.05)); P.add('gun', 'paint', cylZ(0.2, 0.4, 14, 0, 0, 0.35)); P.add('gun', 'dark', cylZ(0.025, 0.4, 6, 0.32, 0.0, 0.25)); P.add('gun', 'dark', box(0.1, 0.08, 0.04, -0.33, 0.14, 0.21));
-  K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.075, brake: { type: 'single', r: 0.1, len: 0.32 } });
+  // M26's large rounded gun shield and coaxial aperture.
+  P.add('gun', 'paint', castLoft(superEllipse(0.82, 0.22, 0.22, 2.35, 48), 0.58, 0.98, 0.96, 0.02, -0.29));
+  P.add('gun', 'paint', cylZ(0.22, 0.22, 24, 0, 0, 0.22));
+  P.add('gun', 'dark', cylZ(0.028, 0.035, 12, 0.43, 0.08, 0.245));
+  P.add('gun', 'dark', cylZ(0.035, 0.04, 12, -0.43, 0.08, 0.245));
+  // Standard M26 90 mm M3 uses the large double-baffle muzzle brake (not the M26A1 single-baffle type).
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.075, brake: { type: 'double', r: 0.14, len: 0.42 } });
   return { P, ...g, wheelType: 'disc', cast: 0.7, castTurret: 1.0, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, bz + 1.12], decals: [...decalsSide('usstar', '', 'hull', d.W / 2 + 0.05, fy - 0.15, -0.3, 0.3), ...decalsSide('usstar', '', 'turret', tw * 0.93, 0.42, bz - 0.2, 0.55)] };
 }
 
