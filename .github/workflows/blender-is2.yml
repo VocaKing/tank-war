@@ -1,0 +1,96 @@
+name: Blender IS-2 asset pipeline
+
+on:
+  push:
+    branches:
+      - blender/is2-model1944-pipeline
+    paths:
+      - 'tools/blender/**'
+      - 'docs/modeling/**'
+      - '.github/workflows/blender-is2.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tools/blender/**'
+      - 'docs/modeling/**'
+      - 'assets/blender/generated/is2-model1944.blend'
+      - 'public/models/is2-model1944.glb'
+      - '.github/workflows/blender-is2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-is2:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          blender --version
+
+      - name: Generate Blender scene, GLB and six review renders
+        run: |
+          mkdir -p build/is2
+          blender --background --factory-startup --python tools/blender/build_is2_model.py -- --output-dir build/is2
+          test -s build/is2/is2-model1944.blend
+          test -s build/is2/is2-model1944.glb
+          test -s build/is2/front.png
+          test -s build/is2/front3q.png
+          test -s build/is2/left.png
+          test -s build/is2/right.png
+          test -s build/is2/rear.png
+          test -s build/is2/top.png
+          ls -lh build/is2
+
+      - name: Commit generated authoring scene and runtime asset to the working branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/blender/is2-model1944-pipeline'
+        run: |
+          mkdir -p assets/blender/generated public/models
+          cp build/is2/is2-model1944.blend assets/blender/generated/is2-model1944.blend
+          cp build/is2/is2-model1944.glb public/models/is2-model1944.glb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/blender/generated/is2-model1944.blend public/models/is2-model1944.glb
+          if git diff --cached --quiet; then
+            echo "Generated Blender assets are already up to date."
+          else
+            git commit -m "Generate IS-2 Model 1944 Blender and GLB assets"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Verify generated assets are committed in pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          cmp build/is2/is2-model1944.glb public/models/is2-model1944.glb
+          cmp build/is2/is2-model1944.blend assets/blender/generated/is2-model1944.blend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build and audit the game
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          node tools_muzzle_geometry.mjs
+          node tools_visual_tank_audit.mjs
+          npm run build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: is2-blender-review
+          path: |
+            build/is2/
+            tank-audit-output/
+          if-no-files-found: warn
+          retention-days: 14
