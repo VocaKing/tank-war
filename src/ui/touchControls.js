@@ -1,5 +1,9 @@
 // Touch controls use the same vehicle inputs, aiming and firing logic as desktop.
-export const isMobile = () => new URLSearchParams(location.search).get('mobile')==='1' || (matchMedia('(pointer: coarse)').matches && navigator.maxTouchPoints>0);
+export const isMobile = () => {
+ const forced=new URLSearchParams(location.search).get('mobile');
+ if(forced==='0')return false;
+ return forced==='1'||document.documentElement.classList.contains('mobile-device')|| /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)|| (navigator.maxTouchPoints>0&&Math.min(screen.width,screen.height,innerWidth,innerHeight)<=1024)||Math.min(innerWidth,innerHeight)<=600;
+};
 export class TouchControls {
  constructor(game){
   this.g=game;this.throttle=0;this.steer=0;this.firing=false;this.listeners=[];
