@@ -7,6 +7,7 @@ import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, castLoft, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
 import * as K from './kit.js';
+import { gunMount, hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
 
 // ---------- Materials ----------
 let NOISE_TEX = null;
@@ -194,7 +195,7 @@ function buildSherman(d) {
   // turret (cast, T23)
   const tp = superEllipse(0.98, 1.0, 1.25, 2.4, 64, (x, z) => [x * (z > 0.4 ? 1 - (z - 0.4) * 0.25 : 1), z]);
   P.add('turret', 'paint', castLoft(tp,0.78,0.84,0.86));
-  P.add('turret', 'paint', box(1.25, 0.56, 0.32, 0, 0.4, 1.05)); P.add('turret', 'paint', cylX(0.29, 1.24, 16, 0, 0.4, 1.12));
+  P.add('gun','paint',box(1.25,0.56,0.32,0,0,0.05)); P.add('gun','paint',cylX(0.29,1.24,32,0,0,0.12));
   P.add('turret', 'paint', cylY(0.33, 0.22, 16, 0.42, 0.88, -0.25)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; P.add('turret', 'glass', box(0.1, 0.07, 0.03, 0.42 + Math.cos(a) * 0.33, 0.9, -0.25 + Math.sin(a) * 0.33, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', box(0.5, 0.05, 0.6, -0.42, 0.8, -0.2)); P.add('turret', 'dark', cylY(0.1, 0.12, 8, -0.1, 0.82, -0.7));
   P.add('turret', 'metal', cylY(0.012, 1.8, 4, -0.6, 1.6, -0.8)); // antenna
@@ -207,8 +208,8 @@ function buildSherman(d) {
     for(const dz of [-0.24,0.24])P.add('hull','metal',cylZ(0.085,0.055,12,x,0.64,z+dz));
   }
   // gun 76 mm M1A2
-  P.add('gun', 'paint', lathe([[0.001, -0.3], [0.13, -0.3], [0.13, 0.2], [0.09, 0.3], [0.068, 0.4], [0.058, 3.9], [0.07, 3.92], [0.085, 3.95], [0.085, 4.2], [0.04, 4.2], [0.001, 4.2]], 18));
-  P.add('gun', 'dark', box(0.03, 0.06, 0.2, 0.0, 0, 4.08));
+  P.add('barrel', 'paint', lathe([[0.001, -0.3], [0.13, -0.3], [0.13, 0.2], [0.09, 0.3], [0.068, 0.4], [0.058, 3.9], [0.07, 3.92], [0.085, 3.95], [0.085, 4.2], [0.04, 4.2], [0.001, 4.2]], 18));
+  P.add('barrel', 'dark', box(0.03, 0.06, 0.2, 0.0, 0, 4.08));
   return {
     P, wheels: [-2.0, -1.6, -0.55, -0.15, 0.9, 1.3].map((z) => ({ z, y: 0.31, r: 0.26, w: 0.5 })),
     sprockets: [{ z: 2.5, y: 0.95, r: 0.33 }], idlers: [{ z: -2.62, y: 0.6, r: 0.3 }], rollers: [-1.9, -0.4, 1.05].map((z) => ({ z, y: 1.03, r: 0.09 })),
@@ -236,14 +237,14 @@ function buildTiger(d) {
   tp.push([-1.25, 1.1], [1.25, 1.1]); tp.reverse();
   P.add('turret', 'paint', topExtrude(tp,0.82,0,0.035,3));
   P.add('turret', 'paint', box(2.4, 0.06, 2.6, 0, 0.83, -0.25));
-  P.add('turret', 'paint', box(1.75, 0.78, 0.32, 0, 0.42, 1.25)); P.add('turret', 'paint', cylX(0.38, 1.74, 16, 0, 0.42, 1.38));
-  P.add('turret', 'paint', cylZ(0.17, 0.35, 14, 0, 0.42, 1.6)); P.add('turret', 'dark', box(0.12, 0.08, 0.05, 0.42, 0.64, 1.42));
+  P.add('gun','paint',box(1.75,0.78,0.32,0,0,0)); P.add('gun','paint',cylX(0.38,1.74,32,0,0,0.13));
+  P.add('gun','paint',cylZ(0.20,0.35,24,0,0,0.35)); P.add('gun','dark',box(0.12,0.08,0.05,0.42,0.22,0.17));
   P.add('turret', 'paint', cylY(0.34, 0.32, 18, -0.6, 0.98, -0.85)); for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; P.add('turret', 'dark', box(0.08, 0.06, 0.03, -0.6 + Math.cos(a) * 0.345, 1.0, -0.85 + Math.sin(a) * 0.345, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', box(1.7, 0.45, 0.55, 0, 0.42, -1.72)); // Rommelkiste
   for (const s of [-1, 1]) for (let i = 0; i < 3; i++) P.add('turret', 'metal', cylZ(0.05, 0.25, 8, s * 1.25, 0.65, 0.75 - i * 0.15, 0.05, -0.6));
   P.add('turret', 'paint', box(0.6, 0.06, 0.7, 0.55, 0.87, -0.3)); P.add('turret', 'dark', cylY(0.12, 0.1, 8, 0.0, 0.88, 0.25));
   P.add('turret', 'metal', cylY(0.012, 2.0, 4, -1.2, 1.7, -2.0));
-  P.add('gun', 'paint', lathe([[0.001, -0.25], [0.18, -0.25], [0.18, 0.35], [0.1, 0.45], [0.09, 1.2], [0.08, 2.6], [0.075, 4.6], [0.135, 4.62], [0.135, 4.75], [0.09, 4.77], [0.09, 4.82], [0.135, 4.84], [0.135, 5.0], [0.045, 5.0], [0.001, 5.0]], 18));
+  P.add('barrel', 'paint', lathe([[0.001, -0.25], [0.18, -0.25], [0.18, 0.35], [0.1, 0.45], [0.09, 1.2], [0.08, 2.6], [0.075, 4.6], [0.135, 4.62], [0.135, 4.75], [0.09, 4.77], [0.09, 4.82], [0.135, 4.84], [0.135, 5.0], [0.045, 5.0], [0.001, 5.0]], 18));
   // Tiger I prototype: visual-only fittings, merged by existing Parts pipeline.
   for (const side of [-1, 1]) {
     const x = side * 1.53;
@@ -303,13 +304,13 @@ function buildT34(d) {
   // turret (cast)
   const tp = superEllipse(1.07, 1.25, 1.2, 2.2, 64, (x, z) => [x * (z > 0.3 ? 1 - (z - 0.3) * 0.22 : 1), z]);
   P.add('turret', 'paint', castLoft(tp,0.78,0.8,0.86));
-  P.add('turret', 'paint', taper(box(1.2, 0.6, 0.35, 0, 0.38, 1.15), 0.08, 0.68, 0.9, 1)); P.add('turret', 'paint', cylX(0.3, 0.9, 14, 0, 0.38, 1.25));
+  P.add('gun','paint',taper(box(1.2,0.6,0.35,0,0,0.15),-0.3,0.3,0.9,1)); P.add('gun','paint',cylX(0.3,0.9,32,0,0,0.25));
   P.add('turret', 'paint', cylY(0.33, 0.25, 16, -0.42, 0.9, -0.45)); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; P.add('turret', 'glass', box(0.08, 0.06, 0.03, -0.42 + Math.cos(a) * 0.335, 0.93, -0.45 + Math.sin(a) * 0.335, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', cylY(0.23, 0.05, 12, 0.42, 0.8, -0.3)); for (const x of [-0.2, 0.55]) P.add('turret', 'metal', box(0.1, 0.12, 0.18, x, 0.84, 0.45));
   for (const s of [-1, 1]) P.add('turret', 'metal', cylZ(0.018, 0.8, 4, s * 0.95, 0.55, -0.2));
   P.add('turret', 'dark', cylY(0.09, 0.14, 8, 0.0, 0.84, -0.95));
   P.add('turret', 'metal', cylY(0.012, 1.6, 4, 0.8, 1.5, -0.7));
-  P.add('gun', 'paint', lathe([[0.001, -0.25], [0.16, -0.25], [0.16, 0.3], [0.1, 0.35], [0.085, 0.6], [0.07, 4.4], [0.078, 4.45], [0.078, 4.65], [0.045, 4.65], [0.001, 4.65]], 18));
+  P.add('barrel', 'paint', lathe([[0.001, -0.25], [0.16, -0.25], [0.16, 0.3], [0.1, 0.35], [0.085, 0.6], [0.07, 4.4], [0.078, 4.45], [0.078, 4.65], [0.045, 4.65], [0.001, 4.65]], 18));
   return {
     P, wheels: [-2.05, -1.07, -0.09, 0.89, 1.87].map((z) => ({ z, y: 0.44, r: 0.41, w: 0.36, spoked: true })),
     sprockets: [{ z: -2.75, y: 0.55, r: 0.37 }], idlers: [{ z: 2.72, y: 0.58, r: 0.34 }], rollers: [],
@@ -342,15 +343,15 @@ function buildT72(d) {
   for (let r = 0; r < 2; r++) for (let a = -70; a <= 70; a += 14) { if (Math.abs(a) < 12) continue; const ar = a * DEG; const rr = r ? 0.96 : 1.12;
     P.add('turret', 'paint', box(0.27, 0.2, 0.09, Math.sin(ar) * rr * 1.08, 0.2 + r * 0.25, Math.cos(ar) * rr * 1.12 + 0.05, -0.25 - r * 0.3, ar)); }
   for (let i = 0; i < 6; i++) P.add('turret', 'paint', box(0.27, 0.08, 0.22, -0.6 + i * 0.24 + (i > 2 ? 0.2 : -0.2), 0.68, 0.55, 0.15));
-  P.add('turret', 'paint', box(0.6, 0.48, 0.3, 0, 0.32, 1.25)); // mantlet
+  P.add('gun','paint',box(0.6,0.48,0.3,0,-0.02,0.20));
   P.add('turret', 'paint', cylY(0.32, 0.2, 16, 0.45, 0.76, -0.2)); P.add('turret', 'metal', box(0.12, 0.16, 0.7, 0.45, 1.0, 0.0)); P.add('turret', 'dark', cylZ(0.022, 1.2, 6, 0.45, 1.0, 0.5)); // NSVT
   P.add('turret', 'paint', cylY(0.28, 0.1, 14, -0.45, 0.72, -0.25)); P.add('turret', 'metal', box(0.3, 0.3, 0.32, -0.55, 0.78, 0.38)); P.add('turret', 'glass', box(0.22, 0.14, 0.02, -0.55, 0.8, 0.55));
   P.add('turret', 'metal', box(0.3, 0.3, 0.3, 0.72, 0.45, 0.95)); P.add('turret', 'glass', cylZ(0.12, 0.02, 14, 0.72, 0.45, 1.11)); // Luna IR light
   for (const s of [-1, 1]) for (let i = 0; i < 4; i++) P.add('turret', 'metal', cylZ(0.045, 0.3, 8, s * (0.8 + i * 0.07), 0.42 + i * 0.03, 0.75 - i * 0.12, 0.045, -0.4));
   P.add('turret', 'metal', cylZ(0.09, 1.3, 10, 0, 0.5, -1.35)); // snorkel tube
   P.add('turret', 'metal', cylY(0.012, 2.0, 4, -0.7, 1.6, -0.8));
-  P.add('gun', 'paint', lathe([[0.001, -0.3], [0.2, -0.3], [0.2, 0.15], [0.12, 0.25], [0.11, 3.4], [0.14, 3.45], [0.14, 3.95], [0.1, 4.0], [0.095, 5.95], [0.1, 6.0], [0.05, 6.0], [0.001, 6.0]], 18));
-  for (const z of [1.2, 2.2, 4.6, 5.3]) P.add('gun', 'paint', cylZ(0.123, 0.06, 18, 0, 0, z));
+  P.add('barrel', 'paint', lathe([[0.001, -0.3], [0.2, -0.3], [0.2, 0.15], [0.12, 0.25], [0.11, 3.4], [0.14, 3.45], [0.14, 3.95], [0.1, 4.0], [0.095, 5.95], [0.1, 6.0], [0.05, 6.0], [0.001, 6.0]], 18));
+  for (const z of [1.2, 2.2, 4.6, 5.3]) P.add('barrel', 'paint', cylZ(0.123, 0.06, 18, 0, 0, z));
   return {
     P, wheels: [-2.55, -1.62, -0.69, 0.24, 1.17, 2.1].map((z) => ({ z, y: 0.4, r: 0.375, w: 0.46 })),
     sprockets: [{ z: -3.15, y: 0.62, r: 0.33 }], idlers: [{ z: 2.95, y: 0.56, r: 0.31 }], rollers: [-1.6, 0.0, 1.5].map((z) => ({ z, y: 0.98, r: 0.075 })),
@@ -380,7 +381,7 @@ function buildAbrams(d) {
   // turret: angular faceted wedge with bustle
   const tp = [[0.95, 2.05], [1.72, 0.55], [1.72, -1.2], [1.55, -2.3], [-1.55, -2.3], [-1.72, -1.2], [-1.72, 0.55], [-0.95, 2.05]];
   P.add('turret', 'paint', taper(topExtrude(tp,0.72,0,0.035,2),0,0.72,0.95,0.97));
-  P.add('turret', 'dark', box(0.75, 0.6, 0.2, 0, 0.36, 1.95)); P.add('turret', 'paint', box(0.62, 0.5, 0.35, 0, 0.38, 2.05));
+  P.add('gun','dark',box(0.75,0.6,0.2,0,-0.02,0)); P.add('gun','paint',box(0.62,0.5,0.35,0,0,0.10));
   P.add('turret', 'paint', box(0.65, 0.42, 0.75, 0.95, 0.9, 1.15)); P.add('turret', 'glass', box(0.5, 0.25, 0.03, 0.95, 0.92, 1.53)); // GPS doghouse
   P.add('turret', 'paint', cylY(0.22, 0.35, 12, -0.55, 0.88, -0.6)); P.add('turret', 'paint', box(0.42, 0.35, 0.42, -0.55, 1.15, -0.6)); P.add('turret', 'glass', box(0.3, 0.18, 0.02, -0.55, 1.17, -0.38)); // CITV
   P.add('turret', 'paint', cylY(0.38, 0.22, 16, 0.75, 0.82, -0.4)); P.add('turret', 'metal', box(0.15, 0.2, 0.9, 0.75, 1.05, -0.2)); P.add('turret', 'dark', cylZ(0.025, 1.4, 6, 0.75, 1.07, 0.5)); // CWS + M2
@@ -391,9 +392,9 @@ function buildAbrams(d) {
   P.add('turret', 'canvas', box(2.6, 0.25, 0.42, 0, 0.88, -2.52));
   for (const s of [-1, 1]) { for (let i = 0; i < 6; i++) P.add('turret', 'metal', cylZ(0.04, 0.22, 8, s * (1.55 + 0.0), 0.5 + (i % 2) * 0.1, 0.8 - Math.floor(i / 2) * 0.1, 0.04, -0.5)); P.add('turret', 'metal', cylY(0.012, 2.2, 4, s * 1.2, 1.8, -2.0)); }
   P.add('turret', 'metal', cylY(0.02, 0.5, 4, 0.0, 0.98, -1.4)); P.add('turret', 'metal', box(0.04, 0.04, 0.2, 0, 1.24, -1.4));
-  P.add('gun', 'paint', lathe([[0.001, -0.3], [0.16, -0.3], [0.16, 0.25], [0.125, 0.3], [0.12, 2.6], [0.155, 2.65], [0.155, 3.25], [0.115, 3.3], [0.105, 5.25], [0.11, 5.3], [0.06, 5.3], [0.001, 5.3]], 18));
-  for (const z of [1.2, 1.9, 3.9, 4.6]) P.add('gun', 'paint', cylZ(0.128, 0.05, 18, 0, 0, z));
-  P.add('gun', 'metal', box(0.08, 0.08, 0.12, 0, 0.14, 5.2));
+  P.add('barrel', 'paint', lathe([[0.001, -0.3], [0.16, -0.3], [0.16, 0.25], [0.125, 0.3], [0.12, 2.6], [0.155, 2.65], [0.155, 3.25], [0.115, 3.3], [0.105, 5.25], [0.11, 5.3], [0.06, 5.3], [0.001, 5.3]], 18));
+  for (const z of [1.2, 1.9, 3.9, 4.6]) P.add('barrel', 'paint', cylZ(0.128, 0.05, 18, 0, 0, z));
+  P.add('barrel', 'metal', box(0.08, 0.08, 0.12, 0, 0.14, 5.2));
   return {
     P, wheels: [-2.75, -1.88, -1.01, -0.14, 0.73, 1.6, 2.47].map((z) => ({ z, y: 0.37, r: 0.32, w: 0.52 })),
     sprockets: [{ z: -3.55, y: 0.62, r: 0.34 }], idlers: [{ z: 3.45, y: 0.62, r: 0.32 }], rollers: [-1.4, 1.2].map((z) => ({ z, y: 0.98, r: 0.08 })),
@@ -538,7 +539,7 @@ function refineRoofDetails(P, spec) {
 }
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
-  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec);
+  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec); gunMount(b.P,b,spec,lathe);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
@@ -571,7 +572,9 @@ export function createTankModel(spec, opts = {}) {
   for (const [k, g] of Object.entries(geo.turret)) mk(g, k, turret, tpl.paintT);
   const gun = new THREE.Group(); gun.position.set(...b.gunPos); turret.add(gun);
   for (const [k, g] of Object.entries(geo.gun || {})) mk(g, k, gun, tpl.paintG);
-  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, d.gunLen); gun.add(muzzle);
+  const barrel = new THREE.Group(); barrel.name='recoiling-barrel'; gun.add(barrel);
+  for (const [k,g] of Object.entries(geo.barrel || {})) mk(g,k,barrel,tpl.paintG);
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, b.barrelLength); barrel.add(muzzle);
   const sight = new THREE.Object3D(); sight.position.set(0.35, 0.25, 0.2); gun.add(sight);
   // tracks: textured ribbon (LOD far) + individual instanced links (LOD near)
   const tracks = [], links = [], trackTex = [];
@@ -596,7 +599,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, muzzle, sight, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, barrel, muzzle, sight, gunClearance:b.gunClearance, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;
