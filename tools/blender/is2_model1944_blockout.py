@@ -31,6 +31,28 @@ def make_mat(name, color, metallic=0.15, roughness=0.75):
     bs.inputs["Base Color"].default_value = (*color, 1.0)
     bs.inputs["Metallic"].default_value = metallic
     bs.inputs["Roughness"].default_value = roughness
+    # Subtle cast/rolled-steel microtexture. Keep it restrained so the model
+    # reads as painted armor in-game rather than noisy concrete.
+    if "olive" in name.lower() or "steel" in name.lower():
+        nodes = m.node_tree.nodes
+        links = m.node_tree.links
+        noise = nodes.new("ShaderNodeTexNoise")
+        noise.inputs["Scale"].default_value = 48.0 if "cast" in name.lower() else 72.0
+        noise.inputs["Detail"].default_value = 3.0
+        noise.inputs["Roughness"].default_value = 0.68
+        ramp = nodes.new("ShaderNodeValToRGB")
+        base = tuple(color)
+        ramp.color_ramp.elements[0].position = 0.18
+        ramp.color_ramp.elements[0].color = (base[0]*0.82, base[1]*0.82, base[2]*0.82, 1.0)
+        ramp.color_ramp.elements[1].position = 0.82
+        ramp.color_ramp.elements[1].color = (min(1,base[0]*1.10), min(1,base[1]*1.10), min(1,base[2]*1.10), 1.0)
+        bump = nodes.new("ShaderNodeBump")
+        bump.inputs["Strength"].default_value = 0.10 if "cast" in name.lower() else 0.065
+        bump.inputs["Distance"].default_value = 0.018
+        links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+        links.new(ramp.outputs["Color"], bs.inputs["Base Color"])
+        links.new(noise.outputs["Fac"], bump.inputs["Height"])
+        links.new(bump.outputs["Normal"], bs.inputs["Normal"])
     return m
 
 PAINT = make_mat("Soviet_olive_painted_steel", (0.19, 0.215, 0.12), 0.22, 0.78)
@@ -314,7 +336,7 @@ for side in (-1, 1):
     # Three return rollers per side.
     for i, y in enumerate((-1.48, 0.0, 1.48)):
         cylinder("Return_roller_%s_%d" % (side, i+1),
-                 (side*1.18, y, 1.075), 0.09, 0.18, STEEL, "X", 32)
+                 (side*1.36, y, 1.075), 0.09, 0.18, STEEL, "X", 32)
 
 # Rear drive sprockets: twin removable 14-tooth rims. Front idlers are plain.
 for side in (-1, 1):
