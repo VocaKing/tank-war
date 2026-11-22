@@ -200,6 +200,12 @@ function buildSherman(d) {
   P.add('turret', 'metal', cylY(0.012, 1.8, 4, -0.6, 1.6, -0.8)); // antenna
   P.add('turret', 'dark', cylZ(0.022, 1.1, 6, 0.42, 1.12, 0.1)); P.add('turret', 'metal', box(0.12, 0.2, 0.25, 0.42, 1.05, -0.3)); // .50 cal
   P.add('turret', 'metal', box(0.08, 0.12, 0.2, 0.32, 0.82, 0.62)); // periscope
+  // Easy Eight: reinforced HVSS spring ends and exposed horizontal shock bodies.
+  for(const side of [-1,1])for(const z of [-1.8,-0.35,1.1]){
+    const x=side*(hw-0.31);
+    P.add('hull','paint',cylZ(0.075,0.59,16,x,0.64,z));
+    for(const dz of [-0.24,0.24])P.add('hull','metal',cylZ(0.085,0.055,12,x,0.64,z+dz));
+  }
   // gun 76 mm M1A2
   P.add('gun', 'paint', lathe([[0.001, -0.3], [0.13, -0.3], [0.13, 0.2], [0.09, 0.3], [0.068, 0.4], [0.058, 3.9], [0.07, 3.92], [0.085, 3.95], [0.085, 4.2], [0.04, 4.2], [0.001, 4.2]], 18));
   P.add('gun', 'dark', box(0.03, 0.06, 0.2, 0.0, 0, 4.08));
@@ -286,6 +292,11 @@ function buildT34(d) {
   P.add('hull', 'metal', cylZ(0.1, 0.12, 10, -1.05, 1.15, 2.6, 0.1, -0.5));
   // external fuel tanks, engine deck, exhausts, spare tracks
   for (const s of [-1, 1]) for (const z of [-1.0, -2.0]) P.add('hull', 'paint', cylZ(0.2, 0.8, 14, s * 1.28, 1.25, z));
+  // T-34 external cylindrical fuel tanks with circumferential retaining straps.
+  for(const side of [-1,1])for(const z of [-1,-2]){
+    for(const dz of [-0.30,0.30]) P.add('hull','metal',T(new THREE.TorusGeometry(0.203,0.014,6,24),side*1.28,1.25,z+dz,0,0,0));
+    P.add('hull','paint',cylY(0.045,0.045,12,side*1.28,1.455,z));
+  }
   P.add('hull', 'dark', box(1.2, 0.03, 1.1, 0, 1.67, -1.4)); for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.3, 10, s * 0.55, 1.15, -3.0, 0.08, 0.6));
   P.add('hull', 'metal', box(1.5, 0.05, 0.4, 0, 1.6, -2.6, 0.45));
   P.add('hull', 'wood', cylX(0.1, 2.0, 8, 0, 1.4, -3.05));
@@ -316,6 +327,9 @@ function buildT72(d) {
   P.add('hull', 'wood', cylX(0.14, 2.6, 10, 0, 1.6, -3.3)); for (const s of [-1, 1]) P.add('hull', 'paint', cylX(0.29, 0.92, 16, s * 0.62, 1.15, -3.55));
   P.add('hull', 'dark', box(2.0, 0.02, 1.5, 0, 1.51, -2.2)); for (let i = 0; i < 8; i++) P.add('hull', 'paint', box(2.0, 0.035, 0.05, 0, 1.53, -1.55 - i * 0.18));
   P.add('hull', 'paint', box(0.6, 0.06, 0.45, 0, 1.52, 1.75)); P.add('hull', 'glass', box(0.12, 0.05, 0.03, 0, 1.53, 2.0));
+  // T-72 external rear fuel drum rims and retention straps.
+  for(const side of [-1,1])for(const dx of [-0.32,0.32])
+    P.add('hull','metal',T(new THREE.TorusGeometry(0.292,0.013,6,24),side*0.62+dx,1.15,-3.55,0,Math.PI/2,0));
   // Kontakt-1 ERA on glacis (rotated to plate slope 68°)
   const gl = 21.8 * DEG; for (let r = 0; r < 2; r++) for (let i = 0; i < 7; i++) { const t = 0.2 + r * 0.32; const z = 3.43 - t * 1.5, y = 0.92 + t * 0.58; P.add('hull', 'paint', box(0.3, 0.08, 0.26, -1.0 + i * 0.33, y + 0.05, z, gl)); }
   P.add('hull', 'metal', box(2.2, 0.06, 0.12, 0, 1.05, 3.12, gl)); // splash guard
@@ -358,6 +372,11 @@ function buildAbrams(d) {
   P.add('hull', 'dark', box(2.6, 0.55, 0.05, 0, 1.1, -3.98)); for (let i = 0; i < 6; i++) P.add('hull', 'metal', box(2.6, 0.03, 0.06, 0, 0.88 + i * 0.09, -4.0));
   P.add('hull', 'dark', box(2.8, 0.02, 2.0, 0, 1.53, -2.6)); for (let i = 0; i < 10; i++) P.add('hull', 'paint', box(2.8, 0.03, 0.06, 0, 1.55, -1.7 - i * 0.19));
   P.add('hull', 'paint', box(0.7, 0.05, 0.5, 0, 1.43, 2.1, 0.2)); for (let i = 0; i < 3; i++) P.add('hull', 'glass', box(0.12, 0.05, 0.03, -0.18 + i * 0.18, 1.45, 2.38, 0.2));
+  // M1 removable skirt panels: visible joints and recessed hinge brackets.
+  for(const side of [-1,1])for(const z of [-3.2,-2.3,-1.4,-0.5,0.4,1.3,2.4,3.25]){
+    P.add('hull','dark',box(0.010,0.48,0.018,side*(z>1.7?1.855:1.84),0.93,z));
+    P.add('hull','paint',box(0.04,0.08,0.13,side*(z>1.7?1.86:1.845),1.16,z));
+  }
   // turret: angular faceted wedge with bustle
   const tp = [[0.95, 2.05], [1.72, 0.55], [1.72, -1.2], [1.55, -2.3], [-1.55, -2.3], [-1.72, -1.2], [-1.72, 0.55], [-0.95, 2.05]];
   P.add('turret', 'paint', taper(topExtrude(tp, 0.72, 0, 0.03, 1), 0, 0.72, 0.95, 0.97));
