@@ -1,5 +1,5 @@
 import publishedBalance from './balanceDefaults.json';
-import { clone, effective, loadLocal, EMPTY } from './balanceConfig.js';
+import { clone, effective, legacyMaxDispersion, loadLocal } from './balanceConfig.js';
 // Tank specifications. Figures are grounded in published real-world data
 // (armor in mm RHA / RHA-equivalent, slope in degrees from vertical,
 // penetration in mm RHA at 100 m vs a flat plate, muzzle velocity in m/s).
@@ -323,6 +323,7 @@ TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // less damage per hit (and APCR/APDS also lose penetration faster with range); HE/HESH have little penetration
 // but the highest damage, splash and module/crew damage. HEAT is countered by ERA, composite and spaced armour.
 for (const t of TANKS) {
+  t.maxDispersion = legacyMaxDispersion(t.dispersion);
   const s0 = t.shells[0]; const D0 = s0.damage;
   t.ammoCap = t.shells.reduce((a, s) => a + s.count, 0); t.defaultLoadout = t.shells.map((s) => s.count);
   for (let i = 0; i < t.shells.length; i++) {

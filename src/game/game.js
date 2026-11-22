@@ -314,14 +314,15 @@ export class Game {
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
     if (!hitP) hitP = pos;
-    // Project the same ballistic impact and physical cone in every camera mode.
+    // Project the impact for the center. Size the ring from the gun's cone
+    // and the camera's magnification, independent of the impact distance.
     const cv = this.renderer.domElement.getBoundingClientRect();
     const depth = -hitP.clone().applyMatrix4(this.camera.matrixWorldInverse).z;
     const sp = hitP.clone().project(this.camera);
     const sx = (sp.x * 0.5 + 0.5) * cv.width, sy = (-sp.y * 0.5 + 0.5) * cv.height;
-    const cone = p.dispersion(); const travel = Math.max(dist, 0);
-    const radPx = dispersionPixels(cone, travel, depth, this.camera.projectionMatrix.elements[5], cv.height);
-    this.reticleRadiusWorld = Math.tan(cone) * travel;
+    const cone = p.dispersion();
+    const radPx = dispersionPixels(cone, this.camera.projectionMatrix.elements[5], cv.height);
+    this.reticleRadiusWorld = Math.tan(cone) * dist;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
     if (depth <= this.camera.near || !Number.isFinite(sx+sy+radPx)) { hud.setReticle(-100, -100, 0, '', ''); return; }
     let state = 'neutral', text = `${Math.round(dist)} m`;

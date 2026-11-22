@@ -166,7 +166,7 @@ export class AIController {
       const flight = dTgt / t.shell.velocity; const w = tgt.model.root.localToWorld(_q.copy(this.aimLocal));
       w.addScaledVector(tgt.vel, flight * (0.7 + 0.3 * this.skill)); w.x += this.aimErr.x * dTgt; w.y += this.aimErr.y * dTgt; w.z += this.aimErr.z * dTgt;
       t.input.aim.copy(w);
-      const ready = t.reloadLeft <= 0 && g.time > this.reactUntil && t.aimError < 0.004 + 0.002 / this.skill && t.bloom < (t.spec.stabilizer < 0.5 ? 2.6 : 1.7);
+      const ready = t.reloadLeft <= 0 && g.time > this.reactUntil && t.aimError < 0.004 + 0.002 / this.skill && t.dispersionProgress < (t.spec.stabilizer < 0.5 ? 0.46 : 0.2);
       const worth = this.bestRatio > 0.85 || (this.bestRatio > 0.55 && g.time - (this.recentlyHit || -99) < 6) || dTgt < 60;
       const concealOK = !t.inBush || this.bestRatio > 1.0 || dTgt < 250 || this.role !== 'sniper';
       if (ready && worth && concealOK && !this.allyInLine(tgt)) { if (t.tryFire(g.time)) this.resampleError(); }

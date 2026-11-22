@@ -16,8 +16,8 @@ function renderList(){
 }
 function renderComparison(main){
  main.append(make('h2','','全车数值对比'));
- const wrap=make('div','table-wrap'),table=make('table'),head=make('tr');for(const label of ['坦克','HP','速度 km/h','功重比 hp/t','装填 s','散布 m/100m','标准弹穿深 mm','标准弹伤害','标准弹 DPM','车体正面 mm','炮塔正面 mm'])head.append(make('th','',label));table.append(head);
- for(const t of draft){const tr=make('tr');for(const x of [t.short,t.hp,t.maxSpeed,(t.power/t.mass).toFixed(1),t.reload,t.dispersion,t.shells[0].pen,t.shells[0].damage,Math.round(t.shells[0].damage*60/t.reload),t.armor.hull.front[0],t.armor.turret.front[0]])tr.append(make('td','',String(x)));tr.onclick=()=>{selected=t.id;compare=false;render()};table.append(tr);}
+ const wrap=make('div','table-wrap'),table=make('table'),head=make('tr');for(const label of ['坦克','HP','速度 km/h','功重比 hp/t','装填 s','百米散布半径（最小–最大）','标准弹穿深 mm','标准弹伤害','标准弹 DPM','车体正面 mm','炮塔正面 mm'])head.append(make('th','',label));table.append(head);
+ for(const t of draft){const tr=make('tr');for(const x of [t.short,t.hp,t.maxSpeed,(t.power/t.mass).toFixed(1),t.reload,`${t.dispersion}–${t.maxDispersion} m`,t.shells[0].pen,t.shells[0].damage,Math.round(t.shells[0].damage*60/t.reload),t.armor.hull.front[0],t.armor.turret.front[0]])tr.append(make('td','',String(x)));tr.onclick=()=>{selected=t.id;compare=false;render()};table.append(tr);}
  wrap.append(table);main.append(wrap,make('p','muted','DPM 为标准弹伤害 × 60 / 装填时间，不计弹夹、技能、未命中和未击穿。点击行编辑。'));
 }
 function render(){

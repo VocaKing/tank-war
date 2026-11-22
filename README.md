@@ -13,9 +13,8 @@ Browser 3D tank battle (Three.js r170 + Vite). 15 tanks in 4 tiers (WWII mediums
 See CREDITS.md for licenses.
 
 ## v4 changes
-- **Gun dispersion.** Each gun has a base accuracy (dispersion-circle radius at 100 m when fully aimed): WWII 0.40–0.48 m, Cold War 0.32–0.36 m, modern stabilised 0.20–0.25 m. Aim time is 1.5–2.5 s.
-- **Aim bloom.** Hull speed, hull rotation and turret traverse widen the circle; stabilisers damp the effect; firing adds bloom. The circle shrinks back exponentially while the tank holds still. Each shell deviates by a clamped 2D gaussian (centre-weighted, never outside the circle). NPCs use the same system.
-- **Reticle.** The dispersion circle is projected at the real impact distance in both third-person and sniper view. Fixed a bug where the reticle disappeared while reloading.
+- **Gun dispersion.** Each tank has editable minimum and maximum cone radii, measured in metres at 100 m. The radius grows linearly toward the maximum while speed is nonzero and shrinks toward the minimum at rest. Aim time controls the full transition. The Abrams stabilizer doubles the time to reach maximum while moving. Players and NPCs use the same rules.
+- **Reticle.** The dot marks the predicted impact, and the ring scales with the current cone angle and optical magnification. Shell deviation is sampled from a centre-weighted 2D Gaussian within the cone.
 - **Tanks.** Weathering (rain streaks, paint chipping), plus tail-light clusters, rubber mud flaps, fender brackets, track tensioners, tow shackles, a tow pintle and a rear infantry phone on modern tanks.
 - **Maps.** Building colour variation for walls, shutters/doors and roofs. Four boulder shapes with bedding strata and tint variety. Per-instance tree and bush tint. Field patchwork on the terrain.
 

@@ -1,21 +1,17 @@
+import { approach } from '../util.js';
+
 // Shared, pure combat math. Angles are radians unless explicitly labelled.
-export const MIN_BLOOM = 1;
-export const MAX_BLOOM = 4.5;
 export const BASE_FOV = 60;
 export const DEG = Math.PI / 180;
 export const MIN_INCIDENCE_COS = 1e-6;
-export function advanceBloom(current, moving, dt, aimTime, max = MAX_BLOOM) {
-  const target = moving ? max : MIN_BLOOM;
-  const step = (max - MIN_BLOOM) * Math.max(0, dt) / Math.max(0.001, aimTime);
-  return Math.max(MIN_BLOOM, Math.min(max, current + Math.sign(target-current)*Math.min(Math.abs(target-current),step)));
+export function advanceDispersion(current, speed, dt, aimTime) {
+  return approach(current, speed === 0 ? 0 : 1, Math.max(0, dt) / aimTime);
 }
 export function zoomFov(zoom, baseFov = BASE_FOV) {
   return 2 * Math.atan(Math.tan(baseFov * DEG / 2) / zoom) / DEG;
 }
-export function dispersionPixels(cone, travel, viewDepth, projectionY, viewportHeight) {
-  // Near parallax can put the impact closer to the camera than the distance
-  // travelled by the shell. Cap the indicator at the cone's angular size.
-  return Math.tan(cone) * Math.max(0,travel) * projectionY * viewportHeight / (2*Math.max(0.01,travel,viewDepth));
+export function dispersionPixels(cone, projectionY, viewportHeight) {
+  return Math.tan(cone) * projectionY * viewportHeight / 2;
 }
 // Geometric line-of-sight thickness, with no shell-dependent angular normalization.
 export function incidence(cosine, nominal) {

@@ -1,6 +1,11 @@
 // Balance editor and game use the same whitelist and validation.
 export const STORAGE_KEY='tw_balance_v1';
 export const EMPTY=()=>({version:1,tanks:{}});
+// Older profiles encode only the minimum and used a 4.5× maximum.
+export const legacyMaxDispersion = minimum => Math.max(minimum, Number((minimum * 4.5).toFixed(6)));
+function maxDispersionFor(tank, patch) {
+ return patch.maxDispersion ?? (patch.dispersion === undefined ? tank.maxDispersion : legacyMaxDispersion(patch.dispersion));
+}
 const def=(path,label,unit,min,max,step,group)=>({path,label,unit,min,max,step,group});
 const core=[
  ['hp','生命值','HP',1,100000,1,'生存'],
@@ -8,7 +13,8 @@ const core=[
  ['maxSpeed','前进最高速度','km/h',1,200,0.1,'机动'],['reverseSpeed','倒车最高速度','km/h',1,100,0.1,'机动'],
  ['hullTraverse','车体转速','°/s',1,180,0.1,'机动'],['turretTraverse','炮塔转速','°/s',1,180,0.1,'火控'],
  ['gunSpeed','炮管俯仰速度','°/s',0.1,90,0.1,'火控'],['gunDepression','俯角','°',0,45,0.1,'火控'],['gunElevation','仰角','°',0,85,0.1,'火控'],
- ['reload','装填时间','s',0.1,120,0.1,'火控'],['aimTime','完整散布收缩时间','s',0.1,30,0.1,'火控'],['dispersion','百米最小散布半径','m',0,5,0.01,'火控'],
+ ['reload','装填时间','s',0.1,120,0.1,'火控'],['aimTime','完整散布收缩时间','s',0.1,30,0.1,'火控'],
+ ['dispersion','百米最小散布半径','m',0,5,0.01,'火控'],['maxDispersion','百米最大散布半径','m',0,100,0.01,'火控'],
  ['viewRange','视野','m',50,1500,1,'侦察']
 ].map(x=>def(...x));
 const faces={front:'正面',side:'侧面',rear:'后面',top:'顶部',bottom:'底部'};
@@ -52,6 +58,8 @@ export function validate(config,baseline){
    if(typeof value!=='number'||!Number.isFinite(value)||value<f.min||value>f.max||(f.step===1&&!Number.isInteger(value)))throw Error(t.short+' / '+f.label+'：必须为 '+f.min+' 至 '+f.max+' 的'+(f.step===1?'整数':'数值'));
    next[path]=value;
   }
+  if (maxDispersionFor(t, next) < (next.dispersion ?? t.dispersion))
+   throw Error(t.short+' / 百米最大散布半径必须大于或等于最小散布半径。');
   const total=t.shells.reduce((sum,sh,i)=>sum+(next['shells.'+i+'.count']??sh.count),0);
   if(total<1||total>500)throw Error(t.short+' 总弹药必须为 1–500 发');
   if(Object.keys(next).length)clean.tanks[id]=next;
@@ -62,6 +70,7 @@ export function effective(baseline,config){
  const checked=validate(config,baseline),result=clone(baseline);
  for(const t of result){
   const patch=checked.tanks[t.id]||{};
+  t.maxDispersion=maxDispersionFor(t,patch);
   for(const [path,value] of Object.entries(patch))write(t,path,value);
   t.ammoCap=t.shells.reduce((n,s)=>n+s.count,0);t.defaultLoadout=t.shells.map(s=>s.count);
   if(Object.keys(patch).some(p=>p.startsWith('shells.')))for(const sh of t.shells)sh.role='Custom balance: '+sh.pen+' mm / '+sh.damage+' HP';
@@ -70,7 +79,16 @@ export function effective(baseline,config){
 }
 export function diff(baseline,values){
  const config=EMPTY();
- for(const t of baseline){const v=values.find(s=>s.id===t.id),patch={};if(!v)continue;for(const f of fields(t)){const x=read(v,f.path);if(x!==read(t,f.path))patch[f.path]=x;}if(Object.keys(patch).length)config.tanks[t.id]=patch;}
+ for (const t of baseline) {
+  const v=values.find(s=>s.id===t.id),patch={};
+  if (!v) continue;
+  for (const { path } of fields(t)) {
+   if (path !== 'maxDispersion' && read(v,path) !== read(t,path)) patch[path]=read(v,path);
+  }
+  // An edited minimum and an unchanged maximum still need to round-trip.
+  if (v.maxDispersion !== maxDispersionFor(t,patch)) patch.maxDispersion=v.maxDispersion;
+  if (Object.keys(patch).length) config.tanks[t.id]=patch;
+ }
  return validate(config,baseline);
 }
 export function loadLocal(baseline){

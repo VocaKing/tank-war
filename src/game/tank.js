@@ -1,11 +1,11 @@
 // Tank entity: drivetrain + terrain-following physics, turret/gun laying, firing, module & crew damage
 import * as THREE from 'three';
 import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
-import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
+import { DEG, clamp, lerp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
-import { advanceBloom, incidence, MAX_BLOOM } from './combatMath.js';
+import { advanceDispersion, incidence } from './combatMath.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
@@ -18,7 +18,6 @@ export function ballisticAngle(v, R, dy) {
 }
 
 export class Tank {
-  static MAX_BLOOM = MAX_BLOOM;
   constructor(game, spec, team, name, isPlayer = false, loadout = null, items = null) {
     this.id = NEXT_ID++; this.game = game; this.spec = spec; this.team = team; this.name = name; this.isPlayer = isPlayer;
     this.abilities = new Abilities(this);
@@ -28,7 +27,7 @@ export class Tank {
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0; this.rock = 0; this.rockV = 0;
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
-    this.turretYaw = 0; this.gunPitch = 0; this.bloom = 3; this.yawRate = 0; this.recoil = 0;
+    this.turretYaw = 0; this.gunPitch = 0; this.dispersionProgress = 0; this.yawRate = 0; this.recoil = 0;
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
     this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
@@ -50,10 +49,20 @@ export class Tank {
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
-  // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
-  baseDispersion() { let d = Math.atan(this.spec.dispersion / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
-  // current dispersion-circle radius (radians); every shell lands inside this cone
-  dispersion() { return this.baseDispersion() * this.bloom; }
+  // Balance values are cone radii in metres at 100 m.
+  dispersion() {
+    const radius = lerp(this.spec.dispersion, this.spec.maxDispersion, this.dispersionProgress);
+    return Math.atan(radius / 100);
+  }
+  updateDispersion(dt) {
+    if (this.spec.dispersion === this.spec.maxDispersion) {
+      this.dispersionProgress = 0;
+      return;
+    }
+    // The active stabilizer slows widening while keeping the configured maximum reachable.
+    const stabilization = this.speed !== 0 && this.abilities.isStabilized ? 2 : 1;
+    this.dispersionProgress = advanceDispersion(this.dispersionProgress, this.speed, dt, this.aimTime() * stabilization);
+  }
   placeAt(x, z, heading) {
     this.pos.set(x, this.game.world.groundHeight(x, z), z); this.heading = heading; this.turretYaw = 0; this.updateGround(1, true); this.syncModel();
   }
@@ -101,6 +110,7 @@ export class Tank {
     // running gear animation
     const half = d.W / 2; updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
     this.moved += Math.abs(this.speed) * dt;
+    this.updateDispersion(dt);
     this.updateTurret(dt);
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
     if (this.abilities) this.abilities.update(dt);
@@ -140,11 +150,6 @@ export class Tank {
     const desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
     this.gunPitch=clamp(approach(this.gunPitch,desiredPitch,s.gunSpeed*DEG*dt),minPitch,s.gunElevation*DEG);
     this.aimError=Math.abs(wrapAngle(yawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
-    // Constant and symmetric rate from fully aimed to maximum bloom.
-    // Turning in place is motion too; small numerical residuals are ignored.
-    const moving = Math.abs(this.speed) > 0.001 || Math.abs(this.turnRate) > 0.001;
-    this.bloom = advanceBloom(this.bloom, moving, dt, this.aimTime());
-    if (this.abilities && this.abilities.isStabilized) this.bloom = Math.min(this.bloom, 1.05);
   }
   updateGround(dt, snap = false) {
     const d = this.spec.dims, W = this.game.world; const T = { height: (x, z) => W.groundHeight(x, z) }; const fx = Math.sin(this.heading), fz = Math.cos(this.heading), rx = Math.cos(this.heading), rz = -Math.sin(this.heading);
