@@ -191,22 +191,20 @@ function trackGeometry(circles, w, th = 0.08, pitch = 0.17) {
     const d = (k / N) * total; while (si < segs.length - 1 && acc + segs[si][2] < d) { acc += segs[si][2]; si++; }
     const [a, b, l] = segs[si]; const t = l > 0 ? (d - acc) / l : 0; loop.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, d]);
   }
+  const nLinks = Math.round(total / pitch);
   const pos = [], uv = [], idx = [];
-  const ring = (k) => { const p = loop[k % N]; return p; };
   // compute outward normal per point (loop is CCW in z,y)
   const nrm = loop.map((p, k) => { const a = loop[(k - 1 + N) % N], b = loop[(k + 1) % N]; let tz = b[0] - a[0], ty = b[1] - a[1]; const l = Math.hypot(tz, ty) || 1; return [ty / l, -tz / l]; });
-  const vi = (k, side, out) => { const p = ring(k); const n = nrm[k % N]; const o = out ? th / 2 : -th / 2; pos.push(side * w / 2, p[1] + n[1] * o, p[0] + n[0] * o); uv.push(p[2] / pitch * (k === N ? 1 : 1) + (k === N ? total / pitch - p[2] / pitch : 0), (side + 1) / 2); return pos.length / 3 - 1; };
   // four surfaces: outer, inner, left, right
   const surf = (sA, oA, sB, oB, flip) => {
     const base = pos.length / 3;
     for (let k = 0; k <= N; k++) { const kk = k % N; const p = loop[kk]; const n = nrm[kk]; const d = k === N ? total : p[2];
-      for (const [s, o] of [[sA, oA], [sB, oB]]) { const off = o ? th / 2 : -th / 2; pos.push(s * w / 2, p[1] + n[1] * off, p[0] + n[0] * off); uv.push(d / pitch, (s + 1) / 2); } }
+      for (const [s, o] of [[sA, oA], [sB, oB]]) { const off = o ? th / 2 : -th / 2; pos.push(s * w / 2, p[1] + n[1] * off, p[0] + n[0] * off); uv.push(d / total * nLinks, (s + 1) / 2); } }
     for (let k = 0; k < N; k++) { const a = base + k * 2, b = a + 1, c = a + 2, d = a + 3; if (flip) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c); }
   };
   surf(-1, true, 1, true, false); surf(-1, false, 1, false, true); surf(-1, false, -1, true, false); surf(1, false, 1, true, true);
-  void vi;
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-  return { geo: g, length: total, loop, nrm };
+  return { geo: g, length: total, loop, nLinks };
 }
 
 // ---------- Per-tank builders ----------
@@ -612,7 +610,7 @@ function getTemplate(spec) {
   const sprocketGeo = sprocketGeometry(spec.paint.base, spec.id);
   const wheelGeoLo = wheelGeometryLo(spec.paint.base);
   const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.25 });
-  const nLinks = Math.round(track.length / pitch);
+  const nLinks = track.nLinks;
   const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.id);
   const linkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.45 });
   templates[spec.id] = { b, geo, paint, paintT, paintG, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch };
@@ -685,9 +683,14 @@ function updateLinks(model) {
 }
 // distL / distR: distance travelled by each track this frame (m)
 export function updateRunningGear(model, distL, distR) {
-  const tp = model.pitch || 0.17; model.trackOffset[0] -= distL / tp; model.trackOffset[1] -= distR / tp;
-  model.trackTex[0].offset.x = model.trackOffset[0]; model.trackTex[1].offset.x = model.trackOffset[1];
   model.spinL = (model.spinL || 0) + distL; model.spinR = (model.spinR || 0) + distR;
+  // Match the links at arc distance i * linkPitch - spin. The tread artwork
+  // is centered at U = 0.5, and each repeat represents one physical link.
+  const linkPitch = model.loopLen / model.nLinks;
+  model.trackOffset[0] = (0.5 + model.spinL / linkPitch) % 1;
+  model.trackOffset[1] = (0.5 + model.spinR / linkPitch) % 1;
+  model.trackTex[0].offset.x = model.trackOffset[0];
+  model.trackTex[1].offset.x = model.trackOffset[1];
   const set = (im, list) => { list.forEach((w, i) => { const dist = w.side < 0 ? model.spinL : model.spinR; _eu.set(dist / w.r, 0, 0); _qq.setFromEuler(_eu); _pos.set(w.x, w.y, w.z); _scl.set(w.w, w.r, w.r); _mat.compose(_pos, _qq, _scl); im.setMatrixAt(i, _mat); }); im.instanceMatrix.needsUpdate = true; };
   set(model.wheels, model.wheelList); set(model.sprockets, model.sprocketList);
   if (model.linksOn && (distL !== 0 || distR !== 0)) updateLinks(model);
