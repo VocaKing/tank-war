@@ -3,7 +3,7 @@ name: Tank model audit
 on:
   push:
     branches:
-      - models/real-world-vehicle-corrections
+      - 'models/**'
   pull_request:
     branches:
       - main
