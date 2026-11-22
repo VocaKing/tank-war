@@ -256,20 +256,20 @@ function buildTiger(d) {
       P.add('hull', 'metal', box(0.035, 0.06, 0.045, x, 1.065, z - 0.42));
     }
     // Hatch rims, hinges and grab handles.
-    P.add('hull', 'metal', cylY(0.315, 0.025, 24, side * 0.8, 1.956, 1.95));
-    P.add('hull', 'paint', box(0.22, 0.07, 0.08, side * 0.8, 2.005, 1.72));
-    P.add('hull', 'metal', box(0.18, 0.026, 0.03, side * 0.8, 2.065, 2.05));
-    for (const dx of [-0.075, 0.075]) P.add('hull', 'metal', box(0.026, 0.065, 0.03, side * 0.8 + dx, 2.035, 2.05));
+    P.add('hull', 'metal', cylY(0.315, 0.025, 24, side * 0.8, 1.786, 1.95));
+    P.add('hull', 'paint', box(0.22, 0.07, 0.08, side * 0.8, 1.835, 1.72));
+    P.add('hull', 'metal', box(0.18, 0.026, 0.03, side * 0.8, 1.895, 2.05));
+    for (const dx of [-0.075, 0.075]) P.add('hull', 'metal', box(0.026, 0.065, 0.03, side * 0.8 + dx, 1.865, 2.05));
     // Exhaust heat shield fasteners and dark open outlet.
     for (const y of [1.25, 1.65]) for (const dx of [-0.12, 0.12]) P.add('hull', 'metal', cylZ(0.022, 0.018, 6, side * 0.5 + dx, y, -3.307));
-    P.add('hull', 'dark', cylY(0.075, 0.018, 16, side * 0.5, 1.732, -3.15));
+    P.add('hull', 'dark', cylY(0.075, 0.018, 16, side * 0.5, 1.562, -3.15));
     // Rear turret bin hinges and latches.
     P.add('turret', 'metal', box(0.09, 0.13, 0.025, side * 0.58, 0.55, -2.005));
     P.add('turret', 'paint', box(0.12, 0.04, 0.08, side * 0.58, 0.665, -1.75));
   }
   // Engine deck grille cross braces and small service fasteners.
-  for (const x of [-0.72, 0, 0.72]) P.add('hull', 'paint', box(0.045, 0.035, 1.08, x, 2.01, -1.95));
-  for (const x of [-0.92, 0.92]) for (let i = 0; i < 5; i++) P.add('hull', 'metal', cylY(0.024, 0.018, 6, x, 1.962, -1.4 - i * 0.27));
+  for (const x of [-0.72, 0, 0.72]) P.add('hull', 'paint', box(0.045, 0.035, 1.08, x, 1.84, -1.95));
+  for (const x of [-0.92, 0.92]) for (let i = 0; i < 5; i++) P.add('hull', 'metal', cylY(0.024, 0.018, 6, x, 1.792, -1.4 - i * 0.27));
   // Commander's cupola lid and loader hatch hinges.
   P.add('turret', 'paint', cylY(0.33, 0.055, 24, -0.6, 1.16, -0.85));
   P.add('turret', 'metal', box(0.18, 0.065, 0.08, -0.6, 1.19, -1.12));
@@ -451,8 +451,8 @@ const EXTRAS = {
     Object.assign(b, { wheelType: 'spoked', cast: 0.35, castTurret: 1.0 });
   },
   tiger(P, d, b) {
-    for (const s of [-1, 1]) { K.towCable(P, 'hull', s * 1.575, 1.6, -2.4, 1.6); K.spareLinks(P, 'turret', s * 1.27, 0.45, 0.35, 3, 0.72, 0.13, s * R90, R90); K.periscope(P, 'hull', s * 0.8, 2.0, 2.3, 0, 0.8); }
-    K.tools(P, 'hull', 0.9, 1.95, 1.4, 1); K.tools(P, 'hull', -0.9, 1.95, 1.4, -1);
+    for (const s of [-1, 1]) { K.towCable(P, 'hull', s * 1.575, 1.6, -2.4, 1.6); K.spareLinks(P, 'turret', s * 1.27, 0.45, 0.35, 3, 0.72, 0.13, s * R90, R90); K.periscope(P, 'hull', s * 0.8, 1.83, 2.3, 0, 0.8); }
+    K.tools(P, 'hull', 0.9, 1.78, 1.4, 1); K.tools(P, 'hull', -0.9, 1.78, 1.4, -1);
     K.cupola(P, 'turret', -0.6, 0.83, -0.85, 0.33, 0.24, 7, 'ww2'); K.mg(P, 'turret', -0.6, 1.25, -0.85, 0, 'mg34');
     K.liftHooks(P, 'turret', [[-0.9, 0.86, 0.4], [0.9, 0.86, 0.4], [0, 0.86, -1.3]]);
     Object.assign(b, { wheelType: 'disc', cast: 0.3, castTurret: 0.35 });
