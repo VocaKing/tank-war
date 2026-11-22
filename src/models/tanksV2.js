@@ -288,7 +288,7 @@ function is2(d) {
   // Cast front cheeks blend the gun shield into the turret nose instead of
   // leaving a cylindrical gun collar on an otherwise featureless drum.
   for (const side of [-1, 1]) {
-    P.add('turret', 'paint', T(new THREE.SphereGeometry(1, 28, 18), side * 0.48, 0.39, bz + 1.00, 0, 0, 0, 0.43, 0.32, 0.23));
+    P.add('turret', 'paint', T(new THREE.SphereGeometry(1, 28, 18), side * 0.48, 0.39, bz + 1.24, 0, 0, 0, 0.43, 0.32, 0.23));
   }
 
   // Commander's fixed six-slit cupola is on the left rear; the loader's hatch
@@ -312,7 +312,7 @@ function is2(d) {
     P, ...g, wheelType: 'disc', cast: 0.45, castTurret: 0.95,
     roadWheelDiameter: g.wheels[0].r * 2,
     glacisAngleFromVertical: Math.atan2(upperGlacisRun, H - (c + 0.46)) / DEG,
-    turretPos: [0, H, d.turretZ], gunPos: [0, 0.46, bz + tl * 0.76],
+    turretPos: [0, H, d.turretZ], gunPos: [0, 0.46, bz + tl * 0.93],
     decals: [],
   };
 }
