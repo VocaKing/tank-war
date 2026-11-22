@@ -209,9 +209,8 @@ function buildSherman(d) {
     P.add('hull','paint',cylZ(0.075,0.59,16,x,0.64,z));
     for(const dz of [-0.24,0.24])P.add('hull','metal',cylZ(0.085,0.055,12,x,0.64,z+dz));
   }
-  // gun 76 mm M1A2
-  P.add('barrel', 'paint', lathe([[0.001, -0.3], [0.13, -0.3], [0.13, 0.2], [0.09, 0.3], [0.068, 0.4], [0.058, 3.9], [0.07, 3.92], [0.085, 3.95], [0.085, 4.2], [0.04, 4.2], [0.001, 4.2]], 18));
-  P.add('barrel', 'dark', box(0.03, 0.06, 0.2, 0.0, 0, 4.08));
+  // 76 mm M1A2 with the characteristic single-baffle muzzle brake fitted to the Easy Eight.
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.06, brake: { type: 'single', r: 0.095, len: 0.30 } });
   return {
     P, wheels: [-2.0, -1.6, -0.55, -0.15, 0.9, 1.3].map((z) => ({ z, y: 0.31, r: 0.26, w: 0.5 })),
     sprockets: [{ z: 2.5, y: 0.95, r: 0.33 }], idlers: [{ z: -2.62, y: 0.6, r: 0.3 }], rollers: [-1.9, -0.4, 1.05].map((z) => ({ z, y: 1.03, r: 0.09 })),
