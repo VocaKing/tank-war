@@ -243,7 +243,7 @@ function buildTiger(d) {
   for (const s of [-1, 1]) for (let i = 0; i < 3; i++) P.add('turret', 'metal', cylZ(0.05, 0.25, 8, s * 1.25, 0.65, 0.75 - i * 0.15, 0.05, -0.6));
   P.add('turret', 'paint', box(0.6, 0.06, 0.7, 0.55, 0.87, -0.3)); P.add('turret', 'dark', cylY(0.12, 0.1, 8, 0.0, 0.88, 0.25));
   P.add('turret', 'metal', cylY(0.012, 2.0, 4, -1.2, 1.7, -2.0));
-  P.add('barrel', 'paint', lathe([[0.001, -0.25], [0.18, -0.25], [0.18, 0.35], [0.1, 0.45], [0.09, 1.2], [0.08, 2.6], [0.075, 4.6], [0.135, 4.62], [0.135, 4.75], [0.09, 4.77], [0.09, 4.82], [0.135, 4.84], [0.135, 5.0], [0.045, 5.0], [0.001, 5.0]], 18));
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.18, r1: 0.075, brake: { type: 'double', r: 0.135, len: 0.42 } });
   // Tiger I prototype: visual-only fittings, merged by existing Parts pipeline.
   for (const side of [-1, 1]) {
     const x = side * 1.53;
@@ -312,7 +312,7 @@ function buildT34(d) {
   for (const s of [-1, 1]) P.add('turret', 'metal', cylZ(0.018, 0.8, 4, s * 0.95, 0.55, -0.2));
   P.add('turret', 'dark', cylY(0.09, 0.14, 8, 0.0, 0.84, -0.95));
   P.add('turret', 'metal', cylY(0.012, 1.6, 4, 0.8, 1.5, -0.7));
-  P.add('barrel', 'paint', lathe([[0.001, -0.25], [0.16, -0.25], [0.16, 0.3], [0.1, 0.35], [0.085, 0.6], [0.07, 4.4], [0.078, 4.45], [0.078, 4.65], [0.045, 4.65], [0.001, 4.65]], 18));
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.16, r1: 0.07 });
   return {
     P, wheels: [-2.05, -1.07, -0.09, 0.89, 1.87].map((z) => ({ z, y: 0.44, r: 0.41, w: 0.36, spoked: true })),
     sprockets: [{ z: -2.75, y: 0.55, r: 0.37 }], idlers: [{ z: 2.72, y: 0.58, r: 0.34 }], rollers: [],
@@ -377,8 +377,7 @@ function buildT72(d) {
   P.add('turret', 'metal', box(0.3, 0.3, 0.3, 0.72, 0.45, 0.95)); P.add('turret', 'glass', cylZ(0.12, 0.02, 14, 0.72, 0.45, 1.11)); // Luna IR light
   for (const s of [-1, 1]) for (let i = 0; i < 4; i++) P.add('turret', 'metal', cylZ(0.045, 0.3, 8, s * (0.8 + i * 0.07), 0.42 + i * 0.03, 0.75 - i * 0.12, 0.045, -0.4));
   P.add('turret', 'metal', cylY(0.012, 2.0, 4, -0.7, 1.6, -0.8));
-  P.add('barrel', 'paint', lathe([[0.001, -0.3], [0.2, -0.3], [0.2, 0.15], [0.12, 0.25], [0.11, 3.4], [0.14, 3.45], [0.14, 3.95], [0.1, 4.0], [0.095, 5.95], [0.1, 6.0], [0.05, 6.0], [0.001, 6.0]], 18));
-  for (const z of [1.2, 2.2, 4.6, 5.3]) P.add('barrel', 'paint', cylZ(0.123, 0.06, 18, 0, 0, z));
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.20, r1: 0.095, evac: { z: 3.6, r: 0.14, len: 0.55 } });
   return {
     P, wheels: [-2.55, -1.62, -0.69, 0.24, 1.17, 2.1].map((z) => ({ z, y: 0.4, r: 0.375, w: 0.46 })),
     sprockets: [{ z: -3.15, y: 0.62, r: 0.33 }], idlers: [{ z: 2.95, y: 0.56, r: 0.31 }], rollers: [-1.6, 0.0, 1.5].map((z) => ({ z, y: 0.98, r: 0.075 })),
@@ -419,9 +418,7 @@ function buildAbrams(d) {
   P.add('turret', 'canvas', box(2.6, 0.25, 0.42, 0, 0.88, -2.52));
   for (const s of [-1, 1]) { for (let i = 0; i < 6; i++) P.add('turret', 'metal', cylZ(0.04, 0.22, 8, s * (1.55 + 0.0), 0.5 + (i % 2) * 0.1, 0.8 - Math.floor(i / 2) * 0.1, 0.04, -0.5)); P.add('turret', 'metal', cylY(0.012, 2.2, 4, s * 1.2, 1.8, -2.0)); }
   P.add('turret', 'metal', cylY(0.02, 0.5, 4, 0.0, 0.98, -1.4)); P.add('turret', 'metal', box(0.04, 0.04, 0.2, 0, 1.24, -1.4));
-  P.add('barrel', 'paint', lathe([[0.001, -0.3], [0.16, -0.3], [0.16, 0.25], [0.125, 0.3], [0.12, 2.6], [0.155, 2.65], [0.155, 3.25], [0.115, 3.3], [0.105, 5.25], [0.11, 5.3], [0.06, 5.3], [0.001, 5.3]], 18));
-  for (const z of [1.2, 1.9, 3.9, 4.6]) P.add('barrel', 'paint', cylZ(0.128, 0.05, 18, 0, 0, z));
-  P.add('barrel', 'metal', box(0.08, 0.08, 0.12, 0, 0.14, 5.2));
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.16, r1: 0.10, evac: { z: 2.85, r: 0.155, len: 0.62 }, sleeve: 5, mrs: true });
   return {
     P, wheels: [-2.75, -1.88, -1.01, -0.14, 0.73, 1.6, 2.47].map((z) => ({ z, y: 0.37, r: 0.32, w: 0.52 })),
     sprockets: [{ z: -3.55, y: 0.62, r: 0.34 }], idlers: [{ z: 3.45, y: 0.62, r: 0.32 }], rollers: [-1.4, 1.2].map((z) => ({ z, y: 0.98, r: 0.08 })),
