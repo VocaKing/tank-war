@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { camoTexture, trackTexture, decalTexture } from '../world/textures.js';
 import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
 
-import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, clean, Parts } from './geom.js';
+import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, castLoft, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
 import * as K from './kit.js';
 
@@ -192,8 +192,8 @@ function buildSherman(d) {
   // HVSS bogies
   for (const z of [-1.8, -0.35, 1.1]) for (const s of [-1, 1]) { P.add('hull', 'paint', box(0.35, 0.4, 1.05, s * (hw - 0.32), 0.55, z)); P.add('hull', 'metal', cylZ(0.07, 0.7, 8, s * (hw - 0.32), 0.82, z, 0.07, 0.4)); }
   // turret (cast, T23)
-  const tp = superEllipse(0.98, 1.0, 1.25, 2.4, 44, (x, z) => [x * (z > 0.4 ? 1 - (z - 0.4) * 0.25 : 1), z]);
-  P.add('turret', 'paint', taper(topExtrude(tp, 0.78, 0, 0.12, 3), 0, 0.78, 0.84, 0.86));
+  const tp = superEllipse(0.98, 1.0, 1.25, 2.4, 64, (x, z) => [x * (z > 0.4 ? 1 - (z - 0.4) * 0.25 : 1), z]);
+  P.add('turret', 'paint', castLoft(tp,0.78,0.84,0.86));
   P.add('turret', 'paint', box(1.25, 0.56, 0.32, 0, 0.4, 1.05)); P.add('turret', 'paint', cylX(0.29, 1.24, 16, 0, 0.4, 1.12));
   P.add('turret', 'paint', cylY(0.33, 0.22, 16, 0.42, 0.88, -0.25)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; P.add('turret', 'glass', box(0.1, 0.07, 0.03, 0.42 + Math.cos(a) * 0.33, 0.9, -0.25 + Math.sin(a) * 0.33, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', box(0.5, 0.05, 0.6, -0.42, 0.8, -0.2)); P.add('turret', 'dark', cylY(0.1, 0.12, 8, -0.1, 0.82, -0.7));
@@ -232,9 +232,9 @@ function buildTiger(d) {
   P.add('hull', 'metal', box(0.04, 0.04, 4.8, 1.45, 1.97, -0.2)); P.add('hull', 'wood', box(0.12, 0.12, 0.9, -1.4, 1.97, -0.9));
   // turret horseshoe
   const tp = [];
-  for (let i = 0; i <= 24; i++) { const a = Math.PI * (i / 24); tp.push([Math.cos(a) * 1.25, -0.2 - Math.sin(a) * 1.25]); }
+  for (let i = 0; i <= 48; i++) { const a = Math.PI * (i / 48); tp.push([Math.cos(a) * 1.25, -0.2 - Math.sin(a) * 1.25]); }
   tp.push([-1.25, 1.1], [1.25, 1.1]); tp.reverse();
-  P.add('turret', 'paint', topExtrude(tp.map(([x, z]) => [x, z]), 0.82, 0, 0.03, 1));
+  P.add('turret', 'paint', topExtrude(tp,0.82,0,0.035,3));
   P.add('turret', 'paint', box(2.4, 0.06, 2.6, 0, 0.83, -0.25));
   P.add('turret', 'paint', box(1.75, 0.78, 0.32, 0, 0.42, 1.25)); P.add('turret', 'paint', cylX(0.38, 1.74, 16, 0, 0.42, 1.38));
   P.add('turret', 'paint', cylZ(0.17, 0.35, 14, 0, 0.42, 1.6)); P.add('turret', 'dark', box(0.12, 0.08, 0.05, 0.42, 0.64, 1.42));
@@ -301,8 +301,8 @@ function buildT34(d) {
   P.add('hull', 'metal', box(1.5, 0.05, 0.4, 0, 1.6, -2.6, 0.45));
   P.add('hull', 'wood', cylX(0.1, 2.0, 8, 0, 1.4, -3.05));
   // turret (cast)
-  const tp = superEllipse(1.07, 1.25, 1.2, 2.2, 40, (x, z) => [x * (z > 0.3 ? 1 - (z - 0.3) * 0.22 : 1), z]);
-  P.add('turret', 'paint', taper(topExtrude(tp, 0.78, 0, 0.1, 2), 0, 0.78, 0.8, 0.86));
+  const tp = superEllipse(1.07, 1.25, 1.2, 2.2, 64, (x, z) => [x * (z > 0.3 ? 1 - (z - 0.3) * 0.22 : 1), z]);
+  P.add('turret', 'paint', castLoft(tp,0.78,0.8,0.86));
   P.add('turret', 'paint', taper(box(1.2, 0.6, 0.35, 0, 0.38, 1.15), 0.08, 0.68, 0.9, 1)); P.add('turret', 'paint', cylX(0.3, 0.9, 14, 0, 0.38, 1.25));
   P.add('turret', 'paint', cylY(0.33, 0.25, 16, -0.42, 0.9, -0.45)); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; P.add('turret', 'glass', box(0.08, 0.06, 0.03, -0.42 + Math.cos(a) * 0.335, 0.93, -0.45 + Math.sin(a) * 0.335, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', cylY(0.23, 0.05, 12, 0.42, 0.8, -0.3)); for (const x of [-0.2, 0.55]) P.add('turret', 'metal', box(0.1, 0.12, 0.18, x, 0.84, 0.45));
@@ -335,7 +335,7 @@ function buildT72(d) {
   P.add('hull', 'metal', box(2.2, 0.06, 0.12, 0, 1.05, 3.12, gl)); // splash guard
   for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.1, 10, s * 0.95, 1.05, 3.3));
   // turret dome
-  const dome = new THREE.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, 0.72, 1.28);
+  const dome = new THREE.SphereGeometry(1, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, 0.72, 1.28);
   { const p = dome.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getZ(i) > 0.4) p.setZ(i, 0.4 + (p.getZ(i) - 0.4) * 0.85); } dome.computeVertexNormals(); }
   P.add('turret', 'paint', dome); P.add('turret', 'paint', cylY(1.12, 0.12, 32, 0, 0.0, 0, 1.15));
   // ERA on turret arc
@@ -379,7 +379,7 @@ function buildAbrams(d) {
   }
   // turret: angular faceted wedge with bustle
   const tp = [[0.95, 2.05], [1.72, 0.55], [1.72, -1.2], [1.55, -2.3], [-1.55, -2.3], [-1.72, -1.2], [-1.72, 0.55], [-0.95, 2.05]];
-  P.add('turret', 'paint', taper(topExtrude(tp, 0.72, 0, 0.03, 1), 0, 0.72, 0.95, 0.97));
+  P.add('turret', 'paint', taper(topExtrude(tp,0.72,0,0.035,2),0,0.72,0.95,0.97));
   P.add('turret', 'dark', box(0.75, 0.6, 0.2, 0, 0.36, 1.95)); P.add('turret', 'paint', box(0.62, 0.5, 0.35, 0, 0.38, 2.05));
   P.add('turret', 'paint', box(0.65, 0.42, 0.75, 0.95, 0.9, 1.15)); P.add('turret', 'glass', box(0.5, 0.25, 0.03, 0.95, 0.92, 1.53)); // GPS doghouse
   P.add('turret', 'paint', cylY(0.22, 0.35, 12, -0.55, 0.88, -0.6)); P.add('turret', 'paint', box(0.42, 0.35, 0.42, -0.55, 1.15, -0.6)); P.add('turret', 'glass', box(0.3, 0.18, 0.02, -0.55, 1.17, -0.38)); // CITV
