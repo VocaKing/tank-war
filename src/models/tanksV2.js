@@ -106,83 +106,204 @@ function panther(d) {
   return { P, ...g, wheelType: 'single', cast: 0.35, castTurret: 0.4, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, gz], decals: [...decalsSide('cross', '', 'turret', tw * 0.9 + 0.05, 0.42, bz - 0.4, 0.42), ...decalsSide('text', '211', 'turret', tw * 0.9 + 0.05, 0.42, bz + 0.25, 0.5)] };
 }
 
+function is2CastLoft(poly, h, cz = 0, y0 = 0) {
+  // IS-2 Model 1944 cast turret: the left wall is noticeably steeper than
+  // the right wall. The upper rings therefore contract asymmetrically.
+  let p = poly.slice();
+  let area = 0;
+  for (let i = 0; i < p.length; i++) {
+    const a = p[i], b = p[(i + 1) % p.length];
+    area += a[0] * b[1] - b[0] * a[1];
+  }
+  if (area < 0) p.reverse();
+  const n = p.length, positions = [], uv = [], idx = [];
+  // [height, left-side scale, right-side scale, front scale, rear-bustle scale]
+  const rings = [
+    [0.00, 0.92, 0.92, 0.95, 0.96],
+    [0.07, 0.98, 0.97, 0.99, 0.99],
+    [0.22, 1.00, 1.00, 1.00, 1.00],
+    [0.46, 1.00, 0.95, 1.00, 1.01],
+    [0.70, 0.99, 0.84, 0.99, 1.03],
+    [0.88, 0.98, 0.78, 0.98, 1.04],
+    [0.97, 0.97, 0.75, 0.97, 1.04],
+    [1.00, 0.96, 0.74, 0.96, 1.04],
+  ];
+  for (const [v, left, right, front, rear] of rings) {
+    for (const [x, z] of p) {
+      const sx = x < 0 ? left : right;
+      const sz = z > cz ? front : rear;
+      positions.push(x * sx, y0 + v * h, cz + (z - cz) * sz);
+      uv.push(x, z);
+    }
+  }
+  for (let j = 0; j < rings.length - 1; j++) {
+    for (let i = 0; i < n; i++) {
+      const a = j * n + i, b = j * n + (i + 1) % n, c = a + n, d = b + n;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  for (const top of [false, true]) {
+    const ring = top ? rings.length - 1 : 0, offset = positions.length / 3;
+    const outline = [];
+    for (let i = 0; i < n; i++) {
+      const k = (ring * n + i) * 3;
+      const x = positions[k], z = positions[k + 2];
+      positions.push(x, positions[k + 1], z);
+      uv.push(x, z);
+      outline.push(new THREE.Vector2(x, z));
+    }
+    for (let [a, b, c] of THREE.ShapeUtils.triangulateShape(outline, [])) {
+      const A = outline[a], B = outline[b], C = outline[c];
+      const cross = (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
+      if ((top && cross > 0) || (!top && cross < 0)) [b, c] = [c, b];
+      idx.push(offset + a, offset + b, offset + c);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+function is2Cupola(P, x, y, z) {
+  // Six-sided, low cast commander's cupola with six separate vision slits.
+  const outline = superEllipse(0.34, 0.34, 0.34, 2.5, 32);
+  P.add('turret', 'paint', T(castLoft(outline, 0.22, 0.88, 0.88), x, y, z));
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3;
+    const wx = x + Math.cos(a) * 0.285;
+    const wz = z + Math.sin(a) * 0.285;
+    const yaw = Math.PI / 2 - a;
+    P.add('turret', 'dark', box(0.125, 0.065, 0.025, wx, y + 0.135, wz, 0, yaw));
+    P.add('turret', 'glass', box(0.088, 0.034, 0.012, wx, y + 0.137, wz + Math.sin(a) * 0.012, 0, yaw));
+  }
+  P.add('turret', 'paint', cylY(0.275, 0.045, 24, x, y + 0.225, z));
+  K.hatch(P, 'turret', x, y + 0.255, z, 0.215);
+}
+
+function is2Mantlet(P) {
+  // Broad, low, rounded D-25T cast shield. It is a shaped plate, not a ball.
+  const sh = new THREE.Shape();
+  sh.moveTo(-0.58, -0.18);
+  sh.bezierCurveTo(-0.64, -0.04, -0.61, 0.16, -0.48, 0.23);
+  sh.bezierCurveTo(-0.27, 0.34, 0.27, 0.34, 0.48, 0.23);
+  sh.bezierCurveTo(0.61, 0.16, 0.64, -0.04, 0.58, -0.18);
+  sh.bezierCurveTo(0.34, -0.29, -0.34, -0.29, -0.58, -0.18);
+  const shield = new THREE.ExtrudeGeometry(sh, {
+    depth: 0.17, bevelEnabled: true, bevelSegments: 4,
+    steps: 1, bevelSize: 0.045, bevelThickness: 0.055, curveSegments: 12,
+  });
+  P.add('gun', 'paint', T(shield, 0, 0, -0.055));
+  // Raised circular collar around the gun opening; the barrel runs through it.
+  P.add('gun', 'paint', T(new THREE.TorusGeometry(0.17, 0.028, 10, 36), 0, 0, 0.17));
+  P.add('gun', 'dark', cylZ(0.125, 0.018, 32, 0, 0, 0.145));
+  // Coaxial DT aperture and the offset telescopic-sight aperture.
+  P.add('gun', 'paint', T(new THREE.TorusGeometry(0.052, 0.012, 6, 20), -0.43, 0.075, 0.16));
+  P.add('gun', 'dark', cylZ(0.039, 0.02, 16, -0.43, 0.075, 0.16));
+  P.add('gun', 'paint', T(new THREE.TorusGeometry(0.043, 0.010, 6, 20), 0.43, 0.105, 0.16));
+  P.add('gun', 'glass', cylZ(0.031, 0.012, 16, 0.43, 0.105, 0.16));
+}
+
 function is2(d) {
-  const P = new Parts(); const hl = d.L / 2, H = d.hullH, c = d.clearance;
-  // IS-2 Model 1944: six large road wheels, rear drive sprockets and three return rollers.
-  const g = gear({ n: 6, z0: -2.05, z1: 2.05, r: 0.34, w: 0.5, rollers: [-1.5, 0.0, 1.5], ry: 0.97, rr: 0.1, spr: { z: -hl + 0.35, y: 0.76, r: 0.33 }, idl: { z: hl - 0.32, y: 0.7, r: 0.3 } });
+  const P = new Parts();
+  const hl = d.L / 2, H = d.hullH, c = d.clearance;
+
+  // Six twin road-wheel stations, 550 mm road-wheel diameter, three return
+  // rollers, rear drive sprocket and front idler; +z is the bow.
+  const g = gear({
+    n: 6, z0: -2.05, z1: 2.05, r: 0.275, w: 0.50,
+    rollers: [-1.5, 0.0, 1.5], ry: 0.91, rr: 0.085,
+    spr: { z: -hl + 0.35, y: 0.76, r: 0.33 },
+    idl: { z: hl - 0.32, y: 0.70, r: 0.30 },
+  });
   const fy = trackTop(g);
 
-  // Late-war single-piece sloped glacis (not the stepped 1943 nose), with a
-  // steep upper plate and a separate lower nose. Side plates remain nearly vertical.
+  // 1944 straight glacis: 60 degrees from vertical. The lower nose plate
+  // is less steep (30 degrees from vertical), unlike the earlier stepped bow.
   const prof = [
-    [-hl + 0.2, c], [hl - 0.6, c], [hl, 0.88],
-    [hl - 0.55, H], [-hl + 0.72, H], [-hl, 1.22], [-hl, c + 0.2],
+    [-hl + 0.20, c],
+    [hl - 0.28, c],
+    [hl, c + 0.46],
+    [hl - 1.68, H],
+    [-hl + 0.72, H],
+    [-hl, 1.18],
+    [-hl, c + 0.20],
   ];
-  const inner = hullShell(P, d, prof, fy, { sideTaper: 0.94 });
+  const inner = hullShell(P, d, prof, fy, { sideTaper: 0.92 });
   torsionArms(P, inner, g, c);
 
-  // Driver's narrow vision slit and fixed bow DT machine-gun mount on the glacis.
-  P.add('hull', 'paint', box(0.29, 0.105, 0.045, -0.52, 1.34, hl - 0.29, -60 * DEG));
-  P.add('hull', 'dark', box(0.20, 0.035, 0.018, -0.52, 1.35, hl - 0.265, -60 * DEG));
-  P.add('hull', 'paint', T(new THREE.SphereGeometry(0.12, 16, 10), 0.55, 1.30, hl - 0.30, 0, 0, 0, 1, 1, 0.72));
-  P.add('hull', 'dark', cylZ(0.022, 0.32, 8, 0.55, 1.31, hl - 0.16, 0.022, 0));
+  // Driver's observation slot sits flush on the sloped glacis.
+  P.add('hull', 'paint', box(0.30, 0.095, 0.045, -0.42, 1.13, hl - 0.48, -30 * DEG));
+  P.add('hull', 'dark', box(0.205, 0.030, 0.018, -0.42, 1.14, hl - 0.455, -30 * DEG));
+  // Fixed bow DT ball mount on the right side of the glacis.
+  P.add('hull', 'paint', T(new THREE.SphereGeometry(1, 20, 14), 0.55, 1.08, hl - 0.45, 0, 0, 0, 0.135, 0.115, 0.10));
+  P.add('hull', 'dark', cylZ(0.024, 0.24, 10, 0.55, 1.08, hl - 0.30));
   K.headlight(P, 'hull', -1.18, fy + 0.16, hl - 0.28, true);
+
+  // Front tow eyes and their reinforced mounting pads.
   for (const side of [-1, 1]) {
-    P.add('hull', 'metal', T(new THREE.TorusGeometry(0.10, 0.018, 6, 16), side * 1.0, c + 0.23, hl - 0.10, 0, 0, Math.PI / 2));
-    P.add('hull', 'metal', box(0.28, 0.06, 0.08, side * 1.0, c + 0.20, hl - 0.08));
+    P.add('hull', 'metal', T(new THREE.TorusGeometry(0.105, 0.018, 6, 18), side * 1.18, c + 0.22, hl - 0.10, 0, Math.PI / 2, 0));
+    P.add('hull', 'metal', box(0.30, 0.07, 0.12, side * 1.18, c + 0.18, hl - 0.12));
   }
 
-  // Four auxiliary fuel tanks: two cylindrical drums along each rear hull side.
+  // Four cylindrical auxiliary fuel tanks, two on each rear hull side.
   for (const side of [-1, 1]) {
     for (const z of [-2.50, -1.43]) {
-      P.add('hull', 'paint', cylZ(0.17, 0.90, 18, side * 1.35, fy + 0.04, z));
-      for (const dz of [-0.34, 0.34]) P.add('hull', 'metal', T(new THREE.TorusGeometry(0.174, 0.014, 6, 24), side * 1.35, fy + 0.04, z + dz));
-      P.add('hull', 'metal', cylY(0.04, 0.045, 10, side * 1.35, fy + 0.23, z));
+      P.add('hull', 'paint', cylZ(0.19, 0.90, 24, side * 1.34, fy + 0.04, z));
+      for (const dz of [-0.34, 0.34]) {
+        P.add('hull', 'metal', T(new THREE.TorusGeometry(0.194, 0.014, 6, 24), side * 1.34, fy + 0.04, z + dz));
+      }
+      P.add('hull', 'metal', cylY(0.045, 0.045, 12, side * 1.34, fy + 0.23, z));
     }
     K.exhaust(P, 'hull', side * 0.55, 1.28, -hl - 0.08, 'ww2', 0.09, 0.42);
     K.towCable(P, 'hull', side * 1.05, H - 0.08, -2.35, 0.72);
   }
+
   K.tools(P, 'hull', 1.25, fy + 0.02, 1.75, 1);
-  deckGrilles(P, -0.7, 0.7, H, -hl + 0.48, -hl + 1.58, 7);
-  P.add('hull', 'paint', box(1.55, 0.055, 0.42, 0, H + 0.025, -hl + 2.05));
-  // A few spare track links sit on the sloped glacis.
-  K.spareLinks(P, 'hull', -0.48, 1.35, hl - 0.24, 3, d.trackW * 0.82, 0.15, 0, -60 * DEG);
+  // Two distinct rear engine-deck grille fields with raised retaining frames.
+  deckGrilles(P, -1.05, -0.22, H, -hl + 0.48, -hl + 1.58, 7);
+  deckGrilles(P, 0.22, 1.05, H, -hl + 0.48, -hl + 1.58, 7);
+  P.add('hull', 'paint', cylY(0.22, 0.07, 24, 0, H + 0.035, -hl + 2.05));
+  P.add('hull', 'metal', T(new THREE.TorusGeometry(0.22, 0.018, 6, 24), 0, H + 0.075, -hl + 2.05));
+  // Spare track links lie parallel to the actual glacis plane, not floating above it.
+  K.spareLinks(P, 'hull', -0.48, 1.17, hl - 0.68, 3, d.trackW * 0.82, 0.15, 0, 23 * DEG);
 
-  // Broad, rounded cast IS-2 turret with the characteristic wide gun shield.
+  // Asymmetric late-production cast turret: the left wall remains steep while
+  // the right wall draws inward toward the roof; the rear bustle is fuller.
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0, th = d.turretH;
-  const poly = superEllipse(tw, tl * 0.88, tl * 1.04, 2.35, 64, (x, z) => [
-    x * (x > 0 ? 0.94 : 1.0) * (z > 0.35 ? 1 - (z - 0.35) * 0.10 : 1), z,
-  ]).map(([x, z]) => [x, z + bz]);
-  turretBody(P, poly, th * 0.96, 0.84, 0.89, bz);
+  const poly = superEllipse(tw, tl * 0.88, tl * 1.04, 2.45, 64, (x, z) => {
+    const side = x < 0 ? 1.0 : 0.91;
+    const front = z > 0 ? 1 - 0.06 * (z / tl) : 1;
+    const rear = z < 0 ? 1.02 : 1;
+    return [x * side * front, z * rear];
+  }).map(([x, z]) => [x, z + bz]);
+  P.add('turret', 'paint', is2CastLoft(poly, th * 0.96, bz));
 
-  // Commander cupola and loader's hatch are separate roof fittings; DShK is mounted
-  // on the commander's cupola on this late-production 1944 configuration.
-  K.cupola(P, 'turret', 0.56, th * 0.93, bz - 0.48, 0.30, 0.25, 6, 'ww2');
-  K.mg(P, 'turret', 0.56, th + 0.28, bz - 0.78, 0, 'dshk');
-  K.hatch(P, 'turret', -0.48, th * 0.95, bz - 0.45, 0.26);
-  K.periscope(P, 'turret', -0.34, th * 0.95, bz + 0.18, 0, 0.85);
-  // Rear-facing DT machine gun in the turret bustle.
-  P.add('turret', 'paint', T(new THREE.SphereGeometry(0.105, 14, 10), -0.58, 0.42, bz - tl * 0.98));
+  // Commander's fixed six-slit cupola is on the left rear; the loader's hatch
+  // is on the right. DShK sits on the cupola, as on late 1944 production tanks.
+  const cupolaX = -0.56, cupolaZ = bz - 0.48, cupolaY = th * 0.76;
+  is2Cupola(P, cupolaX, cupolaY, cupolaZ);
+  K.mg(P, 'turret', cupolaX, cupolaY + 0.30, cupolaZ, 0, 'dshk');
+  K.hatch(P, 'turret', 0.55, th * 0.94, bz - 0.42, 0.27);
+  K.periscope(P, 'turret', -0.30, th * 0.94, bz + 0.22, 0, 0.85);
+
+  // Rear-facing DT ball mount on the left rear turret wall.
+  P.add('turret', 'paint', T(new THREE.SphereGeometry(1, 16, 12), -0.58, 0.42, bz - tl * 0.98, 0, 0, 0, 0.12, 0.11, 0.10));
   K.mg(P, 'turret', -0.58, 0.42, bz - tl * 0.98, Math.PI, 'dt');
-  K.liftHooks(P, 'turret', [[-0.82, th * 0.82, bz + 0.72], [0.82, th * 0.82, bz + 0.72]]);
-  K.grabRail(P, 'turret', [-1.02, 0.42, bz - 0.15], [-1.02, 0.42, bz + 0.38], 0.0);
-  K.grabRail(P, 'turret', [1.02, 0.42, bz - 0.15], [1.02, 0.42, bz + 0.38], 0.0);
+  K.liftHooks(P, 'turret', [[-0.86, th * 0.82, bz + 0.72], [0.86, th * 0.82, bz + 0.72]]);
 
-  // Convex cast mantlet, coaxial opening and 122 mm D-25T with its double-baffle brake.
-  // The IS-2's D-25T has a broad, rounded cast gun shield rather than a small flat box.
-  P.add('gun', 'paint', T(new THREE.SphereGeometry(1, 32, 20), 0, 0, 0.04, 0, 0, 0, 0.95, 0.32, 0.30));
-  P.add('gun', 'paint', cylZ(0.22, 0.24, 24, 0, 0, 0.27));
-  P.add('gun', 'dark', cylZ(0.035, 0.035, 12, -0.42, 0.08, 0.245));
-  P.add('gun', 'dark', box(0.08, 0.035, 0.018, 0.40, 0.13, 0.245));
+  // D-25T 122 mm gun, shaped cast mantlet and double-baffle muzzle brake.
+  is2Mantlet(P);
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.145, r1: 0.085, brake: { type: 'double', r: 0.155, len: 0.55 } });
 
   return {
     P, ...g, wheelType: 'disc', cast: 0.45, castTurret: 0.95,
     turretPos: [0, H, d.turretZ], gunPos: [0, 0.46, bz + tl * 0.88],
-    decals: decalsSide('text', '23', 'turret', tw * 0.94, 0.42, bz - 0.2, 0.55),
+    decals: [],
   };
 }
-
 function pershing(d) {
   const P = new Parts(); const hl = d.L / 2, H = d.hullH, c = d.clearance;
   const g = gear({ n: 6, z0: -2.15, z1: 2.0, r: 0.33, w: 0.48, rollers: [-1.9, -1.0, 0.0, 1.0, 1.9], ry: 0.98, rr: 0.085, spr: { z: -hl + 0.35, y: 0.78, r: 0.33 }, idl: { z: hl - 0.33, y: 0.72, r: 0.3 } });
