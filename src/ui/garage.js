@@ -34,7 +34,7 @@ export class Garage {
     const interactive = (t) => t && t.closest && t.closest('button, select, input, a, label, .tbl-btn, .tcard, .mcard, .box');
     const start = (e) => {
       if (e.button != null && e.button !== 0) return;
-      if (interactive(e.target)) return;
+      if (interactive(e.target) || e.target !== this.renderer.domElement) return;
       this.drag = { x: e.clientX, y: e.clientY, a: this.angle, h: this.hMul || 1 };
     };
     const move = (e) => {
