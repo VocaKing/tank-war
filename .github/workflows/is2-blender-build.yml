@@ -54,9 +54,9 @@ jobs:
           ls -lh public/models/is2_model1944_blockout.glb artifacts/is2-model1944/
 
       - name: Commit generated GLB to the feature branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name == 'push'
         env:
-          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+          TARGET_BRANCH: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
