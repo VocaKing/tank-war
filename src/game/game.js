@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { setWindTime } from '../world/vegetation.js';
-import { TANKS, TANK_BY_ID, sanitizeLoadout, npcLoadout } from './tankData.js';
+import { TANKS, TANK_BY_ID, sanitizeLoadout, npcLoadout, PEN_RNG } from './tankData.js';
 import { Tank } from './tank.js';
 import { Ballistics } from './ballistics.js';
 import { Spotting } from './spotting.js';
@@ -17,6 +17,7 @@ import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 import { Post } from '../render/post.js';
 import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
+import { zoomFov, dispersionPixels } from './combatMath.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
 function _segDist(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceTo(p); }
 
@@ -297,7 +298,7 @@ export class Game {
     // simulate actual gun trajectory to find where the shell would land
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
     const m = p.model; const pos = m.muzzle.getWorldPosition(new THREE.Vector3()); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
-    const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
+    const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity).add(p.vel); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
     let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02;
     for (let i = 0; i < 200 && !hitP; i++) {
       a.copy(pos); v.y -= 9.81 * h; b.copy(pos).addScaledVector(v, h);
@@ -309,27 +310,22 @@ export class Game {
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
     if (!hitP) hitP = pos;
-    // centre on the gun's aim point: where the barrel is pointing, projected to screen
+    // Project the same ballistic impact and physical cone in every camera mode.
     const cv = this.renderer.domElement.getBoundingClientRect();
-    const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3());
-    const gdir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(new THREE.Quaternion()));
-    const aimAt = muzzle.clone().addScaledVector(gdir, Math.max(dist, 20));
-    const sp = aimAt.project(this.camera);
+    const depth = -hitP.clone().applyMatrix4(this.camera.matrixWorldInverse).z;
+    const sp = hitP.clone().project(this.camera);
     const sx = (sp.x * 0.5 + 0.5) * cv.width, sy = (-sp.y * 0.5 + 0.5) * cv.height;
-    const focus = aimAt;
-    // radius from current dispersion; divide by tan(fov/2) so zoom enlarges the circle in proportion
-    const cone = p.dispersion(); const rW = Math.tan(cone) * Math.max(dist, 1);
-    const dc = Math.max(0.5, this.camera.position.distanceTo(focus));
-    const radPx = (rW / dc) / Math.tan(this.camera.fov * DEG / 2) * (cv.height / 2);
-    this.reticleRadiusWorld = rW;
+    const cone = p.dispersion(); const travel = Math.max(dist, 0);
+    const radPx = dispersionPixels(cone, travel, depth, this.camera.projectionMatrix.elements[5], cv.height);
+    this.reticleRadiusWorld = Math.tan(cone) * travel;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
-    if (!Number.isFinite(sx)) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    if (depth <= this.camera.near || !Number.isFinite(sx+sy+radPx)) { hud.setReticle(-100, -100, 0, '', ''); return; }
     let state = 'neutral', text = `${Math.round(dist)} m`;
     if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
-      const ev = this.ballistics.evaluate(hitTank, hitInfo, p.shell, dist);
+      const ev = this.ballistics.evaluate(hitTank, hitInfo, p.previewShell, dist);
       if (ev.ricochet) { state = 'red'; text = `RICOCHET · ${ev.angle.toFixed(0)}°`; }
-      else if (ev.ratio > 1.08) { state = 'green'; text = `PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
-      else if (ev.ratio > 0.92) { state = 'yellow'; text = `CHANCE ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+      else if (ev.eff <= ev.pen * (1-PEN_RNG)) { state = 'green'; text = `PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+      else if (ev.eff <= ev.pen * (1+PEN_RNG)) { state = 'yellow'; text = `CHANCE ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
       else { state = 'red'; text = `NO PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
       text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(dist)} m`;
     }
@@ -345,7 +341,7 @@ export class Game {
     const sn = c.sniper && f === this.player && f.alive;
     m.root.visible = !sn;
     if (sn) {
-      this.camera.position.copy(this.camPosFor(dir, true, m)); c.fov += (50 / c.zoom - c.fov) * Math.min(1, dt * 12); if (!this._wasSn) c.fov = 50 / c.zoom; this.camera.fov = c.fov;
+      this.camera.position.copy(this.camPosFor(dir, true, m)); c.fov += (zoomFov(c.zoom) - c.fov) * Math.min(1, dt * 12); if (!this._wasSn) c.fov = zoomFov(c.zoom); this.camera.fov = c.fov;
     } else {
       const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2; const pos = this.camPosFor(dir, false, m);
       const pullIn = pos.distanceTo(focus) < this.camera.position.distanceTo(focus);
