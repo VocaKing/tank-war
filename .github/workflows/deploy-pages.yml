@@ -27,7 +27,6 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
-      - run: node tools_visual_tank_audit.mjs
       - run: npm run build
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4

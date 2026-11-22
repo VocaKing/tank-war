@@ -55,7 +55,7 @@ export function cupola(P, part, x, y, z, r = 0.34, h = 0.28, n = 7, style = 'ww2
 }
 // machine gun: style 'm2' (heavy, ammo can), 'mg34', 'dshk', 'pkt', 'mag'. dir = yaw (0 = forward +z)
 export function mg(P, part, x, y, z, yaw = 0, style = 'm2', pitch = 0) {
-  const L = style === 'm2' ? 1.65 : style === 'dshk' ? 1.6 : style === 'mag' ? 1.25 : 1.2;
+  const L = style === 'm2' ? 1.65 : style === 'dshk' ? 1.6 : style === 'mag' ? 1.25 : style === 'dt' ? 1.0 : 1.2;
   const fwd = (d) => [x + Math.sin(yaw) * Math.cos(pitch) * d, y + Math.sin(pitch) * d, z + Math.cos(yaw) * Math.cos(pitch) * d];
   const add = (g, d, mat = 'dark') => { const [px, py, pz] = fwd(d); P.add(part, mat, T(g, px, py, pz, -pitch, yaw, 0)); };
   add(new THREE.BoxGeometry(0.11, 0.13, 0.45), 0.05); // receiver
