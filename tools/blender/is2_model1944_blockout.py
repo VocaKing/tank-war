@@ -47,8 +47,8 @@ def make_mat(name, color, metallic=0.15, roughness=0.75):
         ramp.color_ramp.elements[1].position = 0.82
         ramp.color_ramp.elements[1].color = (min(1,base[0]*1.10), min(1,base[1]*1.10), min(1,base[2]*1.10), 1.0)
         bump = nodes.new("ShaderNodeBump")
-        bump.inputs["Strength"].default_value = 0.10 if "cast" in name.lower() else 0.065
-        bump.inputs["Distance"].default_value = 0.018
+        bump.inputs["Strength"].default_value = 0.035 if "cast" in name.lower() else 0.025
+        bump.inputs["Distance"].default_value = 0.008
         links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
         links.new(ramp.outputs["Color"], bs.inputs["Base Color"])
         links.new(noise.outputs["Fac"], bump.inputs["Height"])
@@ -212,7 +212,7 @@ add_uv_sphere("Bow_DT_ball_mount", (0.62, 3.16, 1.13), (0.14, 0.10, 0.13), CAST)
 cylinder("Bow_DT_barrel", (0.62, 3.27, 1.13), 0.022, 0.30, STEEL, "Y", 16)
 for side in (-1, 1):
     x = side * 1.35
-    box("Front_fender_%s" % side, (x, 1.75, 1.20), (0.32, 2.55, 0.07), PAINT, 0.025)
+    box("Full_length_fender_%s" % side, (x, 0.0, 1.20), (0.30, 5.70, 0.07), PAINT, 0.025)
     cylinder("Headlight_body_%s" % side, (side*1.18, 2.90, 1.48), 0.095, 0.13, STEEL, "X", 32)
     cylinder("Headlight_lens_%s" % side, (side*1.18, 2.90, 1.48), 0.068, 0.014, GLASS, "X", 32, 0.0)
     # Protective headlight hoops and front towing shackles.
@@ -423,16 +423,16 @@ for side in (-1, 1):
 for side in (-1, 1):
     for i, y in enumerate((-2.42, -1.42)):
         x = side*1.48
-        cylinder("Auxiliary_fuel_tank_%s_%d" % (side, i+1), (x, y, 1.23),
+        cylinder("Auxiliary_fuel_tank_%s_%d" % (side, i+1), (x, y, 1.48),
                  0.19, 0.86, PAINT, "Y", 40)
         for end in (-0.38, 0.38):
             torus("Fuel_tank_end_rim_%s_%d_%s" % (side, i+1, end),
-                  (x, y+end, 1.23), 0.178, 0.014, STEEL, "Y")
+                  (x, y+end, 1.48), 0.178, 0.014, STEEL, "Y")
         for band_y in (-0.23, 0.23):
             torus("Fuel_tank_retaining_band_%s_%d_%s" % (side, i+1, band_y),
-                  (x, y+band_y, 1.23), 0.194, 0.018, STEEL, "Y")
-        box("Fuel_tank_mount_%s_%d" % (side, i+1), (x-side*0.18, y, 1.00),
-            (0.12, 0.56, 0.10), STEEL, 0.018)
+                  (x, y+band_y, 1.48), 0.194, 0.018, STEEL, "Y")
+        box("Fuel_tank_mount_%s_%d" % (side, i+1), (x-side*0.18, y, 1.25),
+            (0.12, 0.56, 0.12), STEEL, 0.018)
 
 # Tie down / towing details and spare equipment. These are restrained to avoid
 # cluttering the silhouette or inventing fittings not confirmed by references.
