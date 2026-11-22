@@ -152,7 +152,7 @@ export class HUD {
     const dd = this.$('h-dmgdir'); if (this.dmgT > 0 && this.dmgSrc) { this.dmgT -= dt; const ang = Math.atan2(this.dmgSrc.x - p.pos.x, this.dmgSrc.z - p.pos.z) - G.cam.yaw; dd.style.display = 'block'; dd.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`; dd.style.opacity = Math.min(1, this.dmgT); } else dd.style.display = 'none';
     this.miniT -= dt; if (this.miniT <= 0) { this.miniT = 0.15; this.drawMini(); }
     this.updateMarkers(camera);
-    this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; this.$('h-zoom').textContent = '×' + G.cam.zoom + '  ·  ' + (50 / G.cam.zoom).toFixed(1) + '°';
+    this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; this.$('h-zoom').textContent = '×' + G.cam.zoom + '  ·  ' + G.camera.fov.toFixed(1) + '°';
     // aim-assist lock marker (just under the crosshair centre)
     const A = G.assist; const ah = this.$('h-assist'); let aTxt = '', aCls = 'assist';
     if (p.alive && G.lock) { aTxt = 'GUN LOCK · ' + G.lock.spec.short; aCls += ' gun'; }
@@ -164,8 +164,8 @@ export class HUD {
     if (avh._t !== avTxt) { avh.innerHTML = avTxt; avh._t = avTxt; }
   }
   setReticle(sx, sy, radius, state, text) {
-    const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; const ring = r.firstChild; const R = Math.max(5, Math.min(420, radius));
-    ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; ring.style.boxSizing = 'border-box'; r.className = 'reticle ' + state + (this.g.player && this.g.player.bloom < 1.08 ? ' aimed' : ''); const pen = this.$('h-pen'); pen.textContent = text; pen.style.top = Math.max(22, R + 8) + 'px';
+    const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; r.style.visibility = sx === -100 && sy === -100 ? 'hidden' : ''; const ring = r.firstChild; const R = Math.max(0, Number.isFinite(radius) ? radius : 0);
+    ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; ring.style.boxSizing = 'border-box'; r.className = 'reticle ' + state + (this.g.player && this.g.player.bloom < 1.08 ? ' aimed' : ''); const pen = this.$('h-pen'); pen.textContent = text; pen.style.top = Math.max(22, Math.min(R + 8, 80)) + 'px';
   }
   scoreboard(show) {
     const b = this.$('h-board'); if (!show) { b.style.display = 'none'; return; }
