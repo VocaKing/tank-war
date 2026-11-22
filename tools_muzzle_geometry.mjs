@@ -15,10 +15,10 @@ try {
  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const page=await browser.newPage({viewport:{width:900,height:700}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5173/');
+ await page.goto('http://127.0.0.1:5173/tank-war/');
  const result=await page.evaluate(async()=>{
-  const {createTankModel}=await import('/src/models/tankModel.js');
-  const {TANKS}=await import('/src/game/tankData.js');
+  const {createTankModel}=await import('/tank-war/src/models/tankModel.js');
+  const {TANKS}=await import('/tank-war/src/game/tankData.js');
   const out=[];
   for(const spec of TANKS){
    const model=createTankModel(spec,{links:false});
@@ -28,10 +28,9 @@ try {
   }
   const t72=createTankModel(TANKS.find(x=>x.id==='t72'),{links:false});
   t72.root.updateMatrixWorld(true);
-  const THREE=await import('/node_modules/.vite/deps/three.js');
-  const muzzle=t72.muzzle.getWorldPosition(new THREE.Vector3());
-  const pivot=t72.gun.getWorldPosition(new THREE.Vector3());
-  return {out,t72:{pivotZ:t72.gun.position.z,clearancePivot:t72.gunClearance.pivot,front:t72.gunClearance.front,muzzleZ:muzzle.z,pivotWorldZ:pivot.z}};
+  const pivotWorldZ=t72.turret.position.z+t72.gun.position.z;
+  const muzzleWorldZ=pivotWorldZ+t72.barrel.position.z+t72.muzzle.position.z;
+  return {out,t72:{pivotZ:t72.gun.position.z,clearancePivot:t72.gunClearance.pivot,front:t72.gunClearance.front,muzzleZ:muzzleWorldZ,pivotWorldZ}};
  });
  assert.equal(result.out.length,15);
  for(const x of result.out){
