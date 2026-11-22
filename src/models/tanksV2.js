@@ -125,11 +125,11 @@ function is2CastLoft(poly, h, cz = 0, y0 = 0, wallAngles = { left: 4, right: 20 
     [0.00, 0.92, 0.92, 0.94, 0.96],
     [0.07, 0.98, 0.97, 0.98, 0.99],
     [0.22, 1.00, 1.00, 1.00, 1.00],
-    [0.46, 1.00, 1.00, 0.96, 1.01],
-    [0.70, 1.00, 1.00, 0.89, 1.00],
-    [0.88, 1.00, 1.00, 0.83, 0.98],
-    [0.97, 1.00, 1.00, 0.81, 0.96],
-    [1.00, 1.00, 1.00, 0.80, 0.95],
+    [0.46, 1.00, 1.00, 0.93, 1.00],
+    [0.70, 1.00, 1.00, 0.82, 0.97],
+    [0.88, 1.00, 1.00, 0.74, 0.93],
+    [0.97, 1.00, 1.00, 0.71, 0.90],
+    [1.00, 1.00, 1.00, 0.68, 0.88],
   ];
   for (const [v, leftBase, rightBase, front, rear] of rings) {
     const rise = Math.max(0, v - wallBase) * h;
@@ -241,9 +241,14 @@ function is2(d) {
   const inner = hullShell(P, d, prof, fy, { sideTaper: 0.92, upperW: d.W - 0.40 });
   torsionArms(P, inner, g, c);
 
-  // Driver's observation slot sits flush on the sloped glacis.
+  // Driver's fixed glacis vision slit and the two roof periscopes above his station.
   P.add('hull', 'paint', box(0.30, 0.095, 0.045, -0.42, 1.16, hl - 0.48, -30 * DEG));
   P.add('hull', 'dark', box(0.205, 0.030, 0.018, -0.42, 1.17, hl - 0.455, -30 * DEG));
+  for (const x of [-0.78, -0.22]) {
+    P.add('hull', 'paint', box(0.15, 0.055, 0.18, x, H + 0.035, hl - 1.20));
+    P.add('hull', 'dark', box(0.105, 0.018, 0.025, x, H + 0.066, hl - 1.16));
+    P.add('hull', 'glass', box(0.075, 0.012, 0.012, x, H + 0.069, hl - 1.15));
+  }
   // Fixed bow DT ball mount on the right side of the glacis.
   P.add('hull', 'paint', T(new THREE.SphereGeometry(1, 20, 14), 0.55, 1.14, hl - 0.45, 0, 0, 0, 0.135, 0.115, 0.10));
   P.add('hull', 'dark', cylZ(0.024, 0.24, 10, 0.55, 1.14, hl - 0.30));
