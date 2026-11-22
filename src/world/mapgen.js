@@ -8,6 +8,7 @@ export class MapBuilder {
   constructor(def, quality = 'high') {
     this.def = def; this.rng = new RNG(def.seed); this.noise = makeNoise2D(def.seed); this.noise2 = makeNoise2D(def.seed * 7 + 3);
     this.t = new Terrain(def.terrainHalf || 700, 2);
+    this.roadDetail = new Float32Array(this.t.n * this.t.n * 3);
     this.play = def.playHalf || 600;
     this.buildings = []; this.walls = []; this.trees = []; this.bushes = []; this.rocks = []; this.props = []; this.rivers = []; this.lakes = []; this.bridges = []; this.roads = [];
     this.bases = []; this.lanes = []; this.quality = quality;
@@ -100,9 +101,31 @@ export class MapBuilder {
       if (onWater) { const wl = t.waterLevel(x, z) > -1e8 ? t.waterLevel(x, z) : pts[i][2]; pts[i][2] = Math.max(pts[i][2], wl + 1.6); if (bridgeStart < 0) bridgeStart = i; }
       else if (bridgeStart >= 0) { if (!opts.noBridges) this.bridges.push({ pts: pts.slice(Math.max(0, bridgeStart - 4), Math.min(pts.length, i + 4)), width: width + 1 }); bridgeStart = -1; }
     });
-    for (const [x, z, h] of pts) this.forCells(x, z, R, (k, cx, cz, d) => { if (d < dist[k]) { dist[k] = d; lvl[k] = h; } });
+    const lateral = new Float32Array(N);
+    const along = new Float32Array(N);
+    let distance = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const [x, z, h] = pts[i];
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const fx = (b[0] - a[0]) / length, fz = (b[1] - a[1]) / length;
+      if (i > 0) distance += Math.hypot(x - a[0], z - a[1]);
+      this.forCells(x, z, R, (k, cx, cz, d) => {
+        if (d >= dist[k]) return;
+        dist[k] = d; lvl[k] = h;
+        lateral[k] = (cx - x) * fz - (cz - z) * fx;
+        along[k] = distance + (cx - x) * fx + (cz - z) * fz;
+      });
+    }
     for (let k = 0; k < N; k++) {
       const d = dist[k]; if (d > R) continue; const h = lvl[k];
+      const strength = 1 - smoothstep(half * 0.76, half + 1.7, d);
+      const detail = k * 3;
+      if (strength > this.roadDetail[detail + 2]) {
+        this.roadDetail[detail] = lateral[k];
+        this.roadDetail[detail + 1] = along[k];
+        this.roadDetail[detail + 2] = strength;
+      }
       if (d < half) { t.h[k] = h; t.road[k] = Math.max(t.road[k], 1 - smoothstep(half * 0.7, half, d) * 0.6); if (t.occ[k] === OCC.WATER) t.water[k] = -1e9; t.occ[k] = OCC.ROAD; }
       else { const f = smoothstep(half, R, d); t.h[k] = lerp(h, t.h[k], f); t.road[k] = Math.max(t.road[k], (1 - f) * 0.25); }
     }
