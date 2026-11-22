@@ -222,11 +222,12 @@ function is2(d) {
 
   // 1944 straight glacis: 60 degrees from vertical. The lower nose plate
   // is less steep (30 degrees from vertical), unlike the earlier stepped bow.
+  const upperGlacisRun = 1.25;
   const prof = [
     [-hl + 0.20, c],
     [hl - 0.28, c],
     [hl, c + 0.46],
-    [hl - 1.68, H],
+    [hl - upperGlacisRun, H],
     [-hl + 0.72, H],
     [-hl, 1.18],
     [-hl, c + 0.20],
@@ -235,11 +236,11 @@ function is2(d) {
   torsionArms(P, inner, g, c);
 
   // Driver's observation slot sits flush on the sloped glacis.
-  P.add('hull', 'paint', box(0.30, 0.095, 0.045, -0.42, 1.13, hl - 0.48, -30 * DEG));
-  P.add('hull', 'dark', box(0.205, 0.030, 0.018, -0.42, 1.14, hl - 0.455, -30 * DEG));
+  P.add('hull', 'paint', box(0.30, 0.095, 0.045, -0.42, 1.16, hl - 0.48, -30 * DEG));
+  P.add('hull', 'dark', box(0.205, 0.030, 0.018, -0.42, 1.17, hl - 0.455, -30 * DEG));
   // Fixed bow DT ball mount on the right side of the glacis.
-  P.add('hull', 'paint', T(new THREE.SphereGeometry(1, 20, 14), 0.55, 1.08, hl - 0.45, 0, 0, 0, 0.135, 0.115, 0.10));
-  P.add('hull', 'dark', cylZ(0.024, 0.24, 10, 0.55, 1.08, hl - 0.30));
+  P.add('hull', 'paint', T(new THREE.SphereGeometry(1, 20, 14), 0.55, 1.14, hl - 0.45, 0, 0, 0, 0.135, 0.115, 0.10));
+  P.add('hull', 'dark', cylZ(0.024, 0.24, 10, 0.55, 1.14, hl - 0.30));
   K.headlight(P, 'hull', -1.18, fy + 0.16, hl - 0.28, true);
 
   // Front tow eyes and their reinforced mounting pads.
@@ -268,7 +269,7 @@ function is2(d) {
   P.add('hull', 'paint', cylY(0.22, 0.07, 24, 0, H + 0.035, -hl + 2.05));
   P.add('hull', 'metal', T(new THREE.TorusGeometry(0.22, 0.018, 6, 24), 0, H + 0.075, -hl + 2.05));
   // Spare track links lie parallel to the actual glacis plane, not floating above it.
-  K.spareLinks(P, 'hull', -0.48, 1.17, hl - 0.68, 3, d.trackW * 0.82, 0.15, 0, 23 * DEG);
+  K.spareLinks(P, 'hull', -0.48, 1.27, hl - 0.68, 3, d.trackW * 0.82, 0.15, 0, 30 * DEG);
 
   // Asymmetric late-production cast turret: the left wall remains steep while
   // the right wall draws inward toward the roof; the rear bustle is fuller.
@@ -300,6 +301,8 @@ function is2(d) {
 
   return {
     P, ...g, wheelType: 'disc', cast: 0.45, castTurret: 0.95,
+    roadWheelDiameter: g.wheels[0].r * 2,
+    glacisAngleFromVertical: Math.atan2(upperGlacisRun, H - (c + 0.46)) / DEG,
     turretPos: [0, H, d.turretZ], gunPos: [0, 0.46, bz + tl * 0.88],
     decals: [],
   };
