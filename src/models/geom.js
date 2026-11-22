@@ -1,5 +1,6 @@
 // Shared geometry helpers for procedural tank models (1 unit = 1 m, +z = front, +y = up)
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const V3 = THREE.Vector3;
@@ -7,7 +8,43 @@ export const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THR
 export function T(g, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
   _e.set(rx, ry, rz, 'YXZ'); _q.setFromEuler(_e); _m.compose(new V3(x, y, z), _q, new V3(sx, sy, sz)); g.applyMatrix4(_m); return g;
 }
-export const box = (w, h, d, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => T(new THREE.BoxGeometry(w, h, d), x, y, z, rx, ry, rz);
+// Keep thin plate, track and hardware shapes inexpensive; large cast fittings
+// and equipment housings get genuinely radiused edges instead of sharp cubes.
+export function box(w,h,d,x=0,y=0,z=0,rx=0,ry=0,rz=0){
+  w=Math.abs(w);h=Math.abs(h);d=Math.abs(d);
+  const min=Math.min(w,h,d),max=Math.max(w,h,d);
+  const g=min>=0.10 && max>=0.24
+    ? new RoundedBoxGeometry(w,h,d,1,Math.min(0.028,min*0.12))
+    : new THREE.BoxGeometry(w,h,d);
+  return T(g,x,y,z,rx,ry,rz);
+}
+// Cast armor: custom loft between a series of horizontal sections.
+// Indexed walls share vertices for continuous curvature; the roof remains a
+// separate flat panel. The supplied outline controls front/rear asymmetry.
+export function castLoft(poly,h,sx,sz,cz=0,y0=0){
+  let p=poly.slice();
+  let area=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];area+=a[0]*b[1]-b[0]*a[1];}
+  if(area<0)p.reverse();
+  const n=p.length,positions=[],uv=[],idx=[];
+  const rings=[[0,0.92,0.92],[0.07,0.99,0.99],[0.22,1,1],[0.48,1+(sx-1)*0.32,1+(sz-1)*0.32],[0.72,1+(sx-1)*0.67,1+(sz-1)*0.67],[0.88,sx+0.035,sz+0.035],[0.97,sx+0.012,sz+0.012],[1,sx,sz]];
+  for(let j=0;j<rings.length;j++){const [v,a,b]=rings[j];for(let i=0;i<n;i++){const [x,z]=p[i];positions.push(x*a,y0+v*h,cz+(z-cz)*b);uv.push(i/n,v);}}
+  for(let j=0;j<rings.length-1;j++)for(let i=0;i<n;i++){const a=j*n+i,b=j*n+(i+1)%n,c=a+n,d=b+n;idx.push(a,c,b,b,c,d);}
+  for(const top of [false,true]){
+    const ring=top?rings.length-1:0,offset=positions.length/3;
+    const outline=[];
+    for(let i=0;i<n;i++){const k=(ring*n+i)*3;const x=positions[k],z=positions[k+2];positions.push(x,positions[k+1],z);uv.push(x,z);outline.push(new THREE.Vector2(x,z));}
+    for(let [a,b,c] of THREE.ShapeUtils.triangulateShape(outline,[])){
+      const A=outline[a],B=outline[b],C=outline[c];
+      const cross=(B.x-A.x)*(C.y-A.y)-(B.y-A.y)*(C.x-A.x);
+      if((top&&cross>0)||(!top&&cross<0))[b,c]=[c,b];
+      idx.push(offset+a,offset+b,offset+c);
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);g.computeVertexNormals();return g;
+}
 export const cylY = (r, h, seg, x, y, z, r2 = r) => T(new THREE.CylinderGeometry(r, r2, h, seg), x, y, z);
 export const cylX = (r, len, seg, x, y, z, r2 = r) => T(new THREE.CylinderGeometry(r, r2, len, seg), x, y, z, 0, 0, Math.PI / 2);
 export const cylZ = (r, len, seg, x, y, z, r2 = r, rx = 0) => T(new THREE.CylinderGeometry(r2, r, len, seg), x, y, z, Math.PI / 2 + rx, 0, 0);
