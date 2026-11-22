@@ -134,9 +134,9 @@ function wheelGeometry(paintHex, type = 'disc', id = '') {
   if(type==='spoked') for(let i=0;i<6;i++){const a=i/6*Math.PI*2;paintC(T(new THREE.BoxGeometry(0.20,0.52,0.13),0.35,Math.cos(a)*0.48,Math.sin(a)*0.48,a,0,0),col);}
   if (type === 'disc' || type === 'steel') for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; paintC(cylX(0.024, 0.03, 5, s * 0.47, Math.cos(a) * 0.72, Math.sin(a) * 0.72), metal); }
   // IS-2 cast road wheels have a distinctive star-indented face rather than a plain disc.
-  if (id === 'is2') for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    paintC(box(0.028, 0.20, 0.075, 0.48, Math.cos(a) * 0.56, Math.sin(a) * 0.56, a), dark);
+  if (id === 'is2') for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    paintC(box(0.028, 0.18, 0.052, 0.48, Math.cos(a) * 0.56, Math.sin(a) * 0.56, a), dark);
   }
   // mirror for the inner tyre
   const half = parts.length; const mir = new THREE.Matrix4().makeScale(-1, 1, 1);
