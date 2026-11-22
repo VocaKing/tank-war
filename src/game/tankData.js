@@ -1,3 +1,5 @@
+import publishedBalance from './balanceDefaults.json';
+import { clone, effective, loadLocal, EMPTY } from './balanceConfig.js';
 // Tank specifications. Figures are grounded in published real-world data
 // (armor in mm RHA / RHA-equivalent, slope in degrees from vertical,
 // penetration in mm RHA at 100 m vs a flat plate, muzzle velocity in m/s).
@@ -380,3 +382,14 @@ export function armorZone(spec, part, face, local) {
 }
 export const zoneLowerFrontY = (d) => d.clearance + (d.hullH - d.clearance) * 0.42;
 export const zoneLowerSideY = (d) => d.clearance + 0.6;
+
+// Apply overrides AFTER automatic stock ammunition balancing, before any game/menu constructor.
+export const STOCK_TANKS = clone(TANKS);
+let published = STOCK_TANKS, publishedError = '';
+try { published = effective(STOCK_TANKS, publishedBalance); }
+catch(e) { publishedError = String(e.message||e); console.error('Published balance rejected',e); }
+export const PUBLISHED_TANKS = clone(published);
+const local = loadLocal(STOCK_TANKS);
+export const BALANCE_STATUS = { source: local.config ? 'local' : 'published', error: [publishedError,local.error].filter(Boolean).join('; ') };
+const active = local.config ? effective(STOCK_TANKS,local.config) : clone(PUBLISHED_TANKS);
+for(let i=0;i<TANKS.length;i++) Object.assign(TANKS[i],active[i]);
