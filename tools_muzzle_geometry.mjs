@@ -27,9 +27,18 @@ try {
   }
   const t72=createTankModel(TANKS.find(x=>x.id==='t72'),{links:false});
   t72.root.updateMatrixWorld(true);
+  let rearTubeVertices=0;
+  for(const mesh of t72.turret.children){
+   if(!mesh.isMesh||mesh.userData.matKey!=='metal')continue;
+   const p=mesh.geometry.attributes.position;
+   for(let i=0;i<p.count;i++){
+    const radial=Math.hypot(p.getX(i),p.getY(i)-0.5),z=p.getZ(i);
+    if(z>-2.02&&z<-0.68&&Math.abs(radial-0.09)<0.012)rearTubeVertices++;
+   }
+  }
   const pivotWorldZ=t72.turret.position.z+t72.gun.position.z;
   const muzzleWorldZ=pivotWorldZ+t72.barrel.position.z+t72.muzzle.position.z;
-  return {out,t72:{pivotZ:t72.gun.position.z,clearancePivot:t72.gunClearance.pivot,front:t72.gunClearance.front,muzzleZ:muzzleWorldZ,pivotWorldZ}};
+  return {out,t72:{pivotZ:t72.gun.position.z,clearancePivot:t72.gunClearance.pivot,front:t72.gunClearance.front,muzzleZ:muzzleWorldZ,pivotWorldZ,rearTubeVertices}};
  });
  assert.equal(result.out.length,15);
  for(const x of result.out){
@@ -41,6 +50,7 @@ try {
  assert.ok(Math.abs(result.t72.pivotZ-1.05)<1e-6,'T-72B trunnion must stay at the front mantlet position');
  assert.ok(Math.abs(result.t72.clearancePivot-1.05)<1e-6,'T-72B geometry mount override was not applied');
  assert.ok(result.t72.muzzleZ>result.t72.pivotWorldZ+3,'T-72B barrel points forward from its turret mount');
+ assert.equal(result.t72.rearTubeVertices,0,'T-72B still has the protruding rear-center snorkel cylinder');
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify(result,null,2));
 } finally {
