@@ -6,6 +6,12 @@ on:
     paths:
       - "tools/blender/**"
       - ".github/workflows/package-is2-local.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/package-is2-local.yml"
   workflow_dispatch:
 
 permissions:
