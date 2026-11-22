@@ -5,6 +5,7 @@ import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
+import { advanceBloom, incidence, MAX_BLOOM } from './combatMath.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
@@ -17,7 +18,7 @@ export function ballisticAngle(v, R, dy) {
 }
 
 export class Tank {
-  static MAX_BLOOM = 4.5;
+  static MAX_BLOOM = MAX_BLOOM;
   constructor(game, spec, team, name, isPlayer = false, loadout = null, items = null) {
     this.id = NEXT_ID++; this.game = game; this.spec = spec; this.team = team; this.name = name; this.isPlayer = isPlayer;
     this.abilities = new Abilities(this);
@@ -117,12 +118,10 @@ export class Tank {
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
     this.gunPitch = approach(this.gunPitch, clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG), s.gunSpeed * DEG * dt);
     this.aimError = Math.abs(wrapAngle(yawT - this.turretYaw)) + Math.abs(clamp(pitchT, -s.gunDepression * DEG, s.gunElevation * DEG) - this.gunPitch);
-    const stab = s.stabilizer; const aimT = this.aimTime();
-    // aim bloom: hull speed, hull rotation and turret traverse widen the circle (stabilisers damp it); it then
-    // shrinks back exponentially (≈95 % converged after aimTime seconds) while the tank holds still
-    const disturb = Math.min(Tank.MAX_BLOOM, 1 + Math.abs(this.speed) * 0.22 * stab);
-    if (disturb > this.bloom) this.bloom += (disturb - this.bloom) * Math.min(1, dt * 8);
-    this.bloom = 1 + (this.bloom - 1) * Math.exp((-dt * 3.0) / aimT); this.bloom = Math.min(this.bloom, Tank.MAX_BLOOM);
+    // Constant and symmetric rate from fully aimed to maximum bloom.
+    // Turning in place is motion too; small numerical residuals are ignored.
+    const moving = Math.abs(this.speed) > 0.001 || Math.abs(this.turnRate) > 0.001;
+    this.bloom = advanceBloom(this.bloom, moving, dt, this.aimTime());
     if (this.abilities && this.abilities.isStabilized) this.bloom = Math.min(this.bloom, 1.05);
   }
   updateGround(dt, snap = false) {
@@ -151,8 +150,10 @@ export class Tank {
     const disp = this.dispersion(); const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const a = new THREE.Vector3().crossVectors(dir, up).normalize(), b = new THREE.Vector3().crossVectors(dir, a).normalize();
     let gx = g.rng.gauss() / 2.2, gy = g.rng.gauss() / 2.2; const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
-    this.lastDeviation = Math.hypot(gx, gy) * disp;
-    dir.addScaledVector(a, Math.tan(gx * disp)).addScaledVector(b, Math.tan(gy * disp)).normalize();
+    // Sample a disk on the tangent plane: its boundary is exactly tan(disp).
+    const radius = Math.tan(disp);
+    dir.addScaledVector(a, gx * radius).addScaledVector(b, gy * radius).normalize();
+    this.lastDeviation = Math.atan(Math.hypot(gx, gy) * radius);
     const vel = dir.clone().multiplyScalar(sh.velocity).add(this.vel);
     let fireShell = sh;
     if (this.abilities && this.abilities.overpenLeft > 0) {
@@ -200,9 +201,12 @@ export class Tank {
     else if (hit.face === 'rear') n = new THREE.Vector3(0, Math.sin(slope), -Math.cos(slope));
     else if (hit.face === 'side') n = new THREE.Vector3(hit.sideSign * Math.cos(slope), Math.sin(slope), 0);
     else n = new THREE.Vector3(0, hit.face === 'top' ? 1 : -1, 0);
-    const cosA = -hit.ldir.dot(n); let angle = Math.acos(clamp(cosA, -1, 1)) / DEG; if (cosA <= 0) angle = 89.5;
-    const normAngle = Math.max(0, angle - (typeInfo.normalize || 0));
-    let eff = tmm / Math.max(0.05, Math.cos(normAngle * DEG));
+    // A ray's angle to the plate normal includes both armour slope and tank orientation.
+    // Use the geometric path length exactly, before ERA/skirts and track modifiers.
+    const cosA = -hit.ldir.dot(n);
+    const { angle, los } = incidence(cosA, tmm);
+    if (cosA < 0) n.negate();
+    let eff = los;
     const front = hit.face === 'front', hullSide = hit.part === 'hull' && hit.face === 'side';
     if (typeInfo.heat) { eff *= A.heatMult || 1; if (A.era && front) eff += A.era; if (A.skirt && hullSide) eff += A.skirt; }
     else if (!typeInfo.he && A.eraKE && front) eff += A.eraKE;
@@ -212,7 +216,7 @@ export class Tank {
     const ricochet = !typeInfo.he && angle > typeInfo.ricochet && !overmatch;
     // world normal (for ricochet reflection)
     const nw = n.clone(); if (hit.part === 'turret') nw.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.turretYaw); nw.applyQuaternion(this.quat);
-    return { eff, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
+    return { eff, los, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
   }
   // ----- damage -----
   damage(amount, attacker, cause) {
