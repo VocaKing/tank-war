@@ -169,9 +169,9 @@ function is2(d) {
   K.grabRail(P, 'turret', [1.02, 0.42, bz - 0.15], [1.02, 0.42, bz + 0.38], 0.0);
 
   // Convex cast mantlet, coaxial opening and 122 mm D-25T with its double-baffle brake.
-  const mantlet = superEllipse(0.86, 0.22, 0.22, 2.35, 48);
-  P.add('gun', 'paint', castLoft(mantlet, 0.52, 0.98, 0.96, 0.02, -0.26));
-  P.add('gun', 'paint', cylZ(0.22, 0.20, 24, 0, 0, 0.23));
+  // The IS-2's D-25T has a broad, rounded cast gun shield rather than a small flat box.
+  P.add('gun', 'paint', T(new THREE.SphereGeometry(1, 32, 20), 0, 0, 0.04, 0, 0, 0, 0.95, 0.32, 0.30));
+  P.add('gun', 'paint', cylZ(0.22, 0.24, 24, 0, 0, 0.27));
   P.add('gun', 'dark', cylZ(0.035, 0.035, 12, -0.42, 0.08, 0.245));
   P.add('gun', 'dark', box(0.08, 0.035, 0.018, 0.40, 0.13, 0.245));
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.145, r1: 0.085, brake: { type: 'double', r: 0.155, len: 0.55 } });
