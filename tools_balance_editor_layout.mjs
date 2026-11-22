@@ -44,7 +44,7 @@ try {
    }
    report.push({id:TANKS[i].id,groups:actual.length,front:actual.find(x=>x.title==='正面装甲')?.labels.length||0,side:actual.find(x=>x.title==='侧面装甲')?.labels.length||0});
   }
-  const front=document.querySelector('#form .field-group h3');
+  buttons[0].click();
   const section=[...document.querySelectorAll('#form .field-group')].find(x=>x.querySelector('h3')?.textContent==='正面装甲');
   const cells=[...section.querySelectorAll('.field')];
   return {report,desktopColumns:getComputedStyle(section.querySelector('.fields')).gridTemplateColumns.split(' ').length,frontCellRows:new Set(cells.map(x=>Math.round(x.getBoundingClientRect().top))).size};
