@@ -274,15 +274,16 @@ function is2(d) {
   // Asymmetric late-production cast turret: the left wall remains steep while
   // the right wall draws inward toward the roof; the rear bustle is fuller.
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0, th = d.turretH;
-  const poly = superEllipse(tw, tl * 0.86, tl * 1.08, 3.10, 64, (x, z) => {
-    // Broad, slightly flattened front face; rounded rear bustle. The left
-    // side is fuller, while the right flank is narrower and more inclined.
-    const side = x < 0 ? 1.0 : 0.94;
-    const front = z > 0 ? 0.97 : 1;
-    const rear = z < 0 ? 1.035 : 1;
-    const flatFrontZ = z > 0.72 ? 0.72 + (z - 0.72) * 0.78 : z;
-    return [x * side * front, flatFrontZ * rear];
-  }).map(([x, z]) => [x, z + bz]);
+  const turretControl = [
+    [-0.60 * tw, 0.80 * tl], [-0.46 * tw, 0.93 * tl], [-0.10 * tw, 0.98 * tl],
+    [0.28 * tw, 0.96 * tl], [0.62 * tw, 0.84 * tl], [0.82 * tw, 0.60 * tl],
+    [0.91 * tw, 0.28 * tl], [0.90 * tw, -0.25 * tl], [0.77 * tw, -0.67 * tl],
+    [0.50 * tw, -0.91 * tl], [0.12 * tw, -1.02 * tl], [-0.34 * tw, -0.99 * tl],
+    [-0.66 * tw, -0.82 * tl], [-0.85 * tw, -0.50 * tl], [-0.90 * tw, -0.08 * tl],
+    [-0.82 * tw, 0.38 * tl], [-0.70 * tw, 0.66 * tl],
+  ];
+  const turretCurve = new THREE.CatmullRomCurve3(turretControl.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, 'catmullrom', 0.22);
+  const poly = turretCurve.getPoints(96).slice(0, -1).map(v => [v.x, v.z + bz]);
   P.add('turret', 'paint', is2CastLoft(poly, th * 0.96, bz));
   // Cast front cheeks blend the gun shield into the turret nose instead of
   // leaving a cylindrical gun collar on an otherwise featureless drum.
