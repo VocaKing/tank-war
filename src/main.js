@@ -5,6 +5,7 @@ import { Game } from './game/game.js';
 import { Audio } from './game/audio.js';
 import { setMaxAniso } from './world/textures.js';
 import { isMobile } from './ui/touchControls.js';
+import { renderPixelRatio } from './render/pixelRatio.js';
 import './ui/mobile.css';
 
 const canvas = document.getElementById('gl'); const ui = document.getElementById('ui');
@@ -17,8 +18,13 @@ catch(e) {
   document.getElementById('fallback-balance').onclick=()=>import('./ui/balanceEditor.js');
   throw e;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 0.85 : params.get('q') === 'low' ? 1 : 1.5));
-renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+function resizeRenderer(quality) {
+  const ratio = renderPixelRatio(quality, innerWidth, innerHeight, devicePixelRatio, mobile);
+  if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
+  renderer.setSize(innerWidth, innerHeight);
+}
+resizeRenderer('menu');
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9; renderer.outputColorSpace = THREE.SRGBColorSpace;
 setMaxAniso(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 const audio = new Audio();
@@ -43,8 +49,9 @@ function start(opts, gesture = true) {
   menu.show(false); loading.style.display = 'flex'; mode = 'loading';
   setTimeout(() => {
     try {
-      game = new Game(renderer, ui, audio, { ...opts, seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; mode = 'menu'; menu.show(true); } });
-      window.__game = game; renderer.render(game.scene, game.camera);
+      resizeRenderer(opts.quality);
+      game = new Game(renderer, ui, audio, { ...opts, seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
+      window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';
     } catch (e) { console.error(e); loading.innerHTML = '<div><h2>Failed to start</h2><pre>' + (e.stack || e) + '</pre></div>'; return; }
@@ -52,7 +59,7 @@ function start(opts, gesture = true) {
   }, 50);
 }
 window.__start = start; window.__menu = menu;
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); garage.resize(innerWidth, innerHeight); });
+addEventListener('resize', () => { resizeRenderer(game?.quality ?? 'menu'); garage.resize(innerWidth, innerHeight); });
 let last = performance.now(); let fpsAcc = 0, fpsN = 0; window.__fps = 0;
 function loop() {
   requestAnimationFrame(loop); const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now;

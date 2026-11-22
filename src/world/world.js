@@ -7,28 +7,42 @@ import { buildStructures } from './buildings.js';
 import { Vegetation, windUniform, sunU } from './vegetation.js';
 import { Grass } from './grass.js';
 import { GroundDetails } from './groundDetails.js';
+import { coarseTerrainIndices, updateTerrainLOD } from './terrainLod.js';
 import { pbrTex, waterNormalTexture, setTexQuality } from './textures.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Grid2D } from './terrain.js';
 import { DEG, ridged, smoothstep } from '../util.js';
 
-function terrainMaterial(def) {
+function terrainMaterial(def, quality) {
   const L = def.layers;
   const m = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0, vertexColors: true });
+  if (quality === 'low') m.defines = { TERRAIN_LOW: 1 };
   const U = {
     tA: { value: pbrTex(L.A, 'diff') }, tB: { value: pbrTex(L.B, 'diff') }, tC: { value: pbrTex(L.C, 'diff') }, tD: { value: pbrTex(L.D, 'diff') },
-    nA: { value: pbrTex(L.A, 'nor') }, nB: { value: pbrTex(L.B, 'nor') }, nC: { value: pbrTex(L.C, 'nor') }, nD: { value: pbrTex(L.D, 'nor') },
-    aA: { value: pbrTex(L.A, 'arm') }, aB: { value: pbrTex(L.B, 'arm') }, aC: { value: pbrTex(L.C, 'arm') }, aD: { value: pbrTex(L.D, 'arm') },
+    nA: { value: pbrTex(L.A, 'nor') }, nD: { value: pbrTex(L.D, 'nor') },
+    ...(quality !== 'low' ? {
+      nB: { value: pbrTex(L.B, 'nor') }, nC: { value: pbrTex(L.C, 'nor') },
+      aA: { value: pbrTex(L.A, 'arm') }, aB: { value: pbrTex(L.B, 'arm') },
+      aC: { value: pbrTex(L.C, 'arm') }, aD: { value: pbrTex(L.D, 'arm') },
+    } : {}),
     terrainDetail: { value: def.id === 'desert' ? 1 : def.id === 'forest' ? 2 : 0 },
     tintA: { value: new THREE.Vector3(...L.tintA) }, tintB: { value: new THREE.Vector3(...L.tintB) },
   };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; attribute vec3 roadDetail; varying vec3 vRoad; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vRoad = roadDetail; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 splat; attribute vec3 roadDetail; attribute vec2 terrainLight; varying vec2 vTerrainLight; varying vec3 vRoad; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat; vRoad = roadDetail; vTerrainLight = terrainLight; vWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vWN = normalize(mat3(modelMatrix) * objectNormal);');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD, aA, aB, aC, aD; uniform vec3 tintA, tintB; uniform int terrainDetail; varying vec3 vRoad; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN; float tAO = 1.0;
-      vec3 sampleL(sampler2D t, vec2 uv, float far) { vec3 a = texture2D(t, uv).rgb; vec3 b = texture2D(t, uv * 0.173).rgb; return mix(a, (a + b) * 0.5, far); }`)
+      uniform sampler2D tA, tB, tC, tD, nA, nB, nC, nD, aA, aB, aC, aD; uniform vec3 tintA, tintB; uniform int terrainDetail; varying vec2 vTerrainLight; varying vec3 vRoad; varying vec4 vSplat; varying vec3 vWP; varying vec3 vWN; float tAO = 1.0;
+      vec3 sampleL(sampler2D t, vec2 uv, float far) {
+        vec3 a = texture2D(t, uv).rgb;
+        #ifdef TERRAIN_LOW
+          return a;
+        #else
+          vec3 b = texture2D(t, uv * 0.173).rgb;
+          return mix(a, (a + b) * 0.5, far);
+        #endif
+      }`)
       .replace('#include <map_fragment>', `
         float camD = length(vWP - cameraPosition); float far = smoothstep(25.0, 140.0, camD);
         vec2 uv = vWP.xz / 3.2; vec2 uvr = vWP.xz / 6.0; vec2 uvd = vWP.xz / 3.5;
@@ -41,13 +55,20 @@ function terrainMaterial(def) {
         vec3 cA = sampleL(tA, uv, far) * tintA, cB = sampleL(tB, uv * 1.1, far) * tintB, cC = sampleL(tC, uvr, far), cD = sampleL(tD, uvd, far);
         vec3 bw = pow(abs(wn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
         if (steep > 0.01) { cC = texture2D(tC, vWP.zy / 6.0).rgb * bw.x + cC * bw.y + texture2D(tC, vWP.xy / 6.0).rgb * bw.z; }
-        vec3 rA = texture2D(aA, uv).rgb, rB = texture2D(aB, uv * 1.1).rgb, rC = texture2D(aC, uvr).rgb, rD = texture2D(aD, uvd).rgb;
+        #ifndef TERRAIN_LOW
+          vec3 rA = texture2D(aA, uv).rgb, rB = texture2D(aB, uv * 1.1).rgb, rC = texture2D(aC, uvr).rgb, rD = texture2D(aD, uvd).rgb;
+        #endif
         // height blending: each texture's luminance acts as its height map, giving natural interlocking transitions
         vec4 hgt = vec4(dot(cA, vec3(0.33)), dot(cB, vec3(0.33)), dot(cC, vec3(0.33)), dot(cD, vec3(0.33))) * 0.6 + w * 1.4;
         float hmax = max(max(hgt.x, hgt.y), max(hgt.z, hgt.w)) - 0.18;
         vec4 hb = max(hgt - hmax, 0.0) * step(0.001, w); w = hb / (hb.x + hb.y + hb.z + hb.w + 1e-4);
         vec3 col = cA * w.x + cB * w.y + cC * w.z + cD * w.w;
-        float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0)); tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
+        #ifdef TERRAIN_LOW
+          float tRough = dot(w, vec4(0.92, 0.95, 0.88, 0.91));
+        #else
+          float tRough = mix(0.72, 1.0, clamp(rA.g * w.x + rB.g * w.y + rC.g * w.z + rD.g * w.w, 0.0, 1.0));
+          tAO = mix(rA.r * w.x + rB.r * w.y + rC.r * w.z + rD.r * w.w, 1.0, far * 0.8);
+        #endif
         col *= 0.82 + 0.36 * texture2D(tB, vWP.xz / 97.0).g;
         col *= mix(0.92, 1.06, smoothstep(0.2, 0.8, texture2D(tA, vWP.xz / 260.0).r));
         // v4 patchwork: large irregular parcels (fields / meadows / dry patches) tint the ground layer differently
@@ -77,12 +98,18 @@ function terrainMaterial(def) {
         }
         if (terrainDetail == 1) col *= 1.0 + fine * w.x * ripple * 0.055;
         if (terrainDetail == 2) col *= 1.0 - fine * w.x * 0.23 * smoothstep(0.52, 0.82, br * 0.65 + br2 * 0.6);
+        col *= mix(vec3(1.0), vec3(0.76, 0.79, 0.68), vTerrainLight.y * 0.74);
+        tRough = mix(tRough, 0.66, vTerrainLight.y * 0.58);
         diffuseColor.rgb *= col;`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(tRough, 0.95, far * 0.5);')
-      .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= tAO; reflectedLight.indirectSpecular *= tAO * tAO; reflectedLight.directDiffuse *= mix(1.0, tAO, 0.5);')
+      .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= tAO; reflectedLight.indirectSpecular *= tAO * tAO; reflectedLight.directDiffuse *= mix(1.0, tAO, 0.5) * vTerrainLight.x; reflectedLight.directSpecular *= vTerrainLight.x;')
       .replace('#include <normal_fragment_maps>', `
         {
-          vec3 nm = (texture2D(nA, uv).xyz * w.x + texture2D(nB, uv * 1.1).xyz * w.y + texture2D(nC, uvr).xyz * w.z + texture2D(nD, uvd).xyz * w.w) * 2.0 - 1.0;
+          #ifdef TERRAIN_LOW
+            vec3 nm = mix(texture2D(nA, uv).xyz, texture2D(nD, uvd).xyz, w.w) * 2.0 - 1.0;
+          #else
+            vec3 nm = (texture2D(nA, uv).xyz * w.x + texture2D(nB, uv * 1.1).xyz * w.y + texture2D(nC, uvr).xyz * w.z + texture2D(nD, uvd).xyz * w.w) * 2.0 - 1.0;
+          #endif
           nm.xy *= (1.0 - far * 0.7) * 0.9;
           nm.xy += vec2(0.69, 0.72) * fine * w.x * ripple * (terrainDetail == 1 ? 0.12 : 0.0);
           vec3 T = (viewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz; vec3 Bt = (viewMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
@@ -90,21 +117,55 @@ function terrainMaterial(def) {
           normal = normalize(T * nm.x + Bt * nm.y + normal * nm.z);
         }`);
   };
-  m.customProgramCacheKey = () => 'terrain6';
+  m.customProgramCacheKey = () => 'terrain7-' + quality;
   return m;
 }
 
-function buildTerrainMeshes(mb, mat, step, refine) {
+// Shade terrain beneath opposing ridges with the same sun direction as the
+// directional light. A coarse field avoids a second terrain shadow pass.
+function bakeTerrainSun(terrain, direction, overcast) {
+  const side = Math.ceil(terrain.half * 2 / 8) + 1;
+  const spacing = terrain.half * 2 / (side - 1);
+  const exposure = new Float32Array(side * side);
+  const horizontal = Math.hypot(direction.x, direction.z) || 1;
+  const ux = direction.x / horizontal, uz = direction.z / horizontal;
+  const slope = direction.y / horizontal;
+  const strength = overcast ? 0.22 : 0.55;
+  const distances = [10, 16, 24, 36, 54, 81, 121, 180];
+  for (let row = 0; row < side; row++) for (let col = 0; col < side; col++) {
+    const x = col * spacing - terrain.half, z = row * spacing - terrain.half;
+    const y = terrain.height(x, z);
+    let horizon = -Infinity;
+    for (const d of distances) horizon = Math.max(horizon, (terrain.height(x + ux * d, z + uz * d) - y) / d);
+    exposure[row * side + col] = 1 - strength * smoothstep(slope - 0.035, slope + 0.085, horizon);
+  }
+  return (x, z) => {
+    const gx = Math.max(0, Math.min(side - 1, (x + terrain.half) / spacing));
+    const gz = Math.max(0, Math.min(side - 1, (z + terrain.half) / spacing));
+    const ix = Math.min(side - 2, Math.floor(gx)), iz = Math.min(side - 2, Math.floor(gz));
+    const f = gx - ix, g = gz - iz;
+    const a = iz * side + ix, b = a + side;
+    return (exposure[a] * (1 - f) + exposure[a + 1] * f) * (1 - g)
+      + (exposure[b] * (1 - f) + exposure[b + 1] * f) * g;
+  };
+}
+
+function buildTerrainMeshes(mb, mat, step, refine, exposure) {
   const t = mb.t; const tiles = 7; const per = Math.floor((t.n - 1) / tiles); const group = new THREE.Group(); group.name = 'terrain';
+  const lodTiles = [], indexCache = new Map();
   for (let ty = 0; ty < tiles; ty++) for (let tx = 0; tx < tiles; tx++) {
     const i0 = tx * per, j0 = ty * per, i1 = tx === tiles - 1 ? t.n - 1 : i0 + per, j1 = ty === tiles - 1 ? t.n - 1 : j0 + per;
     const nx = Math.ceil((i1 - i0) / step) + 1, nz = Math.ceil((j1 - j0) / step) + 1;
     const pos = new Float32Array(nx * nz * 3), col = new Float32Array(nx * nz * 3), spl = new Float32Array(nx * nz * 4), idx = [];
-    const normal = new Float32Array(nx * nz * 3), road = new Float32Array(nx * nz * 3);
+    const normal = new Float32Array(nx * nz * 3), road = new Float32Array(nx * nz * 3), light = new Float32Array(nx * nz * 2);
+    let maxY = -Infinity;
     let v = 0;
     for (let b = 0; b < nz; b++) for (let a = 0; a < nx; a++) {
       const i = Math.min(i1, i0 + a * step), j = Math.min(j1, j0 + b * step), k = j * t.n + i;
       pos[v * 3] = t.i2x(i); pos[v * 3 + 1] = t.h[k]; pos[v * 3 + 2] = t.i2x(j);
+      maxY = Math.max(maxY, t.h[k]);
+      light[v * 2] = exposure(pos[v * 3], pos[v * 3 + 2]);
+      light[v * 2 + 1] = 1 - smoothstep(0.04, 0.84, Math.abs(t.h[k] - t.water[k]));
       col[v * 3] = t.tint[k * 3]; col[v * 3 + 1] = t.tint[k * 3 + 1]; col[v * 3 + 2] = t.tint[k * 3 + 2];
       const il = Math.max(0, i - 1), ir = Math.min(t.n - 1, i + 1);
       const jl = Math.max(0, j - 1), jr = Math.min(t.n - 1, j + 1);
@@ -117,7 +178,7 @@ function buildTerrainMeshes(mb, mat, step, refine) {
       road[v * 3 + 2] = mb.roadDetail[k * 3 + 2];
       spl.set(mb.splat.subarray(k * 4, k * 4 + 4), v * 4); v++;
     }
-    const centers = [], centerColors = [], centerSplats = [], centerRoads = [], centerNormals = [];
+    const centers = [], centerColors = [], centerSplats = [], centerRoads = [], centerNormals = [], centerLights = [];
     const average = (source, stride, corners, dest) => {
       for (let k = 0; k < stride; k++) dest.push(corners.reduce((sum, i) => sum + source[i * stride + k], 0) / 4);
     };
@@ -134,6 +195,7 @@ function buildTerrainMeshes(mb, mat, step, refine) {
       average(spl, 4, corners, centerSplats);
       average(road, 3, corners, centerRoads);
       average(normal, 3, corners, centerNormals);
+      average(light, 2, corners, centerLights);
       idx.push(p, r, center, r, s, center, s, q, center, q, p, center);
     }
     const append = (base, extra) => {
@@ -145,15 +207,28 @@ function buildTerrainMeshes(mb, mat, step, refine) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(append(pos, centers), 3)); g.setAttribute('color', new THREE.BufferAttribute(append(col, centerColors), 3)); g.setAttribute('splat', new THREE.BufferAttribute(append(spl, centerSplats), 4));
     g.setAttribute('normal', new THREE.BufferAttribute(append(normal, centerNormals), 3));
     g.setAttribute('roadDetail', new THREE.BufferAttribute(append(road, centerRoads), 3));
+    g.setAttribute('terrainLight', new THREE.BufferAttribute(append(light, centerLights), 2));
     g.setIndex(idx); g.computeBoundingSphere();
-    const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; mesh.castShadow = false; group.add(mesh);
+    const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = true; group.add(mesh);
+    if (nx <= 2 || nz <= 2) continue;
+    const coarse = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(g.attributes)) coarse.setAttribute(name, attribute);
+    const indexKey = nx + ':' + nz;
+    if (!indexCache.has(indexKey)) indexCache.set(indexKey, coarseTerrainIndices(nx, nz, 4));
+    const indices = indexCache.get(indexKey);
+    coarse.setIndex(indices);
+    coarse.boundingSphere = g.boundingSphere.clone();
+    const distant = new THREE.Mesh(coarse, mat);
+    distant.receiveShadow = true; distant.visible = false; group.add(distant);
+    lodTiles.push({ near: mesh, far: distant, minX: t.i2x(i0), maxX: t.i2x(i1), minZ: t.i2x(j0), maxZ: t.i2x(j1), maxY });
   }
+  group.userData.lodTiles = lodTiles;
   return group;
 }
 
-function buildFarTerrain(mb, mat) {
+function buildFarTerrain(mb) {
   const t = mb.t; const S = 3000, seg = 120; const step = (2 * S) / seg; const n = seg + 1; const def = mb.def;
-  const pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3), spl = new Float32Array(n * n * 4), idx = [];
+  const pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2), idx = [];
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const x = -S + i * step, z = -S + j * step; const v = j * n + i; const inside = Math.abs(x) < t.half - 1 && Math.abs(z) < t.half - 1;
     const edge = Math.max(Math.abs(x), Math.abs(z));
@@ -161,13 +236,13 @@ function buildFarTerrain(mb, mat) {
     if (inside) h = t.height(x, z) - 25;
     else { const hb = t.height(Math.max(-t.half, Math.min(t.half, x)), Math.max(-t.half, Math.min(t.half, z))); const f = smoothstep(t.half, t.half + 900, edge); h = hb * (1 - f * 0.5) + f * (60 + 160 * ridged(mb.noise, x / 900, z / 900, 4)) - 0.6; }
     pos[v * 3] = x; pos[v * 3 + 1] = h; pos[v * 3 + 2] = z;
-    const fc = def.farColor; col.set([fc[0] * 2.2, fc[1] * 2.2, fc[2] * 2.2], v * 3); spl.set([1, 0, 0, 0], v * 4);
+    const fc = def.farColor; col.set([fc[0] * 2.2, fc[1] * 2.2, fc[2] * 2.2], v * 3); uv.set([x / 18, z / 18], v * 2);
   }
   for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) { const p = j * n + i; idx.push(p, p + n, p + 1, p + 1, p + n, p + n + 1); }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('splat', new THREE.BufferAttribute(spl, 4));
-  g.setAttribute('roadDetail', new THREE.BufferAttribute(new Float32Array(n * n * 3), 3));
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, mat); mesh.receiveShadow = false; mesh.name = 'farTerrain'; return mesh;
+  const mat = new THREE.MeshStandardMaterial({ map: pbrTex(def.layers.A, 'diff'), vertexColors: true, roughness: 0.98 });
+  const mesh = new THREE.Mesh(g, mat); mesh.name = 'farTerrain'; return mesh;
 }
 
 export const waterTime = { value: 0 };
@@ -176,12 +251,12 @@ function waterMaterial() {
   const m = new THREE.MeshPhysicalMaterial({ color: 0x1d3a3c, roughness: 0.04, metalness: 0.0, transparent: true, opacity: 0.9, normalMap: nt, normalScale: new THREE.Vector2(1, 1), ior: 1.33, specularIntensity: 1, envMapIntensity: 1.0 });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uT = waterTime;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float waterDepth; varying float vWaterDepth; varying vec3 vWPw;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vWaterDepth = waterDepth;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPw; varying float vWaterDepth; uniform float uT;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float waterDepth; attribute vec2 waterFlow; varying vec2 vWaterFlow; varying float vWaterDepth; varying vec3 vWPw;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPw = (modelMatrix * vec4(transformed, 1.0)).xyz; vWaterDepth = waterDepth; vWaterFlow = waterFlow;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPw; varying float vWaterDepth; varying vec2 vWaterFlow; uniform float uT;')
       .replace('#include <normal_fragment_maps>', `{
         vec2 p = vWPw.xz; float dist = length(vWPw - cameraPosition);
-        vec3 n1 = texture2D(normalMap, p / 9.0 + vec2(uT * 0.021, uT * 0.013)).xyz * 2.0 - 1.0;
-        vec3 n2 = texture2D(normalMap, p / 3.1 + vec2(-uT * 0.034, uT * 0.027)).xyz * 2.0 - 1.0;
+        vec3 n1 = texture2D(normalMap, p / 9.0 - vWaterFlow * (uT * 0.021)).xyz * 2.0 - 1.0;
+        vec3 n2 = texture2D(normalMap, p / 3.1 - (vWaterFlow * 0.038 + vec2(-0.007, 0.005)) * uT).xyz * 2.0 - 1.0;
         vec3 n3 = texture2D(normalMap, p / 31.0 + vec2(uT * 0.006, -uT * 0.009)).xyz * 2.0 - 1.0;
         float fade = 1.0 - smoothstep(40.0, 400.0, dist) * 0.7;
         vec2 s = (n1.xy * 0.55 + n2.xy * 0.35 * (1.0 - smoothstep(20.0, 120.0, dist)) + n3.xy * 0.5) * 0.32 * fade;
@@ -197,17 +272,19 @@ function waterMaterial() {
           float shallow = (1.0 - deep) * ndv;
           diffuseColor.rgb *= mix(1.25, 0.65, ndv);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.12, 0.16, 0.105) * (1.0 + caustic * 0.09), shallow * 0.72);
+          float shore = (1.0 - smoothstep(0.12, 0.34, abs(vWaterDepth - 0.11))) * smoothstep(0.33, 0.84, caustic);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.19, 0.25, 0.20), shore * 0.34);
           diffuseColor.a = mix(0.96, mix(0.62, 0.86, deep), ndv);
         }`);
   };
-  m.customProgramCacheKey = () => 'water6';
+  m.customProgramCacheKey = () => 'water7';
   return m;
 }
 function buildWater(mb, mat) {
   const group = new THREE.Group(); group.name = 'water';
   for (const rv of mb.rivers) {
     if (rv.dry) continue;
-    const pts = rv.pts, pos = [], uv = [], depth = [], idx = [];
+    const pts = rv.pts, pos = [], uv = [], depth = [], flow = [], idx = [];
     const half = rv.width / 2 + 2.5, lanes = 9;
     let along = 0;
     for (let i = 0; i < pts.length; i++) {
@@ -221,6 +298,7 @@ function buildWater(mb, mat) {
         pos.push(px, h, pz);
         uv.push(along / 12, (half - offset) / 12);
         depth.push(h - mb.t.height(px, pz));
+        flow.push(dx / length, dz / length);
         if (i < pts.length - 1 && j < lanes - 1) {
           const k = i * lanes + j;
           idx.push(k, k + lanes, k + 1, k + 1, k + lanes, k + lanes + 1);
@@ -231,6 +309,7 @@ function buildWater(mb, mat) {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geometry.setAttribute('waterDepth', new THREE.Float32BufferAttribute(depth, 1));
+    geometry.setAttribute('waterFlow', new THREE.Float32BufferAttribute(flow, 2));
     geometry.setIndex(idx);
     const normal = new Float32Array(pos.length);
     for (let i = 1; i < normal.length; i += 3) normal[i] = 1;
@@ -242,12 +321,15 @@ function buildWater(mb, mat) {
     const geometry = new THREE.RingGeometry(0, lk.r + 6, 64, 16);
     geometry.rotateX(-Math.PI / 2);
     const position = geometry.attributes.position, uv = geometry.attributes.uv;
-    const depth = new Float32Array(position.count);
+    const depth = new Float32Array(position.count), flow = new Float32Array(position.count * 2);
     for (let i = 0; i < position.count; i++) {
       depth[i] = lk.wl - mb.t.height(lk.x + position.getX(i), lk.z + position.getZ(i));
+      flow[i * 2] = -position.getZ(i) / (lk.r + 6) * 0.14;
+      flow[i * 2 + 1] = position.getX(i) / (lk.r + 6) * 0.14;
       uv.setXY(i, uv.getX(i) * lk.r / 6, uv.getY(i) * lk.r / 6);
     }
     geometry.setAttribute('waterDepth', new THREE.BufferAttribute(depth, 1));
+    geometry.setAttribute('waterFlow', new THREE.BufferAttribute(flow, 2));
     const mesh = new THREE.Mesh(geometry, mat);
     mesh.position.set(lk.x, lk.wl, lk.z); mesh.receiveShadow = true; group.add(mesh);
   }
@@ -273,13 +355,20 @@ export class World {
     Object.assign(sky2.material.uniforms.turbidity, { value: def.turbidity }); sky2.material.uniforms.rayleigh.value = def.rayleigh; sky2.material.uniforms.sunPosition.value.copy(this.sunDir);
     sky2.material.uniforms.mieCoefficient.value = 0.006;
     this.envRT = pm.fromScene(envScene, 0, 0.1, 2000); scene.environment = this.envRT.texture; scene.environmentIntensity = 0.7;
+    sky2.geometry.dispose(); sky2.material.dispose();
     const fogDen = H ? H.fogDensity : def.fog.density;
     scene.fog = new THREE.FogExp2(H ? new THREE.Color().setRGB(...H.horizon) : def.fog.color, fogDen);
     const sunCol = new THREE.Color().setHSL(0.1, 0.5, def.sun.elevation < 25 ? 0.78 : 0.92);
     const sun = new THREE.DirectionalLight(sunCol, def.sun.elevation < 25 ? 2.8 : 3.3); sun.castShadow = true;
     if (H) { const e = H.sunE; const m = Math.max(...e); sun.color.setRGB(e[0] / m, e[1] / m, e[2] / m); sun.intensity = m; }
-    const sm = quality === 'low' ? 1024 : quality === 'high' ? 4096 : 2048; sun.shadow.mapSize.set(sm, sm);
-    const S = quality === 'high' ? 95 : 110; this.shadowS = S; this.shadowTexel = (2 * S) / sm;
+    const sm = Math.min(renderer.capabilities.maxTextureSize, quality === 'high' ? 3072 : quality === 'medium' ? 1536 : 1024);
+    sun.shadow.mapSize.set(sm, sm);
+    sun.shadow.autoUpdate = false;
+    sun.shadow.needsUpdate = true;
+    this.shadowInterval = quality === 'high' ? 1 / 30 : 1 / 24;
+    this.shadowUpdatedAt = -Infinity;
+    this.shadowFocus = new THREE.Vector3();
+    const S = quality === 'high' ? 88 : 102; this.shadowS = S; this.shadowTexel = (2 * S) / sm;
     Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 800 });
     sun.shadow.bias = -0.00025; sun.shadow.normalBias = this.shadowTexel * 1.6; if (H && H.overcast) sun.shadow.radius = 6; else sun.shadow.radius = 2;
     scene.add(sun); scene.add(sun.target); this.sun = sun;
@@ -288,12 +377,15 @@ export class World {
     this.hdrLoaded = !H; this.exposure = H ? H.exposure : null;
     if (H) this._loadHdri(renderer, H, quality);
     // terrain
-    const tmat = terrainMaterial(def); this.terrainMat = tmat;
-    this.terrainGroup = buildTerrainMeshes(mb, tmat, quality === 'low' ? 2 : 1, quality === 'high'); scene.add(this.terrainGroup);
-    this.far = buildFarTerrain(mb, tmat); scene.add(this.far);
+    const tmat = terrainMaterial(def, quality); this.terrainMat = tmat;
+    const exposure = bakeTerrainSun(mb.t, this.sunDir, H?.overcast);
+    this.terrainDetailDistance = quality === 'high' ? 160 : quality === 'medium' ? 112 : 80;
+    this.terrainGroup = buildTerrainMeshes(mb, tmat, quality === 'low' ? 2 : 1, quality === 'high', exposure); scene.add(this.terrainGroup);
+    this.far = buildFarTerrain(mb); scene.add(this.far);
     this.waterMat = waterMaterial(); this.water = buildWater(mb, this.waterMat); scene.add(this.water);
     // structures and vegetation
     const st = buildStructures(mb, scene, mb.t); this.colliders = st.colliders; this.decks = st.decks || [];
+    this.structureMaterials = st.materials;
     this.colGrid = new Grid2D(mb.t.half, 24); for (const c of this.colliders) this.colGrid.insert(c, c.x, c.z, c.r);
     this.veg = new Vegetation(scene, mb, quality);
     this.grass = new Grass(scene, mb, quality, windUniform);
@@ -308,7 +400,7 @@ export class World {
       ring.rotation.x = -Math.PI / 2; ring.position.set(b.x, y + 0.4, b.z); ring.renderOrder = 2; scene.add(ring);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 12, 8), new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.7, roughness: 0.4 })); pole.position.set(b.x, y + 6, b.z); pole.castShadow = true; scene.add(pole);
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6, 8, 4), new THREE.MeshStandardMaterial({ color: i === 0 ? 0x3fa34d : 0xc0392b, side: THREE.DoubleSide, roughness: 0.9 })); flag.position.set(b.x + 1.3, y + 11, b.z); scene.add(flag);
-      this.baseMarkers.push({ ring, flag });
+      this.baseMarkers.push({ ring, pole, flag });
     }
   }
   _loadHdri(renderer, H, quality) {
@@ -324,7 +416,11 @@ export class World {
       const rt = this.pm.fromEquirectangular(tex); if (this.envRT) this.envRT.dispose(); this.envRT = rt;
       this.scene.environment = rt.texture; this.scene.environmentIntensity = 1.0;
       this.scene.background = tex; this.scene.backgroundIntensity = 1.0; this.bgTex = tex;
-      this.sky.visible = false; this.hemi.intensity = 0.0;
+      this.sky.visible = false;
+      // The pure-sky probe has no photographed ground bounce. A modest
+      // hemisphere fill keeps the underside of eaves and tree crowns legible.
+      this.hemi.color.setRGB(...H.horizon);
+      this.hemi.intensity = H.overcast ? 0.24 : 0.17;
       this.hdrLoaded = true;
     });
   }
@@ -343,7 +439,14 @@ export class World {
     }
     return best;
   }
-  updateShadowCenter(target) {
+  updateTerrainLOD(camera) { updateTerrainLOD(this.terrainGroup.userData.lodTiles, camera, this.terrainDetailDistance); }
+  updateShadowCenter(target, time = 0) {
+    // Shadow maps need fewer updates than the visible pose. Refresh at once
+    // after a teleport or camera handoff so a stale map never follows it.
+    if (time - this.shadowUpdatedAt < this.shadowInterval
+      && this.shadowFocus.distanceToSquared(target) < 12 * 12) return;
+    this.shadowUpdatedAt = time;
+    this.shadowFocus.copy(target);
     // stable shadows: snap the shadow centre to whole shadow-map texels in light space (no shimmering when moving)
     const s = this.sun; const L = this.sunDir; const ty0 = this.terrain.height(target.x, target.z);
     if (!this._lr) { this._lr = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), L).normalize(); this._lu = new THREE.Vector3().crossVectors(L, this._lr).normalize(); }
@@ -351,6 +454,7 @@ export class World {
     const a = Math.round(P.dot(this._lr) / tx_) * tx_, b = Math.round(P.dot(this._lu) / tx_) * tx_, c = P.dot(L);
     const C = this._lr.clone().multiplyScalar(a).addScaledVector(this._lu, b).addScaledVector(L, c);
     s.target.position.copy(C); s.position.copy(C).addScaledVector(L, 400); s.target.updateMatrixWorld();
+    s.shadow.needsUpdate = true;
   }
   update(dt, time, camPos) {
     this.veg.updateLOD(camPos); this.veg.update(dt); this.grass.update(camPos); this.groundDetails.update(camPos);
@@ -368,5 +472,24 @@ export class World {
     let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz); if (t >= 0 && (best < 0 || t < best)) best = t; }
     return best;
   }
-  dispose() { this.disposed = true; if (this.bgTex) this.bgTex.dispose(); this.grass.dispose(); this.groundDetails.dispose(); this.scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this.envRT.dispose(); }
+  dispose() {
+    this.disposed = true;
+    this.bgTex?.dispose();
+    this.grass.dispose(); this.groundDetails.dispose();
+    const geometries = new Set();
+    this.scene.traverse(o => {
+      if (o.isInstancedMesh) o.dispose();
+      if (o.geometry) geometries.add(o.geometry);
+    });
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of [
+      this.sky.material, this.terrainMat, this.far.material, this.waterMat,
+      ...Object.values(this.structureMaterials), ...Object.values(this.veg.mats).flat(),
+      ...Object.values(this.veg.ghostMats), this.veg.rockMat,
+    ]) material.dispose();
+    for (const { ring, pole, flag } of this.baseMarkers) {
+      ring.material.dispose(); pole.material.dispose(); flag.material.dispose();
+    }
+    this.sun.shadow.dispose(); this.envRT.dispose(); this.pm.dispose();
+  }
 }

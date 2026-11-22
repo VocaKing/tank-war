@@ -27,6 +27,7 @@ class Particles {
     g.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aColor', new THREE.BufferAttribute(this.col, 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aRot', new THREE.BufferAttribute(this.rot, 1).setUsage(THREE.DynamicDrawUsage));
+    g.setDrawRange(0, 0);
     this.mat = new THREE.ShaderMaterial({ uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTex: { value: softSprite() }, uScale: { value: 600 } }]), vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending, fog: true });
     this.mat.uniforms.uTex.value = softSprite();
     this.points = new THREE.Points(g, this.mat); this.points.frustumCulled = false; this.points.renderOrder = additive ? 5 : 4; scene.add(this.points); this.geo = g;
@@ -44,21 +45,33 @@ class Particles {
       P[w] = q; w++;
     }
     P.length = w; this.geo.setDrawRange(0, w);
-    for (const k of ['position', 'aSize', 'aColor', 'aRot']) this.geo.attributes[k].needsUpdate = true;
+    if (!w) return;
+    for (const attribute of Object.values(this.geo.attributes)) {
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, w * attribute.itemSize);
+      attribute.needsUpdate = true;
+    }
   }
+  dispose() { this.points.removeFromParent(); this.geo.dispose(); this.mat.dispose(); }
 }
 
 export class Effects {
-  constructor(scene, renderer, dustColor = [0.55, 0.5, 0.42]) {
+  constructor(scene, renderer, dustColor = [0.55, 0.5, 0.42], quality = 'high') {
     this.scene = scene; this.smoke = new Particles(scene, 5000, false); this.fire = new Particles(scene, 2500, true);
     this.dust = dustColor; this.lights = []; this.burners = []; this.tracers = []; this.debris = [];
-    for (let i = 0; i < 4; i++) { const l = new THREE.PointLight(0xffaa55, 0, 60, 1.6); scene.add(l); this.lights.push({ l, t: 0, max: 0.1, i0: 0 }); }
+    const flashes = quality === 'high' ? 4 : quality === 'medium' ? 2 : 1;
+    for (let i = 0; i < flashes; i++) { const l = new THREE.PointLight(0xffaa55, 0, 60, 1.6); scene.add(l); this.lights.push({ l, t: 0, max: 0.1, i0: 0 }); }
     this.tracerGeo = new THREE.CylinderGeometry(0.06, 0.06, 1, 5); this.tracerGeo.rotateX(Math.PI / 2);
     this.tracerMat = new THREE.MeshBasicMaterial({ color: 0xffb566, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
     this.debrisGeo = new THREE.BoxGeometry(1, 1, 1); this.debrisMat = new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 1 });
     this.renderer = renderer;
   }
-  setScale(h, fovDeg) { const s = h / (2 * Math.tan((fovDeg * Math.PI) / 360)); this.smoke.mat.uniforms.uScale.value = s; this.fire.mat.uniforms.uScale.value = s; }
+  setScale(h, fovDeg) { const s = h * this.renderer.getPixelRatio() / (2 * Math.tan((fovDeg * Math.PI) / 360)); this.smoke.mat.uniforms.uScale.value = s; this.fire.mat.uniforms.uScale.value = s; }
+  dispose() {
+    this.smoke.dispose(); this.fire.dispose();
+    this.tracerGeo.dispose(); this.tracerMat.dispose();
+    this.debrisGeo.dispose(); this.debrisMat.dispose();
+  }
   flash(pos, intensity = 60, dur = 0.09, color = 0xffaa55) {
     let best = this.lights[0]; for (const L of this.lights) if (L.t >= L.max) { best = L; break; }
     best.l.position.copy(pos); best.l.color.set(color); best.i0 = intensity; best.t = 0; best.max = dur; best.l.intensity = intensity;

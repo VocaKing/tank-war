@@ -374,7 +374,7 @@ export function buildStructures(mb, scene, terrain) {
         prop('wood', new THREE.CylinderGeometry(rad * 0.90, rad, len, 12, 1, true), x, h, z, 0, Math.PI / 2);
         for (const face of [-1, 1]) {
           const end = z + face * len / 2;
-          prop('woodcut', new THREE.CircleGeometry(rad * (face < 0 ? 0.90 : 1), 12), x, h, end, face < 0 ? Math.PI : 0);
+          prop('woodcut', new THREE.CircleGeometry(rad * (face > 0 ? 0.90 : 1), 12), x, h, end, face < 0 ? Math.PI : 0);
           for (const scale of [0.38, 0.62, 0.81]) prop('woodgrain', new THREE.RingGeometry(rad * scale, rad * scale + 0.009, 12), x + 0.012, h, end + face * 0.002, face < 0 ? Math.PI : 0);
         }
       }
@@ -418,9 +418,27 @@ export function buildStructures(mb, scene, terrain) {
     else if (p.kind === 'sandbags') { for (let i = 0; i < 10; i++) { const row = i < 6 ? 0 : 1; const k = row ? i - 6 : i; const g = new THREE.SphereGeometry(0.4, 8, 5); g.scale(1.1, 0.4, 0.6); xf(g, -2 + k * 0.8 + row * 0.4, 0.18 + row * 0.3, 0); xf(g, p.x, y, p.z, p.rot); B.add('sand', g); } colliders.push(new OBB(p.x, p.z, 2.3, 0.4, p.rot, y - 1, y + 0.75, 'prop')); }
   }
   const group = new THREE.Group(); group.name = 'structures';
-  for (const [k, list] of Object.entries(B.b)) {
-    if (!list.length) continue; const geo = mergeGeometries(list); geo.computeBoundingSphere();
-    M[k].vertexColors = true; const mesh = new THREE.Mesh(geo, M[k]); mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
+  const cell = 192;
+  for (const [key, list] of Object.entries(B.b)) {
+    const material = M[key];
+    material.vertexColors = true;
+    const cells = new Map();
+    const split = list.reduce((count, part) => count + part.attributes.position.count, 0) > 66_000;
+    for (const part of list) {
+      const pos = part.attributes.position;
+      // Split busy materials so buildings outside both the camera and light
+      // frustums never enter those passes. Keep sparse materials batched.
+      const id = split ? Math.floor(pos.getX(0) / cell) + ':' + Math.floor(pos.getZ(0) / cell) : '';
+      if (!cells.has(id)) cells.set(id, []);
+      cells.get(id).push(part);
+    }
+    for (const parts of cells.values()) {
+      const geometry = mergeGeometries(parts);
+      geometry.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      group.add(mesh);
+    }
   }
   scene.add(group);
   return { group, colliders, materials: M, decks };

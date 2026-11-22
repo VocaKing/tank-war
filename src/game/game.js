@@ -15,6 +15,7 @@ import { sanitizeItems, DEFAULT_ITEMS } from './items.js';
 import { setTrackLOD } from '../models/tankModel.js';
 import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 import { Post } from '../render/post.js';
+import { ContactShadows } from '../render/contactShadows.js';
 import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
@@ -32,12 +33,14 @@ export class Game {
     this.quality = opts.quality || 'high'; this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
     this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 6000);
     this.time = 0; this.timeLimit = 15 * 60; this.paused = false; this.ended = false; this.flying = [];
-    this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46]);
+    this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46], this.quality);
     this.ballistics = new Ballistics(this); this.spotting = new Spotting(this); this.nav = new NavGrid(this.world);
     this.capture = [{ points: 0 }, { points: 0 }]; this.smokes = [];
     this.tanks = []; this.ai = [];
     this.spawnTeams(opts.tankId);
     this.player = this.tanks[0];
+    this.world.updateShadowCenter(this.player.pos, 0);
+    this.contactShadows = new ContactShadows(this.world, this.tanks);
     this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, fov: 60, follow: this.player };
     this.armorView = new ArmorView(this); this.lock = null;
     this.assist = new AimAssist(this, opts.aimAssist !== false);
@@ -45,7 +48,10 @@ export class Game {
     this.hud = new HUD(uiRoot, this);
     this.bindInput();
     if (isMobile()) this.touch = new TouchControls(this);
-    if (this.quality === 'high' && !opts.noPost) { try { this.post = new Post(renderer, this.scene, this.camera); } catch (e) { console.warn('post-processing disabled', e); this.post = null; } }
+    if (this.quality === 'high' && !opts.noPost && renderer.extensions.has('EXT_color_buffer_float')) {
+      try { this.post = new Post(renderer, this.scene, this.camera); }
+      catch (e) { console.warn('post-processing disabled', e); this.post = null; }
+    }
     try { this.outline = new Outline(renderer, this.quality); } catch (e) { console.warn('outline disabled', e); this.outline = null; }
     this.resize();
     this.debug = this.makeDebug();
@@ -361,6 +367,8 @@ export class Game {
   }
   // running-gear LOD: individual track links + detailed wheels only when the tank covers enough screen
   updateLOD() {
+    this.world.updateTerrainLOD(this.camera);
+    this.contactShadows.update(this.camera.position);
     const cp = this.camera.position; const k = this.camera.fov / 60; const near = this.quality === 'low' ? 22 : this.quality === 'high' ? 60 : 40;
     for (const t of this.tanks) { if (!t.model.links) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
   }
@@ -393,7 +401,7 @@ export class Game {
     this.armorView.update();
     // player bush ghosting
     const pb = this.player.alive ? this.player.inBush : null; this.world.veg.setPlayerBush(pb && !this.cam.sniper ? pb : pb);
-    this.world.updateShadowCenter(this.cam.follow.pos); this.world.update(dt, this.time, this.camera.position);
+    this.world.updateShadowCenter(this.cam.follow.pos, this.time); this.world.update(dt, this.time, this.camera.position);
     this.effects.update(dt, (x, z) => this.world.terrain.height(x, z));
     this.audio.setListener(this.camera.position);
     if (this.player.alive && !this.ended) this.audio.engine(Math.abs(this.player.input.throttle), this.player.speed); else this.audio.stopEngine();
@@ -406,7 +414,7 @@ export class Game {
   dispose() {
     this.touch?.dispose();
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.contactShadows.dispose(); this.effects.dispose(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly
