@@ -46,8 +46,15 @@ try {
   const fill=new THREE.DirectionalLight(0x9cb7d1,1.2);fill.position.set(-8,5,-5);scene.add(fill);
   const draw=(entry,width,height,view)=>{
    scene.add(entry.model.root);entry.model.root.updateMatrixWorld(true);
-   const aspect=width/height,largest=Math.max(entry.size.length,entry.size.width,entry.size.height);
-   const span=largest*1.38;
+   const aspect=width/height;
+   // Frame each orthographic view around the dimensions that are actually
+   // visible from that direction; the previous length-based front framing
+   // made the nose, turret face and suspension details too small to inspect.
+   const span=view==='front'||view==='rear'
+    ? Math.max(entry.size.width,entry.size.height)*1.05
+    : view==='top'
+     ? entry.size.length*1.10
+     : Math.max(entry.size.length,entry.size.height)*1.05;
    const camera=new THREE.OrthographicCamera(-span*aspect/2,span*aspect/2,span/2,-span/2,0.1,100);
    const c=entry.center;
    const v=view==='side'?[12,4,0.4]:view==='opposite'?[-12,4,0.4]:view==='front'?[0,4,13]:view==='rear'?[0,4,-13]:view==='top'?[0,16,0.01]:[9,6,11];
