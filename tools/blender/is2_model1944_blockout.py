@@ -493,6 +493,10 @@ bpy.ops.export_scene.gltf(filepath=GLB_OUT, export_format="GLB",
                           export_materials="EXPORT")
 print("GLB exported:", GLB_OUT)
 
+# Optional fast iteration mode for Windows workstations; full five-view mode
+# remains the default for CI and historical silhouette validation.
+FAST_PREVIEW = os.environ.get("IS2_FAST_PREVIEW", "0") == "1"
+
 # Studio preview scene.
 floor_mat = make_mat("Preview_floor", (0.055, 0.06, 0.065), 0.0, 0.94)
 bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0.16))
@@ -500,11 +504,13 @@ floor = bpy.context.object
 floor.name = "Preview_only_ground"
 floor.data.materials.append(floor_mat)
 scene.world.color = (0.12, 0.12, 0.12)
-scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items.keys() else "BLENDER_EEVEE"
+# EEVEE identifier changed across Blender releases; select an available one.
+engines = bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items.keys()
+scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in engines else ("BLENDER_EEVEE" if "BLENDER_EEVEE" in engines else "CYCLES")
 if hasattr(scene, "eevee"):
     scene.eevee.taa_render_samples = 64
-scene.render.resolution_x = 1200
-scene.render.resolution_y = 900
+scene.render.resolution_x = 720 if FAST_PREVIEW else 1200
+scene.render.resolution_y = 540 if FAST_PREVIEW else 900
 scene.render.resolution_percentage = 100
 scene.render.image_settings.file_format = "PNG"
 scene.render.film_transparent = False
@@ -542,10 +548,11 @@ def render_view(name, loc, target, ortho=9):
     bpy.ops.render.render(write_still=True)
 
 render_view("01_front_three_quarter", (8.5, 9.0, 5.8), (0, 0.4, 1.25), 11.0)
-render_view("02_left_side", (10.5, 0.0, 3.0), (0, 0.0, 1.25), 10.8)
-render_view("03_front", (0.0, 11.0, 3.0), (0, 0.0, 1.25), 8.0)
-render_view("04_rear", (0.0, -11.0, 3.0), (0, 0.0, 1.25), 8.0)
-render_view("05_top", (0.0, 0.0, 12.0), (0, 0.0, 0.7), 8.0)
+if not FAST_PREVIEW:
+    render_view("02_left_side", (10.5, 0.0, 3.0), (0, 0.0, 1.25), 10.8)
+    render_view("03_front", (0.0, 11.0, 3.0), (0, 0.0, 1.25), 8.0)
+    render_view("04_rear", (0.0, -11.0, 3.0), (0, 0.0, 1.25), 8.0)
+    render_view("05_top", (0.0, 0.0, 12.0), (0, 0.0, 0.7), 8.0)
 
 # Save an editable Blender scene for subsequent sculpting/refinement.
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ART_DIR, "is2_model1944_first_pass.blend"))
