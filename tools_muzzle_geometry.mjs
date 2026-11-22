@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
 
-const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1'],{stdio:'ignore'});
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--base','/'],{stdio:'ignore'});
 let browser;
 try {
  let ready=false;
@@ -15,10 +15,10 @@ try {
  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const page=await browser.newPage({viewport:{width:900,height:700}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5173/tank-war/');
+ await page.goto('http://127.0.0.1:5173/');
  const result=await page.evaluate(async()=>{
-  const {createTankModel}=await import('/tank-war/src/models/tankModel.js');
-  const {TANKS}=await import('/tank-war/src/game/tankData.js');
+  const {createTankModel}=await import('/src/models/tankModel.js');
+  const {TANKS}=await import('/src/game/tankData.js');
   const out=[];
   for(const spec of TANKS){
    const model=createTankModel(spec,{links:false});
