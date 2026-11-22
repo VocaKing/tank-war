@@ -238,7 +238,7 @@ function is2(d) {
     [-hl, 1.18],
     [-hl, c + 0.20],
   ];
-  const inner = hullShell(P, d, prof, fy, { sideTaper: 0.92 });
+  const inner = hullShell(P, d, prof, fy, { sideTaper: 0.92, upperW: d.W - 0.40 });
   torsionArms(P, inner, g, c);
 
   // Driver's observation slot sits flush on the sloped glacis.
@@ -258,11 +258,11 @@ function is2(d) {
   // Four external cylindrical fuel tanks, two on each rear hull side; their mounts sit outside the hull side plate.
   for (const side of [-1, 1]) {
     for (const z of [-2.50, -1.43]) {
-      P.add('hull', 'paint', cylZ(0.19, 0.90, 24, side * (d.W / 2 + 0.04), fy + 0.04, z));
+      P.add('hull', 'paint', cylZ(0.19, 0.90, 24, side * 1.34, fy + 0.04, z));
       for (const dz of [-0.34, 0.34]) {
-        P.add('hull', 'metal', T(new THREE.TorusGeometry(0.194, 0.014, 6, 24), side * (d.W / 2 + 0.04), fy + 0.04, z + dz));
+        P.add('hull', 'metal', T(new THREE.TorusGeometry(0.194, 0.014, 6, 24), side * 1.34, fy + 0.04, z + dz));
       }
-      P.add('hull', 'metal', cylY(0.045, 0.045, 12, side * (d.W / 2 + 0.04), fy + 0.23, z));
+      P.add('hull', 'metal', cylY(0.045, 0.045, 12, side * 1.34, fy + 0.23, z));
     }
     K.exhaust(P, 'hull', side * 0.55, 1.28, -hl - 0.08, 'ww2', 0.09, 0.42);
     K.towCable(P, 'hull', side * 1.05, H - 0.08, -2.35, 0.72);
