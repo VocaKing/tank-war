@@ -1,3 +1,4 @@
+import { MIN_DISPERSION_100M } from './combatMath.js';
 // Balance editor and game use the same whitelist and validation.
 export const STORAGE_KEY='tw_balance_v1';
 export const EMPTY=()=>({version:1,tanks:{}});
@@ -8,7 +9,7 @@ const core=[
  ['maxSpeed','前进最高速度','km/h',1,200,0.1,'机动'],['reverseSpeed','倒车最高速度','km/h',1,100,0.1,'机动'],
  ['hullTraverse','车体转速','°/s',1,180,0.1,'机动'],['turretTraverse','炮塔转速','°/s',1,180,0.1,'火控'],
  ['gunSpeed','炮管俯仰速度','°/s',0.1,90,0.1,'火控'],['gunDepression','俯角','°',0,45,0.1,'火控'],['gunElevation','仰角','°',0,85,0.1,'火控'],
- ['reload','装填时间','s',0.1,120,0.1,'火控'],['aimTime','完整散布收缩时间','s',0.1,30,0.1,'火控'],['dispersion','百米最小散布半径','m',0.01,5,0.01,'火控'],
+ ['reload','装填时间','s',0.1,120,0.1,'火控'],['aimTime','完整散布收缩时间','s',0.1,30,0.1,'火控'],['dispersion','百米最小散布半径','m',MIN_DISPERSION_100M,5,0.01,'火控'],
  ['viewRange','视野','m',50,1500,1,'侦察']
 ].map(x=>def(...x));
 const faces={front:'正面',side:'侧面',rear:'后面',top:'顶部',bottom:'底部'};
