@@ -1,7 +1,7 @@
 // v2 tank builders (Panther, IS-2, Pershing, Centurion, Leopard 1A5, Leopard 2A6, T-90M, Challenger 2, Type 99A, Merkava Mk4).
 // Real-scale (1 unit = 1 m), +z = front. Dimensions come from spec.dims so hit boxes and visuals agree.
 import * as THREE from 'three';
-import { T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, taper, superEllipse, Parts } from './geom.js';
+import { T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, taper, superEllipse, castLoft, Parts } from './geom.js';
 import * as K from './kit.js';
 
 const DEG = Math.PI / 180;
@@ -38,7 +38,13 @@ function gear(o) {
 }
 const trackTop = (g) => Math.max(...[...g.wheels, ...g.sprockets, ...g.idlers, ...g.rollers].map((c) => c.y + c.r)) + 0.075;
 function decalsSide(kind, text, part, x, y, z, s) { return [{ kind, text, part, pos: [x, y, z], ry: Math.PI / 2, s }, { kind, text, part, pos: [-x, y, z], ry: -Math.PI / 2, s }]; }
-function turretBody(P, poly, h, sx, sz, cz, y0 = 0) { P.add('turret', 'paint', taper(topExtrude(poly, h, y0, 0.03, 1), y0, y0 + h, sx, sz, cz)); }
+function turretBody(P,poly,h,sx,sz,cz,y0=0){
+  // Cast turrets use curved multi-section armor; fabricated turrets keep
+  // their characteristic broad planar armor faces and small edge radii.
+  P.add('turret','paint',poly.length>20
+    ? castLoft(poly,h,sx,sz,cz,y0)
+    : taper(topExtrude(poly,h,y0,0.034,2),y0,y0+h,sx,sz,cz));
+}
 function deckGrilles(P,x0,x1,y,z0,z1,n){
   const w=Math.abs(x1-x0), l=Math.abs(z1-z0), x=(x0+x1)/2, z=(z0+z1)/2;
   P.add('hull','dark',box(w,0.02,l,x,y+0.005,z));
@@ -123,7 +129,7 @@ function is2(d) {
   K.spareLinks(P, 'hull', -0.4, 1.15, hl - 0.25, 3, d.trackW, 0.16, 0, -60 * DEG);
   // cast turret
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
-  const poly = superEllipse(tw, 1.12, 1.3, 2.2, 40).map(([x, z]) => [x, z + bz]);
+  const poly = superEllipse(tw,1.12,1.3,2.2,64).map(([x, z]) => [x, z + bz]);
   turretBody(P, poly, d.turretH * 0.9, 0.8, 0.82, bz); P.add('turret', 'paint', taper(topExtrude(superEllipse(tw * 0.8, 0.9, 1.05, 2.2, 32).map(([x, z]) => [x, z + bz]), 0.1, d.turretH * 0.88, 0.05, 2), d.turretH * 0.88, d.turretH * 0.98, 0.9, 0.9, bz));
   P.add('turret', 'paint', box(1.0, 0.55, 0.45, 0, 0.45, bz + 1.0)); for (const s of [-1, 1]) P.add('turret', 'paint', cylY(0.25, 0.6, 12, s * 0.62, 0.42, bz + 0.95));
   K.cupola(P, 'turret', -0.5, d.turretH * 0.95, bz - 0.45, 0.3, 0.26, 6, 'ww2');
@@ -153,7 +159,7 @@ function pershing(d) {
   K.stowageBox(P, 'hull', -1.4, fy + 0.18, 0.6, 0.45, 0.34, 1.0);
   // cast turret with bustle
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
-  turretBody(P, superEllipse(tw, 1.05, 1.62, 2.5, 40).map(([x, z]) => [x, z + bz]), d.turretH, 0.84, 0.9, bz);
+  turretBody(P, superEllipse(tw,1.05,1.62,2.5,64).map(([x, z]) => [x, z + bz]), d.turretH, 0.84, 0.9, bz);
   K.cupola(P, 'turret', 0.55, d.turretH, bz - 0.5, 0.33, 0.26, 6, 'ww2'); K.mg(P, 'turret', 0.55, d.turretH + 0.42, bz - 0.5, 0, 'm2');
   K.hatch(P, 'turret', -0.5, d.turretH, bz - 0.35, 0.27); K.periscope(P, 'turret', -0.45, d.turretH, bz + 0.35, 0, 0.8);
   K.antenna(P, 'turret', -0.8, d.turretH * 0.8, bz - 1.2, 2.2); K.stowageBox(P, 'turret', 0, 0.35, bz - 1.75, 1.6, 0.35, 0.3);
@@ -185,7 +191,7 @@ function centurion(d) {
   for (const s of [-1, 1]) K.exhaust(P, 'hull', s * 0.6, 1.25, -hl - 0.1, 'ww2', 0.09, 0.4);
   // cast/welded turret with side bins and rear basket
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
-  turretBody(P, superEllipse(tw * 0.9, 1.35, 1.6, 3.0, 40).map(([x, z]) => [x, z + bz]), d.turretH, 0.86, 0.93, bz);
+  turretBody(P, superEllipse(tw*0.9,1.35,1.6,3.0,64).map(([x, z]) => [x, z + bz]), d.turretH, 0.86, 0.93, bz);
   for (const s of [-1, 1]) { K.stowageBox(P, 'turret', s * (tw * 0.92 + 0.05), 0.38, bz - 0.3, 0.26, 0.5, 1.7); K.smokeDischargers(P, 'turret', s * 0.95, 0.72, bz + 1.1, s * 0.7, 6, 0.08, 0.2, 0.035); }
   for (let i = 0; i < 6; i++) P.add('turret', 'metal', box(0.02, 0.4, 0.02, -1.0 + i * 0.4, 0.35, bz - 1.75)); P.add('turret', 'metal', box(2.05, 0.03, 0.4, 0, 0.16, bz - 1.6)); P.add('turret', 'metal', box(2.05, 0.03, 0.03, 0, 0.55, bz - 1.78));
   P.add('turret', 'canvas', box(1.6, 0.25, 0.25, 0, 0.3, bz - 1.6));
