@@ -30,7 +30,7 @@ function gear(o) {
   const wheels = [];
   for (let i = 0; i < o.n; i++) {
     const z = o.zs ? o.zs[i] : o.z0 + ((o.z1 - o.z0) * i) / (o.n - 1); const y = o.r + 0.07;
-    if (o.inter) { wheels.push({ z, y, r: o.r, w: 0.17, xo: i % 2 ? 0.19 : -0.12 }); wheels.push({ z, y, r: o.r, w: 0.17, xo: i % 2 ? -0.12 : 0.19 }); }
+    if (o.inter) { wheels.push({ z, y, r: o.r, w: 0.22, xo: i % 2 ? 0.19 : -0.12 }); wheels.push({ z, y, r: o.r, w: 0.22, xo: i % 2 ? -0.12 : 0.19 }); }
     else wheels.push({ z, y, r: o.r, w: o.w });
   }
   const rollers = (o.rollers || []).map((z) => ({ z, y: o.ry, r: o.rr || 0.08 }));
