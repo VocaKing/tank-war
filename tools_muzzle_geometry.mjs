@@ -15,7 +15,7 @@ try {
  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const page=await browser.newPage({viewport:{width:900,height:700}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5173/');
+ await page.goto('http://127.0.0.1:5173/tests/muzzle.html');
  const result=await page.evaluate(async()=>{
   const {createTankModel}=await import('/src/models/tankModel.js');
   const {TANKS}=await import('/src/game/tankData.js');
