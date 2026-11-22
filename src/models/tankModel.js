@@ -229,7 +229,7 @@ function buildSherman(d) {
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.06, brake: { type: 'single', r: 0.095, len: 0.30 } });
   return {
     P, wheels: [-2.35, -1.75, -0.45, 0.15, 1.45, 2.05].map((z) => ({ z, y: 0.31, r: 0.26, w: 0.5 })),
-    sprockets: [{ z: 2.85, y: 0.95, r: 0.33 }], idlers: [{ z: -2.95, y: 0.6, r: 0.3 }], rollers: [-2.0, -0.15, 1.75].map((z) => ({ z, y: 1.03, r: 0.09 })),
+    sprockets: [{ z: 2.85, y: 0.95, r: 0.33 }], idlers: [{ z: -2.75, y: 0.6, r: 0.3 }], rollers: [-2.0, -0.15, 1.75].map((z) => ({ z, y: 1.03, r: 0.09 })),
     turretPos: [0, 1.92, d.turretZ], gunPos: [0, 0.4, 1.0],
     decals: [{ kind: 'usstar', part: 'hull', pos: [1.32, 1.55, -1.2], ry: Math.PI / 2, s: 0.7 }, { kind: 'usstar', part: 'hull', pos: [-1.32, 1.55, -1.2], ry: -Math.PI / 2, s: 0.7 }, { kind: 'usstar', part: 'turret', pos: [0.9, 0.42, -0.35], ry: Math.PI / 2, s: 0.5 }, { kind: 'usstar', part: 'turret', pos: [-0.9, 0.42, -0.35], ry: -Math.PI / 2, s: 0.5 }],
   };
