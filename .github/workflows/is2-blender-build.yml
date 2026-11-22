@@ -32,13 +32,13 @@ jobs:
       - name: Install Blender
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends blender python3-numpy
+          sudo apt-get install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
           blender --version
 
       - name: Generate IS-2 GLB and review renders
         run: |
           mkdir -p public/models artifacts
-          PYTHONPATH=/usr/lib/python3/dist-packages blender --background --python tools/blender/is2_model1944_blockout.py
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background --python tools/blender/is2_model1944_blockout.py
 
       - name: Verify exported asset
         run: |
