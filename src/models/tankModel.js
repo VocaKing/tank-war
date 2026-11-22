@@ -96,6 +96,22 @@ function wheelGeometry(paintHex, type = 'disc', id = '') {
   const col = new THREE.Color(paintHex); const rub = new THREE.Color(0x181817); const hub = new THREE.Color(paintHex).multiplyScalar(0.72); const dark = new THREE.Color(0x0e0e0e); const metal = new THREE.Color(0x4a4843);
   const parts = [];
   const paintC = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
+  // Single-disc road wheels for interleaved German running gear. Unlike the
+  // paired road-wheel units used by Soviet and many post-war tanks, Tiger I
+  // and Panther each place individual wheels in staggered rows across the track.
+  if (type === 'single') {
+    paintC(cylX(1.0, 0.42, 32, 0, 0, 0), tyre);
+    paintC(cylX(0.78, 0.43, 32, 0, 0, 0), col);
+    for (const side of [-1, 1]) {
+      paintC(cylX(0.27, 0.055, 18, side * 0.22, 0, 0), hub);
+      paintC(cylX(0.13, 0.06, 14, side * 0.255, 0, 0), col);
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * Math.PI * 2;
+        paintC(cylX(0.025, 0.035, 6, side * 0.26, Math.cos(a) * 0.56, Math.sin(a) * 0.56), metal);
+      }
+    }
+    return mergeGeometries(parts);
+  }
   const lx = (pts, seg = 24) => { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg); g.rotateZ(-Math.PI / 2); return g; }; // axis -> +x
   const s = 1; const m = (pts) => pts;
   const tyre = type === 'steel' ? metal : rub;
@@ -279,7 +295,7 @@ function buildTiger(d) {
     wheels.push({ z: -2.15 + i * 0.6 + (row === 1 ? 0.3 : 0), y: 0.45, r: 0.4, w: 0.17, xo: [-0.19, 0, 0.19][row] });
   }
   return {
-    P, wheels, sprockets: [{ z: 2.75, y: 0.8, r: 0.42 }], idlers: [{ z: -2.88, y: 0.7, r: 0.3 }], rollers: [],
+    P, wheels, sprockets: [{ z: 2.75, y: 0.8, r: 0.42 }], idlers: [{ z: -2.88, y: 0.7, r: 0.3 }], rollers: [], wheelType: 'single',
     turretPos: [0, 1.95, d.turretZ], gunPos: [0, 0.42, 1.25],
     decals: [{ kind: 'cross', part: 'hull', pos: [1.565, 1.5, -0.6], ry: Math.PI / 2, s: 0.55 }, { kind: 'cross', part: 'hull', pos: [-1.565, 1.5, -0.6], ry: -Math.PI / 2, s: 0.55 }, { kind: 'text', text: '131', part: 'turret', pos: [1.26, 0.45, -0.4], ry: Math.PI / 2, s: 0.75 }, { kind: 'text', text: '131', part: 'turret', pos: [-1.26, 0.45, -0.4], ry: -Math.PI / 2, s: 0.75 }],
   };
