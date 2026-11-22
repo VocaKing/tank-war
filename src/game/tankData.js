@@ -300,7 +300,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 65, power: 1500, maxSpeed: 44, reverseSpeed: 14, hullTraverse: 34, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 1.38, stabilizer: 0.15,
-    dims: { L: 7.97, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 4.65, turretBoxZ: 0.0 },
+    dims: { L: 7.97, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 4.3, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [390, 30], side: [100, 0], rear: [80, 0], top: [16, 0], bottom: [30, 0] },
       turret: { front: [450, 20], side: [190, 10], rear: [100, 0], top: [16, 0] },
