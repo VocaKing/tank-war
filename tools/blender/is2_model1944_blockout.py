@@ -479,7 +479,8 @@ floor.name = "Preview_only_ground"
 floor.data.materials.append(floor_mat)
 scene.world.color = (0.12, 0.12, 0.12)
 scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items.keys() else "BLENDER_EEVEE"
-scene.eevee.taa_render_samples = 64 if hasattr(scene, "eevee") else 64
+if hasattr(scene, "eevee"):
+    scene.eevee.taa_render_samples = 64
 scene.render.resolution_x = 1200
 scene.render.resolution_y = 900
 scene.render.resolution_percentage = 100
