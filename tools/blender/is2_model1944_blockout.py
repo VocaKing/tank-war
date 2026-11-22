@@ -59,7 +59,7 @@ def add_bevel(obj, width=0.025, segments=3):
         mod.width = width
         mod.segments = segments
         mod.limit_method = "ANGLE"
-        obj.modifiers.new("Weighted_corner_normals", "WEIGHTED_NORMAL")
+        pass
     return obj
 
 def box(name, loc, dims, mat, bevel_width=0.02, rotation=None):
