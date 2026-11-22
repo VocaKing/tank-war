@@ -7,6 +7,12 @@ on:
     paths:
       - "tools/blender/**"
       - ".github/workflows/is2-blender-build.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/is2-blender-build.yml"
   workflow_dispatch:
 
 permissions:
@@ -19,6 +25,9 @@ jobs:
     steps:
       - name: Check out project
         uses: actions/checkout@v4
+
+      - name: Validate Python script syntax
+        run: python3 -m py_compile tools/blender/is2_model1944_blockout.py
 
       - name: Install Blender
         run: |
