@@ -130,13 +130,13 @@ def add_uv_sphere(name, loc, scale, mat, segments=48, rings=24):
 # Length is 6.77 m; upper glacis and lower nose are separate plates for readable
 # plate breaks. Cross-section top width is slightly narrower than the lower side.
 stations = [
-    (-3.385, 2.66, 0.48, 1.43),
-    (-2.95,  3.02, 0.46, 1.58),
-    (-2.10,  3.07, 0.46, 1.62),
-    ( 1.45,  3.07, 0.46, 1.62),
-    ( 2.10,  3.03, 0.48, 1.54),
-    ( 2.78,  2.92, 0.54, 1.12),
-    ( 3.385, 2.72, 0.62, 0.88),
+    (-3.385, 2.38, 0.48, 1.43),
+    (-2.95,  2.48, 0.46, 1.58),
+    (-2.10,  2.52, 0.46, 1.62),
+    ( 1.45,  2.52, 0.46, 1.62),
+    ( 2.10,  2.50, 0.48, 1.54),
+    ( 2.78,  2.43, 0.54, 1.12),
+    ( 3.385, 2.34, 0.62, 0.88),
 ]
 verts = []
 ring_n = 6
@@ -189,8 +189,8 @@ for x in (-0.79, -0.23):
 add_uv_sphere("Bow_DT_ball_mount", (0.62, 3.16, 1.13), (0.14, 0.10, 0.13), CAST)
 cylinder("Bow_DT_barrel", (0.62, 3.27, 1.13), 0.022, 0.30, STEEL, "Y", 16)
 for side in (-1, 1):
-    x = side * 1.43
-    box("Front_fender_%s" % side, (x, 1.75, 1.20), (0.42, 2.55, 0.07), PAINT, 0.025)
+    x = side * 1.35
+    box("Front_fender_%s" % side, (x, 1.75, 1.20), (0.32, 2.55, 0.07), PAINT, 0.025)
     cylinder("Headlight_body_%s" % side, (side*1.18, 2.90, 1.48), 0.095, 0.13, STEEL, "X", 32)
     cylinder("Headlight_lens_%s" % side, (side*1.18, 2.90, 1.48), 0.068, 0.014, GLASS, "X", 32, 0.0)
     # Protective headlight hoops and front towing shackles.
@@ -203,12 +203,12 @@ for side in (-1, 1):
 # polygonal turret silhouette in the original Three.js-only asset.
 turret_sections = [
     # z, x-radius, y-radius, center-x, center-y, exponent
-    (1.62, 1.22, 1.32,  0.00, 0.12, 3.1),
-    (1.82, 1.30, 1.40,  0.00, 0.12, 3.1),
-    (2.10, 1.28, 1.37, -0.01, 0.12, 3.0),
-    (2.34, 1.19, 1.28, -0.04, 0.10, 3.0),
-    (2.53, 1.05, 1.13, -0.08, 0.08, 2.9),
-    (2.60, 0.96, 1.03, -0.08, 0.08, 2.8),
+    (1.62, 1.22, 1.32,  0.00, 0.12, 3.8),
+    (1.82, 1.30, 1.40,  0.00, 0.12, 3.8),
+    (2.18, 1.31, 1.40, -0.02, 0.12, 3.8),
+    (2.40, 1.28, 1.36, -0.05, 0.10, 3.6),
+    (2.54, 1.22, 1.30, -0.08, 0.08, 3.5),
+    (2.60, 1.15, 1.24, -0.08, 0.08, 3.4),
 ]
 N = 64
 tv = []
@@ -232,7 +232,7 @@ turret_body = mesh_object("Turret_cast_1944_loft", tv, tf, CAST, True)
 
 # Turret mantlet: cast rounded shield, with a pronounced gun opening and separate
 # coaxial/sight apertures. Its position and shape remain distinct from the turret.
-mantlet = add_uv_sphere("D25T_cast_mantlet", (0.0, 1.39, 2.17), (0.78, 0.245, 0.34), CAST)
+mantlet = add_uv_sphere("D25T_cast_mantlet", (0.0, 1.39, 2.17), (0.83, 0.265, 0.37), CAST)
 cylinder("Main_gun_recess", (0.0, 1.625, 2.17), 0.19, 0.025, DARK, "Y", 40, 0.0)
 torus("Main_gun_mantlet_collar", (0.0, 1.64, 2.17), 0.19, 0.035, STEEL, "Y")
 cylinder("Coaxial_DT_aperture", (-0.43, 1.62, 2.11), 0.055, 0.03, DARK, "Y", 24, 0.0)
@@ -504,9 +504,9 @@ def area_light(name, loc, energy, size):
     direction = Vector((0, 0, 1.1)) - light.location
     light.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
 
-area_light("Key_softbox", (5, 4, 8), 1900, 6)
-area_light("Fill_softbox", (-5, 1, 5), 1200, 5)
-area_light("Rear_rim", (0, -6, 6), 1500, 4)
+area_light("Key_softbox", (5, 4, 8), 1250, 6)
+area_light("Fill_softbox", (-5, 1, 5), 800, 5)
+area_light("Rear_rim", (0, -6, 6), 950, 4)
 
 def render_view(name, loc, target, ortho=9):
     bpy.ops.object.camera_add(location=loc)
