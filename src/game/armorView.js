@@ -158,7 +158,7 @@ export class ArmorView {
     const g = this.game, p = g.player;
     this.active = this.enabled && g.cam.sniper && p.alive && !g.camOverride;
     const muzzle = this.active ? p.model.muzzle.getWorldPosition(new THREE.Vector3()) : null;
-    const sh = p.shell, ty = SHELL_TYPES[sh.type];
+    const sh = p.previewShell, ty = SHELL_TYPES[sh.type];
     for (const t of g.tanks) {
       const show = this.active && t.team !== p.team && t.alive && t.model.root.visible;
       if (!show) { if (this.data.get(t)?.on) this.setOn(t, false); continue; }
@@ -178,7 +178,7 @@ export class ArmorView {
     delta.y -= impactDrop(delta.lengthSq(), delta.y, p.shell.velocity);
     hit.ldir.copy(delta).transformDirection(target.inv);
     if (hit.part === 'turret') hit.ldir.applyAxisAngle(new THREE.Vector3(0,1,0),-target.turretYaw);
-    const ev = g.ballistics.evaluate(target, hit, p.shell, dist);
+    const ev = g.ballistics.evaluate(target, hit, p.previewShell, dist);
     const pmin = ev.pen * (1 - PEN_RNG), pmax = ev.pen * (1 + PEN_RNG);
     const cls = ev.ricochet || ev.eff > pmax ? 'red' : ev.eff <= pmin ? 'green' : 'yellow';
     return { cls, los: ev.los, eff: Math.round(ev.eff), pen: Math.round(ev.pen), part: hit.part, face: hit.face, zone: ev.zone, angle: Math.round(ev.angle), ricochet: ev.ricochet };
