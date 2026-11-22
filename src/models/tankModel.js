@@ -89,20 +89,30 @@ export function burntMaterial() { return sharedMats().burnt; }
 // ---------- Running gear ----------
 // Unit road wheel (radius 1, width 1 along x) – dual tyres with a central guide-horn gap.
 // type: 'disc' (dished steel disc), 'spoked' (cast spokes), 'modern' (aluminium, lightening holes), 'steel' (all-steel, no rubber)
-function wheelGeometry(paintHex, type = 'disc') {
+function wheelGeometry(paintHex, type = 'disc', id = '') {
   const col = new THREE.Color(paintHex); const rub = new THREE.Color(0x181817); const hub = new THREE.Color(paintHex).multiplyScalar(0.72); const dark = new THREE.Color(0x0e0e0e); const metal = new THREE.Color(0x4a4843);
   const parts = [];
   const paintC = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
-  const lx = (pts, seg = 16) => { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg); g.rotateZ(-Math.PI / 2); return g; }; // axis -> +x
+  const lx = (pts, seg = 24) => { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg); g.rotateZ(-Math.PI / 2); return g; }; // axis -> +x
   const s = 1; const m = (pts) => pts;
   const tyre = type === 'steel' ? metal : rub;
   paintC(lx(m([[0.86, 0.06], [0.97, 0.07], [1.0, 0.12], [1.0, 0.42], [0.97, 0.47], [0.86, 0.48]])), tyre);
-  paintC(lx(m([[0.86, 0.48], [0.8, 0.46], [type === 'modern' ? 0.62 : 0.5, 0.4], [0.24, 0.43], [0.2, 0.5], [0.0, 0.5]])), col);
-  paintC(lx(m([[0.0, 0.06], [0.86, 0.06]])), hub);
+  // Distinct raised rims and inset web. Spoked wheels use an open annular web.
+  paintC(lx([[0.86,0.48],[0.82,0.50],[0.76,0.50],[0.73,0.44],[0.70,0.43]]),col);
+  if(type==='spoked'){
+    paintC(lx([[0.70,0.43],[0.70,0.18],[0.78,0.18]]),col);
+    paintC(lx([[0,0.50],[0.20,0.50],[0.26,0.43],[0.26,0.13],[0,0.13]]),hub);
+  }else{
+    const inset=type==='modern'?0.62:0.50;
+    paintC(lx([[0.70,0.43],[inset,0.34],[0.29,0.34],[0.24,0.43],[0.20,0.50],[0,0.50]]),col);
+    paintC(lx([[0.67,0.437],[0.65,0.447],[0.63,0.437]]),col);
+  }
+  if(type!=='spoked') paintC(lx([[0,0.06],[0.86,0.06]]),hub);
   paintC(cylX(0.17, 0.08, 10, s * 0.52, 0, 0), hub); // hub cap
-  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; paintC(cylX(0.03, 0.04, 5, s * 0.5, Math.cos(a) * 0.3, Math.sin(a) * 0.3), metal); } // wheel nuts
+  const nuts=({sherman:8,tiger:8,panther:8,t34:6,is2:6,pershing:8,centurion:8,leo1:8,leo2a6:8,t72:8,t90m:8,m1a2:8,chally2:8,merkava4:8,type99a:8})[id]||6;
+  for(let i=0;i<nuts;i++){const a=i/nuts*Math.PI*2;paintC(cylX(0.03,0.045,6,0.48,Math.cos(a)*0.27,Math.sin(a)*0.27),metal);} // wheel nuts
   if (type === 'modern') for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + 0.3; paintC(cylX(0.09, 0.03, 8, s * 0.43, Math.cos(a) * 0.55, Math.sin(a) * 0.55), dark); }
-  if (type === 'spoked') for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; paintC(T(new THREE.BoxGeometry(0.1, 0.1, 0.55), s * 0.44, Math.cos(a) * 0.5, Math.sin(a) * 0.5, a, 0, 0), col.clone().multiplyScalar(0.85)); paintC(cylX(0.08, 0.02, 8, s * 0.42, Math.cos(a + 0.4) * 0.56, Math.sin(a + 0.4) * 0.56), dark); }
+  if(type==='spoked') for(let i=0;i<6;i++){const a=i/6*Math.PI*2;paintC(T(new THREE.BoxGeometry(0.20,0.52,0.13),0.35,Math.cos(a)*0.48,Math.sin(a)*0.48,a,0,0),col);}
   if (type === 'disc' || type === 'steel') for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; paintC(cylX(0.024, 0.03, 5, s * 0.47, Math.cos(a) * 0.72, Math.sin(a) * 0.72), metal); }
   // mirror for the inner tyre
   const half = parts.length; const mir = new THREE.Matrix4().makeScale(-1, 1, 1);
@@ -399,7 +409,7 @@ const EXTRAS = {
     K.tools(P, 'hull', 0.9, 1.95, 1.4, 1); K.tools(P, 'hull', -0.9, 1.95, 1.4, -1);
     K.cupola(P, 'turret', -0.6, 0.83, -0.85, 0.33, 0.24, 7, 'ww2'); K.mg(P, 'turret', -0.6, 1.25, -0.85, 0, 'mg34');
     K.liftHooks(P, 'turret', [[-0.9, 0.86, 0.4], [0.9, 0.86, 0.4], [0, 0.86, -1.3]]);
-    Object.assign(b, { wheelType: 'steel', cast: 0.3, castTurret: 0.35 });
+    Object.assign(b, { wheelType: 'disc', cast: 0.3, castTurret: 0.35 });
   },
   t72(P, d, b) {
     K.tools(P, 'hull', -1.45, 1.07, 1.8, -1); K.towCable(P, 'hull', 1.15, 1.52, -2.9, -1.0);
@@ -419,14 +429,25 @@ const EXTRAS = {
 // ---------- Template + instance ----------
 const templates = {};
 // one track link (shoe + grouser + guide horns + pins + optional rubber pad); outer side is -y (see placement)
-function linkGeometry(w, pitch, th, modern) {
+function linkGeometry(w, pitch, th, id) {
+  const rubberPad=['sherman','pershing','centurion','leo1','leo2a6','m1a2','chally2','merkava4','type99a'].includes(id);
+  const eastern=['t34','is2','t72','t90m'].includes(id);
   const parts = [];
   const add = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   const steel = new THREE.Color(0x5b5750), dark = new THREE.Color(0x2c2a27), rub = new THREE.Color(0x151514), shiny = new THREE.Color(0x8a857c);
   add(box(w, th * 0.6, pitch * 0.82, 0, 0, 0), steel);
   add(box(w * 0.94, th * 0.5, pitch * 0.18, 0, -th * 0.45, 0), shiny); // grouser (outer, -y)
-  if (modern) for (const s of [-1, 1]) add(box(w * 0.4, th * 0.45, pitch * 0.6, s * w * 0.26, -th * 0.42, pitch * 0.05), rub); // rubber pads
-  for (const s of [-1, 1]) add(box(0.05, th * 1.6, pitch * 0.42, s * w * 0.07, th * 0.95, 0), steel); // guide horns (inner, +y)
+  if (rubberPad) for (const s of [-1,1]) {
+    add(box(w*0.38,th*0.55,pitch*0.62,s*w*0.25,-th*0.45,0),rub);
+    add(box(w*0.39,th*0.18,pitch*0.68,s*w*0.25,-th*0.22,0),steel);
+  } else {
+    // Raised steel chevrons/crossbars rather than rubber pads.
+    for(const s of [-1,1]) add(T(new THREE.BoxGeometry(w*0.43,th*0.40,pitch*0.13),s*w*0.24,-th*0.40,-pitch*0.09,0,s*(eastern?0.28:0.13),0),shiny);
+  }
+  for(const x of eastern?[0]:[-w*0.08,w*0.08]){
+    const horn=new THREE.CylinderGeometry(0.022,0.05,th*1.5,4);
+    add(T(horn,x,th*0.9,0,0,Math.PI/4,0),steel);
+  }
   for (const z of [-1, 1]) add(cylX(th * 0.32, w * 1.04, 6, 0, 0, z * pitch * 0.43), dark); // pins / end connectors
   for (const s of [-1, 1]) add(box(0.04, th * 0.7, pitch * 0.25, s * w * 0.52, 0, pitch * 0.42), dark);
   return mergeGeometries(parts);
@@ -509,12 +530,12 @@ function getTemplate(spec) {
   const trackCircles = [...b.wheels.map((w) => ({ z: w.z, y: w.y, r: w.r })), ...b.sprockets, ...b.idlers, ...b.rollers.filter((r) => !r.free)];
   const pitch = d.trackPitch || (spec.era === 'WWII' ? 0.15 : 0.18);
   const track = trackGeometry(trackCircles, d.trackW, 0.075, pitch);
-  const wheelGeo = wheelGeometry(spec.paint.base, b.wheelType || (b.wheels[0].spoked ? 'spoked' : spec.era === 'WWII' ? 'disc' : 'modern'));
+  const wheelGeo = wheelGeometry(spec.paint.base, b.wheelType || (b.wheels[0].spoked ? 'spoked' : spec.era === 'WWII' ? 'disc' : 'modern'), spec.id);
   const sprocketGeo = sprocketGeometry(spec.paint.base);
   const wheelGeoLo = wheelGeometryLo(spec.paint.base);
   const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.25 });
   const nLinks = Math.round(track.length / pitch);
-  const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.era !== 'WWII');
+  const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.id);
   const linkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.45 });
   templates[spec.id] = { b, geo, paint, paintT, paintG, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch };
   return templates[spec.id];
