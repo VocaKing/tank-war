@@ -90,3 +90,7 @@ html.mobile-device .menu .mapgrid{grid-template-columns:1fr}
  html.mobile-device .menu>.stats{grid-column:1/-1}
  html.mobile-device .menu .mapgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+@media(orientation:landscape) and (min-width:640px){html.mobile-device .menu>*{grid-column:auto;grid-row:auto}html.mobile-device .menu>.brand,html.mobile-device .menu>.mobile-garage-hint,html.mobile-device .menu>.stats{grid-column:1/-1}}
+html.mobile-device .menu[style*="display: none"]{display:none!important}
+html.mobile-device .touch-controls{display:block}
