@@ -208,14 +208,14 @@ export function barrel(P, part, len, opts = {}) {
 // oblique views; the outer cap triangles are removed rather than painted black.
 export function hollowMuzzle(P, opts = {}) {
   const entries=Object.entries(P.b).filter(([key])=>key.startsWith('barrel|'));
+  if(!entries.length)return null;
   const parts=entries.flatMap(([,list])=>list);
   if(!parts.length)return null;
   let muzzleZ=-Infinity;
   for(const g of parts){g.computeBoundingBox();muzzleZ=Math.max(muzzleZ,g.boundingBox.max.z);}
   let outer=0,removed=0;
-  for(const g of parts){
-    const p=g.attributes.position;
-    const near=[];
+  for(const [,list] of entries)for(let gi=0;gi<list.length;gi++){
+    const g=list[gi],p=g.attributes.position,near=[];
     for(let i=0;i<p.count;i++)if(Math.abs(p.getZ(i)-muzzleZ)<1e-4)near.push(Math.hypot(p.getX(i),p.getY(i)));
     if(near.length)outer=Math.max(outer,...near);
     const keep=[];
@@ -232,7 +232,7 @@ export function hollowMuzzle(P, opts = {}) {
         out.setAttribute(name,new THREE.BufferAttribute(arr,a.itemSize,a.normalized));
       }
       out.computeBoundingBox();out.computeBoundingSphere();
-      const at=parts.indexOf(g);if(at>=0)parts[at]=out;
+      list[gi]=out;
       g.dispose();
     }
   }
