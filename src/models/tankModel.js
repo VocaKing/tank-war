@@ -469,7 +469,7 @@ const EXTRAS = {
     K.tools(P, 'hull', 0.9, 1.95, 1.4, 1); K.tools(P, 'hull', -0.9, 1.95, 1.4, -1);
     K.cupola(P, 'turret', -0.6, 0.83, -0.85, 0.33, 0.24, 7, 'ww2'); K.mg(P, 'turret', -0.6, 1.25, -0.85, 0, 'mg34');
     K.liftHooks(P, 'turret', [[-0.9, 0.86, 0.4], [0.9, 0.86, 0.4], [0, 0.86, -1.3]]);
-    Object.assign(b, { wheelType: 'disc', cast: 0.3, castTurret: 0.35 });
+    Object.assign(b, { wheelType: 'single', cast: 0.3, castTurret: 0.35 });
   },
   t72(P, d, b) {
     K.tools(P, 'hull', -1.45, 1.07, 1.8, -1); K.towCable(P, 'hull', 1.15, 1.52, -2.9, -1.0);
