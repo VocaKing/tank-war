@@ -133,5 +133,5 @@ export class Menu {
       <p class="note">Penetration falls with range (AP −18%/km, APCR −35%/km, APFSDS −6%/km, HEAT constant). Effective armor = thickness ÷ cos(impact angle). Ricochet above ${SHELL_TYPES.APCBC.ricochet}° (AP), ${SHELL_TYPES.APDS.ricochet}° (APDS), ${SHELL_TYPES.APFSDS.ricochet}° (APFSDS); HEAT/HESH ignore ricochet but are stopped by ERA, composite (×HEAT multiplier) and spaced skirts. Penetration rolls ±${Math.round(8)}% unless the shell caliber overmatches the plate (3×).</p><button id="m-close">Close</button></div>`;
     o.style.display = 'flex'; o.querySelector('#m-close').onclick = () => this.showTable(false);
   }
-  show(v) { this.root.style.display = v ? 'block' : 'none'; }
+  show(v) { this.root.style.display = v ? '' : 'none'; }
 }
