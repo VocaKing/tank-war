@@ -24,7 +24,6 @@ try {
    const model=createTankModel(spec,{links:false});
    const boreMeshes=model.barrel.children.filter(x=>x.isMesh&&x.userData.matKey==='bore');
    out.push({id:spec.id,removed:model.muzzleInfo?.removed||0,bore:model.muzzleInfo?.bore||0,outer:model.muzzleInfo?.outer||0,boreMeshes:boreMeshes.length,muzzleZ:model.muzzle.position.z});
-   model.root.traverse(x=>{if(x.geometry)x.geometry.dispose();});
   }
   const t72=createTankModel(TANKS.find(x=>x.id==='t72'),{links:false});
   t72.root.updateMatrixWorld(true);
