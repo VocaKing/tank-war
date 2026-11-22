@@ -53,4 +53,9 @@ Some published sources differ slightly on width, height, overall length and armo
 Nothing in Blender. The selected involvement is minimal. Review only the supplied comparison sheet and flag clear historical mismatches. Research and reference selection are handled by the project workflow.
 
 ## Current implementation status
-This branch starts the Blender pipeline with a reproducible blockout generator and this research/acceptance specification. It is not yet a finished production model. Blender is not available in the current execution environment, so the .blend/GLB must be generated in a Blender-enabled environment before game integration.
+The first Blender build has now run successfully in a headless Blender 4.0.2 GitHub Actions runner. It exports:
+- `public/models/is2_model1944_blockout.glb` for eventual Three.js integration.
+- `artifacts/is2-model1944/is2_model1944_first_pass.blend` as the editable Blender source.
+- Five review renders: front three-quarter, left side, front, rear and top.
+
+The generated GLB is committed back to this feature branch by the build workflow; the editable .blend and review renders remain available as the Actions artifact. The model is still a first Level-2 asset pass, not yet accepted for production or switched into the live game. The existing Three.js model remains the game fallback until the Blender asset passes visual, hierarchy, scale and runtime integration checks.
