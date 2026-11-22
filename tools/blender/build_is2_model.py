@@ -723,6 +723,12 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     root = build_model()
 
+    # Blender ships the glTF 2.0 exporter as an add-on; explicitly enable it in factory-startup CI.
+    try:
+        bpy.ops.preferences.addon_enable(module="io_scene_gltf2")
+    except Exception as exc:
+        print("GLTF_ADDON_ENABLE_NOTE", str(exc))
+
     # Export only the vehicle asset; preview cameras/floor are added afterward.
     bpy.ops.object.select_all(action="DESELECT")
     asset_objects = [obj for obj in bpy.context.scene.objects
