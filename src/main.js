@@ -9,7 +9,7 @@ import './ui/mobile.css';
 
 const canvas = document.getElementById('gl'); const ui = document.getElementById('ui');
 const params = new URLSearchParams(location.search);
-const mobile = isMobile(); if (mobile) document.body.classList.add('mobile-mode');
+const mobile = isMobile(); if (mobile) { document.body.classList.add('mobile-mode'); document.documentElement.classList.add('mobile-device'); }
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: 'high-performance' }); }
 catch(e) {
@@ -26,7 +26,7 @@ const garage = new Garage(renderer); garage.resize(innerWidth, innerHeight);
 let game = null; let mode = 'menu';
 const loading = document.createElement('div'); loading.className = 'loading'; loading.innerHTML = '<div><h2>Generating battlefield…</h2><p>Sculpting 1.4 km of terrain, planting forests, building villages</p><div class="spin"></div></div>'; ui.appendChild(loading);
 const menu = new Menu(ui, garage, start, openBalance);
-if (mobile) { if (!localStorage.getItem('tw_q')) { menu.quality='low'; menu.root.querySelector('#m-q').value='low'; } const hint=document.createElement('div');hint.className='mobile-garage-hint';hint.textContent='触屏模式 · 滑动模型旋转 · 战斗建议横屏';menu.root.prepend(hint);
+if (mobile) { if (!localStorage.getItem('tw_mobile_q_init')) { menu.quality='low'; menu.root.querySelector('#m-q').value='low'; localStorage.setItem('tw_q','low'); localStorage.setItem('tw_mobile_q_init','1'); } const hint=document.createElement('div');hint.className='mobile-garage-hint';hint.textContent='手机版 v2 · 滑动查看全部功能 · 战斗建议横屏';menu.root.prepend(hint);
  const inspect=document.createElement('button');inspect.className='mobile-inspect';inspect.textContent='全屏查看 3D 模型';menu.root.append(inspect);
  const back=document.createElement('button');back.className='mobile-inspect-back';back.textContent='返回车库';back.hidden=true;ui.append(back);
  inspect.onclick=()=>{menu.show(false);back.hidden=false;};
