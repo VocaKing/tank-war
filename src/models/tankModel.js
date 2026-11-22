@@ -639,7 +639,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, barrel, muzzle, sight, gunClearance:b.gunClearance, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, barrel, muzzle, sight, gunClearance:b.gunClearance, gunMountNoCollar:!!b.gunMountNoCollar, roadWheelStationsPerSide:b.wheels.length, idlersPerSide:b.idlers.length, returnRollersPerSide:b.rollers.length, driveSprocketsPerSide:b.sprockets.length, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;
