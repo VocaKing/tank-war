@@ -123,10 +123,10 @@ function is2CastLoft(poly, h, cz = 0, y0 = 0) {
     [0.07, 0.98, 0.97, 0.98, 0.99],
     [0.22, 1.00, 1.00, 1.00, 1.00],
     [0.46, 1.00, 0.95, 0.96, 1.01],
-    [0.70, 0.99, 0.84, 0.89, 1.03],
-    [0.88, 0.98, 0.78, 0.83, 1.04],
-    [0.97, 0.97, 0.75, 0.81, 1.04],
-    [1.00, 0.96, 0.74, 0.80, 1.04],
+    [0.70, 0.99, 0.75, 0.89, 1.00],
+    [0.88, 0.98, 0.68, 0.83, 0.98],
+    [0.97, 0.97, 0.66, 0.81, 0.96],
+    [1.00, 0.96, 0.65, 0.80, 0.95],
   ];
   for (const [v, left, right, front, rear] of rings) {
     for (const [x, z] of p) {
@@ -284,6 +284,11 @@ function is2(d) {
     return [x * side * front, flatFrontZ * rear];
   }).map(([x, z]) => [x, z + bz]);
   P.add('turret', 'paint', is2CastLoft(poly, th * 0.96, bz));
+  // Cast front cheeks blend the gun shield into the turret nose instead of
+  // leaving a cylindrical gun collar on an otherwise featureless drum.
+  for (const side of [-1, 1]) {
+    P.add('turret', 'paint', T(new THREE.SphereGeometry(1, 28, 18), side * 0.48, 0.39, bz + 1.00, 0, 0, 0, 0.43, 0.32, 0.23));
+  }
 
   // Commander's fixed six-slit cupola is on the left rear; the loader's hatch
   // is on the right. DShK sits on the cupola, as on late 1944 production tanks.
@@ -306,7 +311,7 @@ function is2(d) {
     P, ...g, wheelType: 'disc', cast: 0.45, castTurret: 0.95,
     roadWheelDiameter: g.wheels[0].r * 2,
     glacisAngleFromVertical: Math.atan2(upperGlacisRun, H - (c + 0.46)) / DEG,
-    turretPos: [0, H, d.turretZ], gunPos: [0, 0.46, bz + tl * 0.88],
+    turretPos: [0, H, d.turretZ], gunPos: [0, 0.46, bz + tl * 0.76],
     decals: [],
   };
 }
