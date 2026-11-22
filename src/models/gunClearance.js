@@ -33,11 +33,13 @@ export function gunMount(P,b,spec,lathe){
  b.gunPos=[b.gunPos[0],b.gunPos[1],pivot];
  // Integrate the trunnion support into the armor, no floating gap or exposed rod
  // bridging the turret. The profile is a solid cast/tapered collar.
- const r=spec.era==='WWII'?0.25:0.23;
- const rear=Math.min(original-0.18,pivot-0.28);
- const collar=lathe([[0.001,rear-pivot],[r*1.28,rear-pivot],[r*1.28,-0.16],[r,-0.04],[r*0.94,0.08],[0.001,0.08]],32);
- collar.translate(b.gunPos[0],b.gunPos[1],pivot);
- P.add('turret','paint',collar);
+ if(!b.gunMountNoCollar){
+  const r=spec.era==='WWII'?0.25:0.23;
+  const rear=Math.min(original-0.18,pivot-0.28);
+  const collar=lathe([[0.001,rear-pivot],[r*1.28,rear-pivot],[r*1.28,-0.16],[r,-0.04],[r*0.94,0.08],[0.001,0.08]],32);
+  collar.translate(b.gunPos[0],b.gunPos[1],pivot);
+  P.add('turret','paint',collar);
+ }
  // Per-part bounds for the hull, retained as collision proxies for gun depression.
  b.gunHullBoxes=[];
  const pivotY=b.turretPos[1]+b.gunPos[1];
