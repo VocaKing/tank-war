@@ -75,6 +75,7 @@ function sharedMats() {
   MATS.metal = new THREE.MeshStandardMaterial({ color: 0x3b3a37, roughness: 0.55, metalness: 0.65 });
   MATS.rubber = new THREE.MeshStandardMaterial({ color: 0x1c1c1b, roughness: 0.95, metalness: 0.0 });
   MATS.dark = new THREE.MeshStandardMaterial({ color: 0x0c0d0e, roughness: 0.6, metalness: 0.3 });
+  MATS.bore = new THREE.MeshStandardMaterial({ color: 0x050607, roughness: 0.96, metalness: 0.08, side: THREE.DoubleSide });
   MATS.glass = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.08, metalness: 0.9, emissive: 0x050a10 });
   MATS.wood = new THREE.MeshStandardMaterial({ color: 0x6a5134, roughness: 0.9 });
   MATS.canvas = new THREE.MeshStandardMaterial({ color: 0x5e5a43, roughness: 1.0 });
@@ -539,7 +540,7 @@ function refineRoofDetails(P, spec) {
 }
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
-  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec); gunMount(b.P,b,spec,lathe);
+  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec); b.muzzleInfo=K.hollowMuzzle(b.P); gunMount(b.P,b,spec,lathe);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
@@ -599,7 +600,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, barrel, muzzle, sight, gunClearance:b.gunClearance, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, barrel, muzzle, sight, gunClearance:b.gunClearance, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;
