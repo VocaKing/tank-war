@@ -192,8 +192,9 @@ export function barrel(P, part, len, opts = {}) {
   const brakeLen = opts.brake ? opts.brake.len : 0; const end = len - brakeLen;
   const ev = opts.evac;
   if (ev) { pr.push([r0 * 0.92 + (r1 - r0 * 0.92) * (ev.z - ev.len / 2) / end, ev.z - ev.len / 2 - 0.04], [ev.r, ev.z - ev.len / 2 + 0.06], [ev.r, ev.z + ev.len / 2 - 0.1], [r0 * 0.9 + (r1 - r0 * 0.9) * (ev.z + ev.len / 2) / end, ev.z + ev.len / 2]); }
-  pr.push([r1, end], [r1 * 1.08, end + 0.01]);
-  if (!opts.brake) pr.push([r1 * 1.08, len], [r1 * 0.72, len], [0.001, len]); else pr.push([r1 * 1.08, end + 0.01], [r1 * 0.72, end + 0.01], [0.001, end + 0.01]);
+  pr.push([r1, end]);
+  if (!opts.brake) pr.push([r1 * 1.08, len], [r1 * 0.72, len], [0.001, len]);
+  else pr.push([r1 * 1.08, end + 0.01], [r1 * 0.72, end + 0.01], [0.001, end + 0.01]);
   P.add(part, opts.mat || 'paint', lathe(pr, 32));
   if(opts.brake){
     const key=part+'|'+(opts.mat||'paint'),list=P.b[key],last=list.length-1;
