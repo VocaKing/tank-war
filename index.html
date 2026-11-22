@@ -11,5 +11,27 @@
 <body>
 <canvas id="gl"></canvas>
 <div id="ui"></div>
+<script type="module">
+const ui=document.getElementById('ui');
+const install=()=>{
+ const menu=ui.querySelector('.menu');
+ if(!menu||menu.querySelector('#m-balance'))return;
+ const b=document.createElement('button');b.id='m-balance';b.textContent='⚙ 游戏平衡编辑器 / Balance Editor';
+ b.style.cssText='position:absolute;top:24px;right:24px;z-index:40;pointer-events:auto;padding:10px 16px;border:1px solid #8ca7bc;border-radius:6px;background:#263b4e;color:#fff;font:inherit;cursor:pointer';
+ menu.append(b);
+ b.onclick=async()=>{
+  b.disabled=true;
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./assets/balanceEditor-D68RL9cG.css';document.head.append(link);
+  try{
+   await import('./assets/balanceEditor-DwEXHOW3.js');
+   const back=ui.querySelector('a.play');if(back){back.removeAttribute('target');back.textContent='返回车库 / 游戏';}
+   const save=ui.querySelector('#save');const toolbar=ui.querySelector('.toolbar');
+   if(save&&toolbar&&!ui.querySelector('#save-return')){const ret=document.createElement('button');ret.id='save-return';ret.textContent='保存并返回车库';ret.onclick=()=>{save.click();if(ui.querySelector('#status.ok'))location.assign('./');};save.after(ret);}
+   document.body.style.userSelect='text';
+  }catch(e){console.error(e);link.remove();b.disabled=false;alert('编辑器加载失败，请刷新重试。');}
+ };
+};
+new MutationObserver(install).observe(ui,{childList:true,subtree:true});install();
+</script>
 </body>
 </html>
