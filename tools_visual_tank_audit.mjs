@@ -37,7 +37,7 @@ try {
    const size=all.getSize(new THREE.Vector3()),bs=body.getSize(new THREE.Vector3()),ts=turret.getSize(new THREE.Vector3());
    return {spec,model,bounds:all,center:all.getCenter(new THREE.Vector3()),size:{length:+size.z.toFixed(2),width:+size.x.toFixed(2),height:+size.y.toFixed(2)},body:{length:+bs.z.toFixed(2),width:+bs.x.toFixed(2),height:+bs.y.toFixed(2)},turret:{length:+ts.z.toFixed(2),width:+ts.x.toFixed(2),height:+ts.y.toFixed(2)}};
   });
-  const report=models.map(x=>({id:x.spec.id,short:x.spec.short,specDims:{hullLength:x.spec.dims.L,width:x.spec.dims.W,hullH:x.spec.dims.hullH,turretH:x.spec.dims.turretH},rendered:x.size,body:x.body,turret:x.turret,gunLen:x.spec.dims.gunLen,muzzle:x.model.muzzleInfo,gunClearance:x.model.gunClearance,gunMountNoCollar:x.model.gunMountNoCollar,roadWheelStationsPerSide:x.model.roadWheelStationsPerSide,idlersPerSide:x.model.idlersPerSide,returnRollersPerSide:x.model.returnRollersPerSide,driveSprocketsPerSide:x.model.driveSprocketsPerSide}));
+  const report=models.map(x=>({id:x.spec.id,short:x.spec.short,specDims:{hullLength:x.spec.dims.L,width:x.spec.dims.W,hullH:x.spec.dims.hullH,turretH:x.spec.dims.turretH},rendered:x.size,body:x.body,turret:x.turret,gunLen:x.spec.dims.gunLen,muzzle:x.model.muzzleInfo,gunClearance:x.model.gunClearance,gunMountNoCollar:x.model.gunMountNoCollar,roadWheelStationsPerSide:x.model.roadWheelStationsPerSide,roadWheelDiameter:x.model.roadWheelDiameter,glacisAngleFromVertical:x.model.glacisAngleFromVertical,idlersPerSide:x.model.idlersPerSide,returnRollersPerSide:x.model.returnRollersPerSide,driveSprocketsPerSide:x.model.driveSprocketsPerSide}));
   const webgl=document.createElement('canvas'),renderer=new THREE.WebGLRenderer({canvas:webgl,antialias:true,alpha:false,preserveDrawingBuffer:true});
   renderer.setPixelRatio(1);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor(0x1a242c,1);renderer.autoClear=false;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a242c);
@@ -98,6 +98,8 @@ try {
  const is2=result.report.find(t=>t.id==='is2');
  assert.equal(is2.specDims.hullLength,6.77);
  assert.equal(is2.specDims.width,3.09);
+ assert.ok(Math.abs(is2.roadWheelDiameter-0.55)<1e-6,'IS-2 road wheels must be 550 mm in diameter');
+ assert.ok(Math.abs(is2.glacisAngleFromVertical-60)<0.2,'IS-2 Model 1944 upper glacis must be 60 degrees from vertical');
  console.log('VISUAL_AUDIT_REPORT='+JSON.stringify(result.report));
  console.log('VISUAL_AUDIT_GRID='+result.grid);
  console.log('VISUAL_AUDIT_IS2='+result.is2);
