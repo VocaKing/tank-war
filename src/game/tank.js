@@ -5,7 +5,7 @@ import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
-import { advanceBloom, incidence, MAX_BLOOM } from './combatMath.js';
+import { advanceBloom, incidence, MAX_BLOOM, MIN_DISPERSION_100M } from './combatMath.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
@@ -51,7 +51,7 @@ export class Tank {
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
   // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
-  baseDispersion() { let d = this.spec.dispersion / 100; if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
+  baseDispersion() { let d = Math.atan(Math.max(MIN_DISPERSION_100M,this.spec.dispersion) / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
   // current dispersion-circle radius (radians); every shell lands inside this cone
   dispersion() { return this.baseDispersion() * this.bloom; }
   placeAt(x, z, heading) {
