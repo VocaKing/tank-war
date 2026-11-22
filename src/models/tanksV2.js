@@ -125,14 +125,13 @@ function is2(d) {
   P.add('hull', 'paint', box(0.29, 0.105, 0.045, -0.52, 1.34, hl - 0.29, -60 * DEG));
   P.add('hull', 'dark', box(0.20, 0.035, 0.018, -0.52, 1.35, hl - 0.265, -60 * DEG));
   P.add('hull', 'paint', T(new THREE.SphereGeometry(0.12, 16, 10), 0.55, 1.30, hl - 0.30, 0, 0, 0, 1, 1, 0.72));
-  P.add('hull', 'dark', cylZ(0.022, 0.32, 8, 0.55, 1.31, hl - 0.16, 0.022, -60 * DEG));
+  P.add('hull', 'dark', cylZ(0.022, 0.32, 8, 0.55, 1.31, hl - 0.16, 0.022, 0));
   K.headlight(P, 'hull', -1.18, fy + 0.16, hl - 0.28, true);
   for (const side of [-1, 1]) {
     P.add('hull', 'metal', T(new THREE.TorusGeometry(0.10, 0.018, 6, 16), side * 1.0, c + 0.23, hl - 0.10, 0, 0, Math.PI / 2));
     P.add('hull', 'metal', box(0.28, 0.06, 0.08, side * 1.0, c + 0.20, hl - 0.08));
   }
 
-  // Two cylindrical auxiliary fuel drums on the rear hull sides (not rectangular side bins).
   // Four auxiliary fuel tanks: two cylindrical drums along each rear hull side.
   for (const side of [-1, 1]) {
     for (const z of [-2.50, -1.43]) {
