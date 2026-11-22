@@ -34,7 +34,7 @@ try {
    const size=all.getSize(new THREE.Vector3()),bs=body.getSize(new THREE.Vector3()),ts=turret.getSize(new THREE.Vector3());
    return {spec,model,bounds:all,center:all.getCenter(new THREE.Vector3()),size:{length:+size.z.toFixed(2),width:+size.x.toFixed(2),height:+size.y.toFixed(2)},body:{length:+bs.z.toFixed(2),width:+bs.x.toFixed(2),height:+bs.y.toFixed(2)},turret:{length:+ts.z.toFixed(2),width:+ts.x.toFixed(2),height:+ts.y.toFixed(2)}};
   });
-  const report=models.map(x=>({id:x.spec.id,short:x.spec.short,specDims:{hullLength:x.spec.dims.L,width:x.spec.dims.W,hullH:x.spec.dims.hullH,turretH:x.spec.dims.turretH},rendered:x.size,body:x.body,turret:x.turret,gunLen:x.spec.dims.gunLen}));
+  const report=models.map(x=>({id:x.spec.id,short:x.spec.short,specDims:{hullLength:x.spec.dims.L,width:x.spec.dims.W,hullH:x.spec.dims.hullH,turretH:x.spec.dims.turretH},rendered:x.size,body:x.body,turret:x.turret,gunLen:x.spec.dims.gunLen,muzzle:x.model.muzzleInfo,gunClearance:x.model.gunClearance,wheelsPerSide:x.model.wheelList.filter(w=>w.side<0).length}));
   const webgl=document.createElement('canvas'),renderer=new THREE.WebGLRenderer({canvas:webgl,antialias:true,alpha:false,preserveDrawingBuffer:true});
   renderer.setPixelRatio(1);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor(0x1a242c,1);renderer.autoClear=false;
   const scene=new THREE.Scene();scene.background=new THREE.Color(0x1a242c);
@@ -66,6 +66,18 @@ try {
   renderer.dispose();
   return {report,grid:grid.toDataURL('image/jpeg',0.66).split(',')[1],is2:detail.toDataURL('image/jpeg',0.7).split(',')[1]};
  });
+ const expectedOverall={sherman:7.57,tiger:8.45,t34:8.15,t72:9.53,m1a2:9.77,panther:8.86,is2:9.83,pershing:8.647,centurion:9.83,leo1:9.54,leo2a6:10.97,t90m:9.83,chally2:11.50,type99a:10.92,merkava4:9.04};
+ for(const tank of result.report){
+  assert.ok(tank.muzzle&&tank.muzzle.bore>0, tank.id+' has no open muzzle bore');
+  assert.ok(Number.isFinite(tank.gunClearance.front)&&tank.gunClearance.pivot>=tank.gunClearance.front+0.1-1e-3,tank.id+' gun pivot intersects the turret face');
+  const delta=Math.abs(tank.rendered.length-expectedOverall[tank.id]);
+  assert.ok(delta<0.65,tank.id+' rendered overall length '+tank.rendered.length+'m differs from reference '+expectedOverall[tank.id]+'m');
+ }
+ const tiger=result.report.find(t=>t.id==='tiger');
+ assert.equal(tiger.wheelsPerSide,25,'Tiger I must show 24 interleaved road wheels plus one idler per side');
+ const is2=result.report.find(t=>t.id==='is2');
+ assert.equal(is2.specDims.hullLength,6.77);
+ assert.equal(is2.specDims.width,3.09);
  console.log('VISUAL_AUDIT_REPORT='+JSON.stringify(result.report));
  console.log('VISUAL_AUDIT_GRID='+result.grid);
  console.log('VISUAL_AUDIT_IS2='+result.is2);
