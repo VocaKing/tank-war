@@ -25,10 +25,10 @@ export class TouchControls {
   const fire=root.querySelector('[data-action=fire]');
   on(fire,'pointerdown',e=>{if(!ready()||fireId!==null)return;e.preventDefault();game.audio.init();game.audio.resume();fireId=e.pointerId;fire.setPointerCapture(e.pointerId);this.firing=true;game.player.tryFire(game.time);});
   for(const type of ['pointerup','pointercancel','lostpointercapture'])on(fire,type,e=>{if(e.pointerId===fireId){fireId=null;this.firing=false;}});
-  for(const b of root.querySelectorAll('button:not([data-action=fire])'))on(b,'click',()=>{
+  const runAction=b=>{
    const a=b.dataset.action,p=game.player;
    if(a==='pause'){game.setPaused(!game.paused);return;}
-   if(a==='score'){const board=game.hud.$('h-board');const open=board.style.display!=='flex';game.hud.scoreboard(open);if(open){const box=board.querySelector('.box');if(box){const close=document.createElement('button');close.textContent='关闭战况';close.onclick=()=>game.hud.scoreboard(false);box.append(close);}}return;}
+   if(a==='score'){this.clear();const board=game.hud.$('h-board');const open=board.style.display!=='flex';game.hud.scoreboard(open);if(open){const box=board.querySelector('.box');if(box){const close=document.createElement('button');close.textContent='关闭战况';close.type='button';close.onpointerdown=e=>{e.preventDefault();e.stopPropagation();game.hud.scoreboard(false);};close.onclick=()=>game.hud.scoreboard(false);box.append(close);}}return;}
    if(!ready())return;
    if(a==='scope')game.toggleSniper();
    if(a==='zoom'){if(!game.cam.sniper)game.toggleSniper();else {const z=game.constructor.ZOOMS;game.cam.zoom=z[(z.indexOf(game.cam.zoom)+1)%z.length];}}
@@ -37,17 +37,25 @@ export class TouchControls {
    if(a==='ability')p.tryAbility();
    if(a.startsWith('ammo'))p.selectShell(+a.slice(4));
    if(a.startsWith('item'))game.useItem(+a.slice(4));
-  });
+  };
+  // iOS WebViews can suppress synthetic clicks during multitouch or while HUD
+  // labels are updated. Activate immediately on the same pointerdown as Fire.
+  for(const b of root.querySelectorAll('button:not([data-action=fire])')){
+   b.type='button';
+   on(b,'pointerdown',e=>{if(e.button!==undefined&&e.button!==0)return;e.preventDefault();e.stopPropagation();runAction(b);},{passive:false});
+   on(b,'click',e=>{e.stopPropagation();if(e.detail===0&&(!e.pointerType||e.pointerType===''))runAction(b);});
+  }
   this.clear=()=>{resetDrive();aimId=fireId=null;this.firing=false;};
   on(window,'blur',this.clear);on(document,'visibilitychange',()=>{if(document.hidden)this.clear();});
  }
  update(){
   const g=this.g,p=g.player;
+  const label=(b,v)=>{if(b.textContent!==v)b.textContent=v;};
   this.root.classList.toggle('touch-paused',g.paused||g.ended||!p.alive);
   if(g.paused||g.ended||!p.alive)this.clear();
-  for(const b of this.root.querySelectorAll('button')){const a=b.dataset.action;if(a==='scope')b.textContent=g.cam.sniper?'退出开镜':'开镜';if(a==='zoom')b.textContent=g.cam.sniper?'×'+g.cam.zoom:'倍率';if(a==='armor')b.classList.toggle('active',g.armorView.enabled);if(a==='lock')b.classList.toggle('active',!!g.lock);
-   if(a.startsWith('ammo')){const i=+a.slice(4);b.textContent='弹 '+(i+1)+' · '+(p.ammo[i]??0);b.classList.toggle('active',p.shellIdx===i);}
-   if(a==='fire')b.textContent=p.reloadLeft>0?p.reloadLeft.toFixed(1)+'s':'开火';
+  for(const b of this.root.querySelectorAll('button')){const a=b.dataset.action;if(a==='scope')label(b,g.cam.sniper?'退出开镜':'开镜');if(a==='zoom')label(b,g.cam.sniper?'×'+g.cam.zoom:'倍率');if(a==='armor')b.classList.toggle('active',g.armorView.enabled);if(a==='lock')b.classList.toggle('active',!!g.lock);
+   if(a.startsWith('ammo')){const i=+a.slice(4);label(b,'弹 '+(i+1)+' · '+(p.ammo[i]??0));b.classList.toggle('active',p.shellIdx===i);}
+   if(a==='fire')label(b,p.reloadLeft>0?p.reloadLeft.toFixed(1)+'s':'开火');
   }
  }
  dispose(){this.clear();for(const off of this.listeners)off();this.root.remove();}
