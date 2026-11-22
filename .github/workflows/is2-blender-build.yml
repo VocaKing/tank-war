@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-is2:
@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Check out project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Validate Python script syntax
         run: python3 -m py_compile tools/blender/is2_model1944_blockout.py
@@ -50,6 +52,21 @@ jobs:
           test -s artifacts/is2-model1944/04_rear.png
           test -s artifacts/is2-model1944/05_top.png
           ls -lh public/models/is2_model1944_blockout.glb artifacts/is2-model1944/
+
+      - name: Commit generated GLB to the feature branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/models/is2_model1944_blockout.glb
+          if git diff --cached --quiet; then
+            echo "Generated GLB is already current."
+          else
+            git commit -m "Add generated IS-2 Model 1944 Blender GLB"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
 
       - name: Upload model and visual review package
         if: always()
