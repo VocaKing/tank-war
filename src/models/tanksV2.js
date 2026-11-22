@@ -135,9 +135,9 @@ function is2(d) {
   // Four auxiliary fuel tanks: two cylindrical drums along each rear hull side.
   for (const side of [-1, 1]) {
     for (const z of [-2.50, -1.43]) {
-      P.add('hull', 'paint', cylZ(0.17, 0.90, 18, side * 1.48, fy + 0.04, z));
-      for (const dz of [-0.34, 0.34]) P.add('hull', 'metal', T(new THREE.TorusGeometry(0.174, 0.014, 6, 24), side * 1.48, fy + 0.04, z + dz));
-      P.add('hull', 'metal', cylY(0.04, 0.045, 10, side * 1.48, fy + 0.23, z));
+      P.add('hull', 'paint', cylZ(0.17, 0.90, 18, side * 1.35, fy + 0.04, z));
+      for (const dz of [-0.34, 0.34]) P.add('hull', 'metal', T(new THREE.TorusGeometry(0.174, 0.014, 6, 24), side * 1.35, fy + 0.04, z + dz));
+      P.add('hull', 'metal', cylY(0.04, 0.045, 10, side * 1.35, fy + 0.23, z));
     }
     K.exhaust(P, 'hull', side * 0.55, 1.28, -hl - 0.08, 'ww2', 0.09, 0.42);
     K.towCable(P, 'hull', side * 1.05, H - 0.08, -2.35, 0.72);
@@ -290,7 +290,7 @@ function leo2a6(d) {
     K.skirt(P, s * (d.W / 2 + 0.03), fy + 0.03, -hl + 0.3, hl - 2.05, 0.55, 5, 0.05);
     K.headlight(P, 'hull', s * 1.45, H - 0.05, hl - 1.6); P.add('hull', 'metal', cylZ(0.08, 0.12, 10, s * 1.0, c + 0.35, hl - 0.5));
     deckGrilles(P, s * 0.3, s * 1.6, H, -hl + 0.3, -hl + 2.2, 12);
-    K.stowageBox(P, 'hull', s * 1.3, H - 0.3, -hl - 0.12, 0.8, 0.4, 0.22);
+    K.stowageBox(P, 'hull', s * 1.3, H - 0.3, -hl + 0.12, 0.8, 0.4, 0.22);
   }
   K.towCable(P, 'hull', 0.0, H - 0.25, hl - 1.5, hl - 0.4); K.tools(P, 'hull', 0.0, H, -hl + 2.9, 1);
   K.hatchRect(P, 'hull', -0.7, H, hl - 1.95, 0.6, 0.55); for (let i = 0; i < 3; i++) K.periscope(P, 'hull', -0.9 + i * 0.2, H, hl - 1.75, 0, 0.7);
@@ -367,7 +367,7 @@ function chally2(d) {
     K.skirt(P, s * (d.W / 2 + 0.06), fy + 0.04, -hl + 0.5, hl - 0.6, 0.6, 7, 0.11); // Dorchester side armour
     K.headlight(P, 'hull', s * 1.3, H - 0.25, hl - 0.75); P.add('hull', 'metal', cylZ(0.08, 0.12, 10, s * 0.95, c + 0.3, hl - 0.55));
     deckGrilles(P, s * 0.25, s * 1.55, H, -hl + 0.35, -hl + 2.3, 12);
-    K.stowageBox(P, 'hull', s * 1.25, H - 0.35, -hl - 0.12, 0.8, 0.45, 0.22);
+    K.stowageBox(P, 'hull', s * 1.25, H - 0.35, -hl + 0.12, 0.8, 0.45, 0.22);
   }
   K.towCable(P, 'hull', -0.8, H + 0.03, -2.0, 0.9); K.tools(P, 'hull', 0.8, H, -hl + 2.8, 1);
   K.hatchRect(P, 'hull', 0, H, hl - 1.85, 0.6, 0.55); K.periscope(P, 'hull', 0, H, hl - 1.6, 0, 0.9);
@@ -435,7 +435,7 @@ function merkava4(d) {
   for (const s of [-1, 1]) {
     K.skirt(P, s * (d.W / 2 + 0.06), fy + 0.04, -hl + 0.3, hl - 0.45, 0.62, 6, 0.09);
     K.headlight(P, 'hull', s * 1.35, fy + 0.25, hl - 0.6);
-    K.stowageBox(P, 'hull', s * 1.2, H - 0.45, -hl - 0.15, 0.9, 0.55, 0.25);
+    K.stowageBox(P, 'hull', s * 1.2, H - 0.45, -hl + 0.15, 0.9, 0.55, 0.25);
   }
   // front engine deck grilles on the long glacis (rotated)
   for (let i = 0; i < 6; i++) P.add('hull', 'dark', T(new THREE.BoxGeometry(2.2, 0.03, 0.08), 0, 1.15 + i * 0.08, hl - 0.4 - i * 0.29, -0.24, 0, 0));
