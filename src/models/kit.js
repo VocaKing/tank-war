@@ -172,6 +172,21 @@ export function slatCage(P, part, x0, x1, y0, y1, z, nBars = 9) {
 }
 // gun barrel profile helper: returns lathe geometry along +z from z=0 (mantlet face) to length
 // opts: r0 (breech/root radius), r1 (muzzle radius), evac {z, r, len}, brake {type:'double'|'single'|'mono', r, len}, sleeve true (thermal sleeve bands), mrs
+function removeBarrelCapAtZ(geometry,z) {
+  const p=geometry.attributes.position,keep=[];
+  for(let i=0;i<p.count;i+=3){
+    const cap=Math.abs(p.getZ(i)-z)<1e-4&&Math.abs(p.getZ(i+1)-z)<1e-4&&Math.abs(p.getZ(i+2)-z)<1e-4;
+    if(!cap)keep.push(i,i+1,i+2);
+  }
+  if(keep.length===p.count)return geometry;
+  const out=new THREE.BufferGeometry();
+  for(const [name,a] of Object.entries(geometry.attributes)){
+    const arr=new Float32Array(keep.length*a.itemSize);
+    for(let j=0;j<keep.length;j++)for(let k=0;k<a.itemSize;k++)arr[j*a.itemSize+k]=a.array[keep[j]*a.itemSize+k];
+    out.setAttribute(name,new THREE.BufferAttribute(arr,a.itemSize,a.normalized));
+  }
+  out.computeBoundingBox();out.computeBoundingSphere();geometry.dispose();return out;
+}
 export function barrel(P, part, len, opts = {}) {
   const r0 = opts.r0 ?? 0.12, r1 = opts.r1 ?? 0.08; const pr = [[0.001, -0.25], [r0 * 1.2, -0.25], [r0 * 1.2, 0.15], [r0, 0.25]];
   const brakeLen = opts.brake ? opts.brake.len : 0; const end = len - brakeLen;
@@ -180,6 +195,10 @@ export function barrel(P, part, len, opts = {}) {
   pr.push([r1, end], [r1 * 1.08, end + 0.01]);
   if (!opts.brake) pr.push([r1 * 1.08, len], [r1 * 0.72, len], [0.001, len]); else pr.push([r1 * 1.08, end + 0.01], [r1 * 0.72, end + 0.01], [0.001, end + 0.01]);
   P.add(part, opts.mat || 'paint', lathe(pr, 32));
+  if(opts.brake){
+    const key=part+'|'+(opts.mat||'paint'),list=P.b[key],last=list.length-1;
+    list[last]=removeBarrelCapAtZ(list[last],end+0.01);
+  }
   if (opts.sleeve) { const n = opts.sleeve; for (let i = 1; i < n; i++) { const z = 0.4 + (end - 0.6) * (i / n); if (ev && Math.abs(z - ev.z) < ev.len / 2 + 0.1) continue; const rr = r0 + (r1 - r0) * (z / end); P.add(part, 'metal', cylZ(rr * 1.18, 0.05, 16, 0, 0, z)); } }
   if (opts.brake) {
     const b = opts.brake; const z0 = end; const rb = b.r;
@@ -187,7 +206,7 @@ export function barrel(P, part, len, opts = {}) {
       P.add(part, 'paint', lathe([[0.001, z0], [rb, z0], [rb, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.55], [rb, z0 + b.len * 0.55], [rb, z0 + b.len], [rb * 0.72, z0 + b.len], [0.001, z0 + b.len]], 32));
       for (const f of [0.45, 0.8]) for (const side of [-1, 1]) P.add(part, 'dark', box(0.03, rb * 1.3, b.len * 0.18, side * rb * 0.98, 0, z0 + b.len * f));
     } else if (b.type === 'single') {
-      const hole = Math.min(0.065, rb * 0.58), outerX = rb * 1.1, outerY = rb * 0.75;
+      const hole = Math.min(0.065, rb * 0.58), outerX = rb * 1.1, outerY = rb * 0.75; P.muzzleBoreRadius = Math.min(P.muzzleBoreRadius ?? Infinity, hole * 0.9);
       const barY = Math.max(0.018, outerY - hole), barX = Math.max(0.018, outerX - hole);
       P.add(part, 'paint', box(outerX * 2, barY, b.len, 0, hole + barY / 2, z0 + b.len / 2));
       P.add(part, 'paint', box(outerX * 2, barY, b.len, 0, -hole - barY / 2, z0 + b.len / 2));
@@ -237,8 +256,8 @@ export function hollowMuzzle(P, opts = {}) {
     }
   }
   if(!(outer>0.035))return {muzzleZ,outer,bore:0,removed};
-  const bore=Math.max(0.028,Math.min(opts.boreRadius??0.067,outer*0.68));
-  const depth=Math.max(0.28,Math.min(0.46,outer*4.2));
+  const bore=Math.max(0.028,Math.min(opts.boreRadius??P.muzzleBoreRadius??0.067,outer*0.68));
+  const depth=Math.max(0.55,Math.min(0.85,outer*6));
   const wall=new THREE.CylinderGeometry(bore,bore,depth,32,1,true).rotateX(Math.PI/2);
   wall.translate(0,0,muzzleZ-depth/2);
   P.add('barrel','bore',wall);
