@@ -458,9 +458,47 @@ function finishDetails(P, d, b, spec) {
   }
   P.add('hull', 'metal', box(0.16, 0.12, 0.18, 0, d.clearance + 0.3, -hl + 0.02)); P.add('hull', 'metal', cylY(0.03, 0.18, 8, 0, d.clearance + 0.3, -hl - 0.06));
 }
+// Fine roof fittings: sample actual painted surfaces so details follow each hull form.
+function refineRoofDetails(P, spec) {
+  if (spec.id === 'tiger') return;
+  const modern = ['m1a2','chally2','leo2a6','merkava4','type99a','t90m','t72'].includes(spec.id);
+  const rounded = ['sherman','t34','is2','pershing','centurion','t72','t90m'].includes(spec.id);
+  const ray = new THREE.Raycaster();
+  const down = new THREE.Vector3(0,-1,0);
+  for (const part of ['hull','turret']) {
+    const surfaces = P.b[part + '|paint'];
+    if (!surfaces || !surfaces.length) continue;
+    const g = mergeGeometries(surfaces);
+    if (!g) continue;
+    g.computeBoundingBox();
+    const bounds = g.boundingBox;
+    const mat = new THREE.MeshBasicMaterial({side:THREE.DoubleSide});
+    const mesh = new THREE.Mesh(g,mat);
+    const width = bounds.max.x - bounds.min.x, length = bounds.max.z - bounds.min.z;
+    const roof = (x,z) => {
+      ray.set(new THREE.Vector3(x,bounds.max.y+1,z),down);
+      const hit = ray.intersectObject(mesh,false)[0];
+      return hit && hit.face && hit.face.normal.y > 0.8 ? hit.point.y : null;
+    };
+    // Low-profile fasteners along deck or turret roof edges, adapted to actual surfaces.
+    for (const side of [-1,1]) {
+      const x = (bounds.min.x+bounds.max.x)/2 + side*width*(part==='hull'?0.34:rounded?0.23:0.32);
+      const count = part==='hull' ? (modern?8:5) : (modern?5:3);
+      for(let i=0;i<count;i++){
+        const z=bounds.min.z+length*(0.20+0.60*(i+0.5)/count);
+        const y=roof(x,z);
+        if(y===null) continue;
+        const radius=modern?0.019:0.024;
+        P.add(part,'paint',cylY(radius*1.4,0.012,8,x,y+0.006,z));
+        P.add(part,'metal',cylY(radius,0.014,6,x,y+0.016,z));
+      }
+    }
+    g.dispose(); mat.dispose();
+  }
+}
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
-  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec);
+  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
