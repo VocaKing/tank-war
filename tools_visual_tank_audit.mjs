@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from 'playwright';
@@ -17,11 +19,12 @@ try {
  page.on('console',m=>{if(m.type()==='error')process.stdout.write('BROWSER_ERROR='+m.text()+'\\n');});
  await page.goto('http://127.0.0.1:5173/');
  const result=await page.evaluate(async()=>{
-  const {THREE,createTankModel}=await import('/src/models/tankModel.js');
+  const {THREE,createTankModel,setTrackLOD}=await import('/src/models/tankModel.js');
   const {TANKS}=await import('/src/game/tankData.js');
   const colors={paint:0x77805c,metal:0x55534b,rubber:0x242424,dark:0x141719,glass:0x435b65,wood:0x71583b,canvas:0x8b8068,burnt:0x211c18,bore:0x050607,steel:0x77736b,tail:0x8d1d15,amber:0x9c6c19,track:0x45433e};
   const models=TANKS.map(spec=>{
    const model=createTankModel(spec,{links:false});
+   setTrackLOD(model,true); // audit the detailed road-wheel and individual-link geometry, not the far LOD proxy
    for(const mesh of model.meshes){
     if(mesh.userData.decal){mesh.visible=false;continue;}
     const key=mesh.userData.matKey||'track';
@@ -66,6 +69,11 @@ try {
   renderer.dispose();
   return {report,grid:grid.toDataURL('image/jpeg',0.66).split(',')[1],is2:detail.toDataURL('image/jpeg',0.7).split(',')[1]};
  });
+ const outDir=process.env.TANK_AUDIT_OUT||'tank-audit-output';
+ mkdirSync(outDir,{recursive:true});
+ writeFileSync(join(outDir,'tank-lineup.jpg'),Buffer.from(result.grid,'base64'));
+ writeFileSync(join(outDir,'is2-views.jpg'),Buffer.from(result.is2,'base64'));
+ writeFileSync(join(outDir,'tank-audit.json'),JSON.stringify(result.report,null,2));
  const expectedOverall={sherman:7.57,tiger:8.45,t34:8.15,t72:9.53,m1a2:9.77,panther:8.86,is2:9.83,pershing:8.647,centurion:9.83,leo1:9.54,leo2a6:10.97,t90m:9.83,chally2:11.50,type99a:10.92,merkava4:9.04};
  for(const tank of result.report){
   assert.ok(tank.muzzle&&tank.muzzle.bore>0, tank.id+' has no open muzzle bore');
