@@ -4,7 +4,7 @@ import './balanceEditor.css';
 let draft=clone(TANKS),selected=TANKS[0].id,dirty=false,compare=false;
 const root=document.getElementById('ui');document.getElementById('gl').hidden=true;root.className='balance-root';
 document.documentElement.lang='zh-CN';document.title='Steel Front · 游戏平衡编辑器';
-root.innerHTML='<header><div><small>STEEL FRONT / DESIGNER TOOLS</small><h1>游戏平衡编辑器</h1><p>调整坦克、装甲、弹药和特殊技能。保存后刷新游戏生效。</p></div><a class="play" href="./" target="_blank" rel="noopener">打开游戏 ↗</a></header><div class="notice" id="status" role="status"></div><div class="toolbar"><button id="save" class="primary">保存并应用</button><button id="export">导出配置 JSON</button><button id="import">导入配置</button><input id="file" type="file" accept=".json,application/json" hidden><button id="restore">恢复发布版</button><button id="compare">全车对比</button></div><div class="layout"><aside><h2>坦克列表</h2><input id="search" placeholder="搜索坦克 / 型号" aria-label="搜索坦克"><div id="list"></div></aside><main id="form"></main></div><footer>本地配置仅影响同一浏览器、同一网站的游戏。全玩家默认数值：导出 balanceDefaults.json 后替换 GitHub 仓库 src/game/balanceDefaults.json，并重新部署。<br>修改会在下一次加载游戏时使用，不影响正在进行的战斗。</footer>';
+root.innerHTML='<header><div><small>STEEL FRONT / DESIGNER TOOLS</small><h1>游戏平衡编辑器</h1><p>调整坦克、装甲、弹药和特殊技能。保存后刷新游戏生效。</p></div><a class="play" href="./">返回车库 / 游戏</a></header><div class="notice" id="status" role="status"></div><div class="toolbar"><button id="save" class="primary">保存并应用</button><button id="save-return">保存并返回车库</button><button id="export">导出配置 JSON</button><button id="import">导入配置</button><input id="file" type="file" accept=".json,application/json" hidden><button id="restore">恢复发布版</button><button id="compare">全车对比</button></div><div class="layout"><aside><h2>坦克列表</h2><input id="search" placeholder="搜索坦克 / 型号" aria-label="搜索坦克"><div id="list"></div></aside><main id="form"></main></div><footer>本地配置仅影响同一浏览器、同一网站的游戏。全玩家默认数值：导出 balanceDefaults.json 后替换 GitHub 仓库 src/game/balanceDefaults.json，并重新部署。<br>修改会在下一次加载游戏时使用，不影响正在进行的战斗。</footer>';
 const $=id=>document.getElementById(id), make=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;};
 function status(msg,kind=''){const e=$('status');e.textContent=msg;e.className='notice '+kind;}
 function changed(){dirty=true;$('save').textContent='保存并应用 · 未保存';}
@@ -36,7 +36,9 @@ function render(){
 }
 $('search').oninput=renderList;
 $('compare').onclick=()=>{compare=!compare;render()};
-$('save').onclick=()=>{try{const cfg=diff(STOCK_TANKS,draft);saveLocal(cfg,STOCK_TANKS);dirty=false;$('save').textContent='保存并应用';status('已保存 '+Object.keys(cfg.tanks).length+' 辆坦克的自定义配置。刷新游戏即可加载。','ok');}catch(e){status(e.message,'error');}};
+function saveDraft(){try{const cfg=diff(STOCK_TANKS,draft);saveLocal(cfg,STOCK_TANKS);dirty=false;$('save').textContent='保存并应用';status('已保存 '+Object.keys(cfg.tanks).length+' 辆坦克的自定义配置。返回车库即可加载。','ok');return true;}catch(e){status(e.message,'error');return false;}}
+$('save').onclick=saveDraft;
+$('save-return').onclick=()=>{if(saveDraft())location.assign(new URL('./',location.href).href);};
 $('export').onclick=()=>{try{const cfg=diff(STOCK_TANKS,draft);const url=URL.createObjectURL(new Blob([JSON.stringify(cfg,null,2)+'\n'],{type:'application/json'}));const a=make('a');a.href=url;a.download='balanceDefaults.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('已导出配置。可备份、分享或替换仓库默认文件。','ok');}catch(e){status(e.message,'error');}};
 $('import').onclick=()=>$('file').click();
 $('file').onchange=async()=>{try{const f=$('file').files[0];if(!f)return;if(f.size>1000000)throw Error('配置文件过大');const config=validate(JSON.parse(await f.text()),STOCK_TANKS);draft=effective(STOCK_TANKS,config);changed();render();status('配置已导入预览，点击保存并应用后才会影响游戏。','ok');}catch(e){status(e.message,'error')}finally{$('file').value=''}};

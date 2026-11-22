@@ -5,9 +5,9 @@ import { MAPS } from '../world/maps.js';
 
 const los = (a) => Math.round(a[0] / Math.cos((a[1] * Math.PI) / 180));
 export class Menu {
-  constructor(root, garage, onStart) {
+  constructor(root, garage, onStart, onBalance) {
     this.root = document.createElement('div'); this.root.className = 'menu'; root.appendChild(this.root);
-    this.garage = garage; this.onStart = onStart; this.tank = localStorage.getItem('tw_tank') || 'sherman'; this.map = localStorage.getItem('tw_map') || 'village'; this.quality = localStorage.getItem('tw_q') || 'high';
+    this.garage = garage; this.onStart = onStart; this.onBalance = onBalance; this.tank = localStorage.getItem('tw_tank') || 'sherman'; this.map = localStorage.getItem('tw_map') || 'village'; this.quality = localStorage.getItem('tw_q') || 'high';
     if (!TANK_BY_ID[this.tank]) this.tank = 'sherman'; if (!MAPS.find((m) => m.id === this.map)) this.map = 'village';
     this.render(); this.select(this.tank);
   }
@@ -15,7 +15,7 @@ export class Menu {
     this.root.innerHTML = `
       <div class="brand"><h1>STEEL FRONT</h1><span>3D Tank War · v3.0</span></div>
       <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}</div>
-      <div class="menutools"><button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
+      <button id="m-balance" class="balance-menu-btn" style="position:absolute;top:24px;right:24px;z-index:40;pointer-events:auto;padding:10px 16px;border:1px solid #8ca7bc;border-radius:6px;background:#263b4e;color:#fff;font:inherit;cursor:pointer">⚙ 游戏平衡编辑器 / Balance Editor</button>\n      <div class="menutools"><button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
         <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to soft-lock the camera on it; mouse input is dampened near the target, pull away firmly to break"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
@@ -27,6 +27,7 @@ export class Menu {
     this.root.querySelector('#m-lo-btn').onclick = () => this.showLoadout(true);
     this.root.querySelector('#m-table').onclick = () => this.showTable(true);
     this.root.querySelector('#m-armor').onclick = () => this.toggleArmor();
+    this.root.querySelector('#m-balance').onclick = () => this.onBalance();
     const q = this.root.querySelector('#m-q'); q.value = this.quality; q.onchange = () => { this.quality = q.value; localStorage.setItem('tw_q', q.value); };
     const aa = this.root.querySelector('#m-aa'); aa.checked = localStorage.getItem('tw_aa') !== '0'; aa.onchange = () => localStorage.setItem('tw_aa', aa.checked ? '1' : '0');
     this.selectMap(this.map);

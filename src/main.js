@@ -16,7 +16,13 @@ const audio = new Audio();
 const garage = new Garage(renderer); garage.resize(innerWidth, innerHeight);
 let game = null; let mode = 'menu';
 const loading = document.createElement('div'); loading.className = 'loading'; loading.innerHTML = '<div><h2>Generating battlefield…</h2><p>Sculpting 1.4 km of terrain, planting forests, building villages</p><div class="spin"></div></div>'; ui.appendChild(loading);
-const menu = new Menu(ui, garage, start);
+const menu = new Menu(ui, garage, start, openBalance);
+async function openBalance() {
+  if (mode !== 'menu') return;
+  mode = 'balance';
+  try { await import('./ui/balanceEditor.js'); }
+  catch(e) { console.error(e); mode = 'menu'; alert('Unable to open balance editor. Please reload and retry.'); }
+}
 function start(opts, gesture = true) {
   if (gesture) { audio.init(); audio.resume(); }
   menu.show(false); loading.style.display = 'flex'; mode = 'loading';
