@@ -101,7 +101,7 @@ function panther(d) {
   // gun: "chin" mantlet + 75 mm KwK 42 L/70 with double-baffle brake
   const gz = bz + tl - 0.1;
   P.add('gun', 'paint', cylX(0.38, 1.25, 20, 0, -0.02, 0.05)); P.add('gun', 'paint', box(1.25, 0.25, 0.3, 0, -0.32, 0.05)); P.add('gun', 'dark', box(0.1, 0.07, 0.04, 0.38, 0.12, 0.43));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.12, r1: 0.07, brake: { type: 'double', r: 0.105, len: 0.42 } });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.07, brake: { type: 'double', r: 0.105, len: 0.42 } });
   return { P, ...g, wheelType: 'disc', cast: 0.35, castTurret: 0.4, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, gz], decals: [...decalsSide('cross', '', 'turret', tw * 0.9 + 0.05, 0.42, bz - 0.4, 0.42), ...decalsSide('text', '211', 'turret', tw * 0.9 + 0.05, 0.42, bz + 0.25, 0.5)] };
 }
 
@@ -138,7 +138,7 @@ function is2(d) {
   for (const s of [-1, 1]) K.grabRail(P, 'turret', [s * 0.95, 0.55, bz - 0.4], [s * 0.88, 0.55, bz + 0.3], 0.0);
   K.periscope(P, 'turret', 0.3, d.turretH * 0.95, bz + 0.3, 0, 0.8);
   P.add('gun', 'paint', box(0.95, 0.62, 0.32, 0, 0, 0.05)); P.add('gun', 'paint', cylZ(0.22, 0.45, 14, 0, 0, 0.35));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.14, r1: 0.085, brake: { type: 'double', r: 0.155, len: 0.55 } });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.14, r1: 0.085, brake: { type: 'double', r: 0.155, len: 0.55 } });
   return { P, ...g, wheelType: 'disc', cast: 0.6, castTurret: 1.0, turretPos: [0, H, d.turretZ], gunPos: [0, 0.45, bz + 1.22], decals: decalsSide('text', '23', 'turret', tw * 0.94, 0.4, bz - 0.2, 0.55) };
 }
 
@@ -165,7 +165,7 @@ function pershing(d) {
   K.antenna(P, 'turret', -0.8, d.turretH * 0.8, bz - 1.2, 2.2); K.stowageBox(P, 'turret', 0, 0.35, bz - 1.75, 1.6, 0.35, 0.3);
   K.liftHooks(P, 'turret', [[-0.85, d.turretH * 0.8, bz + 0.5], [0.85, d.turretH * 0.8, bz + 0.5]]);
   P.add('gun', 'paint', box(1.05, 0.62, 0.3, 0, 0, 0.05)); P.add('gun', 'paint', cylZ(0.2, 0.4, 14, 0, 0, 0.35)); P.add('gun', 'dark', cylZ(0.025, 0.4, 6, 0.32, 0.0, 0.25)); P.add('gun', 'dark', box(0.1, 0.08, 0.04, -0.33, 0.14, 0.21));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.12, r1: 0.075, brake: { type: 'single', r: 0.1, len: 0.32 } });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.075, brake: { type: 'single', r: 0.1, len: 0.32 } });
   return { P, ...g, wheelType: 'disc', cast: 0.7, castTurret: 1.0, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, bz + 1.12], decals: [...decalsSide('usstar', '', 'hull', d.W / 2 + 0.05, fy - 0.15, -0.3, 0.3), ...decalsSide('usstar', '', 'turret', tw * 0.93, 0.42, bz - 0.2, 0.55)] };
 }
 
@@ -198,7 +198,7 @@ function centurion(d) {
   K.cupola(P, 'turret', 0.55, d.turretH, bz - 0.3, 0.36, 0.25, 8, 'modern'); K.mg(P, 'turret', 0.55, d.turretH + 0.45, bz - 0.3, 0, 'mag');
   K.hatch(P, 'turret', -0.55, d.turretH, bz - 0.25, 0.3); K.antenna(P, 'turret', -0.9, d.turretH * 0.8, bz - 1.0); K.antenna(P, 'turret', 0.95, d.turretH * 0.8, bz - 1.05, 1.6);
   P.add('gun', 'paint', box(0.72, 0.52, 0.28, 0, 0, 0.02)); P.add('gun', 'canvas', cylZ(0.24, 0.4, 14, 0, 0, 0.35, 0.16));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.12, r1: 0.074, evac: { z: 2.9, r: 0.14, len: 0.75 } });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.074, evac: { z: 2.9, r: 0.14, len: 0.75 } });
   return { P, ...g, wheelType: 'disc', cast: 0.4, castTurret: 0.9, turretPos: [0, H - 0.2, d.turretZ], gunPos: [0, 0.4, bz + 1.45], decals: decalsSide('text', '31', 'turret', tw * 0.92 + 0.19, 0.42, bz - 0.3, 0.42) };
 }
 
@@ -227,7 +227,7 @@ function leo1(d) {
   for (let i = 0; i < 5; i++) P.add('turret', 'metal', box(0.02, 0.35, 0.02, -0.9 + i * 0.45, d.turretH * 0.6, bz - tl - 0.35)); P.add('turret', 'metal', box(1.9, 0.03, 0.4, 0, 0.12, bz - tl - 0.18)); P.add('turret', 'canvas', box(1.5, 0.3, 0.3, 0, 0.3, bz - tl - 0.18));
   K.antenna(P, 'turret', -1.0, d.turretH, bz - 1.2); K.antenna(P, 'turret', 1.0, d.turretH, bz - 1.25, 1.6);
   P.add('gun', 'paint', box(0.55, 0.5, 0.45, 0, 0, 0.0)); P.add('gun', 'rubber', cylZ(0.2, 0.25, 12, 0, 0, 0.3));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.12, r1: 0.072, evac: { z: 2.3, r: 0.13, len: 0.7 }, sleeve: 5 });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.072, evac: { z: 2.3, r: 0.13, len: 0.7 }, sleeve: 5 });
   return { P, ...g, wheelType: 'modern', cast: 0.25, castTurret: 0.2, turretPos: [0, H, d.turretZ], gunPos: [0, 0.4, bz + tl - 0.1], decals: [...decalsSide('cross', '', 'turret', tw * 0.95 + 0.06, 0.42, bz - 0.95, 0.4), ...decalsSide('cross', '', 'hull', d.W / 2 + 0.05, fy - 0.2, 1.8, 0.3)] };
 }
 
@@ -264,7 +264,7 @@ function leo2a6(d) {
   K.antenna(P, 'turret', -1.4, th, bz - 1.75, 2.4); K.antenna(P, 'turret', 1.4, th, bz - 1.75, 1.8);
   K.liftHooks(P, 'turret', [[-1.3, th, bz + 0.3], [1.3, th, bz + 0.3]]);
   P.add('gun', 'paint', box(0.55, 0.62, 0.6, 0, 0, -0.05)); P.add('gun', 'dark', box(0.42, 0.5, 0.05, 0, 0, 0.26));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.13, r1: 0.076, evac: { z: 2.5, r: 0.145, len: 0.85 }, sleeve: 6, mrs: true });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.13, r1: 0.076, evac: { z: 2.5, r: 0.145, len: 0.85 }, sleeve: 6, mrs: true });
   return { P, ...g, wheelType: 'modern', cast: 0.15, castTurret: 0.15, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, bz + tl - 0.55], decals: [...decalsSide('cross', '', 'turret', tw + 0.24, 0.45, bz - 0.4, 0.35)] };
 }
 
@@ -306,7 +306,7 @@ function t90m(d) {
   P.add('turret', 'paint', cylY(0.33, 0.12, 16, 0.5, th + 0.06, bz - 0.85)); P.add('turret', 'paint', box(0.3, 0.3, 0.45, 0.5, th + 0.35, bz - 0.85)); K.mg(P, 'turret', 0.5, th + 0.45, bz - 0.7, 0, 'dshk'); // Kord RWS
   K.hatch(P, 'turret', -0.5, th, bz - 0.7, 0.28); K.antenna(P, 'turret', -1.1, th, bz - 1.2, 2.2);
   P.add('gun', 'paint', box(0.62, 0.5, 0.3, 0, 0, 0)); P.add('gun', 'rubber', cylZ(0.2, 0.3, 12, 0, 0, 0.28));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.135, r1: 0.085, evac: { z: 3.6, r: 0.14, len: 0.5 }, sleeve: 5 });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.135, r1: 0.085, evac: { z: 3.6, r: 0.14, len: 0.5 }, sleeve: 5 });
   return { P, ...g, wheelType: 'disc', cast: 0.2, castTurret: 0.25, turretPos: [0, H, d.turretZ], gunPos: [0, 0.34, bz + tl - 0.25], decals: decalsSide('text', '102', 'turret', tw - 0.2 + 0.04, th * 0.42, bz - tl + 0.4, 0.45).map((x) => ({ ...x, pos: [x.pos[0] > 0 ? 1.14 : -1.14, x.pos[1], x.pos[2]] })) };
 }
 
@@ -339,7 +339,7 @@ function chally2(d) {
   K.cupola(P, 'turret', 0.65, th, bz - 0.75, 0.36, 0.2, 8, 'modern'); K.hatch(P, 'turret', -0.7, th, bz - 0.6, 0.3); K.mg(P, 'turret', -0.7, th + 0.32, bz - 0.3, 0, 'mag');
   K.antenna(P, 'turret', -1.5, th, bz - 1.9, 2.4); K.antenna(P, 'turret', 1.5, th, bz - 1.9, 2.0);
   P.add('gun', 'paint', box(0.6, 0.55, 0.35, 0, 0, 0)); P.add('gun', 'canvas', cylZ(0.24, 0.35, 12, 0, 0, 0.32, 0.17));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.13, r1: 0.085, evac: { z: 2.7, r: 0.15, len: 1.0 }, sleeve: 6, mrs: true });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.13, r1: 0.085, evac: { z: 2.7, r: 0.15, len: 1.0 }, sleeve: 6, mrs: true });
   return { P, ...g, wheelType: 'modern', cast: 0.15, castTurret: 0.1, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, bz + tl - 0.1], decals: decalsSide('text', '11B', 'turret', tw * 0.95 + 0.3, th * 0.5, bz - 0.8, 0.38) };
 }
 
@@ -375,7 +375,7 @@ function type99a(d) {
   for (let i = 0; i < 4; i++) P.add('turret', 'metal', box(0.02, 0.35, 0.02, -1.2 + i * 0.8, th * 0.55, bz - tl - 0.35)); P.add('turret', 'metal', box(2.5, 0.03, 0.4, 0, 0.12, bz - tl - 0.18));
   K.antenna(P, 'turret', -1.3, th, bz - 1.5, 2.3);
   P.add('gun', 'paint', box(0.55, 0.5, 0.35, 0, 0, 0)); P.add('gun', 'rubber', cylZ(0.2, 0.3, 12, 0, 0, 0.3));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.135, r1: 0.085, evac: { z: 3.2, r: 0.145, len: 0.65 }, sleeve: 5 });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.135, r1: 0.085, evac: { z: 3.2, r: 0.145, len: 0.65 }, sleeve: 5 });
   return { P, ...g, wheelType: 'disc', cast: 0.2, castTurret: 0.15, turretPos: [0, H, d.turretZ], gunPos: [0, 0.36, bz + tl - 0.35], decals: decalsSide('redstar', '', 'turret', tw * 0.94 + 0.04, th * 0.45, bz - 0.6, 0.45) };
 }
 
@@ -415,7 +415,7 @@ function merkava4(d) {
   K.hatch(P, 'turret', -0.6, th, bz - 1.25, 0.3); K.mg(P, 'turret', -0.6, th + 0.3, bz - 1.0, 0, 'mag');
   K.antenna(P, 'turret', -1.3, th, bz - 2.0, 2.5); K.antenna(P, 'turret', 1.3, th, bz - 2.0, 2.0);
   P.add('gun', 'paint', box(0.5, 0.45, 0.6, 0, 0, 0)); P.add('gun', 'canvas', cylZ(0.22, 0.4, 12, 0, 0, 0.45, 0.16));
-  K.barrel(P, 'gun', d.gunLen, { r0: 0.13, r1: 0.085, evac: { z: 2.8, r: 0.15, len: 0.9 }, sleeve: 6, mrs: true });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.13, r1: 0.085, evac: { z: 2.8, r: 0.15, len: 0.9 }, sleeve: 6, mrs: true });
   return { P, ...g, wheelType: 'disc', cast: 0.15, castTurret: 0.1, turretPos: [0, H, d.turretZ], gunPos: [0, 0.38, bz + tl - 1.0], decals: decalsSide('text', '3', 'turret', tw * 0.88 + 0.05, th * 0.4, bz - 1.2, 0.45) };
 }
 
