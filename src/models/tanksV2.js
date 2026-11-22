@@ -119,14 +119,14 @@ function is2CastLoft(poly, h, cz = 0, y0 = 0) {
   const n = p.length, positions = [], uv = [], idx = [];
   // [height, left-side scale, right-side scale, front scale, rear-bustle scale]
   const rings = [
-    [0.00, 0.92, 0.92, 0.95, 0.96],
-    [0.07, 0.98, 0.97, 0.99, 0.99],
+    [0.00, 0.92, 0.92, 0.94, 0.96],
+    [0.07, 0.98, 0.97, 0.98, 0.99],
     [0.22, 1.00, 1.00, 1.00, 1.00],
-    [0.46, 1.00, 0.95, 1.00, 1.01],
-    [0.70, 0.99, 0.84, 0.99, 1.03],
-    [0.88, 0.98, 0.78, 0.98, 1.04],
-    [0.97, 0.97, 0.75, 0.97, 1.04],
-    [1.00, 0.96, 0.74, 0.96, 1.04],
+    [0.46, 1.00, 0.95, 0.96, 1.01],
+    [0.70, 0.99, 0.84, 0.89, 1.03],
+    [0.88, 0.98, 0.78, 0.83, 1.04],
+    [0.97, 0.97, 0.75, 0.81, 1.04],
+    [1.00, 0.96, 0.74, 0.80, 1.04],
   ];
   for (const [v, left, right, front, rear] of rings) {
     for (const [x, z] of p) {
@@ -186,19 +186,19 @@ function is2Cupola(P, x, y, z) {
 function is2Mantlet(P) {
   // Broad, low, rounded D-25T cast shield. It is a shaped plate, not a ball.
   const sh = new THREE.Shape();
-  sh.moveTo(-0.58, -0.18);
-  sh.bezierCurveTo(-0.64, -0.04, -0.61, 0.16, -0.48, 0.23);
-  sh.bezierCurveTo(-0.27, 0.34, 0.27, 0.34, 0.48, 0.23);
-  sh.bezierCurveTo(0.61, 0.16, 0.64, -0.04, 0.58, -0.18);
-  sh.bezierCurveTo(0.34, -0.29, -0.34, -0.29, -0.58, -0.18);
+  sh.moveTo(-0.70, -0.19);
+  sh.bezierCurveTo(-0.79, -0.03, -0.75, 0.19, -0.58, 0.28);
+  sh.bezierCurveTo(-0.34, 0.40, 0.34, 0.40, 0.58, 0.28);
+  sh.bezierCurveTo(0.75, 0.19, 0.79, -0.03, 0.70, -0.19);
+  sh.bezierCurveTo(0.42, -0.33, -0.42, -0.33, -0.70, -0.19);
   const shield = new THREE.ExtrudeGeometry(sh, {
-    depth: 0.17, bevelEnabled: true, bevelSegments: 4,
-    steps: 1, bevelSize: 0.045, bevelThickness: 0.055, curveSegments: 12,
+    depth: 0.21, bevelEnabled: true, bevelSegments: 5,
+    steps: 1, bevelSize: 0.060, bevelThickness: 0.065, curveSegments: 16,
   });
-  P.add('gun', 'paint', T(shield, 0, 0, -0.055));
+  P.add('gun', 'paint', T(shield, 0, 0, -0.065));
   // Raised circular collar around the gun opening; the barrel runs through it.
-  P.add('gun', 'paint', T(new THREE.TorusGeometry(0.17, 0.028, 10, 36), 0, 0, 0.17));
-  P.add('gun', 'dark', cylZ(0.125, 0.018, 32, 0, 0, 0.145));
+  P.add('gun', 'paint', T(new THREE.TorusGeometry(0.19, 0.035, 10, 40), 0, 0, 0.19));
+  P.add('gun', 'dark', cylZ(0.145, 0.018, 32, 0, 0, 0.165));
   // Coaxial DT aperture and the offset telescopic-sight aperture.
   P.add('gun', 'paint', T(new THREE.TorusGeometry(0.052, 0.012, 6, 20), -0.43, 0.075, 0.16));
   P.add('gun', 'dark', cylZ(0.039, 0.02, 16, -0.43, 0.075, 0.16));
@@ -274,11 +274,14 @@ function is2(d) {
   // Asymmetric late-production cast turret: the left wall remains steep while
   // the right wall draws inward toward the roof; the rear bustle is fuller.
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0, th = d.turretH;
-  const poly = superEllipse(tw, tl * 0.88, tl * 1.04, 2.45, 64, (x, z) => {
-    const side = x < 0 ? 1.0 : 0.91;
-    const front = z > 0 ? 1 - 0.06 * (z / tl) : 1;
-    const rear = z < 0 ? 1.02 : 1;
-    return [x * side * front, z * rear];
+  const poly = superEllipse(tw, tl * 0.86, tl * 1.08, 3.10, 64, (x, z) => {
+    // Broad, slightly flattened front face; rounded rear bustle. The left
+    // side is fuller, while the right flank is narrower and more inclined.
+    const side = x < 0 ? 1.0 : 0.94;
+    const front = z > 0 ? 0.97 : 1;
+    const rear = z < 0 ? 1.035 : 1;
+    const flatFrontZ = z > 0.72 ? 0.72 + (z - 0.72) * 0.78 : z;
+    return [x * side * front, flatFrontZ * rear];
   }).map(([x, z]) => [x, z + bz]);
   P.add('turret', 'paint', is2CastLoft(poly, th * 0.96, bz));
 
@@ -297,7 +300,7 @@ function is2(d) {
 
   // D-25T 122 mm gun, shaped cast mantlet and double-baffle muzzle brake.
   is2Mantlet(P);
-  K.barrel(P, 'barrel', d.gunLen, { r0: 0.145, r1: 0.085, brake: { type: 'double', r: 0.155, len: 0.55 } });
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.15, r1: 0.09, brake: { type: 'double', r: 0.17, len: 0.60 } });
 
   return {
     P, ...g, wheelType: 'disc', cast: 0.45, castTurret: 0.95,
