@@ -102,7 +102,7 @@ export class Game {
     });
     on(window, 'keyup', (e) => { this.keys[e.code] = false; if (e.code === 'Tab') this.hud.scoreboard(false); });
     on(c, 'mousedown', (e) => {
-      if (this.touch && e.sourceCapabilities?.firesTouchEvents) return;
+      if (this.touch) return;
       this.audio.init(); this.audio.resume();
       if (this.paused || this.ended) return;
       if (document.pointerLockElement !== c) { c.requestPointerLock?.(); }
