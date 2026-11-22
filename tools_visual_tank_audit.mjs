@@ -17,7 +17,7 @@ try {
  page.on('console',m=>{if(m.type()==='error')process.stdout.write('BROWSER_ERROR='+m.text()+'\\n');});
  await page.goto('http://127.0.0.1:5173/');
  const result=await page.evaluate(async()=>{
-  const THREE=await import('three');
+  const THREE=await import('/node_modules/three/build/three.module.js');
   const {TANKS}=await import('/src/game/tankData.js');
   const {createTankModel}=await import('/src/models/tankModel.js');
   const colors={paint:0x77805c,metal:0x55534b,rubber:0x242424,dark:0x141719,glass:0x435b65,wood:0x71583b,canvas:0x8b8068,burnt:0x211c18,bore:0x050607,steel:0x77736b,tail:0x8d1d15,amber:0x9c6c19,track:0x45433e};
