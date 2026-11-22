@@ -1,5 +1,5 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/balanceEditor-eHRgzAXD.js","assets/tankData-rKozZKxd.js","assets/balanceEditor-C2nEW3Yd.css"])))=>i.map(i=>d[i]);
-var gd=Object.defineProperty;var vd=(s,t,e)=>t in s?gd(s,t,{enumerable:!0,configurable:!0,writable:!0,value:e}):s[t]=e;var na=(s,t,e)=>vd(s,typeof t!="symbol"?t+"":t,e);import{_ as Wh}from"./game-BtVzb-zx.js";import{b as Mi,g as Un,h as xd,T as br,i as Ba,j as Gs,k as Md,z as Vh,p as yd,l as Sd,n as wd}from"./tankData-rKozZKxd.js";import"./modulepreload-polyfill-B5Qt9EMX.js";/**
+var gd=Object.defineProperty;var vd=(s,t,e)=>t in s?gd(s,t,{enumerable:!0,configurable:!0,writable:!0,value:e}):s[t]=e;var na=(s,t,e)=>vd(s,typeof t!="symbol"?t+"":t,e);import{_ as Wh}from"./game-CDv2tCQc.js";import{b as Mi,g as Un,h as xd,T as br,i as Ba,j as Gs,k as Md,z as Vh,p as yd,l as Sd,n as wd}from"./tankData-rKozZKxd.js";import"./modulepreload-polyfill-B5Qt9EMX.js";/**
  * @license
  * Copyright 2010-2024 Three.js Authors
  * SPDX-License-Identifier: MIT
