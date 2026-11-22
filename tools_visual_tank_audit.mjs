@@ -50,7 +50,8 @@ try {
    const span=largest*1.38;
    const camera=new THREE.OrthographicCamera(-span*aspect/2,span*aspect/2,span/2,-span/2,0.1,100);
    const c=entry.center;
-   const v=view==='side'?[12,4,0.4]:view==='front'?[0,4,13]:[9,6,11];
+   const v=view==='side'?[12,4,0.4]:view==='opposite'?[-12,4,0.4]:view==='front'?[0,4,13]:view==='rear'?[0,4,-13]:view==='top'?[0,16,0.01]:[9,6,11];
+   if(view==='top')camera.up.set(0,0,-1);
    camera.position.set(c.x+v[0],c.y+v[1],c.z+v[2]);camera.lookAt(c.x,c.y+0.08,c.z);camera.updateProjectionMatrix();
    renderer.setSize(width,height,false);renderer.setViewport(0,0,width,height);renderer.setScissor(0,0,width,height);renderer.setScissorTest(true);renderer.clear(true,true,true);renderer.render(scene,camera);
    scene.remove(entry.model.root);
@@ -63,9 +64,9 @@ try {
    g.drawImage(draw(models[i],cellW,cellH-30,'three'),x,y);
    g.fillStyle='#e7edf4';g.font='bold 17px system-ui';g.fillText(models[i].spec.short,x+10,y+cellH-9);
   }
-  const is2=models.find(x=>x.spec.id==='is2'),views=['three','side','front'],tileW=720,tileH=540,detail=document.createElement('canvas');detail.width=tileW*3;detail.height=tileH+32;
+  const is2=models.find(x=>x.spec.id==='is2'),views=['three','side','opposite','front','rear','top'],labels=['FRONT 3/4','RIGHT SIDE','LEFT SIDE','FRONT','REAR','TOP'],tileW=640,tileH=480,detail=document.createElement('canvas');detail.width=tileW*views.length;detail.height=tileH+32;
   const dctx=detail.getContext('2d');dctx.fillStyle='#111820';dctx.fillRect(0,0,detail.width,detail.height);
-  for(let i=0;i<views.length;i++){dctx.drawImage(draw(is2,tileW,tileH,views[i]),i*tileW,0);dctx.fillStyle='#e7edf4';dctx.font='bold 16px system-ui';dctx.fillText(['FRONT 3/4','SIDE','FRONT'][i],i*tileW+10,tileH+23);}
+  for(let i=0;i<views.length;i++){dctx.drawImage(draw(is2,tileW,tileH,views[i]),i*tileW,0);dctx.fillStyle='#e7edf4';dctx.font='bold 16px system-ui';dctx.fillText(labels[i],i*tileW+10,tileH+23);}
   renderer.dispose();
   return {report,grid:grid.toDataURL('image/jpeg',0.66).split(',')[1],is2:detail.toDataURL('image/jpeg',0.7).split(',')[1]};
  });
