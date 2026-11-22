@@ -94,3 +94,15 @@ html.mobile-device .menu .mapgrid{grid-template-columns:1fr}
 @media(orientation:landscape) and (min-width:640px){html.mobile-device .menu>*{grid-column:auto;grid-row:auto}html.mobile-device .menu>.brand,html.mobile-device .menu>.mobile-garage-hint,html.mobile-device .menu>.stats{grid-column:1/-1}}
 html.mobile-device .menu[style*="display: none"]{display:none!important}
 html.mobile-device .touch-controls{display:block}
+
+/* Always-visible deploy action. Outside normal scrolling flow, above content, below dialogs. */
+.mobile-deploy{display:none}
+html.mobile-device .menu{padding-bottom:calc(90px + env(safe-area-inset-bottom,0px))!important}
+html.mobile-device .menu>.mobile-deploy{display:block!important;position:fixed!important;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom,0px));width:auto!important;z-index:65;min-height:54px;padding:12px;border:1px solid #efcb73;border-radius:10px;background:linear-gradient(#f6d77b,#bf8a2a);box-shadow:0 3px 18px #000a;color:#18130b;font-size:20px;font-weight:800;pointer-events:auto;touch-action:manipulation}
+html.mobile-device .menu:has(.overlay[style*="display: flex"])>.mobile-deploy{visibility:hidden}
+html.mobile-device .menu #m-maps{align-items:center;justify-content:center}
+html.mobile-device .menu #m-maps .mapbox{display:flex;flex-direction:column;width:min(100%,700px);max-height:calc(100dvh - 24px);overflow:hidden;min-height:0}
+html.mobile-device .menu #m-maps .mapgrid{overflow:auto;min-height:0;flex:1}
+html.mobile-device .menu #m-maps .mapacts{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;flex-shrink:0;padding-top:8px;background:#15191d}
+html.mobile-device .menu #m-maps .mapacts button{flex:1;min-height:44px;white-space:normal}
+html.mobile-device .menu #m-maps #m-map-go{background:#e6bb53;color:#151009;font-weight:800}
