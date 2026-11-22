@@ -1,5 +1,4 @@
 // Shared, pure combat math. Angles are radians unless explicitly labelled.
-export const MIN_DISPERSION_100M = 1.2; // radius in metres, minimum stock and custom balance
 export const MIN_BLOOM = 1;
 export const MAX_BLOOM = 4.5;
 export const BASE_FOV = 60;
@@ -14,7 +13,9 @@ export function zoomFov(zoom, baseFov = BASE_FOV) {
   return 2 * Math.atan(Math.tan(baseFov * DEG / 2) / zoom) / DEG;
 }
 export function dispersionPixels(cone, travel, viewDepth, projectionY, viewportHeight) {
-  return Math.tan(cone) * Math.max(0,travel) * projectionY * viewportHeight / (2*Math.max(0.01,viewDepth));
+  // Near parallax can put the impact closer to the camera than the distance
+  // travelled by the shell. Cap the indicator at the cone's angular size.
+  return Math.tan(cone) * Math.max(0,travel) * projectionY * viewportHeight / (2*Math.max(0.01,travel,viewDepth));
 }
 // Geometric line-of-sight thickness, with no shell-dependent angular normalization.
 export function incidence(cosine, nominal) {

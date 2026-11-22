@@ -301,7 +301,7 @@ export class Game {
   updateReticle() {
     // simulate actual gun trajectory to find where the shell would land
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
-    const m = p.model; const pos = m.muzzle.getWorldPosition(new THREE.Vector3()); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
+    const m = p.model; const pos = p.shotOrigin(m.muzzle.getWorldPosition(new THREE.Vector3())); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
     const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity).add(p.vel); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
     let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02;
     for (let i = 0; i < 200 && !hitP; i++) {

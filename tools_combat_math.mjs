@@ -19,6 +19,8 @@ near(x,1);
 const px=(z)=>dispersionPixels(0.004,300,300,1/Math.tan(zoomFov(z)*Math.PI/360),1080);
 for(const z of [2,4,8,16])near(px(z)/px(1),z);
 assert.ok(px(16)>px(8));
+near(dispersionPixels(0.004,5,0.4,2,1080),dispersionPixels(0.004,5,5,2,1080));
+near(dispersionPixels(0,5,0.4,2,1080),0);
 assert.ok(impactDrop(300**2,0,800)>0);
 near(impactDrop(0,0,800),0);
 console.log('Combat math checks passed: incidence, bloom rate and limits, optical magnification and projectile drop.');

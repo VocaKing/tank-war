@@ -5,7 +5,7 @@ import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
-import { advanceBloom, incidence, MAX_BLOOM, MIN_DISPERSION_100M } from './combatMath.js';
+import { advanceBloom, incidence, MAX_BLOOM } from './combatMath.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
@@ -51,7 +51,7 @@ export class Tank {
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
   // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
-  baseDispersion() { let d = Math.atan(Math.max(MIN_DISPERSION_100M,this.spec.dispersion) / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
+  baseDispersion() { let d = Math.atan(this.spec.dispersion / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
   // current dispersion-circle radius (radians); every shell lands inside this cone
   dispersion() { return this.baseDispersion() * this.bloom; }
   placeAt(x, z, heading) {
@@ -110,11 +110,27 @@ export class Tank {
     this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
   }
   updateTurret(dt) {
-    const s = this.spec; const aim = this.input.aim; const gunW = this.model.gun.getWorldPosition(_v);
-    const dx = aim.x - gunW.x, dy = aim.y - gunW.y, dz = aim.z - gunW.z; const R = Math.hypot(dx, dz);
-    if (!Number.isFinite(dx + dy + dz)) return; // ignore an invalid aim point instead of poisoning the turret state
-    const th = ballisticAngle(this.shell.velocity, R, dy);
-    _v2.set((dx / (R || 1)) * Math.cos(th), Math.sin(th), (dz / (R || 1)) * Math.cos(th));
+    const s = this.spec, m = this.model;
+    const aim = _v.copy(this.input.aim).applyMatrix4(this.inv).sub(m.turret.position);
+    if (!Number.isFinite(aim.x + aim.y + aim.z)) return;
+    // Solve around the turret axis. The trunnion moves as the turret turns,
+    // so aiming from its current position can oscillate at point-blank range.
+    const range = Math.hypot(aim.x, aim.z);
+    const mount = m.gun.position;
+    const yaw = range > 1e-4
+      ? Math.atan2(aim.x, aim.z) - Math.asin(clamp(mount.x / range, -1, 1))
+      : this.turretYaw;
+    const sin = Math.sin(yaw), cos = Math.cos(yaw);
+    const rise = aim.y - mount.y;
+    const forward = aim.x * sin + aim.z * cos - mount.z;
+    // Converge upwards no closer than the muzzle. Nearby surfaces above the
+    // gun pivot would otherwise demand steep angles for tiny height changes.
+    const aimRange = Math.max(forward, rise > 0 ? m.muzzle.position.z : 0.01);
+    _v2.set(sin * aimRange, rise, cos * aimRange).applyQuaternion(this.quat);
+    const { x: dx, y: dy, z: dz } = _v2;
+    const horizontal = Math.hypot(dx, dz);
+    const th = ballisticAngle(this.shell.velocity, horizontal, dy);
+    _v2.set(dx / (horizontal || 1) * Math.cos(th), Math.sin(th), dz / (horizontal || 1) * Math.cos(th));
     _q.copy(this.quat).invert(); _v2.applyQuaternion(_q);
     const yawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
     const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
@@ -148,6 +164,22 @@ export class Tank {
     m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
+  shotOrigin(muzzle) {
+    const pivot = this.model.gun.getWorldPosition(new THREE.Vector3());
+    const reach = pivot.distanceTo(muzzle);
+    let first = 1;
+    for (const t of this.game.tanks) {
+      if (t === this) continue;
+      const d = t.spec.dims;
+      const radius = reach + Math.hypot(d.W / 2, d.hullH + d.turretH, d.L / 2);
+      if (t.pos.distanceToSquared(pivot) > radius * radius) continue;
+      const hit = t.rayTest(pivot, muzzle);
+      if (hit) first = Math.min(first, hit.t);
+    }
+    // The visual barrel can overlap an adjacent vehicle. Launch just before
+    // its first plate so the normal hit test sees the entry surface.
+    return first < 1 ? pivot.lerp(muzzle, Math.max(0, first - 0.05 / reach)) : muzzle;
+  }
   tryFire(time) {
     if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
     const g = this.game; const sh = this.shell; const m = this.model;
@@ -166,13 +198,14 @@ export class Tank {
       const mult = this.abilities.consumeOverpen();
       fireShell = { ...sh, pen: Math.round(sh.pen * mult) };
     }
-    g.ballistics.spawn(this, fireShell, muzzle, vel);
+    const origin = this.shotOrigin(muzzle);
+    g.ballistics.spawn(this, fireShell, origin, vel);
     this.ammo[this.shellIdx]--; this.reloadLeft = this.reloadTime(); this.lastFired = time; this.stats.shots++;
     if (this.abilities) this.abilities.onFire();
     // Firing retains visual recoil, but does not inject a jump into the linear dispersion curve.
     this.recoil = 1;
     this.rockV -= (sh.caliber / 100) * 1.4 * (40 / this.spec.mass) * Math.cos(this.turretYaw);
-    g.effects.muzzle(muzzle, dir, sh.caliber); g.audio.gun(muzzle, sh.caliber, this.isPlayer);
+    g.effects.muzzle(origin, dir, sh.caliber); g.audio.gun(origin, sh.caliber, this.isPlayer);
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
     return true;
   }
