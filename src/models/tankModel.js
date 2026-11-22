@@ -356,7 +356,7 @@ function buildT72(d) {
   return {
     P, wheels: [-2.55, -1.62, -0.69, 0.24, 1.17, 2.1].map((z) => ({ z, y: 0.4, r: 0.375, w: 0.46 })),
     sprockets: [{ z: -3.15, y: 0.62, r: 0.33 }], idlers: [{ z: 2.95, y: 0.56, r: 0.31 }], rollers: [-1.6, 0.0, 1.5].map((z) => ({ z, y: 0.98, r: 0.075 })),
-    turretPos: [0, 1.5, d.turretZ], gunPos: [0, 0.34, 1.05],
+    turretPos: [0, 1.5, d.turretZ], gunPos: [0, 0.34, 1.05], gunMountZ: 1.05,
     decals: [{ kind: 'text', text: '214', part: 'turret', pos: [-0.85, 0.42, -0.6], ry: -Math.PI / 2 - 0.5, s: 0.5 }, { kind: 'text', text: '214', part: 'turret', pos: [0.85, 0.42, -0.6], ry: Math.PI / 2 + 0.5, s: 0.5 }],
   };
 }
