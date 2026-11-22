@@ -59,3 +59,25 @@ The first Blender build has now run successfully in a headless Blender 4.0.2 Git
 - Five review renders: front three-quarter, left side, front, rear and top.
 
 The generated GLB is committed back to this feature branch by the build workflow; the editable .blend and review renders remain available as the Actions artifact. The model is still a first Level-2 asset pass, not yet accepted for production or switched into the live game. The existing Three.js model remains the game fallback until the Blender asset passes visual, hierarchy, scale and runtime integration checks.
+
+## Windows 11 local build (RTX 5060 Ti)
+
+This is the **manual, user-controlled** route. It does **not** expose the user's PC as a public GitHub Actions runner, open any ports, or grant ChatGPT unattended access.
+
+1. Install Blender on Windows from https://www.blender.org/download/ (4.5 LTS is the conservative compatibility choice; the pipeline is CI-tested with 4.0.2, not yet tested on every newer version).
+2. Open https://github.com/VocaKing/tank-war/tree/blender/is2-model1944-level2 , use **Code → Download ZIP**, then extract it.
+3. Double-click `tools/blender/build-is2-windows.cmd`.
+4. The launcher finds Blender under `C:\Program Files\Blender Foundation\`, generates the GLB/.blend and a single 720×540 front three-quarter preview.
+5. For all five high-resolution renders, open Command Prompt in the `tools/blender` folder and run `build-is2-windows.cmd -Full`.
+6. Outputs remain in the extracted folder:
+   - `public/models/is2_model1944_blockout.glb`
+   - `artifacts/is2-model1944/is2_model1944_first_pass.blend`
+   - `artifacts/is2-model1944/*.png`
+
+If Blender lives in a nonstandard folder, specify an environment variable `BLENDER_EXE` pointing to `blender.exe` before starting the launcher. The script makes no automated uploads. To let the modeler review the local render, explicitly upload the preview here or attach it to GitHub. For safety, **do not register a personal Windows PC as a self-hosted runner on this public repository**.
+
+### GPU and performance
+
+The preview uses EEVEE on a local computer, which normally uses GPU graphics acceleration. OptiX is a separate Cycles rendering backend; this project does not automatically enable or require Cycles/OptiX. Initial builds also perform geometry generation and scene export on CPU.
+
+The first GPU build should be timed before claiming a particular speedup.
