@@ -31,6 +31,7 @@ try {
   const muzzleWorldZ=pivotWorldZ+t72.barrel.position.z+t72.muzzle.position.z;
   return {out,t72:{pivotZ:t72.gun.position.z,clearancePivot:t72.gunClearance.pivot,front:t72.gunClearance.front,muzzleZ:muzzleWorldZ,pivotWorldZ}};
  });
+ console.log('MUZZLE_RESULTS',JSON.stringify(result,null,2));
  assert.equal(result.out.length,15);
  for(const x of result.out){
   assert.ok(x.removed>0, x.id+' has no open muzzle face');
