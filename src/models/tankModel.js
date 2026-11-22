@@ -95,6 +95,7 @@ export function burntMaterial() { return sharedMats().burnt; }
 function wheelGeometry(paintHex, type = 'disc', id = '') {
   const col = new THREE.Color(paintHex); const rub = new THREE.Color(0x181817); const hub = new THREE.Color(paintHex).multiplyScalar(0.72); const dark = new THREE.Color(0x0e0e0e); const metal = new THREE.Color(0x4a4843);
   const parts = [];
+  const tyre = type === 'steel' ? metal : rub;
   const paintC = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   // Single-disc road wheels for interleaved German running gear. Unlike the
   // paired road-wheel units used by Soviet and many post-war tanks, Tiger I
@@ -114,7 +115,6 @@ function wheelGeometry(paintHex, type = 'disc', id = '') {
   }
   const lx = (pts, seg = 24) => { const g = new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg); g.rotateZ(-Math.PI / 2); return g; }; // axis -> +x
   const s = 1; const m = (pts) => pts;
-  const tyre = type === 'steel' ? metal : rub;
   paintC(lx(m([[0.86, 0.06], [0.97, 0.07], [1.0, 0.12], [1.0, 0.42], [0.97, 0.47], [0.86, 0.48]])), tyre);
   // Distinct raised rims and inset web. Spoked wheels use an open annular web.
   paintC(lx([[0.86,0.48],[0.82,0.50],[0.76,0.50],[0.73,0.44],[0.70,0.43]]),col);
