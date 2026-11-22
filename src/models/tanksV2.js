@@ -123,7 +123,7 @@ function is2(d) {
   // Driver's narrow vision slit and fixed bow DT machine-gun mount on the glacis.
   P.add('hull', 'paint', box(0.29, 0.105, 0.045, -0.52, 1.34, hl - 0.29, -60 * DEG));
   P.add('hull', 'dark', box(0.20, 0.035, 0.018, -0.52, 1.35, hl - 0.265, -60 * DEG));
-  P.add('hull', 'paint', T(new THREE.SphereGeometry(0.12, 16, 10), 0.55, 1.30, hl - 0.30, 0, 0, 1, 1, 0.72));
+  P.add('hull', 'paint', T(new THREE.SphereGeometry(0.12, 16, 10), 0.55, 1.30, hl - 0.30, 0, 0, 0, 1, 1, 0.72));
   P.add('hull', 'dark', cylZ(0.022, 0.32, 8, 0.55, 1.31, hl - 0.16, 0.022, -60 * DEG));
   K.headlight(P, 'hull', -1.18, fy + 0.16, hl - 0.28, true);
   for (const side of [-1, 1]) {
