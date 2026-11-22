@@ -74,7 +74,8 @@ try {
  writeFileSync(join(outDir,'tank-lineup.jpg'),Buffer.from(result.grid,'base64'));
  writeFileSync(join(outDir,'is2-views.jpg'),Buffer.from(result.is2,'base64'));
  writeFileSync(join(outDir,'tank-audit.json'),JSON.stringify(result.report,null,2));
- const expectedOverall={sherman:7.57,tiger:8.45,t34:8.15,t72:9.53,m1a2:9.77,panther:8.86,is2:9.83,pershing:8.647,centurion:9.83,leo1:9.54,leo2a6:10.97,t90m:9.83,chally2:11.50,type99a:10.92,merkava4:9.04};
+ // T-72B and T-90M envelope lengths include the fitted rear auxiliary fuel drums; the published base lengths exclude them.
+ const expectedOverall={sherman:7.57,tiger:8.45,t34:8.15,t72:9.91,m1a2:9.83,panther:8.86,is2:9.83,pershing:8.647,centurion:9.83,leo1:9.54,leo2a6:10.97,t90m:10.25,chally2:11.55,type99a:10.92,merkava4:9.04};
  for(const tank of result.report){
   assert.ok(tank.muzzle&&tank.muzzle.bore>0, tank.id+' has no open muzzle bore');
   assert.ok(Number.isFinite(tank.gunClearance.front)&&(tank.gunMountNoCollar||tank.gunClearance.pivot>=tank.gunClearance.front+0.1-1e-3),tank.id+' gun pivot intersects the turret face without a cut-out mount');
