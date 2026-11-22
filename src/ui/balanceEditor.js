@@ -25,9 +25,12 @@ function render(){
  const t=draft.find(x=>x.id===selected),stock=STOCK_TANKS.find(x=>x.id===selected),published=PUBLISHED_TANKS.find(x=>x.id===selected);
  const title=make('div','section-title');title.append(make('h2','',t.name));const reset=make('button','','恢复本车发布值');reset.onclick=()=>{if(!confirm('恢复 '+t.short+' 的发布版数值？'))return;draft[draft.indexOf(t)]=clone(published);changed();render()};title.append(reset);main.append(title);
  const stats=make('div','stats');const metrics=()=>{stats.replaceChildren();for(const [name,value] of [['功重比',(t.power/t.mass).toFixed(1)+' hp/t'],['标准弹 DPM',Math.round(t.shells[0].damage*60/t.reload)],['总弹药',t.shells.reduce((a,s)=>a+s.count,0)+' 发']]){const card=make('div','stat');card.append(make('small','',name),make('strong','',String(value)));stats.append(card);}};metrics();main.append(stats);
- let group='',grid;
+ let group='',section,grid;
  for(const f of fields(stock)){
-  if(group!==f.group){group=f.group;main.append(make('h3','',group));grid=make('div','fields');main.append(grid);}
+  if(group!==f.group){
+   group=f.group;section=make('section','field-group');
+   section.append(make('h3','',group));grid=make('div','fields');section.append(grid);main.append(section);
+  }
   const cell=make('label','field'),caption=make('span','field-label',f.label+' · '+f.unit),input=make('input','number');input.type='number';input.min=f.min;input.max=f.max;input.step=f.step;input.value=read(t,f.path);input.setAttribute('aria-label',f.label+' '+f.unit);
   const base=read(published,f.path),note=make('small','muted','发布值 '+base);const flag=()=>{cell.classList.toggle('modified',Number(input.value)!==base);};flag();
   input.addEventListener('input',()=>{const v=input.value.trim()===''?NaN:Number(input.value);set(t,f.path,v);changed();flag();metrics();});

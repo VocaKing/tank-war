@@ -15,14 +15,20 @@ const core=[
 const faces={front:'正面',side:'侧面',rear:'后面',top:'顶部',bottom:'底部'};
 export function fields(t){
  const out=core.slice();
- for(const part of ['hull','turret'])for(const face of Object.keys(t.armor[part])){
-  const name=(part==='hull'?'车体':'炮塔')+faces[face],p='armor.'+part+'.'+face;
-  out.push(def(p+'.0',name+'厚度','mm',0.1,3000,0.1,'装甲'),def(p+'.1',name+'倾角','°',0,89,0.1,'装甲'));
+ // One clear row per armor aspect: hull and turret values sit beside each other.
+ for(const face of ['front','side','rear','top','bottom']){
+  const group=faces[face]+'装甲';
+  for(const part of ['hull','turret']){
+   if(!t.armor[part]?.[face])continue;
+   const name=part==='hull'?'车体':'炮塔',p='armor.'+part+'.'+face;
+   out.push(def(p+'.0',name+'厚度','mm',0.1,3000,0.1,group),def(p+'.1',name+'倾角','°',0,89,0.1,group));
+  }
  }
- for(const [key,name] of [['lowerFront','首下'],['lowerSide','下侧'],['mantlet','炮盾']])if(t.armor[key]){
-  out.push(def('armor.'+key+'.0',name+'厚度','mm',0.1,3000,0.1,'装甲'),def('armor.'+key+'.1',name+'倾角','°',0,89,0.1,'装甲'));
+ for(const [key,name] of [['lowerFront','首下装甲'],['lowerSide','下侧装甲'],['mantlet','炮盾装甲']])if(t.armor[key]){
+  const group=name;
+  out.push(def('armor.'+key+'.0','厚度','mm',0.1,3000,0.1,group),def('armor.'+key+'.1','倾角','°',0,89,0.1,group));
  }
- for(const [key,name,max] of [['era','HEAT 反应装甲附加量',3000],['eraKE','动能弹反应装甲附加量',3000],['skirt','侧裙附加防护',3000],['heatMult','HEAT 防护倍率',10]])if(key in t.armor)out.push(def('armor.'+key,name,key==='heatMult'?'×':'mm',key==='heatMult'?0.1:0,max,key==='heatMult'?0.01:1,'装甲'));
+ for(const [key,name,max] of [['era','HEAT 反应装甲附加量',3000],['eraKE','动能弹反应装甲附加量',3000],['skirt','侧裙附加防护',3000],['heatMult','HEAT 防护倍率',10]])if(key in t.armor)out.push(def('armor.'+key,name,key==='heatMult'?'×':'mm',key==='heatMult'?0.1:0,max,key==='heatMult'?0.01:1,'附加防护'));
  for(let i=0;i<t.shells.length;i++){
   const sh=t.shells[i],group='弹药 '+(i+1)+' · '+sh.name;
   for(const [key,label,unit,min,max,step] of [['pen','百米穿深','mm',1,3000,1],['damage','单发伤害','HP',1,10000,1],['velocity','初速','m/s',100,2500,1],['count','默认携带量','发',0,500,1]])out.push(def('shells.'+i+'.'+key,label,unit,min,max,step,group));
