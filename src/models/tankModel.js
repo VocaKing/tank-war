@@ -370,7 +370,7 @@ function buildT72(d) {
     P.add('turret', 'paint', box(0.27, 0.2, 0.09, Math.sin(ar) * rr * 1.08, 0.2 + r * 0.25, Math.cos(ar) * rr * 1.12 + 0.05, -0.25 - r * 0.3, ar)); }
   for (let i = 0; i < 6; i++) P.add('turret', 'paint', box(0.27, 0.08, 0.22, -0.6 + i * 0.24 + (i > 2 ? 0.2 : -0.2), 0.68, 0.55, 0.15));
   const t72Mantlet=lathe([[0.205,-0.18],[0.29,-0.18],[0.325,-0.09],[0.31,0.03],[0.27,0.16],[0.235,0.25],[0.205,0.25]],32);
-  t72Mantlet.translate(0,-0.02,0.16); P.add('gun','paint',t72Mantlet);
+  t72Mantlet.translate(0,0,0.16); P.add('gun','paint',t72Mantlet);
   P.add('turret', 'paint', cylY(0.32, 0.2, 16, 0.45, 0.76, -0.2)); P.add('turret', 'metal', box(0.12, 0.16, 0.7, 0.45, 1.0, 0.0)); P.add('turret', 'dark', cylZ(0.022, 1.2, 6, 0.45, 1.0, 0.5)); // NSVT
   P.add('turret', 'paint', cylY(0.28, 0.1, 14, -0.45, 0.72, -0.25)); P.add('turret', 'metal', box(0.3, 0.3, 0.32, -0.55, 0.78, 0.38)); P.add('turret', 'glass', box(0.22, 0.14, 0.02, -0.55, 0.8, 0.55));
   P.add('turret', 'metal', box(0.3, 0.3, 0.3, 0.72, 0.45, 0.95)); P.add('turret', 'glass', cylZ(0.12, 0.02, 14, 0.72, 0.45, 1.11)); // Luna IR light
