@@ -222,9 +222,9 @@ function buildSherman(d) {
 function buildTiger(d) {
   const P = new Parts(); const hw = d.W / 2;
   // superstructure (overhangs tracks) and lower hull
-  P.add('hull', 'paint', sideExtrude([[-3.0, 1.0], [2.95, 1.0], [2.8, 1.95], [-2.85, 1.95], [-3.0, 1.5]], 3.12, 0, 0.03));
+  P.add('hull', 'paint', sideExtrude([[-3.0, 1.0], [2.95, 1.0], [2.8, 1.95], [-2.85, 1.95], [-3.0, 1.5]], 3.52, 0, 0.03));
   P.add('hull', 'paint', sideExtrude([[-3.05, 0.55], [2.6, 0.5], [3.15, 0.9], [3.1, 1.02], [-3.1, 1.02]], 1.85, 0, 0.03));
-  P.add('hull', 'paint', box(3.12, 0.06, 0.4, 0, 1.0, 3.12)); // front mudguards
+  P.add('hull', 'paint', box(3.52, 0.06, 0.4, 0, 1.0, 3.12)); // front mudguards
   for (const s of [-1, 1]) { P.add('hull', 'metal', cylZ(0.1, 0.25, 10, s * 1.0, 0.95, 3.1)); P.add('hull', 'metal', box(0.8, 0.05, 0.06, s * 0.9, 1.9, 2.85)); }
   P.add('hull', 'dark', box(0.32, 0.08, 0.04, 0.6, 1.62, 2.88, -9 * DEG)); P.add('hull', 'paint', cylZ(0.11, 0.12, 12, -0.75, 1.55, 2.9)); P.add('hull', 'dark', cylZ(0.03, 0.3, 6, -0.75, 1.55, 3.0));
   P.add('hull', 'metal', cylZ(0.09, 0.18, 10, -0.35, 1.8, 2.93)); // headlight
@@ -237,11 +237,9 @@ function buildTiger(d) {
   const tp = [];
   for (let i = 0; i <= 48; i++) { const a = Math.PI * (i / 48); tp.push([Math.cos(a) * 1.25, -0.2 - Math.sin(a) * 1.25]); }
   tp.push([-1.25, 1.1], [1.25, 1.1]); tp.reverse();
-  P.add('turret', 'paint', topExtrude(tp,0.82,0,0.035,3));
-  P.add('turret', 'paint', box(2.4, 0.06, 2.6, 0, 0.83, -0.25));
+  P.add('turret', 'paint', castLoft(tp,0.82,0.94,0.96,0));
   P.add('gun','paint',box(1.75,0.78,0.32,0,0,0)); P.add('gun','paint',cylX(0.38,1.74,32,0,0,0.13));
   P.add('gun','paint',cylZ(0.20,0.35,24,0,0,0.35)); P.add('gun','dark',box(0.12,0.08,0.05,0.42,0.22,0.17));
-  P.add('turret', 'paint', cylY(0.34, 0.32, 18, -0.6, 0.98, -0.85)); for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; P.add('turret', 'dark', box(0.08, 0.06, 0.03, -0.6 + Math.cos(a) * 0.345, 1.0, -0.85 + Math.sin(a) * 0.345, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', box(1.7, 0.45, 0.55, 0, 0.42, -1.72)); // Rommelkiste
   for (const s of [-1, 1]) for (let i = 0; i < 3; i++) P.add('turret', 'metal', cylZ(0.05, 0.25, 8, s * 1.25, 0.65, 0.75 - i * 0.15, 0.05, -0.6));
   P.add('turret', 'paint', box(0.6, 0.06, 0.7, 0.55, 0.87, -0.3)); P.add('turret', 'dark', cylY(0.12, 0.1, 8, 0.0, 0.88, 0.25));
@@ -276,8 +274,11 @@ function buildTiger(d) {
   P.add('turret', 'metal', box(0.18, 0.065, 0.08, -0.6, 1.19, -1.12));
   for (const x of [0.37, 0.73]) P.add('turret', 'paint', box(0.09, 0.065, 0.12, x, 0.92, -0.59));
   P.add('turret', 'metal', box(0.17, 0.035, 0.04, 0.55, 0.945, -0.08));
-  const wheels = []; for (let i = 0; i < 8; i++) wheels.push({ z: -2.25 + i * 0.6, y: 0.45, r: 0.4, w: 0.18, xo: i % 2 ? 0.2 : -0.12 });
-  for (let i = 0; i < 8; i++) wheels.push({ z: -2.25 + i * 0.6, y: 0.45, r: 0.4, w: 0.18, xo: i % 2 ? -0.12 : 0.2 });
+  // Late Tiger I running gear: 24 steel road wheels per side in three interleaved rows.
+  const wheels = [];
+  for (let row = 0; row < 3; row++) for (let i = 0; i < 8; i++) {
+    wheels.push({ z: -2.15 + i * 0.6 + (row === 1 ? 0.3 : 0), y: 0.45, r: 0.4, w: 0.17, xo: [-0.19, 0, 0.19][row] });
+  }
   return {
     P, wheels, sprockets: [{ z: 2.75, y: 0.8, r: 0.42 }], idlers: [{ z: -2.88, y: 0.7, r: 0.3 }], rollers: [],
     turretPos: [0, 1.95, d.turretZ], gunPos: [0, 0.42, 1.25],
