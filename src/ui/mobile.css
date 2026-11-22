@@ -106,3 +106,16 @@ html.mobile-device .menu #m-maps .mapgrid{overflow:auto;min-height:0;flex:1}
 html.mobile-device .menu #m-maps .mapacts{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;flex-shrink:0;padding-top:8px;background:#15191d}
 html.mobile-device .menu #m-maps .mapacts button{flex:1;min-height:44px;white-space:normal}
 html.mobile-device .menu #m-maps #m-map-go{background:#e6bb53;color:#151009;font-weight:800}
+
+/* Explicit hit testing: battle readouts never steal touches from action buttons. */
+html.mobile-device .touch-hud .touch-controls{z-index:80;pointer-events:none;touch-action:none}
+html.mobile-device .touch-hud .touch-controls button,
+html.mobile-device .touch-hud .touch-drive{pointer-events:auto!important;touch-action:none!important;position:relative;-webkit-tap-highlight-color:transparent}
+html.mobile-device .touch-hud .touch-drive{position:absolute}
+html.mobile-device .touch-hud .touch-controls button:active{filter:brightness(1.35);transform:scale(.97)}
+html.mobile-device .touch-hud .touch-actions,
+html.mobile-device .touch-hud .touch-ammo,
+html.mobile-device .touch-hud .touch-top{pointer-events:none}
+html.mobile-device .touch-hud .overlay{z-index:100;pointer-events:auto}
+html.mobile-device .touch-hud .overlay button{touch-action:manipulation}
+html.mobile-device .touch-hud .panel,html.mobile-device .touch-hud .scope,html.mobile-device .touch-hud .markers{pointer-events:none}

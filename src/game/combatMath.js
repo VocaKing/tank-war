@@ -1,4 +1,5 @@
 // Shared, pure combat math. Angles are radians unless explicitly labelled.
+export const MIN_DISPERSION_100M = 1.2; // radius in metres, minimum stock and custom balance
 export const MIN_BLOOM = 1;
 export const MAX_BLOOM = 4.5;
 export const BASE_FOV = 60;

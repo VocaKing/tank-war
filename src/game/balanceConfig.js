@@ -1,3 +1,4 @@
+import { MIN_DISPERSION_100M } from './combatMath.js';
 // Balance editor and game use the same whitelist and validation.
 export const STORAGE_KEY='tw_balance_v1';
 export const EMPTY=()=>({version:1,tanks:{}});
@@ -8,7 +9,7 @@ const core=[
  ['maxSpeed','前进最高速度','km/h',1,200,0.1,'机动'],['reverseSpeed','倒车最高速度','km/h',1,100,0.1,'机动'],
  ['hullTraverse','车体转速','°/s',1,180,0.1,'机动'],['turretTraverse','炮塔转速','°/s',1,180,0.1,'火控'],
  ['gunSpeed','炮管俯仰速度','°/s',0.1,90,0.1,'火控'],['gunDepression','俯角','°',0,45,0.1,'火控'],['gunElevation','仰角','°',0,85,0.1,'火控'],
- ['reload','装填时间','s',0.1,120,0.1,'火控'],['aimTime','完整散布收缩时间','s',0.1,30,0.1,'火控'],['dispersion','百米最小散布半径','m',0.01,5,0.01,'火控'],
+ ['reload','装填时间','s',0.1,120,0.1,'火控'],['aimTime','完整散布收缩时间','s',0.1,30,0.1,'火控'],['dispersion','百米最小散布半径','m',MIN_DISPERSION_100M,5,0.01,'火控'],
  ['viewRange','视野','m',50,1500,1,'侦察']
 ].map(x=>def(...x));
 const faces={front:'正面',side:'侧面',rear:'后面',top:'顶部',bottom:'底部'};
@@ -35,13 +36,14 @@ export const read=(obj,path)=>path.split('.').reduce((v,k)=>v[k],obj);
 function write(obj,path,value){const keys=path.split('.'),last=keys.pop();keys.reduce((v,k)=>v[k],obj)[last]=value;}
 const plain=o=>o!==null&&typeof o==='object'&&!Array.isArray(o);
 export const clone=o=>JSON.parse(JSON.stringify(o));
-export function validate(config,baseline){
+export function validate(config,baseline,migrateLegacy=false){
  if(!plain(config)||config.version!==1||!plain(config.tanks))throw Error('配置格式错误：需要 version: 1 和 tanks。');
  const clean=EMPTY(),byId=new Map(baseline.map(t=>[t.id,t]));
  for(const [id,patch] of Object.entries(config.tanks)){
   const t=byId.get(id);if(!t||!plain(patch))throw Error('未知坦克或配置：'+id);
   const allowed=new Map(fields(t).map(f=>[f.path,f])), next={};
-  for(const [path,value] of Object.entries(patch)){
+  for(const [path,raw] of Object.entries(patch)){
+   const value=migrateLegacy&&path==='dispersion'&&typeof raw==='number'&&raw>=0.01&&raw<MIN_DISPERSION_100M?MIN_DISPERSION_100M:raw;
    const f=allowed.get(path);if(!f)throw Error(id+' 不支持字段 '+path);
    if(typeof value!=='number'||!Number.isFinite(value)||value<f.min||value>f.max||(f.step===1&&!Number.isInteger(value)))throw Error(t.short+' / '+f.label+'：必须为 '+f.min+' 至 '+f.max+' 的'+(f.step===1?'整数':'数值'));
    next[path]=value;
@@ -53,7 +55,7 @@ export function validate(config,baseline){
  return clean;
 }
 export function effective(baseline,config){
- const checked=validate(config,baseline),result=clone(baseline);
+ const checked=validate(config,baseline,true),result=clone(baseline);
  for(const t of result){
   const patch=checked.tanks[t.id]||{};
   for(const [path,value] of Object.entries(patch))write(t,path,value);
@@ -68,7 +70,7 @@ export function diff(baseline,values){
  return validate(config,baseline);
 }
 export function loadLocal(baseline){
- try{const raw=globalThis.localStorage?.getItem(STORAGE_KEY);return raw?{config:validate(JSON.parse(raw),baseline),error:''}:{config:null,error:''};}
+ try{const raw=globalThis.localStorage?.getItem(STORAGE_KEY);return raw?{config:validate(JSON.parse(raw),baseline,true),error:''}:{config:null,error:''};}
  catch(e){return {config:null,error:String(e.message||e)};}
 }
 export function saveLocal(config,baseline){
