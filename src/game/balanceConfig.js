@@ -49,7 +49,7 @@ export function validate(config,baseline,migrateLegacy=false){
   const t=byId.get(id);if(!t||!plain(patch))throw Error('未知坦克或配置：'+id);
   const allowed=new Map(fields(t).map(f=>[f.path,f])), next={};
   for(const [path,raw] of Object.entries(patch)){
-   const value=migrateLegacy&&path==='dispersion'&&typeof raw==='number'&&raw>=0.01&&raw<MIN_DISPERSION_100M?MIN_DISPERSION_100M:raw;
+   const value=raw; // preserve sub-metre values from new and existing local balance files
    const f=allowed.get(path);if(!f)throw Error(id+' 不支持字段 '+path);
    if(typeof value!=='number'||!Number.isFinite(value)||value<f.min||value>f.max||(f.step===1&&!Number.isInteger(value)))throw Error(t.short+' / '+f.label+'：必须为 '+f.min+' 至 '+f.max+' 的'+(f.step===1?'整数':'数值'));
    next[path]=value;
