@@ -4,6 +4,7 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createTankModel, hasDetailedTankModel, loadDetailedTankModel } from '../models/tankModel.js';
 import { applyArmorPreview, clearArmorPreview } from './armorPreview.js';
 import { pbrTex } from '../world/textures.js';
+import { sharedMediaUrl } from '../media.js';
 
 // Frame the entire lineup at the same metres per pixel. Position the orbit a
 // little forward of the hull centre to leave room for the longest gun.
@@ -16,26 +17,26 @@ export class Garage {
   constructor(renderer) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1b1d1f);
-    this.scene.fog = new THREE.Fog(0x1b1d1f, 18, 45);
+    this.scene.background = new THREE.Color(0x202528);
+    this.scene.fog = new THREE.Fog(0x202528, 18, 45);
     this.camera = new THREE.OrthographicCamera(-7, 7, 4, -4, 0.1, 1200);
     this.models = {};
     this.angle = 0.6; this.current = null; this.drag = null; this.armorMode = false;
     const pm = new THREE.PMREMGenerator(renderer);
-    new RGBELoader().load('./tex/studio_1k.hdr', (hdr) => { hdr.mapping = THREE.EquirectangularReflectionMapping; this.scene.environment = pm.fromEquirectangular(hdr).texture; this.scene.environmentIntensity = 0.55; hdr.dispose(); });
+    new RGBELoader().load(sharedMediaUrl('tex/studio_1k.hdr'), (hdr) => { hdr.mapping = THREE.EquirectangularReflectionMapping; this.scene.environment = pm.fromEquirectangular(hdr).texture; this.scene.environmentIntensity = 0.83; hdr.dispose(); pm.dispose(); });
     // The larger floor keeps the same texel density and fills an orthographic view at low angles.
     const floorTex = pbrTex('gravel_road', 'diff', 40), floorN = pbrTex('gravel_road', 'nor', 40);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(200, 64), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorN, color: 0x8a8580, roughness: 0.95 }));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(200, 64), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorN, color: 0x727579, roughness: 0.95 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; this.scene.add(floor);
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 5.8, 0.12, 64), new THREE.MeshStandardMaterial({ color: 0x2b2c2e, roughness: 0.8, metalness: 0.3 }));
     plinth.position.y = 0.06; plinth.receiveShadow = true; this.scene.add(plinth);
     this.turntable = new THREE.Group(); this.turntable.position.y = 0.12; this.scene.add(this.turntable);
-    const key = new THREE.DirectionalLight(0xfff1dd, 2.6); key.position.set(6, 10, 5); key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 30 }); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.02;
+    const key = new THREE.DirectionalLight(0xfff1df, 3.25); key.position.set(6, 8, 6); key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048); Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 30 }); key.shadow.bias = -0.00038; key.shadow.normalBias = 0.011;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x9fb8ff, 1.2); rim.position.set(-8, 4, -6); this.scene.add(rim);
-    this.scene.add(new THREE.HemisphereLight(0xcfd8e0, 0x2a2622, 0.5));
-    const spot = new THREE.SpotLight(0xffe2b8, 40, 30, 0.6, 0.6); spot.position.set(0, 12, 0); spot.target = this.turntable; this.scene.add(spot);
+    const rim = new THREE.DirectionalLight(0xc5daed, 1.4); rim.position.set(-8, 5, -7); this.scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xeaf0f3, 0.60); fill.position.set(-6, 3, 8); this.scene.add(fill);
+    this.scene.add(new THREE.HemisphereLight(0xcfd8e0, 0x625744, 0.64));
     this._bindDrag();
   }
   _bindDrag() {
@@ -113,7 +114,7 @@ export class Garage {
   }
   render(dt) {
     if (!this.drag) this.angle += dt * 0.18;
-    const rise = 3.2 * (this.hMul || 1);
+    const rise = 4.9 * (this.hMul || 1);
     // Orthographic distance leaves scale unchanged. Pull the camera back
     // enough that the entire near plane sits above the showroom floor.
     const setback = Math.max(1, (this.camera.top + 1) / rise);

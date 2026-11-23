@@ -24,7 +24,7 @@ function render(){
  renderList();const main=$('form');main.replaceChildren();if(compare){renderComparison(main);return;}
  const t=draft.find(x=>x.id===selected),stock=STOCK_TANKS.find(x=>x.id===selected),published=PUBLISHED_TANKS.find(x=>x.id===selected);
  const title=make('div','section-title');title.append(make('h2','',t.name));const reset=make('button','','恢复本车发布值');reset.onclick=()=>{if(!confirm('恢复 '+t.short+' 的发布版数值？'))return;draft[draft.indexOf(t)]=clone(published);changed();render()};title.append(reset);main.append(title);
- const stats=make('div','stats');const metrics=()=>{stats.replaceChildren();for(const [name,value] of [['功重比',(t.power/t.mass).toFixed(1)+' hp/t'],['标准弹 DPM',Math.round(t.shells[0].damage*60/t.reload)],['总弹药',t.shells.reduce((a,s)=>a+s.count,0)+' 发']]){const card=make('div','stat');card.append(make('small','',name),make('strong','',String(value)));stats.append(card);}};metrics();main.append(stats);
+ const summary=make('div','balance-metrics');const metrics=()=>{summary.replaceChildren();for(const [name,value] of [['功重比',(t.power/t.mass).toFixed(1)+' hp/t'],['标准弹 DPM',Math.round(t.shells[0].damage*60/t.reload)],['总弹药',t.shells.reduce((a,s)=>a+s.count,0)+' 发']]){const card=make('div','balance-metric');card.append(make('small','',name),make('strong','',String(value)));summary.append(card);}};metrics();main.append(summary);
  let group='',section,grid;
  for(const f of fields(stock)){
   if(group!==f.group){

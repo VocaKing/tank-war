@@ -60,6 +60,25 @@ try {
   return {columns:getComputedStyle(section.querySelector('.fields')).gridTemplateColumns.split(' ').length,rows:new Set(cells.map(x=>Math.round(x.getBoundingClientRect().top))).size};
  });
  assert.equal(mobile.columns,2,'Mobile editor should use two columns');
+ for(const viewport of [{width:2048,height:1055},{width:390,height:844}]){
+  await page.setViewportSize(viewport);
+  await page.goto('http://127.0.0.1:5173/');
+  await page.locator('#m-balance').evaluate(button=>button.click());
+  await page.waitForSelector('.balance-root #form .field');
+  const layout=await page.evaluate(()=>{
+   const metrics=document.querySelector('.balance-metrics'),form=document.querySelector('#form');
+   const bounds=metrics.getBoundingClientRect(),parent=form.getBoundingClientRect();
+   const title=document.querySelector('.section-title').getBoundingClientRect();
+   const field=document.querySelector('.field-group').getBoundingClientRect();
+   return {position:getComputedStyle(metrics).position,contained:bounds.left>=parent.left&&bounds.right<=parent.right,
+    inFlow:bounds.top>=title.bottom&&bounds.bottom<=field.top,horizontalScroll:document.documentElement.scrollWidth>innerWidth};
+  });
+  assert.deepEqual(layout,{position:'static',contained:true,inFlow:true,horizontalScroll:false});
+  const spread=page.getByRole('spinbutton',{name:'百米最小散布半径 m',exact:true});
+  await spread.fill('0.6');
+  await page.locator('#save').click();
+  assert.match(await page.locator('#status').textContent(),/已保存/);
+ }
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify({desktop,mobile},null,2));
 } finally {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RNG, makeNoise2D, fbm, tileField, sampleField } from '../util.js';
+import { sharedMediaUrl } from '../media.js';
 
 const loader = new THREE.TextureLoader();
 const cache = new Map();
@@ -30,7 +31,7 @@ let texHi = false;
 export function setTexQuality(q) { texHi = q === 'high'; }
 function loadPbr(name, kind) {
   const hi = texHi && kind !== 'arm' && HI_SETS.has(name);
-  const t = loader.load(`./tex/${name}_${kind}${hi ? '_2k' : ''}.jpg`, texture => {
+  const t = loader.load(sharedMediaUrl(`tex/${name}_${kind}${hi ? '_2k' : ''}.jpg`), texture => {
     // WebGL2 texture storage is immutable. Release the placeholder's
     // allocation before uploading the decoded image at its actual size.
     texture.dispose();

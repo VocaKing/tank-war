@@ -12,6 +12,7 @@ import { pbrTex, waterNormalTexture, setTexQuality } from './textures.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Grid2D, OBB } from './terrain.js';
 import { DEG, ridged, smoothstep } from '../util.js';
+import { sharedMediaUrl } from '../media.js';
 
 function terrainMaterial(def, quality) {
   const L = def.layers;
@@ -405,7 +406,7 @@ export class World {
   }
   _loadHdri(renderer, H, quality) {
     const res = quality === 'low' ? '1k' : '2k';
-    new RGBELoader().setDataType(THREE.FloatType).load(`./tex/${H.file}_${res}.hdr`, (tex) => {
+    new RGBELoader().setDataType(THREE.FloatType).load(sharedMediaUrl(`tex/${H.file}_${res}.hdr`), (tex) => {
       if (this.disposed) { tex.dispose(); return; }
       // clamp the sun disc: its energy is carried by the DirectionalLight (measured from this HDRI), so IBL must not count it twice
       const d = tex.image.data; for (let i = 0; i < d.length; i += 4) { const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; if (l > 40) { const k = 40 / l; d[i] *= k; d[i + 1] *= k; d[i + 2] *= k; } }

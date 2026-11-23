@@ -7,6 +7,9 @@ import { makeTrackBelt } from './trackBelt.js';
 
 const templates = new Map();
 const requests = new Map();
+const sharedMaps = new Map();
+const materialMaps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap'];
+const sharedMaterialName = /^(Abraded rubber|Burnished contact|Oxidized track|Forged and soot)/;
 const rollingAxis = new THREE.Vector3(1, 0, 0);
 const sides = ['R', 'L']; // Blender's right track is the negative-x track in game coordinates.
 const beltMaterial = new THREE.MeshStandardMaterial({ color: 0x39342c, roughness: 0.81, metalness: 0.36, side: THREE.DoubleSide });
@@ -100,6 +103,18 @@ function prepare(scene, spec) {
   sight.position.set(0.35, 0.25, 0.20);
   gun.add(sight);
   scene.updateMatrixWorld(true);
+  const materials = new Set();
+  root.traverse(node => { if (node.isMesh) materials.add(node.material); });
+  for (const material of materials) for (const slot of materialMaps) {
+    const texture = material[slot];
+    if (!texture) continue;
+    texture.anisotropy = 8;
+    if (sharedMaterialName.test(texture.name)) {
+      const key = `${texture.name}/${texture.colorSpace}/${texture.channel}`;
+      if (!sharedMaps.has(key)) sharedMaps.set(key, texture);
+      material[slot] = sharedMaps.get(key);
+    }
+  }
   const tracks = sides.map(side => prepareSide(body, side, spec));
   return { root, tracks, clearance: expansionGunClearance(spec) };
 }
@@ -109,9 +124,12 @@ export function loadExpansionModel(spec) {
   if (!hasExpansionModel(id)) return Promise.resolve(false);
   if (templates.has(id)) return Promise.resolve(true);
   if (!requests.has(id)) {
-    const request = import('three/addons/loaders/GLTFLoader.js').then(async ({ GLTFLoader }) => {
+    const request = Promise.all([
+      import('three/addons/loaders/GLTFLoader.js'),
+      import('three/addons/libs/meshopt_decoder.module.js'),
+    ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
       const url = import.meta.env.BASE_URL + `models/armour-expansion/${id}.glb`;
-      const gltf = await new GLTFLoader().loadAsync(url);
+      const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
       templates.set(id, prepare(gltf.scene, spec));
       return true;
     }).catch(error => {
@@ -213,7 +231,9 @@ export function createExpansionModel(spec, near) {
   const tracks = sides.map((side, i) => trackMotion(body, side, template.tracks[i], near));
   const gun = find(body, 'GUN_PIVOT');
   const meshes = [];
+  const detailGroups = [];
   root.traverse(node => {
+    if (node.userData.close_detail) { detailGroups.push(node); node.visible = near; }
     if (!node.isMesh) return;
     if (/^(Armor|Fittings)/.test(node.material.name)) node.userData.matKey = 'paint';
     node.castShadow = node.receiveShadow = true;
@@ -223,7 +243,10 @@ export function createExpansionModel(spec, near) {
     root, body, meshes, gun, turret: find(body, spec.casemate ? 'CASEMATE_ANCHOR' : 'TURRET_PIVOT'),
     barrel: find(gun, 'RECOIL_SLIDE'), muzzle: find(gun, 'MUZZLE_SOCKET'), sight: find(gun, 'GUN_SIGHT'),
     maxRecoil: MAX_RECOIL, gunPitchFloor: template.clearance, linksOn: near,
-    setRunningGearNear(value) { tracks.forEach(track => track.setNear(value)); },
+    setRunningGearNear(value) {
+      for (const track of tracks) track.setNear(value);
+      for (const detail of detailGroups) detail.visible = value;
+    },
     moveRunningGear(left, right) { tracks[0].move(left); tracks[1].move(right); },
   };
 }

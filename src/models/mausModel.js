@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { approach } from '../util.js';
 import { makeTrackBelt } from './trackBelt.js';
+import { sharedMediaUrl } from '../media.js';
 
-const MAUS_URL = import.meta.env.BASE_URL + 'models/maus-engineering.glb';
+const MAUS_URL = sharedMediaUrl('models/maus-engineering.glb');
 const WORLD_X = new THREE.Vector3(1, 0, 0);
 const identityScale = new THREE.Vector3(1, 1, 1);
 const lowTrackMaterial = new THREE.MeshStandardMaterial({ color: 0x39342c, roughness: 0.81, metalness: 0.36, side: THREE.DoubleSide });
