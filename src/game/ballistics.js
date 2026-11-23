@@ -128,7 +128,7 @@ export class Ballistics {
     if (he) { dmg = s.spec.damage * 0.45 * clamp(1 - ev.eff / (s.spec.caliber * 1.2), 0, 1); if (dmg > 1) tank.damage(dmg, shooter, 'he'); g.effects.impactGround(p, s.spec.caliber, true);
       // HE/HESH blast wrecks external modules even without penetrating
       if (tank.alive && g.rng.next() < 0.4) { const m = ['gun', 'turret', 'engine'][Math.floor(g.rng.next() * 3)]; if (tank.modules[m] === 1) { tank.modules[m] = 0.5; if (toPlayer) g.hud.message(m[0].toUpperCase() + m.slice(1) + ' damaged by HE blast', '#ffb060'); } } }
-    if (ev.tracks && g.rng.next() < 0.45) { tank.breakTracks(); if (toPlayer) g.hud.message('Tracks destroyed! Repairing…', '#ffb060'); }
+    if (ev.tracks && g.rng.next() < 0.45) { tank.breakTracks(); if (toPlayer) g.hud.message(tank.mobilityLabel + ' destroyed! Repairing…', '#ffb060'); }
     if (fromPlayer) g.hud.hitMarker(dmg > 1 ? 'blast' : 'nonpen', Math.round(dmg)); if (toPlayer) g.hud.damageFrom(shooter, Math.round(dmg), dmg > 1 ? 'HE blast' : 'Hit – not penetrated');
     return true;
   }
