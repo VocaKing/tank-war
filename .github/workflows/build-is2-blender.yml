@@ -1,0 +1,42 @@
+name: Build IS-2 Model 1944 Blender blockout
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/blender/**'
+      - 'docs/IS2_BLENDER_WORKFLOW.md'
+      - '.github/workflows/build-is2-blender.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  blender-export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          blender --version
+
+      - name: Generate IS-2 Model 1944 blockout GLB
+        run: blender --background --python tools/blender/is2_model1944_blockout.py
+
+      - name: Validate exported GLB
+        run: |
+          test -s public/models/is2_model1944_blockout.glb
+          file public/models/is2_model1944_blockout.glb
+          stat --format='GLB size: %s bytes' public/models/is2_model1944_blockout.glb
+
+      - name: Upload Blender model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: is2-model1944-blender-blockout
+          path: public/models/is2_model1944_blockout.glb
+          if-no-files-found: error
+          retention-days: 30
