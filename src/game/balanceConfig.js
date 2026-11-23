@@ -42,7 +42,7 @@ export const read=(obj,path)=>path.split('.').reduce((v,k)=>v[k],obj);
 function write(obj,path,value){const keys=path.split('.'),last=keys.pop();keys.reduce((v,k)=>v[k],obj)[last]=value;}
 const plain=o=>o!==null&&typeof o==='object'&&!Array.isArray(o);
 export const clone=o=>JSON.parse(JSON.stringify(o));
-export function validate(config,baseline,migrateLegacy=false){
+export function validate(config,baseline){
  if(!plain(config)||config.version!==1||!plain(config.tanks))throw Error('配置格式错误：需要 version: 1 和 tanks。');
  const clean=EMPTY(),byId=new Map(baseline.map(t=>[t.id,t]));
  for(const [id,patch] of Object.entries(config.tanks)){
@@ -61,7 +61,7 @@ export function validate(config,baseline,migrateLegacy=false){
  return clean;
 }
 export function effective(baseline,config){
- const checked=validate(config,baseline,true),result=clone(baseline);
+ const checked=validate(config,baseline),result=clone(baseline);
  for(const t of result){
   const patch=checked.tanks[t.id]||{};
   for(const [path,value] of Object.entries(patch))write(t,path,value);
@@ -76,7 +76,7 @@ export function diff(baseline,values){
  return validate(config,baseline);
 }
 export function loadLocal(baseline){
- try{const raw=globalThis.localStorage?.getItem(STORAGE_KEY);return raw?{config:validate(JSON.parse(raw),baseline,true),error:''}:{config:null,error:''};}
+ try{const raw=globalThis.localStorage?.getItem(STORAGE_KEY);return raw?{config:validate(JSON.parse(raw),baseline),error:''}:{config:null,error:''};}
  catch(e){return {config:null,error:String(e.message||e)};}
 }
 export function saveLocal(config,baseline){
