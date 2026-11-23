@@ -25,7 +25,7 @@ small{opacity:.7}
 .tbl-btn{margin-top:8px;text-align:center}
 .menutools{position:absolute;left:24px;width:240px;bottom:190px;display:flex;flex-direction:column;gap:6px;z-index:30;pointer-events:auto}
 .menutools .tbl-btn{margin:0;width:100%}
-.stats{position:absolute;right:24px;top:76px;width:400px;max-height:calc(100% - 306px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px;backdrop-filter:blur(6px)}
+.stats{position:absolute;right:24px;top:76px;bottom:295px;width:400px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px;backdrop-filter:blur(6px)}
 .stats h2{margin:0 0 2px;font-size:19px;color:var(--acc)}.stats .tag{font-size:12px;opacity:.75}.stats p{font-size:12.5px;line-height:1.4;opacity:.9}
 .vehicle-skills{margin-top:12px}
 .vehicle-skills h3{margin:0 0 6px;font-size:13px;color:#eee7d8}
