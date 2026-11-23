@@ -8,7 +8,7 @@ export class TouchControls {
  constructor(game){
   this.g=game;this.throttle=0;this.steer=0;this.firing=false;this.listeners=[];
   const root=document.createElement('div');root.className='touch-controls';this.root=root;
-  root.innerHTML='<div class="touch-drive" aria-label="驾驶摇杆"><span>驾驶</span><i></i></div><div class="touch-actions"><button data-action="scope">开镜</button><button data-action="zoom">倍率</button><button data-action="armor">装甲</button><button data-action="lock">锁定</button><button data-action="ability">技能</button><button data-action="fire" class="touch-fire">开火</button></div><div class="touch-ammo"><button data-action="ammo0">弹 1</button><button data-action="ammo1">弹 2</button><button data-action="ammo2">弹 3</button><button data-action="item0">装备 1</button><button data-action="item1">装备 2</button><button data-action="item2">装备 3</button></div><div class="touch-top"><button data-action="score">战况</button><button data-action="pause">暂停</button></div><div class="touch-hint">左手驾驶 · 右手滑动战场瞄准 · 建议横屏</div>';
+  root.innerHTML='<div class="touch-drive" aria-label="驾驶摇杆"><span>驾驶</span><i></i></div><div class="touch-actions"><button data-action="scope">开镜</button><button data-action="zoom">倍率</button><button data-action="armor">装甲</button><button data-action="lock">锁定</button><button data-action="ability">技能</button><button data-action="spade">驻锄</button><button data-action="fire" class="touch-fire">开火</button></div><div class="touch-ammo"><button data-action="ammo0">弹 1</button><button data-action="ammo1">弹 2</button><button data-action="ammo2">弹 3</button><button data-action="item0">装备 1</button><button data-action="item1">装备 2</button><button data-action="item2">装备 3</button></div><div class="touch-top"><button data-action="score">战况</button><button data-action="pause">暂停</button></div><div class="touch-hint">左手驾驶 · 右手滑动战场瞄准 · 建议横屏</div>';
   game.hud.root.append(root);game.hud.root.classList.add('touch-hud');
   const canvas=game.renderer.domElement,drive=root.querySelector('.touch-drive'),knob=drive.querySelector('i');
   const on=(target,event,fn,opts)=>{target.addEventListener(event,fn,opts);this.listeners.push(()=>target.removeEventListener(event,fn,opts));};
@@ -35,6 +35,7 @@ export class TouchControls {
    if(a==='armor')game.armorView.toggle();
    if(a==='lock')game.toggleLock();
    if(a==='ability')p.tryAbility();
+   if(a==='spade' && p.spec.artillery)p.toggleSpade();
    if(a.startsWith('ammo'))p.selectShell(+a.slice(4));
    if(a.startsWith('item'))game.useItem(+a.slice(4));
   };
@@ -56,6 +57,7 @@ export class TouchControls {
   for(const b of this.root.querySelectorAll('button')){const a=b.dataset.action;if(a==='scope')label(b,g.cam.sniper?'退出开镜':'开镜');if(a==='zoom')label(b,g.cam.sniper?'×'+g.cam.zoom:'倍率');if(a==='armor')b.classList.toggle('active',g.armorView.enabled);if(a==='lock')b.classList.toggle('active',!!g.lock);
    if(a.startsWith('ammo')){const i=+a.slice(4);label(b,'弹 '+(i+1)+' · '+(p.ammo[i]??0));b.classList.toggle('active',p.shellIdx===i);}
    if(a==='fire')label(b,p.reloadLeft>0?p.reloadLeft.toFixed(1)+'s':'开火');
+   if(a==='spade'){label(b,p.spadeState==='deployed'?'驻锄已放':'驻锄');b.classList.toggle('active',p.spadeProgress>0.01);}
   }
  }
  dispose(){this.clear();for(const off of this.listeners)off();this.root.remove();}
