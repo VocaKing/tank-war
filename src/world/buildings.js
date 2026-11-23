@@ -50,7 +50,31 @@ function archedOpening(width, height, frame) {
   return { molding, glazing };
 }
 
-export function buildingMaterials() {
+const WEATHERED = ['stone', 'castle', 'brick', 'plaster', 'damaged', 'wood'];
+
+function weatherMasonry(material, mapId) {
+  const strength = mapId === 'desert' ? 0.22 : mapId === 'forest' ? 0.36 : 0.30;
+  material.onBeforeCompile = shader => {
+    shader.uniforms.wallWeathering = { value: strength };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float floorHeight; varying vec3 vWallExposure;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWallExposure = vec3(position.x, position.y - floorHeight, position.z);');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float wallWeathering; varying vec3 vWallExposure;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        float wallAcross = vWallExposure.x * 0.72 + vWallExposure.z * 0.68;
+        float mottling = sin(wallAcross * 5.4 + sin(wallAcross * 1.33) * 1.8);
+        float splashHeight = 0.9 + mottling * 0.22;
+        float damp = 1.0 - smoothstep(0.04, splashHeight, vWallExposure.y);
+        float streak = smoothstep(0.27, 0.9, mottling) * 0.11 * (1.0 - damp);
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(0.88, 0.83, 0.67), damp * 0.68);
+        diffuseColor.rgb *= 1.0 - wallWeathering * (damp + streak);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor *= 1.0 - damp * 0.14;');
+  };
+  material.customProgramCacheKey = () => 'structure-weathering';
+}
+
+export function buildingMaterials(mapId) {
   const tex = (n, rep = 1) => ({ map: pbrTex(n, 'diff'), normalMap: pbrTex(n, 'nor'), roughnessMap: pbrTex(n, 'arm'), aoMap: pbrTex(n, 'arm'), aoMapIntensity: 0.8 });
   const M = {
     stone: new THREE.MeshStandardMaterial({ ...tex('plastered_stone_wall'), roughness: 0.92, color: 0xf0e8dc }),
@@ -76,17 +100,26 @@ export function buildingMaterials() {
     burnt: new THREE.MeshStandardMaterial({ color: 0x1a1714, roughness: 1, transparent: true, opacity: 0.75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide }),
     paintwhite: new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.85 }),
   };
+  for (const key of WEATHERED) weatherMasonry(M[key], mapId);
   return M;
 }
 
 // v4: per-building colour variation via vertex colours (walls, shutters/doors, roof tiles), merged per material
 const TINTABLE = { stone: 'wall', plaster: 'wall', damaged: 'wall', brick: 'brick', paintwood: 'trim', roof: 'roof', slate: 'roof', castle: 'stoneT' };
 class Buckets {
-  constructor() { this.b = {}; this.tint = null; }
+  constructor() { this.b = {}; this.tint = null; this.floor = null; }
   add(k, g) {
     const n = clean(g); const c = new Float32Array(n.attributes.position.count * 3); const t = (this.tint && this.tint[TINTABLE[k]]) || null;
     c.fill(1); if (!t && k === 'paintwood') for (let i = 0; i < c.length; i += 3) { c[i] = 0.076; c[i + 1] = 0.148; c[i + 2] = 0.099; } if (t) for (let i = 0; i < c.length; i += 3) { c[i] = t[0]; c[i + 1] = t[1]; c[i + 2] = t[2]; }
-    n.setAttribute('color', new THREE.BufferAttribute(c, 3)); (this.b[k] ||= []).push(n);
+    n.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    if (WEATHERED.includes(k)) {
+      const position = n.attributes.position, floor = new Float32Array(position.count);
+      if (this.floor === null) {
+        for (let i = 0; i < floor.length; i++) floor[i] = position.getY(i) - 8;
+      } else floor.fill(this.floor);
+      n.setAttribute('floorHeight', new THREE.BufferAttribute(floor, 1));
+    }
+    (this.b[k] ||= []).push(n);
   }
 }
 const WALL_TINTS = [[1.05, 1.05, 1.02], [1.3, 1.24, 1.1], [1.28, 1.1, 0.82], [1.12, 1.12, 1.16], [1.25, 1.02, 0.96], [0.95, 0.9, 0.84], [1.35, 1.3, 1.2]];
@@ -98,7 +131,7 @@ function pickTint(r, style) {
 }
 
 export function buildStructures(mb, scene, terrain) {
-  const M = buildingMaterials(); const B = new Buckets(); const colliders = []; const r = new RNG(mb.def.seed + 99);
+  const M = buildingMaterials(mb.def.id); const B = new Buckets(); const colliders = []; const r = new RNG(mb.def.seed + 99);
   const detailRng = new RNG(mb.def.seed + 571);
   const wallMat = (b) => (b.style === 'brick' ? 'brick' : b.style === 'desert' ? (b.ruined ? 'damaged' : 'plaster') : b.style === 'castle' ? 'castle' : b.style === 'cabin' ? 'wood' : 'stone');
   const place = (g, b, lx, ly, lz, ry = 0, rx = 0, rz = 0) => { xf(g, lx, ly, lz, ry, rx, rz); xf(g, b.x, b.y, b.z, b.rot); return g; };
@@ -129,6 +162,7 @@ export function buildStructures(mb, scene, terrain) {
   };
   for (const b of mb.buildings) {
     B.tint = pickTint(r, b.style);
+    B.floor = b.y;
     const wm = wallMat(b); const fl = b.floors || 1; let H = fl * 3 + 0.4; let top = H;
     if (b.kind === 'tower') {
       H = fl * 4; const g = boxUV(b.w, H, b.d, 3); place(g, b, 0, H / 2, 0); B.add('castle', g);
@@ -287,6 +321,7 @@ export function buildStructures(mb, scene, terrain) {
   // walls
   for (const w of mb.walls) {
     const y = terrain.height(w.x, w.z); const mat = w.style === 'adobe' ? 'plaster' : w.style === 'castle' ? 'castle' : 'stone';
+    B.floor = y;
     const g = boxUV(w.thick, w.h + 1, w.len, 2.5); xf(g, w.x, y + (w.h - 1) / 2, w.z, w.rot); B.add(mat, g);
     // Individual coping blocks give masonry a broken silhouette and mortar joints.
     const n = Math.max(1, Math.ceil(w.len / (w.style === 'adobe' ? 1.8 : 1.16)));
@@ -298,7 +333,7 @@ export function buildStructures(mb, scene, terrain) {
     }
     colliders.push(new OBB(w.x, w.z, w.thick / 2, w.len / 2, w.rot, y - 1, y + w.h, 'wall'));
   }
-  B.tint = null;
+  B.tint = null; B.floor = null;
   // bridges: drivable deck that follows a ramp/arch profile between the two banks (so tanks drive ON it),
   // segmented deck + parapets; the deck surface is exported for World.groundHeight
   const decks = [];
@@ -343,6 +378,7 @@ export function buildStructures(mb, scene, terrain) {
   // props
   for (const p of mb.props) {
     const y = p.y;
+    B.floor = y;
     const prop = (key, g, x, h, z, ry = 0, rx = 0, rz = 0) => {
       xf(g, x, h, z, ry, rx, rz);
       B.add(key, xf(g, p.x, y, p.z, p.rot));

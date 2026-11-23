@@ -9,11 +9,35 @@ export function setMaxAniso(a) { maxAniso = a; }
 // Poly Haven CC0 textures shipped in /public/tex
 // v5: 2k sets for terrain layers on High (1k otherwise); 'arm' = AO/Roughness/Metal packed (linear)
 const HI_SETS = new Set(['leafy_grass', 'forest_ground_04', 'aerial_rocks_02', 'gravel_road', 'coast_sand_01', 'dry_ground_01']);
+const FALLBACK_COLORS = {
+  leafy_grass: '#727e4b', forest_ground_04: '#796955', aerial_rocks_02: '#888075',
+  gravel_road: '#9b8978', coast_sand_01: '#c3ae84', dry_ground_01: '#aa8b64',
+  plastered_stone_wall: '#b3ab9b', red_brick_03: '#955748', clay_plaster: '#bca981',
+  damaged_plaster: '#a99573', clay_roof_tiles_02: '#a26752',
+  brown_planks_05: '#8b725b', bark_brown_02: '#7a6552', rusty_metal_02: '#776457',
+};
+const fallbackImages = new Map();
+function fallbackImage(name, kind) {
+  const color = kind === 'nor' ? '#8080ff' : kind === 'arm' ? '#ffc800' : (FALLBACK_COLORS[name] ?? '#aaa498');
+  if (!fallbackImages.has(color)) {
+    const [image, context] = canvas(1, 1);
+    context.fillStyle = color; context.fillRect(0, 0, 1, 1);
+    fallbackImages.set(color, image);
+  }
+  return fallbackImages.get(color);
+}
 let texHi = false;
 export function setTexQuality(q) { texHi = q === 'high'; }
 function loadPbr(name, kind) {
   const hi = texHi && kind !== 'arm' && HI_SETS.has(name);
-  const t = loader.load(`./tex/${name}_${kind}${hi ? '_2k' : ''}.jpg`);
+  const t = loader.load(`./tex/${name}_${kind}${hi ? '_2k' : ''}.jpg`, texture => {
+    // WebGL2 texture storage is immutable. Release the placeholder's
+    // allocation before uploading the decoded image at its actual size.
+    texture.dispose();
+  });
+  // TextureLoader swaps this image out as soon as the real map decodes.
+  t.image = fallbackImage(name, kind);
+  t.needsUpdate = true;
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso;
   if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace;
   return t;

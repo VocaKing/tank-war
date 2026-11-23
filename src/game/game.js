@@ -16,6 +16,7 @@ import { setTrackLOD } from '../models/tankModel.js';
 import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 import { Post } from '../render/post.js';
 import { ContactShadows } from '../render/contactShadows.js';
+import { TrackMarks } from '../render/trackMarks.js';
 import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
@@ -41,6 +42,7 @@ export class Game {
     this.player = this.tanks[0];
     this.world.updateShadowCenter(this.player.pos, 0);
     this.contactShadows = new ContactShadows(this.world, this.tanks);
+    this.trackMarks = new TrackMarks(this.world, this.tanks, this.quality);
     this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, fov: 60, follow: this.player };
     this.armorView = new ArmorView(this); this.lock = null;
     this.assist = new AimAssist(this, opts.aimAssist !== false);
@@ -193,7 +195,13 @@ export class Game {
   }
   setPaused(v) { if (this.ended) return; this.touch?.clear(); this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
   exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
-  resize() { this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix(); if (this.post) this.post.resize(innerWidth, innerHeight); if (this.outline) this.outline.resize(); }
+  resize() {
+    this.camera.aspect = innerWidth / innerHeight;
+    this.camera.updateProjectionMatrix();
+    if (this.post) this.post.resize(innerWidth, innerHeight);
+    if (this.outline) this.outline.resize();
+    this.frameRequested = true;
+  }
   onKill(attacker, victim, cause) {
     this.hud.kill(attacker, victim, cause);
     if (victim.isPlayer) { this.cam.sniper = false; const a = this.tanks.find((t) => t.team === 0 && t.alive); if (a) this.cam.follow = a; }
@@ -396,6 +404,7 @@ export class Game {
     this.updateCapture(dt); this.checkEnd();
     this.assist.preCamera();
     this.updateCamera(dt);
+    this.trackMarks.update(this.time, this.camera.position);
     this.computeAim(); this.assist.postAim(dt);
     this.updateReticle();
     this.armorView.update();
@@ -408,13 +417,14 @@ export class Game {
     this.hud.update(dt, this.camera);
   }
   render() {
+    this.frameRequested = false;
     if (this.post) this.post.render(); else this.renderer.render(this.scene, this.camera);
     if (this.outline && !this.camOverride) this.outline.render(this.assist.outlineTarget(), this.camera);
   }
   dispose() {
     this.touch?.dispose();
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.contactShadows.dispose(); this.effects.dispose(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.contactShadows.dispose(); this.trackMarks.dispose(); this.effects.dispose(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly

@@ -60,12 +60,19 @@ function start(opts, gesture = true) {
 }
 window.__start = start; window.__menu = menu;
 addEventListener('resize', () => { resizeRenderer(game?.quality ?? 'menu'); garage.resize(innerWidth, innerHeight); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && game) game.frameRequested = true;
+});
 let last = performance.now(); let fpsAcc = 0, fpsN = 0; window.__fps = 0;
 function loop() {
   requestAnimationFrame(loop); const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now;
   fpsAcc += dt; fpsN++; if (fpsAcc > 1) { window.__fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
   if (mode === 'menu') { renderer.toneMappingExposure = 0.9; garage.render(dt); }
-  else if (mode === 'game' && game) { if (game.debugPaused) game.updateCamera(1 / 60); else game.update(dt); game.render(); }
+  else if (mode === 'game' && game) {
+    if (game.debugPaused) game.updateCamera(1 / 60);
+    else game.update(dt);
+    if (!game.paused || game.debugPaused || game.frameRequested) game.render();
+  }
 }
 loop();
 window.__ready = true;
