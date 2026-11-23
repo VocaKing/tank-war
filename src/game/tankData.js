@@ -354,6 +354,7 @@ export const TANKS = [
       { name: '3OF26 HE-FRAG', type: 'HE', caliber: 125, pen: 45, velocity: 850, damage: 600, count: 8, blastRadius: 5.7 },
     ],
     paint: { base: '#59604d', camo: ['#343d31', '#85816b'], accent: '#424a3a' },
+    systemTag: 'UNMANNED TURRET · ERA + APS',
     desc: 'Unmanned turret and isolated three-person crew capsule; layered modular reactive armour and a limited-charge hard-kill active protection system.',
   },
   {
@@ -375,6 +376,7 @@ export const TANKS = [
       { name: '105 mm HE', type: 'HE', caliber: 105, pen: 25, velocity: 700, damage: 430, count: 5, blastRadius: 4.5 },
     ],
     paint: { base: '#58634b', camo: ['#374333', '#777b62'], accent: '#46503c' },
+    systemTag: 'TURRETLESS · HULL AIM',
     desc: 'Turretless Swedish S-tank. The fixed 105 mm gun is aimed by pivoting the hull and pitching the entire vehicle with its hydropneumatic suspension.',
   },
   {
@@ -394,6 +396,7 @@ export const TANKS = [
       { name: '183 mm L4A1 HESH', type: 'HESH', caliber: 183, pen: 190, velocity: 762, damage: 1180, count: 12, blastRadius: 9.5 },
     ],
     paint: { base: '#59624c', camo: ['#333c2e', '#777c62'], accent: '#414a38' },
+    systemTag: '183 mm HESH · OPEN MOUNT',
     desc: 'Experimental open gun mounting for the 183 mm L4A1. Extreme HESH impact and recoil, tiny ammunition supply, exposed crew and a restricted safe firing arc.',
   },
   {
@@ -416,6 +419,7 @@ export const TANKS = [
       { name: 'M344A1 106 mm HEAT', type: 'HEAT', caliber: 106, pen: 320, velocity: 503, damage: 410, count: 18 },
     ],
     paint: { base: '#565d42', camo: ['#333a2c', '#7c8061'], accent: '#444b35' },
+    systemTag: 'SIX RECOILLESS RIFLES · SALVO',
     desc: 'Ultra-light open-top tank destroyer with six 106 mm M40 recoilless rifles. Select single, paired or six-tube salvo fire; thin armour leaves the crew exposed.',
   },
   {
@@ -437,6 +441,7 @@ export const TANKS = [
       { name: '120 mm HE', type: 'HE', caliber: 120, pen: 35, velocity: 900, damage: 560, count: 8, blastRadius: 5.0 },
     ],
     paint: { base: '#6b7054', camo: ['#3c4637', '#929078'], accent: '#555b43' },
+    systemTag: '8×8 WHEELS · 120 mm',
     desc: 'High-mobility 8×8 wheeled tank destroyer with a 120 mm L/45 cannon. Exceptional road speed, but noticeably less traction away from prepared roads.',
   },
   {
@@ -457,6 +462,7 @@ export const TANKS = [
       { name: '3OF26 HE', type: 'HE', caliber: 125, pen: 35, velocity: 850, damage: 560, count: 16, blastRadius: 5.5 },
     ],
     paint: { base: '#59634c', camo: ['#344030', '#88836a'], accent: '#454e39' },
+    systemTag: 'AMPHIBIOUS · HYDRO SUSPENSION',
     desc: 'Airborne amphibious light tank destroyer. Its 125 mm gun uses an autoloader; adjustable hydropneumatic suspension changes the vehicle stance, and water imposes no normal mobility penalty.',
   },
   {
@@ -477,6 +483,7 @@ export const TANKS = [
       { name: '155 mm HE / BONUS', type: 'HE', caliber: 155, pen: 55, velocity: 850, damage: 650, count: 21, blastRadius: 11.5 },
     ],
     paint: { base: '#667052', camo: ['#394333', '#8a866d'], accent: '#4b553c' },
+    systemTag: '155 mm AUTO · SHOOT & SCOOT',
     desc: 'Fully automated wheeled 155 mm artillery system. Protected crew cabin, rapid automatic firing-position deployment, three-round fire mission and automatic shoot-and-scoot packing cycle.',
   },
   {
@@ -498,6 +505,7 @@ export const TANKS = [
       { name: '9M120 Ataka-T ATGM', type: 'HEAT', caliber: 130, pen: 700, velocity: 550, damage: 650, count: 4, guided: true, blastRadius: 3.0 },
     ],
     paint: { base: '#5d644e', camo: ['#374031', '#85806a'], accent: '#48503c' },
+    systemTag: 'TWIN 30 mm · ATGM',
     desc: 'Tank-support combat vehicle with twin 30 mm autocannons, four ready anti-tank guided missiles and heavy modular protection. The autocannons fire controlled bursts.',
   },
   {
@@ -518,6 +526,7 @@ export const TANKS = [
       { name: '57 mm HE-FRAG', type: 'HE', caliber: 57, pen: 18, velocity: 700, damage: 190, count: 40, blastRadius: 6.0 },
     ],
     paint: { base: '#59634d', camo: ['#344031', '#89846b'], accent: '#454e3a' },
+    systemTag: '57 mm AUTOCANNON · AIRBURST',
     desc: 'Tracked 57 mm air-defence gun system with passive 360-degree target search, rapid autocannon bursts and programmable time-fuzed airburst ammunition.',
   },
   {
@@ -543,6 +552,7 @@ export const TANKS = [
       { name: '105 mm HEP', type: 'HESH', caliber: 105, pen: 100, velocity: 730, damage: 480, count: 6 },
     ],
     paint: { base: '#62694d', camo: ['#374232', '#8c886e'], accent: '#4c553d' },
+    systemTag: 'THREE ARMOUR KITS · AIR-MOBILE',
     desc: 'Air-transportable light tank with three removable armour packages. Select the light airborne fit or trade mobility for stronger add-on protection.',
   }
 ];
