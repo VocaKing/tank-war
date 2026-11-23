@@ -302,9 +302,11 @@ export class Game {
   updateReticle() {
     // simulate actual gun trajectory to find where the shell would land
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    // High-arc artillery prediction is much longer; update it at 10 Hz rather than every render frame.
+    if (p.spec.artillery) { if (this.time - (this._lastArtilleryReticleAt ?? -1e9) < 0.1) return; this._lastArtilleryReticleAt = this.time; }
     const m = p.model; const pos = m.muzzle.getWorldPosition(new THREE.Vector3()); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
     const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity).add(p.vel); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
-    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = p.spec.artillery ? 0.03 : 0.02;
+    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = p.spec.artillery ? 0.04 : 0.02;
     const maxSteps = p.spec.artillery ? Math.ceil((p.spec.artillery.maxFlightSeconds || 42) / h) : 200;
     for (let i = 0; i < maxSteps && !hitP; i++) {
       a.copy(pos); v.y -= 9.81 * h; b.copy(pos).addScaledVector(v, h);
