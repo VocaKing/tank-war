@@ -147,8 +147,8 @@ export class AIController {
       const engageStop = tgt && ((this.role === 'assault' && dTgt < 380 && this.bestRatio > 0.7) || this.state === 'capture' || atHold || (this.state === 'retreat' && t.inBush));
       if (atHold || engageStop) {
         moving = false;
-        if (tgt) this.faceHeading(Math.atan2(tgt.pos.x - t.pos.x, tgt.pos.z - t.pos.z) + this.angleOff);
-        else if (this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);
+        if (tgt && !t.spec.fixedGun) this.faceHeading(Math.atan2(tgt.pos.x - t.pos.x, tgt.pos.z - t.pos.z) + this.angleOff);
+        else if (!tgt && this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);
         else { t.input.throttle = 0; t.input.steer = 0; }
         if (this.state === 'capture' && !tgt) { const b = this.enemyBase; if (Math.hypot(t.pos.x - b.x, t.pos.z - b.z) > b.r * 0.7) { moving = true; this.steerTo(b.x, b.z, 0.6); } }
       } else if (this.path.length && this.pi < this.path.length) {

@@ -5,6 +5,8 @@ Browser 3D tank battle (Three.js r170 + Vite). 15 tanks in 4 tiers (WWII mediums
 - Dev: `npm install && npm run dev` · Build: `npm run build` (output in dist/) · Preview: `npm run preview`
 - Play the build: serve dist/ with any static server (see dist/README.txt).
   URL params: `?autostart=1&map=village|forest|desert&tank=<id>&q=low|medium|high`
+- `?fixedGunTest=1` applies fixed-gun aiming to the player's selected vehicle for that match.
+  Vehicle specs opt into this mechanism with `fixedGun: true`. Release WASD or the touch joystick to aim with the hull.
   Tank ids: sherman t34 tiger panther is2 pershing centurion t72 leo1 m1a2 chally2 leo2a6 merkava4 type99a t90m
 - Aiming: Shift / right click = sniper; wheel = zoom ×2/4/8/16; X = armor-penetration view (sniper only, default on);
   E = lock gun on the target under the crosshair. Reticle = predicted ballistic impact; circle = current dispersion.

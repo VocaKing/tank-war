@@ -54,7 +54,7 @@ export class Game {
     this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, fov: 60, follow: this.player };
     this.armorView = new ArmorView(this); this.lock = null;
     this.assist = new AimAssist(this, opts.aimAssist !== false);
-    this.keys = {}; this.mouseDown = false; this.aimPoint = new THREE.Vector3();
+    this.keys = {}; this.mouseDown = false; this.aimPoint = this.player.input.aim.clone();
     this.hud = new HUD(uiRoot, this);
     this.bindInput();
     if (isMobile()) this.touch = new TouchControls(this);
@@ -90,7 +90,9 @@ export class Game {
       const list = team ? team1 : team0; const names = (team ? ENEMY_NAMES : ALLY_NAMES).slice().sort(() => r.next() - 0.5);
       list.forEach((id, i) => {
         const isPlayer = team === 0 && i === 0;
-        const spec = TANK_BY_ID[id]; const lo = isPlayer ? sanitizeLoadout(spec, this.opts.loadout) : npcLoadout(spec, r); const items = isPlayer ? sanitizeItems(this.opts.items || DEFAULT_ITEMS) : (r.next() < 0.5 ? ['repair', 'extinguisher', 'medkit'] : r.next() < 0.5 ? ['repair', 'medkit', 'reload'] : ['repair', 'extinguisher', 'smoke']);
+        const stock = TANK_BY_ID[id];
+        const spec = isPlayer && this.opts.fixedGunTest ? { ...stock, fixedGun: true } : stock;
+        const lo = isPlayer ? sanitizeLoadout(spec, this.opts.loadout) : npcLoadout(spec, r); const items = isPlayer ? sanitizeItems(this.opts.items || DEFAULT_ITEMS) : (r.next() < 0.5 ? ['repair', 'extinguisher', 'medkit'] : r.next() < 0.5 ? ['repair', 'medkit', 'reload'] : ['repair', 'extinguisher', 'smoke']);
         const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer, lo, items);
         let x = base.x + fx * (18 + (i % 3) * 16) + px * ((i - 3) * 22 + r.range(-6, 6)) + r.range(-8, 8), z = base.z + fz * (18 + (i % 3) * 16) + pz * ((i - 3) * 22 + r.range(-6, 6)) + r.range(-8, 8);
         const [ci, cj] = this.nav.nearestWalkable(...this.nav.toCell(x, z)); [x, z] = this.nav.center(ci, cj);
@@ -117,6 +119,7 @@ export class Game {
       if (slot !== undefined && slot >= 0) this.useItem(slot);
     });
     on(window, 'keyup', (e) => { this.keys[e.code] = false; if (e.code === 'Tab') this.hud.scoreboard(false); });
+    on(window, 'blur', () => { this.keys = {}; this.mouseDown = false; });
     on(c, 'mousedown', (e) => {
       if (this.touch) return;
       this.audio.init(); this.audio.resume();
@@ -243,11 +246,26 @@ export class Game {
   // ---------- per-frame ----------
   updatePlayerInput() {
     const p = this.player; const k = this.keys;
-    if (!p.alive || this.ended) { p.input.throttle = 0; p.input.steer = 0; return; }
-    p.input.throttle = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0); p.input.steer = (k.KeyA ? 1 : 0) - (k.KeyD ? 1 : 0);
-    if (this.touch) { p.input.throttle = clamp(p.input.throttle + this.touch.throttle,-1,1); p.input.steer = clamp(p.input.steer + this.touch.steer,-1,1); }
+    if (!p.alive || this.ended) {
+      p.input.throttle = 0; p.input.steer = 0; p.input.driveHeld = true;
+      return;
+    }
+    p.input.throttle = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
+    p.input.steer = (k.KeyA ? 1 : 0) - (k.KeyD ? 1 : 0);
+    p.input.driveHeld = !!(k.KeyW || k.KeyA || k.KeyS || k.KeyD || k.Space || this.touch?.driveHeld);
+    if (this.touch) { p.input.throttle = clamp(p.input.throttle + this.touch.throttle, -1, 1); p.input.steer = clamp(p.input.steer + this.touch.steer, -1, 1); }
     if (k.Space) { p.input.throttle = 0; if (!p.airborne) p.speed *= 0.9; }
     p.input.aim.copy(this.aimPoint);
+    if (p.spec.fixedGun && !this.debugAim && !this.lock) {
+      const dir = this.camDir();
+      const forward = (p.input.aim.x - p.pos.x) * dir.x + (p.input.aim.z - p.pos.z) * dir.z;
+      // A chase camera can hit a wall behind the vehicle. Keep following
+      // the sight direction there so the hull cannot turn away from the view.
+      if (forward <= 0.1) {
+        p.input.aim.copy(p.pos).addScaledVector(dir, 100);
+        p.input.aim.y += p.model.turret.position.y + p.model.gun.position.y;
+      }
+    }
     if (this.mouseDown || this.touch?.firing) p.tryFire(this.time);
   }
   updateCapture(dt) {

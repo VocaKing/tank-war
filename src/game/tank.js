@@ -5,11 +5,12 @@ import { DEG, clamp, lerp, approach, approachAngle, wrapAngle } from '../util.js
 import { armorZone, zoneLowerSideY } from './tankData.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
-import { advanceDispersion, incidence } from './combatMath.js';
+import { advanceDispersion, impactDrop, incidence } from './combatMath.js';
 
 export const GRAVITY = 9.81;
 let NEXT_ID = 1;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+const _gunPose = new THREE.Quaternion();
 
 export function ballisticAngle(v, R, dy) {
   const g = GRAVITY; const v2 = v * v; const disc = v2 * v2 - g * (g * R * R + 2 * dy * v2);
@@ -32,7 +33,8 @@ export class Tank {
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
     this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
-    this.input = { throttle: 0, steer: 0, aim: new THREE.Vector3(0, 0, 0) };
+    this.input = { throttle: 0, steer: 0, driveHeld: false, aim: new THREE.Vector3() };
+    this.hullAiming = false;
     this.lastFired = -100; this.inBush = null; this.visibleUntil = [0, 0]; this.spotted = [false, false]; this.lastSeenPos = [null, null];
     this.stats = { damage: 0, kills: 0, shots: 0, hits: 0, pens: 0, received: 0 };
     this.lastAttacker = null; this.lastDamagedAt = -100; this.inWater = false; this.groundY = 0; this.moved = 0;
@@ -69,6 +71,8 @@ export class Tank {
     this.pos.set(x, 0, z);
     this.heading = heading;
     this.turretYaw = 0;
+    if (this.hullAiming) this.turnRate = 0;
+    this.hullAiming = false;
     this.rock = this.rockV = 0;
     this._rockLift = 0;
     this.vel.set(0, 0, 0);
@@ -85,6 +89,7 @@ export class Tank {
     if (this.burning > 0) { this.burning -= dt; this.damage(this.maxHp * 0.012 * dt, this.lastAttacker, 'fire'); if (!this.alive) return; }
     if (this.airborne) {
       this.turnRate = 0;
+      this.hullAiming = false;
       const level = W.terrain.waterLevel(this.pos.x, this.pos.z);
       this.inWater = level - this.pos.y > 0.15;
     } else {
@@ -133,14 +138,53 @@ export class Tank {
     this.speed = approach(this.speed, target, (braking ? (mobile ? 3.0 : 6) : accel) * dt);
     const vmaxF = (s.maxSpeed / 3.6) * lf;
     const turnMax = s.hullTraverse * DEG * driver * (mobile ? 1 : 0) * (1 - 0.45 * Math.min(1, Math.abs(this.speed) / vmaxF)) * (this.inWater ? 0.6 : 1);
-    const turnTarget = steer * turnMax * (this.speed < -0.3 ? -1 : 1);
-    this.turnRate = approach(this.turnRate, turnTarget, turnMax * 3 * dt + 0.001);
+    const hullAim = s.fixedGun === true && mobile && !this.input.driveHeld && thr === 0 && steer === 0;
+    if (this.hullAiming && !hullAim) this.turnRate = 0;
+    this.hullAiming = hullAim;
+    if (hullAim && dt > 0) {
+      const error = this.fixedGunHeadingError();
+      const turnTarget = clamp(error / dt, -turnMax, turnMax);
+      const turnRate = approach(this.turnRate, turnTarget, turnMax * 3 * dt + 0.001);
+      // The final step cannot pass the aim point or turn away from it on reversal.
+      this.turnRate = clamp(turnRate * dt, Math.min(0, error), Math.max(0, error)) / dt;
+    } else {
+      const turnTarget = steer * turnMax * (this.speed < -0.3 ? -1 : 1);
+      this.turnRate = s.fixedGun && !mobile ? 0 : approach(this.turnRate, turnTarget, turnMax * 3 * dt + 0.001);
+    }
     if (Math.abs(steer) > 0.1 && Math.abs(thr) < 0.1) this.speed *= Math.pow(0.6, dt);
     this.heading = wrapAngle(this.heading + this.turnRate * dt);
   }
+  fixedGunHeadingError() {
+    const aim = this.input.aim;
+    const dx = aim.x - this.pos.x, dz = aim.z - this.pos.z;
+    const range = Math.hypot(dx, dz);
+    if (!Number.isFinite(range + aim.y) || range < 0.1) return 0;
+    const { turret, gun } = this.model;
+    const mountX = turret.position.x + gun.position.x;
+    const tilt = this.pitch + this.rock;
+    // A fixed gun can elevate in the hull's forward plane. Align that
+    // plane with the sight, accounting for the mount offset and side slope.
+    const sinRoll = Math.sin(this.roll);
+    const rightX = Math.cos(this.roll), rightZ = sinRoll * Math.sin(tilt);
+    const rightY = sinRoll * Math.cos(tilt);
+    const dy = aim.y - this.pos.y;
+    const drop = rightY === 0 ? 0 : impactDrop(range * range, dy - turret.position.y - gun.position.y, this.shell.velocity, GRAVITY);
+    const lateral = (mountX - (dy + drop) * rightY) / (range * Math.hypot(rightX, rightZ));
+    if (Math.abs(lateral) >= 1) return 0;
+    const heading = Math.atan2(dx, dz) + Math.atan2(rightZ, rightX) - Math.asin(lateral);
+    return wrapAngle(heading - this.heading);
+  }
   updateTurret(dt) {
     const s = this.spec, m = this.model;
-    const aim = _v.copy(this.input.aim).applyMatrix4(this.inv).sub(m.turret.position);
+    const aim = _v.copy(this.input.aim);
+    let pose = this.quat;
+    if (s.fixedGun) {
+      // The drivetrain may already have rotated the hull this frame.
+      pose = _gunPose.setFromEuler(_e.set(this.pitch + this.rock, this.heading, this.roll, 'YXZ'));
+      aim.sub(this.pos).applyQuaternion(_q.copy(pose).invert());
+      this.turretYaw = 0;
+    } else aim.applyMatrix4(this.inv);
+    aim.sub(m.turret.position);
     if (!Number.isFinite(aim.x + aim.y + aim.z)) return;
     // Solve around the turret axis. The trunnion moves as the turret turns,
     // so aiming from its current position can oscillate at point-blank range.
@@ -155,15 +199,18 @@ export class Tank {
     // Converge upwards no closer than the muzzle. Nearby surfaces above the
     // gun pivot would otherwise demand steep angles for tiny height changes.
     const aimRange = Math.max(forward, rise > 0 ? m.muzzle.position.z : 0.01);
-    _v2.set(sin * aimRange, rise, cos * aimRange).applyQuaternion(this.quat);
+    _v2.set(sin * aimRange, rise, cos * aimRange).applyQuaternion(pose);
     const { x: dx, y: dy, z: dz } = _v2;
     const horizontal = Math.hypot(dx, dz);
     const th = ballisticAngle(this.shell.velocity, horizontal, dy);
     _v2.set(dx / (horizontal || 1) * Math.cos(th), Math.sin(th), dz / (horizontal || 1) * Math.cos(th));
-    _q.copy(this.quat).invert(); _v2.applyQuaternion(_q);
+    _q.copy(pose).invert(); _v2.applyQuaternion(_q);
     const yawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
-    const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
-    const prev = this.turretYaw; this.turretYaw = wrapAngle(approachAngle(this.turretYaw, yawT, rate * dt));
+    const prev = this.turretYaw;
+    if (!s.fixedGun) {
+      const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
+      this.turretYaw = wrapAngle(approachAngle(prev, yawT, rate * dt));
+    }
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
     const minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
     const desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);

@@ -50,7 +50,7 @@ function start(opts, gesture = true) {
   setTimeout(() => {
     try {
       resizeRenderer(opts.quality);
-      game = new Game(renderer, ui, audio, { ...opts, seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
+      game = new Game(renderer, ui, audio, { ...opts, fixedGunTest: params.get('fixedGunTest') === '1', seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
       window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';
