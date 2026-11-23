@@ -14,7 +14,7 @@ export class Menu {
   render() {
     this.root.innerHTML = `
       <div class="brand"><h1>STEEL FRONT</h1><span>3D Tank War · v3.0</span></div>
-      <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small></button>`).join('')).join('')}</div>
+      <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map((t) => `<button class="tcard" data-id="${t.id}"><b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small>${t.systemTag ? `<small class="tcard-system">${t.systemTag}</small>` : ''} </button>`).join('')).join('')}</div>
       <button id="m-balance" class="balance-menu-btn" style="position:absolute;top:24px;right:24px;z-index:40;pointer-events:auto;padding:10px 16px;border:1px solid #8ca7bc;border-radius:6px;background:#263b4e;color:#fff;font:inherit;cursor:pointer">⚙ 游戏平衡编辑器 / Balance Editor</button>\n      <div class="menutools"><button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
