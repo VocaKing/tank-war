@@ -99,7 +99,7 @@ export class Tank {
     if (!this.alive) return;
     this.equip.update(dt);
     if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
-    if (this.modules.tracks < 1) {
+    if (this.trackRepairs[0] > 0 || this.trackRepairs[1] > 0) {
       const previous = this.modules.tracks;
       this.trackRepairs[0] = Math.max(0, this.trackRepairs[0] - dt);
       this.trackRepairs[1] = Math.max(0, this.trackRepairs[1] - dt);
