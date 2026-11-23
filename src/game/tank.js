@@ -400,7 +400,8 @@ export class Tank {
   }
   // effective armour for a hit (from rayTest) and a shell; dist = shell travel
   armorAt(hit, shellSpec, typeInfo) {
-    const A = this.spec.armor; const [arm, zone] = armorZone(this.spec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
+    const armorSpec = this.armorProfile === this.spec.armor ? this.spec : { ...this.spec, armor: this.armorProfile };
+    const A = armorSpec.armor; const [arm, zone] = armorZone(armorSpec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
     let n;
     if (hit.face === 'front') n = new THREE.Vector3(0, Math.sin(slope), Math.cos(slope));
     else if (hit.face === 'rear') n = new THREE.Vector3(0, Math.sin(slope), -Math.cos(slope));
@@ -413,8 +414,13 @@ export class Tank {
     if (cosA < 0) n.negate();
     let eff = los;
     const front = hit.face === 'front', hullSide = hit.part === 'hull' && hit.face === 'side';
-    if (typeInfo.heat) { eff *= A.heatMult || 1; if (A.era && front) eff += A.era; if (A.skirt && hullSide) eff += A.skirt; }
-    else if (!typeInfo.he && A.eraKE && front) eff += A.eraKE;
+    const turretSide = hit.part === 'turret' && hit.face === 'side';
+    if (typeInfo.heat) {
+      eff *= A.heatMult || 1;
+      if (A.era && front) eff += A.era;
+      if (A.eraSide && (hullSide || turretSide)) eff += A.eraSide;
+      if (A.skirt && hullSide) eff += A.skirt;
+    } else if (!typeInfo.he && A.eraKE && (front || hullSide || turretSide)) eff += A.eraKE * (front ? 1 : 0.55);
     let tracks = false;
     if (hullSide && hit.local.y < zoneLowerSideY(this.spec.dims)) { tracks = true; eff += 20; }
     const overmatch = shellSpec.caliber > tmm * 3;
@@ -454,18 +460,24 @@ export class Tank {
       if ((this.spec.engineZone === 'rear' && (lz < -L * 0.22 || hit.face === 'rear')) || (this.spec.engineZone === 'front' && (lz > L * 0.22 || hit.face === 'front'))) { if (this.modules.engine === 1) msgs.push('Engine damaged'); this.modules.engine = 0.5; if (r.next() < 0.22) { this.burning = 7; msgs.push('Fire!'); } }
       const ar = this.spec.ammoRack;
       if (!ar.turretBustle && lz > ar.zMin && lz < ar.zMax && hit.local.y < ar.yMax && r.next() < ar.chance * (shellSpec.type === 'HEAT' ? 1.3 : 1)) { this.damage(this.hp + 1, attacker, 'ammo'); return ['AMMO RACK DETONATED']; }
-      if (hit.tracks || hit.local.y < this.spec.dims.clearance + 0.5) { this.breakTracks(); msgs.push('Tracks destroyed'); }
+      if (hit.tracks || hit.local.y < this.spec.dims.clearance + 0.5) { this.breakTracks(); msgs.push(this.mobilityLabel + ' damaged'); }
     } else {
       if (hit.face === 'front' && r.next() < 0.35) { if (this.modules.gun === 1) msgs.push('Gun damaged'); this.modules.gun = 0.5; }
       if ((hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
       if (this.spec.ammoRack.turretBustle && hit.face === 'rear') { this.ammo = this.ammo.map((n) => Math.floor(n * 0.4)); msgs.push('Bustle ammo cooked off – blow-out panels vented'); }
     }
-    for (const c of this.crew) if (c.alive && r.next() < (shellSpec.type === 'APFSDS' ? 0.16 : shellSpec.type === 'HEAT' ? 0.22 : 0.2)) { c.alive = false; msgs.push(c.role + ' knocked out'); }
+    for (const c of this.crew) {
+      let crewChance = shellSpec.type === 'APFSDS' ? 0.16 : shellSpec.type === 'HEAT' ? 0.22 : 0.2;
+      if (this.spec.openTop) crewChance *= 1.65;
+      if (this.spec.unmannedTurret && hit.part === 'turret') crewChance = 0.015;
+      else if (this.spec.crewCapsule && hit.part === 'hull') crewChance *= 0.72;
+      if (c.alive && r.next() < crewChance) { c.alive = false; msgs.push(c.role + ' knocked out'); }
+    }
     if (this.crew.every((c) => !c.alive)) { this.damage(this.hp + 1, attacker, 'crew'); return msgs.concat(['Crew knocked out']); }
     this.damage(dmg, attacker, 'pen');
     return msgs;
   }
-  breakTracks() { this.modules.tracks = 0; this.trackRepair = 9; this.speed *= 0.2; }
+  breakTracks() { this.modules[this.mobilityModule] = 0; this.trackRepair = 9; this.speed *= 0.2; }
 }
 
 // slab test: returns {t, axis, sign} where sign is outward direction of entered face
