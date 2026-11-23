@@ -7,6 +7,7 @@ import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, castLoft, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
 import { buildSpecialist } from './specialistModels.js';
+import { createMausModel } from './mausModel.js';
 import * as K from './kit.js';
 import { gunMount, hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
 export { THREE };
@@ -638,6 +639,14 @@ function getTemplate(spec) {
 }
 
 export function createTankModel(spec, opts = {}) {
+  if (spec.id === 'mauseng') {
+    const imported = createMausModel(!!opts.links);
+    if (imported) {
+      imported.maxRecoil = MAX_RECOIL;
+      imported.gunPitchFloor = (yaw, min, max) => hullPitchFloor(getTemplate(spec).b, yaw, min, max);
+      return imported;
+    }
+  }
   const tpl = getTemplate(spec); const d = spec.dims; const { b, geo, mats } = tpl;
   const root = new THREE.Group(); root.name = spec.id;
   const body = new THREE.Group(); root.add(body); // body receives pitch/roll
@@ -705,6 +714,10 @@ const _mat = new THREE.Matrix4(), _pos = new V3(), _scl = new V3(), _qq = new TH
 // switch between individual links (near) and the scrolling textured ribbon (far)
 export function setTrackLOD(model, near) {
   if (model.linksOn === near) return; model.linksOn = near;
+  if (model.setRunningGearNear) {
+    model.setRunningGearNear(near);
+    return;
+  }
   for (let i = 0; i < 2; i++) { model.links[i].visible = near; model.tracks[i].visible = !near; }
   model.wheels.geometry = near ? model.wheelGeo : model.wheelGeoLo;
   if (near) updateLinks(model);
@@ -724,6 +737,10 @@ function updateLinks(model) {
 }
 // distL / distR: distance travelled by each track this frame (m)
 export function updateRunningGear(model, distL, distR) {
+  if (model.moveRunningGear) {
+    model.moveRunningGear(distL, distR);
+    return;
+  }
   const tp = model.pitch || 0.17; model.trackOffset[0] -= distL / tp; model.trackOffset[1] -= distR / tp;
   model.trackTex[0].offset.x = model.trackOffset[0]; model.trackTex[1].offset.x = model.trackOffset[1];
   model.spinL = (model.spinL || 0) + distL; model.spinR = (model.spinR || 0) + distR;

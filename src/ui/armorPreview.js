@@ -63,7 +63,7 @@ export function applyArmorPreview(model, spec, shellOrPen) {
   let n = 0;
   model.root.traverse((o) => {
     if (!o.isMesh || o.userData.decal) return;
-    if (o === model.wheels || o === model.sprockets) return;
+    if (o.userData.runningGear || o === model.wheels || o === model.sprockets) return;
     if (model.tracks && model.tracks.includes(o)) return;
     if (model.links && model.links.includes(o)) return;
     const key = o.userData.matKey;

@@ -376,7 +376,7 @@ export class Game {
     this.world.updateTerrainLOD(this.camera);
     this.contactShadows.update(this.camera.position);
     const cp = this.camera.position; const k = this.camera.fov / 60; const near = this.quality === 'low' ? 22 : this.quality === 'high' ? 60 : 40;
-    for (const t of this.tanks) { if (!t.model.links) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
+    for (const t of this.tanks) { if (!t.model.links && !t.model.setRunningGearNear) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
   }
   buildEarthwork(tank) {
     const shape = this.world.addEarthwork(tank, this.tanks);

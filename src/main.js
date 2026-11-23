@@ -3,6 +3,9 @@ import { Garage } from './ui/garage.js';
 import { Menu } from './ui/menu.js';
 import { initPhysics } from './game/physics.js';
 import { Game } from './game/game.js';
+import { TANK_BY_ID } from './game/tankData.js';
+import { loadMausModel } from './models/mausModel.js';
+import { RNG } from './util.js';
 import { Audio } from './game/audio.js';
 import { setMaxAniso } from './world/textures.js';
 import { isMobile } from './ui/touchControls.js';
@@ -33,6 +36,9 @@ const garage = new Garage(renderer); garage.resize(innerWidth, innerHeight);
 let game = null; let mode = 'menu';
 const loading = document.createElement('div'); loading.className = 'loading'; loading.innerHTML = '<div><h2>Generating battlefield…</h2><p>Sculpting 1.4 km of terrain, planting forests, building villages</p><div class="spin"></div></div>'; ui.appendChild(loading);
 const menu = new Menu(ui, garage, start, openBalance);
+const requestedTank = params.get('tank');
+const tankId = Object.prototype.hasOwnProperty.call(TANK_BY_ID, requestedTank) ? requestedTank : null;
+if (tankId && !params.has('autostart')) menu.select(tankId);
 if (mobile) { if (!localStorage.getItem('tw_mobile_q_init')) { menu.quality='low'; menu.root.querySelector('#m-q').value='low'; localStorage.setItem('tw_q','low'); localStorage.setItem('tw_mobile_q_init','1'); } const hint=document.createElement('div');hint.className='mobile-garage-hint';hint.textContent='手机版 v2 · 滑动查看全部功能 · 战斗建议横屏';menu.root.prepend(hint);
  const inspect=document.createElement('button');inspect.className='mobile-inspect';inspect.textContent='全屏查看 3D 模型';menu.root.append(inspect);
  const back=document.createElement('button');back.className='mobile-inspect-back';back.textContent='返回车库';back.hidden=true;ui.append(back);
@@ -50,9 +56,12 @@ function start(opts, gesture = true) {
   menu.show(false); loading.style.display = 'flex'; mode = 'loading';
   setTimeout(async () => {
     try {
-      const physicsEngine = await initPhysics();
+      const seed = Number(params.get('seed')) || ((Math.random() * 1e9) | 0) || 1;
+      // Matchmaking uses its own RNG here so the real match consumes the usual sequence.
+      const needsMaus = Game.matchmake(opts.tankId, new RNG(seed)).includes('mauseng');
+      const [physicsEngine] = await Promise.all([initPhysics(), needsMaus ? loadMausModel() : null]);
       resizeRenderer(opts.quality);
-      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
+      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
       window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';
@@ -78,4 +87,4 @@ function loop() {
 }
 loop();
 window.__ready = true;
-if (params.get('autostart')) start({ tankId: params.get('tank') || 'sherman', mapId: params.get('map') || 'village', quality: params.get('q') || (mobile?'low':'high'), loadout: params.get('loadout') ? params.get('loadout').split(',').map(Number) : undefined, items: params.get('items') ? params.get('items').split(',') : undefined, aimAssist: params.get('aa') !== '0' && localStorage.getItem('tw_aa') !== '0' }, false);
+if (params.get('autostart')) start({ tankId: tankId || 'sherman', mapId: params.get('map') || 'village', quality: params.get('q') || (mobile?'low':'high'), loadout: params.get('loadout') ? params.get('loadout').split(',').map(Number) : undefined, items: params.get('items') ? params.get('items').split(',') : undefined, aimAssist: params.get('aa') !== '0' && localStorage.getItem('tw_aa') !== '0' }, false);

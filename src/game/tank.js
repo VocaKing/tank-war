@@ -121,7 +121,9 @@ export class Tank {
     }
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
     if (this.secondaryReloadLeft > 0) this.secondaryReloadLeft = Math.max(0, this.secondaryReloadLeft - dt);
-    if (this.model.blade) {
+    if (this.model.moveBlade) {
+      this.model.moveBlade(this.abilities.dozerActive, dt);
+    } else if (this.model.blade) {
       this.model.blade.position.y = approach(this.model.blade.position.y, this.abilities.dozerActive ? 0.48 : 1.22, dt * 2.5);
       this.model.blade.rotation.x = approach(this.model.blade.rotation.x, this.abilities.dozerActive ? 0.13 : -0.35, dt * 1.5);
     }

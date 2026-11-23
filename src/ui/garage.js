@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createTankModel } from '../models/tankModel.js';
+import { loadMausModel } from '../models/mausModel.js';
 import { applyArmorPreview, clearArmorPreview } from './armorPreview.js';
 import { pbrTex } from '../world/textures.js';
 
@@ -56,6 +57,20 @@ export class Garage {
     this.current.turret.rotation.y = 0.0; this.current.gun.rotation.x = -0.04;
     this.spec = spec;
     if (this.armorMode) this.setArmorMode(true);
+    if (spec.id === 'mauseng' && !this.current.root.userData.importedMaus) {
+      const placeholder = this.current;
+      loadMausModel().then(loaded => {
+        if (!loaded || this.models[spec.id] !== placeholder) return;
+        this.models[spec.id] = createTankModel(spec, { links: true });
+        clearArmorPreview(placeholder);
+        if (this.current === placeholder) this.show(spec);
+        placeholder.links.forEach(mesh => mesh.dispose());
+        placeholder.wheels.dispose();
+        placeholder.sprockets.dispose();
+        placeholder.tracks.forEach(mesh => mesh.material.dispose());
+        placeholder.trackTex.forEach(texture => texture.dispose());
+      });
+    }
   }
   setArmorMode(on, shell) {
     this.armorMode = !!on;

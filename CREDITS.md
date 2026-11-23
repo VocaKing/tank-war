@@ -27,7 +27,8 @@ Downloaded at 1K, recompressed to JPEG (q82). Files in public/tex/ (copied to di
 | studio_1k.hdr | https://polyhaven.com/a/studio_small_08 (garage lighting) |
 
 ## Procedural assets (made for this project, no third-party license)
-- All 15 tank models (geometry built in code from published dimensions), camouflage, track links, wheels, decal textures.
+- Procedural tank geometry, camouflage, track links, wheels, and decal textures.
+- Maus Engineering HD model and textures — supplied with the project by the owner.
 - Grass cards and building details (frames, gutters, damage) — procedural.
 - Foliage cards (leaves, needles, palm fronds), water normals, window textures — drawn on canvas at runtime.
 - Terrain, maps, buildings, vegetation placement — procedural.
