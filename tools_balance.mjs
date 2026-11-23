@@ -3,13 +3,14 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {SPECIALIST_TANKS} from './src/game/specialistTanks.js';
+import {EXPANSION_TANKS} from './src/game/expansionTanks.js';
 const source=await readFile(new URL('./src/game/tankData.js',import.meta.url),'utf8');
 const config=await readFile(new URL('./src/game/balanceConfig.js',import.meta.url),'utf8');
 const strip=s=>s.replace(/^import .*$/gm,'').replace(/^export /gm,'');
 const store=new Map(),env={localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)}};
 const api=new Function('globalThis',strip(config)+'\nreturn {STORAGE_KEY,EMPTY,clone,effective,legacyMaxDispersion,loadLocal,saveLocal,diff};')(env);
 function load(published=api.EMPTY()){
- return new Function('publishedBalance','clone','effective','legacyMaxDispersion','loadLocal','EMPTY','SPECIALIST_TANKS',strip(source)+'\nreturn {TANKS,TANK_BY_ID,STOCK_TANKS,armorZone,penAtRange,sanitizeLoadout,BALANCE_STATUS};')(published,api.clone,api.effective,api.legacyMaxDispersion,api.loadLocal,api.EMPTY,SPECIALIST_TANKS);
+ return new Function('publishedBalance','clone','effective','legacyMaxDispersion','loadLocal','EMPTY','SPECIALIST_TANKS','EXPANSION_TANKS',strip(source)+'\nreturn {TANKS,TANK_BY_ID,STOCK_TANKS,armorZone,penAtRange,sanitizeLoadout,BALANCE_STATUS};')(published,api.clone,api.effective,api.legacyMaxDispersion,api.loadLocal,api.EMPTY,SPECIALIST_TANKS,EXPANSION_TANKS);
 }
 const stock=load().STOCK_TANKS,cfg=api.EMPTY();
 const stockTiger=stock.find(t=>t.id==='tiger');

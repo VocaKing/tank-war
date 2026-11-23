@@ -331,7 +331,7 @@ export class Tank {
     const p = this.pos.clone(); p.y += this.spec.dims.hullH;
     g.effects.explosion(p, true); g.audio.impact(p, 'explosion');
     g.effects.addBurner(this.model.root, new THREE.Vector3(0, this.spec.dims.hullH + 0.3, -this.spec.dims.L * 0.25), 45, 1);
-    if (cause === 'ammo') {
+    if (cause === 'ammo' && !this.spec.casemate) {
       // turret blown off
       const t = this.model.turret; const wp = t.getWorldPosition(new THREE.Vector3()); const wq = t.getWorldQuaternion(new THREE.Quaternion());
       this.turretGone = true; g.scene.attach(t); t.position.copy(wp); t.quaternion.copy(wq);
@@ -353,7 +353,7 @@ export class Tank {
       }
     } else {
       if (hit.face === 'front' && r.next() < 0.35) { if (this.modules.gun === 1) msgs.push('Gun damaged'); this.modules.gun = 0.5; }
-      if ((hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
+      if (!this.spec.casemate && (hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
       if (this.spec.ammoRack.turretBustle && hit.face === 'rear') { this.ammo = this.ammo.map((n) => Math.floor(n * 0.4)); msgs.push('Bustle ammo cooked off – blow-out panels vented'); }
     }
     for (const c of this.crew) if (c.alive && r.next() < (shellSpec.type === 'APFSDS' ? 0.16 : shellSpec.type === 'HEAT' ? 0.22 : 0.2)) { c.alive = false; msgs.push(c.role + ' knocked out'); }

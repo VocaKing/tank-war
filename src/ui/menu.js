@@ -10,7 +10,7 @@ const typeBadge = (type) => `<span class="ability-badge ${type}">${type === 'act
 function tankCard(t) {
   const abilities = describeTankAbilities(t);
   return `<button class="tcard" data-id="${t.id}" aria-pressed="false">
-    <b>${t.short}<em>${t.cls}</em></b><small>${t.nation} · ${t.year}</small>
+    <b>${t.short}<em>${t.casemate ? 'TD' : t.cls}</em></b><small>${t.nation} · ${t.year}</small>
     ${abilities.length ? `<span class="tank-ability-labels" lang="zh-CN">${abilities.map(({ type, name }) =>
       `<span class="tank-ability-label">${typeBadge(type)} ${name}</span>`).join('')}</span>` : ''}
   </button>`;
@@ -120,15 +120,17 @@ export class Menu {
     }
     const bar = (label, v, max, unit = '', inv = false) => { const f = Math.max(0.04, Math.min(1, inv ? 1 - v / max + 0.15 : v / max)); return `<div class="bar"><span>${label}</span><div><i style="width:${f * 100}%"></i></div><b>${v}${unit}</b></div>`; };
     const sh = t.shells[0]; const a = t.armor;
+    const upperArmor = t.casemate ? 'Casemate' : 'Turret';
     const stats = this.root.querySelector('#m-stats');
     stats.innerHTML = `<h2>${t.name}</h2><div class="tag">Tier ${['I', 'II', 'III', 'IV'][t.tier - 1]} ${t.cls} · ${t.nation} · ${t.era} · ${t.year} · crew ${t.crew.length}${t.autoloader ? ' (autoloader)' : ''}</div>
       ${!this.mobile && skills ? `<section class="vehicle-skills" lang="zh-CN" aria-label="车辆技能">${skills}</section>` : ''}
       <p>${t.desc}</p>
-      ${bar('Hit points', t.hp, 2000)}${bar('Damage (AP)', sh.damage, 450)}${bar('Penetration', sh.pen, 760, ' mm')}${bar('Hull front (LOS)', los(a.hull.front), 700, ' mm')}${bar('Turret front (LOS)', los(a.turret.front), 950, ' mm')}
-      ${bar('Top speed', t.maxSpeed, 72, ' km/h')}${bar('Reload', t.reload, 19, ' s', true)}${bar('Turret traverse', t.turretTraverse, 45, '°/s')}${bar('View range', t.viewRange, 520, ' m')}
+      ${t.casemate ? `<p>Fixed gun. Release ${this.mobile ? 'the drive joystick' : 'WASD'} to aim with the hull.</p>` : ''}
+      ${bar('Hit points', t.hp, 2000)}${bar('Damage (' + (sh.type === 'HE' ? 'HE' : 'AP') + ')', sh.damage, 450)}${bar('Penetration', sh.pen, 760, ' mm')}${bar('Hull front (LOS)', los(a.hull.front), 700, ' mm')}${bar(upperArmor + ' front (LOS)', los(a.turret.front), 950, ' mm')}
+      ${bar('Top speed', t.maxSpeed, 72, ' km/h')}${bar('Reload', t.reload, 19, ' s', true)}${t.casemate ? bar('Hull traverse', t.hullTraverse, 45, '°/s') : bar('Turret traverse', t.turretTraverse, 45, '°/s')}${bar('View range', t.viewRange, 520, ' m')}
       <table class="armor"><tr><th></th><th>Front</th><th>Side</th><th>Rear</th><th>Top</th></tr>
         <tr><td>Hull</td>${['front', 'side', 'rear', 'top'].map((k) => `<td>${a.hull[k][0]}<small>${a.hull[k][1] ? ' @' + a.hull[k][1] + '°' : ''}</small></td>`).join('')}</tr>
-        <tr><td>Turret</td>${['front', 'side', 'rear', 'top'].map((k) => `<td>${a.turret[k][0]}<small>${a.turret[k][1] ? ' @' + a.turret[k][1] + '°' : ''}</small></td>`).join('')}</tr></table>
+        <tr><td>${upperArmor}</td>${['front', 'side', 'rear', 'top'].map((k) => `<td>${a.turret[k][0]}<small>${a.turret[k][1] ? ' @' + a.turret[k][1] + '°' : ''}</small></td>`).join('')}</tr></table>
       <div class="shells">${t.shells.map((s, i) => `<div><b>${s.name}</b><small>${s.type} · ${s.caliber} mm · pen ${s.pen} mm · ${s.damage} dmg · ${s.velocity} m/s · ×${this.loadout(id)[i]}</small></div>`).join('')}<small>Stowage ${t.ammoCap} rounds</small></div>
       <div class="misc">${t.mass} t · ${t.power} hp (${(t.power / t.mass).toFixed(1)} hp/t) · reverse ${t.reverseSpeed} km/h · gun ${-t.gunDepression}°/+${t.gunElevation}° · aim ${t.aimTime}s · ${t.dims.L}×${t.dims.W} m${a.era ? ' · ERA +' + a.era + ' mm vs HEAT' : ''}</div>`;
     stats.scrollTop = 0;

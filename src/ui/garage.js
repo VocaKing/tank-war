@@ -1,8 +1,7 @@
 // Garage / showroom scene used by the main menu
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { createTankModel } from '../models/tankModel.js';
-import { loadMausModel } from '../models/mausModel.js';
+import { createTankModel, hasDetailedTankModel, loadDetailedTankModel } from '../models/tankModel.js';
 import { applyArmorPreview, clearArmorPreview } from './armorPreview.js';
 import { pbrTex } from '../world/textures.js';
 
@@ -65,9 +64,9 @@ export class Garage {
     this.current.turret.rotation.y = 0.0; this.current.gun.rotation.x = -0.04;
     this.spec = spec;
     if (this.armorMode) this.setArmorMode(true);
-    if (spec.id === 'mauseng' && !this.current.root.userData.importedMaus) {
+    if (hasDetailedTankModel(spec.id) && this.current.links) {
       const placeholder = this.current;
-      loadMausModel().then(loaded => {
+      loadDetailedTankModel(spec).then(loaded => {
         if (!loaded || this.models[spec.id] !== placeholder) return;
         this.models[spec.id] = createTankModel(spec, { links: true });
         clearArmorPreview(placeholder);

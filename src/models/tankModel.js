@@ -8,7 +8,9 @@ import { trackCenterOffset } from '../game/vehicleDimensions.js';
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, castLoft, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
 import { buildSpecialist } from './specialistModels.js';
-import { createMausModel } from './mausModel.js';
+import { createMausModel, loadMausModel } from './mausModel.js';
+import { buildExpansionFallback, expansionGunClearance, hasExpansionModel } from './expansionFallback.js';
+import { createExpansionModel, loadExpansionModel } from './expansionModel.js';
 import * as K from './kit.js';
 import { gunMount, hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
 export { THREE };
@@ -604,8 +606,18 @@ function refineRoofDetails(P, spec) {
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
   const d = spec.dims;
+  const expansion = hasExpansionModel(spec.id);
   const specialist = spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious;
-  const b = (specialist ? buildSpecialist : BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec); b.muzzleInfo=K.hollowMuzzle(b.P); gunMount(b.P,b,spec,lathe);
+  const builder = expansion ? buildExpansionFallback : specialist ? buildSpecialist : BUILDERS[spec.id] || buildV2;
+  const b = builder(d, spec);
+  if (!expansion) {
+    if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b);
+    finishDetails(b.P, d, b, spec);
+    refineRoofDetails(b.P, spec);
+  }
+  b.muzzleInfo = K.hollowMuzzle(b.P);
+  gunMount(b.P, b, spec, lathe);
+  const gunPitchFloor = expansion ? expansionGunClearance(spec) : (yaw, min, max) => hullPitchFloor(b, yaw, min, max);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
@@ -629,7 +641,7 @@ function getTemplate(spec) {
   }
   if (spec.amphibious) attachments.trim = box(d.W * 0.82, 0.07, 0.78, 0, 0, 0.36);
   const trackCircles = [...b.wheels.map((w) => ({ z: w.z, y: w.y, r: w.r })), ...b.sprockets, ...b.idlers, ...b.rollers.filter((r) => !r.free)];
-  const pitch = d.trackPitch || (spec.era === 'WWII' ? 0.15 : 0.18);
+  const pitch = d.trackPitch || b.trackPitch || (spec.era === 'WWII' ? 0.15 : 0.18);
   const track = trackGeometry(trackCircles, d.trackW, 0.075, pitch);
   const wheelGeo = wheelGeometry(spec.paint.base, b.wheelType || (b.wheels[0].spoked ? 'spoked' : spec.era === 'WWII' ? 'disc' : 'modern'), spec.id);
   const sprocketGeo = sprocketGeometry(spec.paint.base, spec.id);
@@ -638,8 +650,16 @@ function getTemplate(spec) {
   const nLinks = Math.round(track.length / pitch);
   const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.id);
   const linkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.45 });
-  templates[spec.id] = { b, geo, paint, paintT, paintG, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch, attachments };
+  templates[spec.id] = { b, geo, paint, paintT, paintG, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch, attachments, gunPitchFloor };
   return templates[spec.id];
+}
+
+export function hasDetailedTankModel(id) {
+  return id === 'mauseng' || hasExpansionModel(id);
+}
+
+export function loadDetailedTankModel(spec) {
+  return spec.id === 'mauseng' ? loadMausModel() : loadExpansionModel(spec);
 }
 
 export function createTankModel(spec, opts = {}) {
@@ -647,9 +667,13 @@ export function createTankModel(spec, opts = {}) {
     const imported = createMausModel(!!opts.links);
     if (imported) {
       imported.maxRecoil = MAX_RECOIL;
-      imported.gunPitchFloor = (yaw, min, max) => hullPitchFloor(getTemplate(spec).b, yaw, min, max);
+      imported.gunPitchFloor = getTemplate(spec).gunPitchFloor;
       return imported;
     }
+  }
+  if (hasExpansionModel(spec.id)) {
+    const imported = createExpansionModel(spec, !!opts.links);
+    if (imported) return imported;
   }
   const tpl = getTemplate(spec); const d = spec.dims; const { b, geo, mats } = tpl;
   const root = new THREE.Group(); root.name = spec.id;
@@ -710,7 +734,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, barrel, muzzle, sight, secondaryGun, secondaryMuzzle, blade, trim, gunClearance:b.gunClearance, gunMountNoCollar:!!b.gunMountNoCollar, roadWheelStationsPerSide:b.wheels.length, roadWheelDiscsPerSide:b.wheels.length * (b.wheelType === 'single' ? 1 : 2), roadWheelDiameter:b.roadWheelDiameter ?? (b.wheels[0]?.r ?? 0) * 2, frontIdlerDiameter:b.frontIdlerDiameter, driveSprocketTeethPerSide:b.driveSprocketTeeth, auxiliaryFuelTanks:b.auxiliaryFuelTanks, headlights:b.headlights, rearDTMountX:b.rearDTMountX, roadWheelStarIndentations:b.roadWheelStarIndentations, turretLeftWallAngleFromVertical:b.turretLeftWallAngleFromVertical, turretRightWallAngleFromVertical:b.turretRightWallAngleFromVertical, trackLinksPerSide:tpl.nLinks, glacisAngleFromVertical:b.glacisAngleFromVertical, idlersPerSide:b.idlers.length, returnRollersPerSide:b.rollers.length, driveSprocketsPerSide:b.sprockets.length, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, barrel, muzzle, sight, secondaryGun, secondaryMuzzle, blade, trim, gunClearance:b.gunClearance, gunMountNoCollar:!!b.gunMountNoCollar, roadWheelStationsPerSide:b.wheels.length, roadWheelDiscsPerSide:b.wheels.length * (b.wheelType === 'single' ? 1 : 2), roadWheelDiameter:b.roadWheelDiameter ?? (b.wheels[0]?.r ?? 0) * 2, frontIdlerDiameter:b.frontIdlerDiameter, driveSprocketTeethPerSide:b.driveSprocketTeeth, auxiliaryFuelTanks:b.auxiliaryFuelTanks, headlights:b.headlights, rearDTMountX:b.rearDTMountX, roadWheelStarIndentations:b.roadWheelStarIndentations, turretLeftWallAngleFromVertical:b.turretLeftWallAngleFromVertical, turretRightWallAngleFromVertical:b.turretRightWallAngleFromVertical, trackLinksPerSide:tpl.nLinks, glacisAngleFromVertical:b.glacisAngleFromVertical, idlersPerSide:b.idlers.length, returnRollersPerSide:b.rollers.length, driveSprocketsPerSide:b.sprockets.length, muzzleInfo:b.muzzleInfo, gunPitchFloor:tpl.gunPitchFloor, maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;

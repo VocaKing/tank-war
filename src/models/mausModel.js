@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { approach } from '../util.js';
+import { makeTrackBelt } from './trackBelt.js';
 
 const MAUS_URL = import.meta.env.BASE_URL + 'models/maus-engineering.glb';
 const WORLD_X = new THREE.Vector3(1, 0, 0);
@@ -48,30 +49,6 @@ function batchRigid(group, excluded = new Set()) {
   }
 }
 
-function makeLowBelt(poses) {
-  const points = [];
-  const indices = [];
-  const normal = new THREE.Vector3();
-  const segments = poses.length / 3;
-  for (let i = 0; i < segments; i++) {
-    const { position, rotation } = poses[i * 3];
-    normal.set(0, 1, 0).applyQuaternion(rotation);
-    for (const [x, offset] of [[-0.48, -0.04], [0.48, -0.04], [0.48, 0.05], [-0.48, 0.05]]) {
-      points.push(position.x + x, position.y + normal.y * offset, position.z + normal.z * offset);
-    }
-    for (let j = 0; j < 4; j++) {
-      const a = i * 4 + j, b = i * 4 + (j + 1) % 4;
-      const c = ((i + 1) % segments) * 4 + (j + 1) % 4, d = ((i + 1) % segments) * 4 + j;
-      indices.push(a, b, c, a, c, d);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
 function prepareTrack(track) {
   track.updateWorldMatrix(true, true);
   const inverse = track.matrixWorld.clone().invert();
@@ -99,7 +76,7 @@ function prepareTrack(track) {
     return { position, rotation };
   }
   const poses = shoes.map((shoe, i) => extract(shoe, i, 0));
-  const silhouette = [makeLowBelt(poses)];
+  const silhouette = [makeTrackBelt(poses, 0.96)];
   wheels.forEach(wheel => {
     const name = originalName(wheel);
     const endWheel = /^(Front_Idler_|Rear_Sprocket_)/.test(name);

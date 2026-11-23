@@ -19,13 +19,13 @@ const core=[
 ].map(x=>def(...x));
 const faces={front:'正面',side:'侧面',rear:'后面',top:'顶部',bottom:'底部'};
 export function fields(t){
- const out=core.slice();
+ const out=t.casemate?core.filter(f=>f.path!=='turretTraverse'):core.slice();
  // One clear row per armor aspect: hull and turret values sit beside each other.
  for(const face of ['front','side','rear','top','bottom']){
   const group=faces[face]+'装甲';
   for(const part of ['hull','turret']){
    if(!t.armor[part]?.[face])continue;
-   const name=part==='hull'?'车体':'炮塔',p='armor.'+part+'.'+face;
+   const name=part==='hull'?'车体':t.casemate?'战斗室':'炮塔',p='armor.'+part+'.'+face;
    out.push(def(p+'.0',name+'厚度','mm',0.1,3000,0.1,group),def(p+'.1',name+'倾角','°',0,89,0.1,group));
   }
  }

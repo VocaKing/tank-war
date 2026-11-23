@@ -1,4 +1,5 @@
 import { SPECIALIST_TANKS } from './specialistTanks.js';
+import { EXPANSION_TANKS } from './expansionTanks.js';
 import publishedBalance from './balanceDefaults.json';
 import { clone, effective, legacyMaxDispersion, loadLocal } from './balanceConfig.js';
 // Tank specifications. Figures are grounded in published real-world data
@@ -320,6 +321,7 @@ export const TANKS = [
     desc: 'Crew survivability first: front-mounted engine, modular wedge armor with a long sloped turret, rear hatch and ball-and-chain curtains under the bustle.',
   },
   ...SPECIALIST_TANKS,
+  ...EXPANSION_TANKS,
 ];
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // ---- v3 ammunition balance & loadouts ----
@@ -329,7 +331,7 @@ TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // but the highest damage, splash and module/crew damage. HEAT is countered by ERA, composite and spaced armour.
 for (const t of TANKS) {
   t.maxDispersion = legacyMaxDispersion(t.dispersion);
-  const s0 = t.shells[0]; const D0 = s0.damage;
+  const s0 = t.shells[0]; const D0 = s0.baseDamage ?? s0.damage;
   t.ammoCap = t.shells.reduce((a, s) => a + s.count, 0); t.defaultLoadout = t.shells.map((s) => s.count);
   for (let i = 0; i < t.shells.length; i++) {
     const s = t.shells[i]; s.baseDamage ??= s.damage;

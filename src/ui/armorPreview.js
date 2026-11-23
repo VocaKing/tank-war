@@ -2,7 +2,7 @@
 // vertices by local normal + position. Reference pen is chosen so the hull front is
 // borderline (yellow); sides and rear then show as green, thick plates as red.
 import * as THREE from 'three';
-import { SHELL_TYPES, PEN_RNG } from '../game/tankData.js';
+import { PEN_RNG } from '../game/tankData.js';
 
 const DEG = Math.PI / 180;
 const C = {
@@ -60,6 +60,9 @@ export function applyArmorPreview(model, spec, shellOrPen) {
     turret: { front: los(A.turret?.front?.[0], A.turret?.front?.[1]), side: los(A.turret?.side?.[0], A.turret?.side?.[1]), rear: los(A.turret?.rear?.[0], A.turret?.rear?.[1]), top: los(A.turret?.top?.[0], A.turret?.top?.[1]) },
   };
   ud._armorOrig = [];
+  model.root.updateWorldMatrix(true, true);
+  const point = new THREE.Vector3(), normal = new THREE.Vector3();
+  const transform = new THREE.Matrix4(), normals = new THREE.Matrix3();
   let n = 0;
   model.root.traverse((o) => {
     if (!o.isMesh || o.userData.decal) return;
@@ -70,18 +73,31 @@ export function applyArmorPreview(model, spec, shellOrPen) {
     if (!key || (key !== 'paint' && key !== 'metal' && key !== 'steel')) return;
     let isTurret = false, p = o.parent;
     while (p) { if (p === model.turret || p === model.gun) { isTurret = true; break; } p = p.parent; }
-    const part = isTurret ? 'turret' : 'hull';
     const pos = o.geometry.attributes.position;
     const nrm = o.geometry.attributes.normal;
     if (!pos) return;
+    const anchor = isTurret ? model.turret : model.root;
+    transform.copy(anchor.matrixWorld).invert().multiply(o.matrixWorld);
+    normals.getNormalMatrix(transform);
     const arr = new Float32Array(pos.count * 3);
-    const pal = plates[part];
     for (let i = 0; i < pos.count; i++) {
-      const face = faceOf(nrm ? nrm.getX(i) : 0, nrm ? nrm.getY(i) : 1, nrm ? nrm.getZ(i) : 0, pos.getX(i), pos.getY(i), pos.getZ(i), isTurret);
+      point.fromBufferAttribute(pos, i).applyMatrix4(transform);
+      if (nrm) normal.fromBufferAttribute(nrm, i).applyNormalMatrix(normals);
+      else normal.set(0, 1, 0);
+      // A detailed casemate is part of the hull mesh. Its upper plates use
+      // the same armor data as the separate upper volume in the hit test.
+      const casePlate = !isTurret && spec.casemate && point.y >= spec.dims.hullH;
+      if (casePlate) {
+        point.y -= spec.dims.hullH;
+        point.z -= spec.dims.turretZ;
+      }
+      const face = faceOf(normal.x, normal.y, normal.z, point.x, point.y, point.z, isTurret || casePlate);
+      const pal = isTurret || casePlate ? plates.turret : plates.hull;
       const c = penColorFor(pal[face] || pal.front, pen);
       arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b;
     }
-    ud._armorOrig.push({ mesh: o, mat: o.material, colorAttr: o.geometry.getAttribute('color') });
+    ud._armorOrig.push({ mesh: o, mat: o.material, geometry: o.geometry });
+    o.geometry = o.geometry.clone();
     o.geometry.setAttribute('color', new THREE.BufferAttribute(arr, 3));
     o.material = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
     n++;
@@ -96,11 +112,11 @@ export function clearArmorPreview(model) {
   if (!model || !model.root) return;
   const ud = model.root.userData;
   if (!ud._armorApplied) return;
-  for (const { mesh, mat, colorAttr } of ud._armorOrig || []) {
-    if (!mesh) continue;
+  for (const { mesh, mat, geometry } of ud._armorOrig || []) {
+    mesh.material.dispose();
+    mesh.geometry.dispose();
     mesh.material = mat;
-    if (colorAttr) mesh.geometry.setAttribute('color', colorAttr);
-    else mesh.geometry.deleteAttribute('color');
+    mesh.geometry = geometry;
   }
   ud._armorOrig = [];
   ud._armorApplied = false;
