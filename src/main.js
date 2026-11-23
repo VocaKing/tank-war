@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Garage } from './ui/garage.js';
 import { Menu } from './ui/menu.js';
+import { initPhysics } from './game/physics.js';
 import { Game } from './game/game.js';
 import { Audio } from './game/audio.js';
 import { setMaxAniso } from './world/textures.js';
@@ -47,10 +48,11 @@ async function openBalance() {
 function start(opts, gesture = true) {
   if (gesture) { audio.init(); audio.resume(); }
   menu.show(false); loading.style.display = 'flex'; mode = 'loading';
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
+      const physicsEngine = await initPhysics();
       resizeRenderer(opts.quality);
-      game = new Game(renderer, ui, audio, { ...opts, fixedGunTest: params.get('fixedGunTest') === '1', seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
+      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
       window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';

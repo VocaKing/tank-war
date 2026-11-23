@@ -1,4 +1,4 @@
-// Tank entity: drivetrain + terrain-following physics, turret/gun laying, firing, module & crew damage
+// Tank entity: vehicle state, gun laying, firing, and module & crew damage
 import * as THREE from 'three';
 import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
 import { DEG, clamp, lerp, approach, approachAngle, wrapAngle } from '../util.js';
@@ -7,10 +7,11 @@ import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
 import { advanceDispersion, impactDrop, incidence } from './combatMath.js';
 
-export const GRAVITY = 9.81;
+import { GRAVITY } from './physics.js';
+
+export { GRAVITY };
 let NEXT_ID = 1;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
-const _gunPose = new THREE.Quaternion();
 
 export function ballisticAngle(v, R, dy) {
   const g = GRAVITY; const v2 = v * v; const disc = v2 * v2 - g * (g * R * R + 2 * dy * v2);
@@ -26,19 +27,18 @@ export class Tank {
     if (this.abilities.magazine) this.reloadLeft = 0;
     this.model = createTankModel(spec); game.scene.add(this.model.root);
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
-    this.airborne = false; this.verticalSpeed = 0; this.landingSpeed = 0;
-    this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0; this.rock = 0; this.rockV = 0;
+    this.airborne = false; this.landingSpeed = 0;
+    this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0;
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.dispersionProgress = 0; this.yawRate = 0; this.recoil = 0;
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
     this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
-    this.input = { throttle: 0, steer: 0, driveHeld: false, aim: new THREE.Vector3() };
+    this.input = { throttle: 0, steer: 0, brake: false, driveHeld: false, aim: new THREE.Vector3() };
     this.hullAiming = false;
     this.lastFired = -100; this.inBush = null; this.visibleUntil = [0, 0]; this.spotted = [false, false]; this.lastSeenPos = [null, null];
     this.stats = { damage: 0, kills: 0, shots: 0, hits: 0, pens: 0, received: 0 };
     this.lastAttacker = null; this.lastDamagedAt = -100; this.inWater = false; this.groundY = 0; this.moved = 0;
-    this.collisionRadius = Math.hypot(spec.dims.W / 2 + 0.05, spec.dims.L / 2 + 0.05);
     this.hullBox = { x: spec.dims.W / 2, y0: 0.3, y1: spec.dims.hullH, z: spec.dims.L / 2 };
     const d = spec.dims; const tc = d.turretBoxZ || 0;
     this.turBox = { x: d.turretW / 2, y0: 0, y1: d.turretH, z0: tc - d.turretL / 2, z1: tc + d.turretL / 2 };
@@ -67,92 +67,62 @@ export class Tank {
     const stabilization = this.speed !== 0 && this.abilities.isStabilized ? 2 : 1;
     this.dispersionProgress = advanceDispersion(this.dispersionProgress, this.speed, dt, this.aimTime() * stabilization);
   }
-  placeAt(x, z, heading) {
-    this.pos.set(x, 0, z);
+  placeAt(x, z, heading, speed = 0) {
+    const W = this.game.world, d = this.spec.dims;
+    const fx = Math.sin(heading), fz = Math.cos(heading);
+    // Fit the spawn pose once. All motion after placement comes from the rigid body.
+    const length = d.L * 0.42, width = (d.W - d.trackW) / 2;
+    const front = W.groundHeight(x + fx * length, z + fz * length);
+    const rear = W.groundHeight(x - fx * length, z - fz * length);
+    const right = W.groundHeight(x + fz * width, z - fx * width);
+    const left = W.groundHeight(x - fz * width, z + fx * width);
+    this.groundY = W.groundHeight(x, z);
+    this.pitch = -Math.atan2(front - rear, length * 2);
+    this.roll = Math.atan2(right - left, width * 2);
     this.heading = heading;
+    this.pos.set(x, Math.max(this.groundY, (front + rear) / 2, (right + left) / 2), z);
+    this.quat.setFromEuler(_e.set(this.pitch, heading, this.roll, 'YXZ'));
     this.turretYaw = 0;
-    if (this.hullAiming) this.turnRate = 0;
     this.hullAiming = false;
-    this.rock = this.rockV = 0;
-    this._rockLift = 0;
+    this.turnRate = 0;
+    this.airborne = false;
+    this.landingSpeed = 0;
     this.vel.set(0, 0, 0);
-    this.updateGround(1, true);
+    this.speed = 0;
+    this.game.physics?.place(this, speed);
     this.syncModel();
   }
-  setHeading(h) { this.heading = h; }
 
   update(dt, time) {
     if (!this.alive) return;
-    const d = this.spec.dims, W = this.game.world;
-    this.equip.update(dt); if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
-    if (this.trackRepair > 0) { this.trackRepair -= dt; if (this.trackRepair <= 0) { this.modules.tracks = 1; if (this.isPlayer) this.game.hud.message('Tracks repaired', '#9fd39f'); } }
-    if (this.burning > 0) { this.burning -= dt; this.damage(this.maxHp * 0.012 * dt, this.lastAttacker, 'fire'); if (!this.alive) return; }
-    if (this.airborne) {
-      this.turnRate = 0;
-      this.hullAiming = false;
-      const level = W.terrain.waterLevel(this.pos.x, this.pos.z);
-      this.inWater = level - this.pos.y > 0.15;
-    } else {
-      this.updateDrivetrain(dt);
+    this.equip.update(dt);
+    if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
+    if (this.trackRepair > 0) {
+      this.trackRepair -= dt;
+      if (this.trackRepair <= 0) {
+        this.modules.tracks = 1;
+        if (this.isPlayer) this.game.hud.message('Tracks repaired', '#9fd39f');
+      }
     }
-    const nfx = Math.sin(this.heading), nfz = Math.cos(this.heading);
-    const ox = this.pos.x, oz = this.pos.z;
-    this.pos.x += nfx * this.speed * dt; this.pos.z += nfz * this.speed * dt;
-    // knock trees
-    const kn = !this.airborne && W.veg.knock(this.pos.x + nfx * d.L * 0.42, this.pos.z + nfz * d.L * 0.42, d.W * 0.5, nfx * Math.sign(this.speed), nfz * Math.sign(this.speed), this.speed);
-    if (kn) { this.speed *= 0.82; if (this.isPlayer) this.game.audio.impact(this.pos, 'ground'); }
-    this.vel.set((this.pos.x - ox) / Math.max(dt, 1e-4), 0, (this.pos.z - oz) / Math.max(dt, 1e-4));
-    // running gear animation
-    const half = d.W / 2; updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
-    this.moved += Math.abs(this.speed) * dt;
-    this.updateDispersion(dt);
-    this.updateTurret(dt);
+    if (this.burning > 0) {
+      this.burning -= dt;
+      this.damage(this.maxHp * 0.012 * dt, this.lastAttacker, 'fire');
+      if (!this.alive) return;
+    }
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
-    if (this.abilities) this.abilities.update(dt);
+    this.abilities.update(dt);
     this.recoil = Math.max(0, this.recoil - dt * 1.2);
-    // hull rocking spring (firing / braking)
-    const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
-    this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
   }
-  updateDrivetrain(dt) {
-    const s = this.spec, d = s.dims, W = this.game.world, T = W.terrain;
-    const mobile = this.modules.tracks > 0;
-    const driver = this.crewAlive('Driver') ? 1 : 0.65;
-    const thr = clamp(this.input.throttle, -1, 1), steer = clamp(this.input.steer, -1, 1);
-    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
-    const hf = W.groundHeight(this.pos.x + fx * d.L * 0.4, this.pos.z + fz * d.L * 0.4), hb = W.groundHeight(this.pos.x - fx * d.L * 0.4, this.pos.z - fz * d.L * 0.4);
-    const grade = (hf - hb) / (d.L * 0.8);
-    const ptw = s.power / s.mass; const dir = Math.abs(this.speed) > 0.2 ? Math.sign(this.speed) : Math.sign(thr);
-    const uphill = grade * dir;
-    const slopeF = uphill > 0 ? clamp(1 - uphill * 1.35 * clamp(18 / ptw, 0.6, 1.5), uphill < 0.58 ? 0.15 : 0, 1) : 1 + Math.min(0.25, -uphill * 0.8);
-    const wl = T.waterLevel(this.pos.x, this.pos.z); const depth = wl - this.groundY; this.inWater = depth > 0.15;
-    const waterF = depth > 0 ? clamp(1 - depth * 0.38, 0.2, 1) : 1;
-    const ri = T.x2i(this.pos.x), rj = T.x2i(this.pos.z); const onRoad = T.inside(ri, rj) ? T.road[T.idx(ri, rj)] : 0;
-    const terrF = 0.78 + 0.22 * Math.min(1, onRoad * 1.5);
-    const od = this.equip.active('overdrive'); const lf = this.equip.factor;
-    const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1) * (this.abilities ? this.abilities.speedMult : 1);
-    let target = mobile ? thr * vmax * slopeF * waterF * terrF : 0;
-    if (uphill > 0.75) target = Math.min(target, 0) - 0.5; // too steep: slide back
-    const light = s.cls === 'Light' ? 2.4 : 1; const accel = clamp(ptw * 0.075, 0.6, 2.2) * light * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
-    const braking = Math.sign(target) !== Math.sign(this.speed) || Math.abs(target) < Math.abs(this.speed);
-    this.speed = approach(this.speed, target, (braking ? (mobile ? 3.0 : 6) : accel) * dt);
-    const vmaxF = (s.maxSpeed / 3.6) * lf;
-    const turnMax = s.hullTraverse * DEG * driver * (mobile ? 1 : 0) * (1 - 0.45 * Math.min(1, Math.abs(this.speed) / vmaxF)) * (this.inWater ? 0.6 : 1);
-    const hullAim = s.fixedGun === true && mobile && !this.input.driveHeld && thr === 0 && steer === 0;
-    if (this.hullAiming && !hullAim) this.turnRate = 0;
-    this.hullAiming = hullAim;
-    if (hullAim && dt > 0) {
-      const error = this.fixedGunHeadingError();
-      const turnTarget = clamp(error / dt, -turnMax, turnMax);
-      const turnRate = approach(this.turnRate, turnTarget, turnMax * 3 * dt + 0.001);
-      // The final step cannot pass the aim point or turn away from it on reversal.
-      this.turnRate = clamp(turnRate * dt, Math.min(0, error), Math.max(0, error)) / dt;
-    } else {
-      const turnTarget = steer * turnMax * (this.speed < -0.3 ? -1 : 1);
-      this.turnRate = s.fixedGun && !mobile ? 0 : approach(this.turnRate, turnTarget, turnMax * 3 * dt + 0.001);
+
+  updateAfterMotion(dt) {
+    if (this.alive) {
+      const half = (this.spec.dims.W - this.spec.dims.trackW) / 2;
+      updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
+      this.moved += Math.abs(this.speed) * dt;
+      this.updateDispersion(dt);
+      this.updateTurret(dt);
     }
-    if (Math.abs(steer) > 0.1 && Math.abs(thr) < 0.1) this.speed *= Math.pow(0.6, dt);
-    this.heading = wrapAngle(this.heading + this.turnRate * dt);
+    this.syncModel();
   }
   fixedGunHeadingError() {
     const aim = this.input.aim;
@@ -161,7 +131,7 @@ export class Tank {
     if (!Number.isFinite(range + aim.y) || range < 0.1) return 0;
     const { turret, gun } = this.model;
     const mountX = turret.position.x + gun.position.x;
-    const tilt = this.pitch + this.rock;
+    const tilt = this.pitch;
     // A fixed gun can elevate in the hull's forward plane. Align that
     // plane with the sight, accounting for the mount offset and side slope.
     const sinRoll = Math.sin(this.roll);
@@ -176,15 +146,9 @@ export class Tank {
   }
   updateTurret(dt) {
     const s = this.spec, m = this.model;
-    const aim = _v.copy(this.input.aim);
-    let pose = this.quat;
-    if (s.fixedGun) {
-      // The drivetrain may already have rotated the hull this frame.
-      pose = _gunPose.setFromEuler(_e.set(this.pitch + this.rock, this.heading, this.roll, 'YXZ'));
-      aim.sub(this.pos).applyQuaternion(_q.copy(pose).invert());
-      this.turretYaw = 0;
-    } else aim.applyMatrix4(this.inv);
-    aim.sub(m.turret.position);
+    const pose = this.quat;
+    const aim = _v.copy(this.input.aim).sub(this.pos).applyQuaternion(_q.copy(pose).invert()).sub(m.turret.position);
+    if (s.fixedGun) this.turretYaw = 0;
     if (!Number.isFinite(aim.x + aim.y + aim.z)) return;
     // Solve around the turret axis. The trunnion moves as the turret turns,
     // so aiming from its current position can oscillate at point-blank range.
@@ -216,90 +180,6 @@ export class Tank {
     const desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
     this.gunPitch=clamp(approach(this.gunPitch,desiredPitch,s.gunSpeed*DEG*dt),minPitch,s.gunElevation*DEG);
     this.aimError=Math.abs(wrapAngle(yawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
-  }
-  updateGround(dt, snap = false) {
-    if (dt <= 0) return;
-    const d = this.spec.dims, W = this.game.world;
-    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
-    const { x, z } = this.pos;
-    const lx = d.L * 0.4, wx = d.W * 0.4;
-    const hf = W.groundHeight(x + fx * lx, z + fz * lx), hb = W.groundHeight(x - fx * lx, z - fz * lx);
-    const hl = W.groundHeight(x + fz * wx, z - fx * wx), hr = W.groundHeight(x - fz * wx, z + fx * wx);
-    const hc = W.groundHeight(x, z);
-    const pitch = -Math.atan2(hf - hb, lx * 2), roll = Math.atan2(hl - hr, wx * 2);
-    const ground = Math.max((hf + hb) / 2, (hl + hr) / 2, hc) - 0.02;
-    const rockLift = this._rockLift || 0;
-    this.landingSpeed = 0;
-    this._rockLift = 0;
-
-    const slopeVerticalSpeed = clamp((hf - hb) / (lx * 2) * this.speed, -12, 12);
-    const wasAirborne = !snap && this.airborne;
-    const verticalStep = (this.verticalSpeed - GRAVITY * dt * 0.5) * dt;
-    const nextY = this.pos.y + verticalStep;
-    const canLaunch = !snap && !wasAirborne && Math.abs(this.speed) >= 4 &&
-      rockLift === 0 && this._groundRockLift === 0 && this.groundY + verticalStep > ground + 2 * dt * dt;
-    let takingOff = false;
-    if (canLaunch) {
-      // Check for sustained clearance over the whole track length. Heightfield
-      // seams can briefly drop away even when the tank is on a continuous slope.
-      const previewTime = 0.26;
-      const travel = this.speed * (previewTime - dt);
-      const ax = x + fx * travel, az = z + fz * travel;
-      const ahead = W.groundHeight(ax, az);
-      const front = W.groundHeight(ax + fx * lx, az + fz * lx);
-      const rear = W.groundHeight(ax - fx * lx, az - fz * lx);
-      const offset = -Math.sin(this.pitch + this.rock) * lx;
-      const aheadGround = Math.max(ahead - 0.02, front - offset - 0.08, rear + offset - 0.08);
-      const flightHeight = this.groundY + (this.verticalSpeed - GRAVITY * previewTime * 0.5) * previewTime;
-      takingOff = flightHeight > aheadGround + 0.16;
-    }
-
-    const groundBlend = snap ? 1 : 1 - Math.exp(-16 * dt);
-    const groundPitch = lerp(this.pitch, pitch, groundBlend);
-    const groundRoll = lerp(this.roll, roll, groundBlend);
-    const clearance = (bodyPitch, bodyRoll) => {
-      const hullPitch = bodyPitch + this.rock;
-      const frontOffset = -Math.sin(hullPitch) * lx;
-      const rightOffset = Math.sin(bodyRoll) * Math.cos(hullPitch) * wx;
-      return Math.max(ground, hf - frontOffset - 0.08, hb + frontOffset - 0.08,
-        hl - rightOffset - 0.08, hr + rightOffset - 0.08) + rockLift;
-    };
-
-    this.airborne = false;
-    if (wasAirborne || takingOff) {
-      const flightPitch = -Math.atan2(this.verticalSpeed * Math.sign(this.speed), Math.max(4, Math.abs(this.speed)));
-      const airPitch = lerp(this.pitch, flightPitch, 1 - Math.exp(-2.8 * dt));
-      const airRoll = this.roll * Math.exp(-2.4 * dt);
-      if (nextY > clearance(airPitch, airRoll)) {
-        this.airborne = true;
-        this.pitch = airPitch;
-        this.roll = airRoll;
-        this.pos.y = nextY;
-        this.verticalSpeed -= GRAVITY * dt;
-      }
-    }
-    if (!this.airborne) {
-      this.pitch = groundPitch;
-      this.roll = groundRoll;
-      const support = clearance(groundPitch, groundRoll);
-      if (wasAirborne) {
-        this.landingSpeed = Math.max(0, slopeVerticalSpeed - (this.verticalSpeed - GRAVITY * dt));
-        this.inWater = W.terrain.waterLevel(x, z) - support > 0.15;
-        this.rockV += Math.min(1.3, this.landingSpeed * 0.16) * Math.sign(this.speed);
-        this.speed *= 1 - Math.min(0.3, this.landingSpeed * 0.035);
-      }
-      // Follow the slope tangent, easing small changes while maintaining track clearance.
-      const restingHeight = ground + rockLift;
-      const carriedHeight = this.pos.y + slopeVerticalSpeed * dt;
-      const settledHeight = lerp(carriedHeight, restingHeight, groundBlend);
-      this.pos.y = snap || wasAirborne ? support : Math.max(support, Math.min(restingHeight + 0.18, settledHeight));
-      const contactVerticalSpeed = clamp((ground - this.groundY) / dt, -12, 12);
-      this.verticalSpeed = snap || wasAirborne ? slopeVerticalSpeed : lerp(this.verticalSpeed, contactVerticalSpeed, groundBlend);
-    }
-    this.vel.y = this.airborne ? this.verticalSpeed : 0;
-    this.groundY = ground;
-    this._groundRockLift = rockLift;
-    _e.set(this.pitch + this.rock, this.heading, this.roll, 'YXZ'); this.quat.setFromEuler(_e);
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
@@ -346,7 +226,7 @@ export class Tank {
     if (this.abilities) this.abilities.onFire();
     // Firing retains visual recoil, but does not inject a jump into the linear dispersion curve.
     this.recoil = 1;
-    this.rockV -= (sh.caliber / 100) * 1.4 * (40 / this.spec.mass) * Math.cos(this.turretYaw);
+    g.physics?.recoil(this, m.gun.getWorldPosition(_v), dir, sh.caliber);
     g.effects.muzzle(origin, dir, sh.caliber); g.audio.gun(origin, sh.caliber, this.isPlayer);
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
     return true;
@@ -409,7 +289,7 @@ export class Tank {
   }
   destroy(attacker, cause = 'destroyed') {
     if (!this.alive) return;
-    this.alive = false; this.hp = 0; this.speed = 0; this.burning = 0;
+    this.alive = false; this.hp = 0; this.burning = 0;
     const g = this.game; burnModel(this.model);
     const p = this.pos.clone(); p.y += this.spec.dims.hullH;
     g.effects.explosion(p, true); g.audio.impact(p, 'explosion');
@@ -442,7 +322,7 @@ export class Tank {
     this.damage(dmg, attacker, 'pen');
     return msgs;
   }
-  breakTracks() { this.modules.tracks = 0; this.trackRepair = 9; this.speed *= 0.2; }
+  breakTracks() { this.modules.tracks = 0; this.trackRepair = 9; }
 }
 
 // slab test: returns {t, axis, sign} where sign is outward direction of entered face

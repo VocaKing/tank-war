@@ -15,12 +15,14 @@ try {
     const { Tank } = await load('game/tank.js');
     const { TANK_BY_ID } = await load('game/tankData.js');
     const { Game } = await load('game/game.js');
+    const { BattlefieldPhysics, initPhysics } = await load('game/physics.js');
+    const engine = await initPhysics();
     const { Terrain } = await load('world/terrain.js');
     const { TouchControls } = await load('ui/touchControls.js');
     const { THREE } = await load('models/tankModel.js');
 
     const terrain = new Terrain(200, 2);
-    const world = { terrain, groundHeight: () => 0, veg: { knock: () => false } };
+    const world = { terrain, playHalf: 200, colliders: [], decks: [], groundHeight: () => 0, veg: { knock: () => false, rocks: [] } };
     const game = Object.assign(Object.create(Game.prototype), {
       world, scene: new THREE.Scene(), keys: {}, time: 0, cam: { yaw: Math.PI / 2, pitch: 0 },
       aimPoint: new THREE.Vector3(), debugAim: true, hud: { root: document.body },
@@ -36,18 +38,24 @@ try {
         game.time += dt;
         game.updatePlayerInput();
         tank.update(dt, game.time);
-        tank.updateGround(dt);
-        tank.syncModel();
+        game.physics.advance(dt);
+        tank.updateAfterMotion(dt);
       }
     };
-    function start(tank, heading = 0) {
+    function start(tank, heading = 0, speed = 0) {
+      game.physics?.free();
+      for (const vehicle of [fixed, normal]) vehicle.vehicle = null;
+      for (let z = 0; z < terrain.n; z++) for (let x = 0; x < terrain.n; x++) {
+        terrain.h[terrain.idx(x, z)] = world.groundHeight(terrain.i2x(x), terrain.i2x(z));
+      }
+      game.physics = new BattlefieldPhysics(engine, world);
       game.player = tank;
       game.keys = {};
       game.touch = null;
       game.debugAim = true;
       tank.speed = tank.turnRate = 0;
       tank.modules.tracks = 1;
-      tank.placeAt(0, 0, heading);
+      tank.placeAt(0, 0, heading, speed);
       game.aimPoint.set(90, 2, 0);
     }
 
@@ -59,11 +67,11 @@ try {
     const beforeDrive = fixed.pos.z;
     game.keys.KeyW = true;
     step(70);
-    const driving = { heading: fixed.heading, moved: fixed.pos.z - beforeDrive, yaw: fixed.turretYaw };
+    const driving = { heading: fixed.heading, moved: fixed.pos.z - beforeDrive, yaw: fixed.turretYaw, rate: fixed.turnRate, auto: fixed.hullAiming };
     game.keys.KeyW = false;
     step();
     const afterRelease = { heading: fixed.heading, speed: fixed.speed };
-    step(300);
+    step(540);
     const settled = { heading: fixed.heading, error: fixed.fixedGunHeadingError(), elevation: fixed.gunPitch,
       yaw: fixed.model.turret.rotation.y, speed: fixed.speed, spread: fixed.dispersionProgress };
 
@@ -102,14 +110,13 @@ try {
     const broken = fixed.heading;
     fixed.modules.tracks = 1;
     fixed.airborne = true;
-    fixed.pos.y = 4;
+    fixed.vehicle.body.setTranslation({ x: 0, y: 4, z: 0 }, true);
     step(20);
     const airborne = { heading: fixed.heading, flying: fixed.airborne, yaw: fixed.turretYaw };
     step(150);
     const grounded = fixed.heading;
 
-    start(fixed);
-    fixed.speed = -6;
+    start(fixed, 0, -6);
     step(8);
     const reversing = { heading: fixed.heading, speed: fixed.speed };
 
@@ -128,36 +135,40 @@ try {
     start(fixed);
     game.debugAim = false;
     game.aimPoint.set(-5, 2, 0);
-    step(100);
+    step(160);
     const occluded = fixed.heading;
 
     start(normal);
     step(120);
+    game.physics.free();
     return { afterAim, driving, afterRelease, settled, keysCancel, brake, right, touchCentered, touchReleased,
       shortest, broken, airborne, grounded, reversing, slope, occluded, normal: { heading: normal.heading, yaw: normal.turretYaw } };
   }, base);
 
   assert.ok(result.afterAim > 0.05);
-  assert.equal(result.driving.heading, result.afterAim);
+  assert.ok(!result.driving.auto && Math.abs(result.driving.rate) < 0.01);
+  assert.ok(Math.abs(result.driving.heading - result.afterAim) < 0.20, JSON.stringify(result));
   assert.equal(result.driving.yaw, 0);
   assert.ok(result.driving.moved > 0.5);
   assert.ok(result.afterRelease.heading > result.driving.heading && result.afterRelease.speed > 0);
-  assert.ok(Math.abs(result.settled.error) < 1e-5 && result.settled.yaw === 0 && result.settled.spread === 0);
-  assert.equal(result.keysCancel, 0);
-  assert.equal(result.brake, 0);
+  assert.ok(Math.abs(result.settled.error) < 1e-5 && result.settled.yaw === 0 && result.settled.spread === 0, JSON.stringify(result));
+  assert.ok(Math.abs(result.keysCancel) < 1e-4);
+  assert.ok(Math.abs(result.brake) < 1e-4);
   assert.ok(result.right < -0.1);
-  assert.deepEqual(result.touchCentered, { heading: 0, held: true, steer: 0, throttle: 0 });
+  assert.ok(Math.abs(result.touchCentered.heading) < 1e-4);
+  assert.deepEqual({ held: result.touchCentered.held, steer: result.touchCentered.steer, throttle: result.touchCentered.throttle },
+    { held: true, steer: 0, throttle: 0 });
   assert.equal(result.touchReleased.held, false);
   assert.ok(result.touchReleased.heading > 0.1);
   assert.ok(result.shortest < -Math.PI + 0.5);
-  assert.equal(result.broken, 0);
-  assert.deepEqual(result.airborne, { heading: 0, flying: true, yaw: 0 });
+  assert.ok(Math.abs(result.broken) < 1e-4);
+  assert.ok(result.airborne.flying && Math.abs(result.airborne.heading) < 1e-4 && result.airborne.yaw === 0);
   assert.ok(result.grounded > 0.5);
   assert.ok(result.reversing.heading > 0 && result.reversing.speed < 0);
   assert.ok(result.slope.aimAngle < 0.002 && Math.abs(result.slope.hullError) < 1e-5 && result.slope.yaw === 0,
     JSON.stringify(result.slope));
   assert.ok(Math.abs(result.occluded - Math.PI / 2) < 0.02);
-  assert.equal(result.normal.heading, 0);
+  assert.ok(Math.abs(result.normal.heading) < 1e-4);
   assert.ok(result.normal.yaw > 0.5);
   console.log('Fixed gun aim, drive priority, joystick release, ground constraints and normal turret checks passed.');
 } finally {

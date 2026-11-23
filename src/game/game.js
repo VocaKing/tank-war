@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { World } from '../world/world.js';
 import { setWindTime } from '../world/vegetation.js';
 import { TANKS, TANK_BY_ID, sanitizeLoadout, npcLoadout, PEN_RNG } from './tankData.js';
+import { BattlefieldPhysics } from './physics.js';
 import { Tank } from './tank.js';
 import { Ballistics } from './ballistics.js';
 import { Spotting } from './spotting.js';
@@ -13,7 +14,7 @@ import { HUD } from '../ui/hud.js';
 import { ArmorView } from './armorView.js';
 import { sanitizeItems, DEFAULT_ITEMS } from './items.js';
 import { setTrackLOD } from '../models/tankModel.js';
-import { RNG, clamp, DEG, wrapAngle } from '../util.js';
+import { RNG, clamp, DEG } from '../util.js';
 import { Post } from '../render/post.js';
 import { ContactShadows } from '../render/contactShadows.js';
 import { TrackMarks } from '../render/trackMarks.js';
@@ -40,6 +41,7 @@ export class Game {
   constructor(renderer, uiRoot, audio, opts) {
     this.renderer = renderer; this.audio = audio; this.opts = opts; this.rng = new RNG(opts.seed || ((Math.random() * 1e9) | 0));
     this.quality = opts.quality || 'high'; this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
+    this.physics = new BattlefieldPhysics(opts.physicsEngine, this.world);
     this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 6000);
     this.time = 0; this.timeLimit = 15 * 60; this.paused = false; this.ended = false; this.flying = [];
     this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46], this.quality);
@@ -247,14 +249,15 @@ export class Game {
   updatePlayerInput() {
     const p = this.player; const k = this.keys;
     if (!p.alive || this.ended) {
-      p.input.throttle = 0; p.input.steer = 0; p.input.driveHeld = true;
+      p.input.throttle = 0; p.input.steer = 0; p.input.brake = true; p.input.driveHeld = true;
       return;
     }
     p.input.throttle = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
     p.input.steer = (k.KeyA ? 1 : 0) - (k.KeyD ? 1 : 0);
     p.input.driveHeld = !!(k.KeyW || k.KeyA || k.KeyS || k.KeyD || k.Space || this.touch?.driveHeld);
     if (this.touch) { p.input.throttle = clamp(p.input.throttle + this.touch.throttle, -1, 1); p.input.steer = clamp(p.input.steer + this.touch.steer, -1, 1); }
-    if (k.Space) { p.input.throttle = 0; if (!p.airborne) p.speed *= 0.9; }
+    p.input.brake = !!k.Space;
+    if (p.input.brake) p.input.throttle = 0;
     p.input.aim.copy(this.aimPoint);
     if (p.spec.fixedGun && !this.debugAim && !this.lock) {
       const dir = this.camDir();
@@ -277,82 +280,6 @@ export class Game {
         if (att.some((t) => this.time - t.lastDamagedAt < 0.05)) cap.points = Math.max(0, cap.points - 30);
         cap.points = Math.min(100, cap.points + dt * (100 / 90) * Math.min(3, att.length));
       } else if (!att.length) cap.points = Math.max(0, cap.points - dt * 6);
-    }
-  }
-  // tank footprint (oriented rectangle) vs structure OBBs: separating-axis test, minimal push-out
-  static rectPush(px, pz, hx, hz, h, c) {
-    const tax = [Math.cos(h), -Math.sin(h)], taz = [Math.sin(h), Math.cos(h)];
-    const oax = [c.c, -c.s], oaz = [c.s, c.c];
-    const dx = px - c.x, dz = pz - c.z; let best = null;
-    for (const n of [oax, oaz, tax, taz]) {
-      const d = dx * n[0] + dz * n[1];
-      const rA = Math.abs(hx * (tax[0] * n[0] + tax[1] * n[1])) + Math.abs(hz * (taz[0] * n[0] + taz[1] * n[1]));
-      const rB = Math.abs(c.hx * (oax[0] * n[0] + oax[1] * n[1])) + Math.abs(c.hz * (oaz[0] * n[0] + oaz[1] * n[1]));
-      const ov = rA + rB - Math.abs(d); if (ov <= 0) return null;
-      if (!best || ov < best[2]) best = [n[0] * (d < 0 ? -1 : 1), n[1] * (d < 0 ? -1 : 1), ov];
-    }
-    return best;
-  }
-  resolveStructures(t) {
-    const W = this.world; const d = t.spec.dims; const hx = d.W / 2 + 0.05, hz = d.L / 2 + 0.05; let hitAny = false;
-    for (let it = 0; it < 3; it++) {
-      let moved = false;
-      for (const c of W.colGrid.query(t.pos.x, t.pos.z, hz + 2)) {
-        if (c.kind === 'deck') continue;
-        if (c.y1 < t.pos.y + 0.3 || c.y0 > t.pos.y + d.hullH + (t.turretGone ? 0 : d.turretH)) continue; // e.g. under a bridge deck / below a parapet top
-        const res = Game.rectPush(t.pos.x, t.pos.z, hx, hz, t.heading, c); if (!res) continue;
-        t.pos.x += res[0] * (res[2] + 0.002); t.pos.z += res[1] * (res[2] + 0.002); moved = true; hitAny = true;
-        // kill the velocity component driving into the obstacle
-        const fx = Math.sin(t.heading), fz = Math.cos(t.heading); const into = -(fx * res[0] + fz * res[1]) * Math.sign(t.speed || 1);
-        if (into > 0.3) t.speed *= 0.6; else t.speed *= 0.95;
-      }
-      if (!moved) break;
-    }
-    return hitAny;
-  }
-  resolveCollisions() {
-    const T = this.tanks; const W = this.world;
-    for (const t of T) {
-      const d = t.spec.dims; const fx = Math.sin(t.heading), fz = Math.cos(t.heading); const r = d.W * 0.5;
-      for (const off of [-d.L * 0.3, 0, d.L * 0.3]) {
-        const cx = t.pos.x + fx * off, cz = t.pos.z + fz * off;
-        for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) {
-          const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.7;
-          if (dd >= R || dd < 0.01) continue;
-          if (t.airborne && t.pos.y > W.terrain.height(rk.x, rk.z) + rk.s * 0.8) continue;
-          if (rk.s < 2.4) { const lift = rk.s * 0.55 * (1 - dd / R); if (lift > (t._rockLift || 0)) t._rockLift = lift; t.speed *= 0.985; }
-          else { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.9; }
-        }
-      }
-      const H = W.playHalf - 4; if (Math.abs(t.pos.x) > H) { t.pos.x = Math.sign(t.pos.x) * H; t.speed *= 0.8; } if (Math.abs(t.pos.z) > H) { t.pos.z = Math.sign(t.pos.z) * H; t.speed *= 0.8; }
-      this.resolveStructures(t);
-    }
-    // A second pass resolves most contacts in a pile-up or beside a wall.
-    for (let pass = 0; pass < 2; pass++) {
-      let contact = false;
-      for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
-        const a = T[i], b = T[j], da = a.spec.dims, db = b.spec.dims;
-        const dx = a.pos.x - b.pos.x, dz = a.pos.z - b.pos.z;
-        const r = a.collisionRadius + b.collisionRadius + 0.1;
-        if (dx * dx + dz * dz > r * r) continue;
-        const topA = a.pos.y + da.hullH + (a.turretGone ? 0 : da.turretH);
-        const topB = b.pos.y + db.hullH + (b.turretGone ? 0 : db.turretH);
-        if (a.pos.y + 0.25 > topB || b.pos.y + 0.25 > topA) continue;
-        const box = { x: b.pos.x, z: b.pos.z, hx: db.W / 2 + 0.05, hz: db.L / 2 + 0.05,
-          c: Math.cos(b.heading), s: Math.sin(b.heading) };
-        const push = Game.rectPush(a.pos.x, a.pos.z, da.W / 2 + 0.05, da.L / 2 + 0.05, a.heading, box);
-        if (!push) continue;
-        contact = true;
-        const [nx, nz, depth] = push;
-        const ma = a.alive ? a.spec.mass : 200, mb = b.alive ? b.spec.mass : 200;
-        const wa = mb / (ma + mb), wb = 1 - wa;
-        const separation = depth + 0.002;
-        a.pos.x += nx * separation * wa; a.pos.z += nz * separation * wa;
-        b.pos.x -= nx * separation * wb; b.pos.z -= nz * separation * wb;
-        if (pass === 0) { a.speed *= 0.9; b.speed *= 0.9; }
-        this.resolveStructures(a); this.resolveStructures(b);
-      }
-      if (!contact) break;
     }
   }
   computeAim() {
@@ -458,8 +385,19 @@ export class Game {
     this.smokes = this.smokes.filter((c) => c.until > this.time);
     for (const t of this.tanks) if (!t.isPlayer && t.alive && !this.freezeAI) this.npcItems(t);
     for (const t of this.tanks) t.update(dt, this.time);
-    this.resolveCollisions();
-    for (const t of this.tanks) { if (t.alive || t.airborne) t.updateGround(dt); t.syncModel(); }
+    this.physics.advance(dt);
+    for (const t of this.tanks) {
+      t.updateAfterMotion(dt);
+      if (!t.alive || t.airborne || Math.abs(t.speed) < 0.6) continue;
+      const d = t.spec.dims, dir = Math.sign(t.speed);
+      const fx = Math.sin(t.heading) * dir, fz = Math.cos(t.heading) * dir;
+      const knocked = this.world.veg.knock(t.pos.x + fx * d.L * 0.42, t.pos.z + fz * d.L * 0.42, d.W / 2, fx, fz, t.speed);
+      if (knocked) {
+        // Wood breaking dissipates part of the vehicle's forward momentum.
+        this.physics.brushImpact(t);
+        if (t.isPlayer) this.audio.impact(t.pos, 'ground');
+      }
+    }
     this.ballistics.update(dt); this.spotting.update(dt, this.time);
     // render visibility: enemies only if spotted by our team
     for (const t of this.tanks) { if (t.team !== this.player.team && t.alive) t.model.root.visible = t.spotted[this.player.team]; }
@@ -507,7 +445,7 @@ export class Game {
   dispose() {
     this.touch?.dispose();
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.contactShadows.dispose(); this.trackMarks.dispose(); this.effects.dispose(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.contactShadows.dispose(); this.trackMarks.dispose(); this.effects.dispose(); this.physics.free(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly
@@ -521,7 +459,7 @@ export class Game {
   }
   makeDebug() {
     return {
-      teleport: (x, z, h = 0) => { this.player.placeAt(x, z, h); },
+      teleport: (x, z, h = 0, speed = 0) => { this.player.placeAt(x, z, h, speed); },
       cam: (yaw, pitch, dist) => { this.cam.yaw = yaw; this.cam.pitch = pitch; if (dist) this.cam.dist = dist; this._camInit = false; },
       freeze: (v = true) => { this.freezeAI = v; for (const t of this.tanks) if (!t.isPlayer) { t.input.throttle = 0; t.input.steer = 0; } },
       place: (idx, x, z, h) => { this.tanks[idx].placeAt(x, z, h); },
@@ -537,4 +475,3 @@ export class Game {
     };
   }
 }
-void wrapAngle;

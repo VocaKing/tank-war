@@ -4,6 +4,7 @@
 - All game code (src/) — written for this project.
 - **three.js r170** — MIT License, © 2010-2024 three.js authors. https://github.com/mrdoob/three.js
   (bundled in dist/assets/*.js; includes three/examples Sky shader, BufferGeometryUtils, RGBELoader — MIT)
+- **Rapier 3D 0.19.3** — Apache License 2.0, Dimforge. [License](public/licenses/Rapier-Apache-2.0.txt) · https://rapier.rs/
 - Build tooling: Vite (MIT), Playwright (Apache-2.0) for QA only — not shipped.
 
 ## Textures & HDRI — Poly Haven (CC0 1.0, public domain) — https://polyhaven.com/license
