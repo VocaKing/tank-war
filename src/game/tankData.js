@@ -315,6 +315,26 @@ export const TANKS = [
     paint: { base: '#8d8a72', camo: null, accent: '#75725c' },
     desc: 'Crew survivability first: front-mounted engine, modular wedge armor with a long sloped turret, rear hatch and ball-and-chain curtains under the bustle.',
   },
+  {
+    id: 'pzh2000', tier: 4, cls: 'Artillery', name: 'PzH 2000 Self-Propelled Howitzer', short: 'PzH 2000', nation: 'Germany', era: 'Modern', year: 1998,
+    crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
+    mass: 55.3, power: 1000, maxSpeed: 60, reverseSpeed: 14, hullTraverse: 28, turretTraverse: 5.5, gunSpeed: 3.2,
+    gunDepression: 2, gunElevation: 85, hp: 1320, viewRange: 500, reload: 21.0, aimTime: 6.5, dispersion: 3.8, stabilizer: 0,
+    artillery: { highArc: true, spadeDeploySeconds: 2.2, spadeRetractSeconds: 1.7, recoilDistance: 0.92, recoilRecovery: 2.5, maxFlightSeconds: 42, aiEngageRange: 980 },
+    dims: { L: 7.95, W: 3.58, hullH: 1.72, clearance: 0.48, trackW: 0.62, turretZ: 0.05, turretL: 4.10, turretW: 3.35, turretH: 1.05, gunLen: 5.85, turretBoxZ: 0.0 },
+    armor: {
+      hull: { front: [80, 35], side: [25, 0], rear: [20, 0], top: [15, 0], bottom: [15, 0] },
+      turret: { front: [30, 20], side: [20, 0], rear: [15, 0], top: [12, 0] },
+      lowerFront: [55, 30], lowerSide: [20, 0], mantlet: [35, 0],
+    },
+    engineZone: 'front', ammoRack: { zMin: -2.6, zMax: 1.2, yMax: 0.95, chance: 0.12 },
+    shells: [
+      { name: '155 mm HE-VT / HE', type: 'HE', caliber: 155, pen: 55, velocity: 145, damage: 580, count: 24, blastRadius: 11.5 },
+      { name: '155 mm HEAT', type: 'HEAT', caliber: 155, pen: 230, velocity: 145, damage: 500, count: 8 },
+    ],
+    paint: { base: '#62664c', camo: ['#343b2d', '#8a8464'], accent: '#4b513b' },
+    desc: 'Heavy tracked artillery platform. Deploys a rear stabilizer spade before firing, uses a high-angle ballistic arc, slow turret traverse and a long reload cycle.',
+  },
 ];
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // ---- v3 ammunition balance & loadouts ----
