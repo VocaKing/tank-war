@@ -6,6 +6,14 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { N8AOPass } from 'n8ao';
 
+const BLOOM_SCALE = 0.65;
+
+class ScaledBloomPass extends UnrealBloomPass {
+  setSize(width, height) {
+    super.setSize(Math.max(32, Math.round(width * BLOOM_SCALE)), Math.max(32, Math.round(height * BLOOM_SCALE)));
+  }
+}
+
 export class Post {
   constructor(renderer, scene, camera) {
     this.renderer = renderer; const w = innerWidth, h = innerHeight;
@@ -18,7 +26,7 @@ export class Post {
     ao.configuration.transparencyAware = false;
     Object.assign(ao.configuration, { aoRadius: 1.7, distanceFalloff: 1.2, intensity: 1.55, halfRes: true, depthAwareUpsampling: true, gammaCorrection: false, aoSamples: 12, denoiseSamples: 6, denoiseRadius: 10, color: new THREE.Color(0, 0, 0), screenSpaceRadius: false });
     this.composer.addPass(ao);
-    const bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.14, 0.55, 2.2); this.bloom = bloom; this.composer.addPass(bloom);
+    const bloom = new ScaledBloomPass(new THREE.Vector2(w * BLOOM_SCALE, h * BLOOM_SCALE), 0.16, 0.52, 2.2); this.bloom = bloom; this.composer.addPass(bloom);
     this.composer.addPass(new OutputPass());
     const pr = renderer.getPixelRatio(); this.smaa = new SMAAPass(w * pr, h * pr); this.composer.addPass(this.smaa);
   }

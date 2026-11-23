@@ -58,20 +58,24 @@ export class ContactShadows {
     for (const t of this.tanks) {
       if (!(t.isPlayer || t.model.root.visible)) continue;
       const p = t.pos;
-      const distance = Math.hypot(camera.x - p.x, camera.z - p.z);
-      if (distance > 135) continue;
+      const dx = camera.x - p.x, dz = camera.z - p.z;
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared >= 135 * 135) continue;
       const groundY = world.groundHeight(p.x, p.z);
       if (world.terrain.waterLevel(p.x, p.z) > groundY + 0.1) continue;
-      const opacity = 0.30 * Math.min(1, (135 - distance) / 30) * Math.max(0, 1 - (p.y - groundY) * 1.4);
-      if (opacity <= 0) continue;
+      const elevation = Math.max(0, p.y - groundY);
+      if (elevation >= 1.25) continue;
+      const fade = 1 - elevation / 1.25;
+      const opacity = 0.30 * Math.min(1, (135 - Math.sqrt(distanceSquared)) / 30) * fade * fade;
       const sin = Math.sin(t.heading), cos = Math.cos(t.heading);
-      const dims = t.spec.dims, width = dims.W * 1.34, length = dims.L * 1.23;
+      const dims = t.spec.dims;
+      const width = dims.W * 1.34 + elevation * 0.7, length = dims.L * 1.23 + elevation * 0.7;
       for (let z = 0; z < ROW; z++) for (let x = 0; x < ROW; x++) {
         const u = (x / (ROW - 1) - 0.5) * width, v = (z / (ROW - 1) - 0.5) * length;
         const wx = p.x + cos * u + sin * v, wz = p.z - sin * u + cos * v;
         const index = active * VERTICES + z * ROW + x;
         this.position.setXYZ(index, wx, world.groundHeight(wx, wz) + 0.045, wz);
-        this.opacity.setX(index, Math.min(0.30, opacity));
+        this.opacity.setX(index, opacity);
       }
       active++;
     }

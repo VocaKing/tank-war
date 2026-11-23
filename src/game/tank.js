@@ -25,6 +25,7 @@ export class Tank {
     if (this.abilities.magazine) this.reloadLeft = 0;
     this.model = createTankModel(spec); game.scene.add(this.model.root);
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
+    this.airborne = false; this.verticalSpeed = 0; this.landingSpeed = 0;
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0; this.rock = 0; this.rockV = 0;
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.dispersionProgress = 0; this.yawRate = 0; this.recoil = 0;
@@ -35,6 +36,7 @@ export class Tank {
     this.lastFired = -100; this.inBush = null; this.visibleUntil = [0, 0]; this.spotted = [false, false]; this.lastSeenPos = [null, null];
     this.stats = { damage: 0, kills: 0, shots: 0, hits: 0, pens: 0, received: 0 };
     this.lastAttacker = null; this.lastDamagedAt = -100; this.inWater = false; this.groundY = 0; this.moved = 0;
+    this.collisionRadius = Math.hypot(spec.dims.W / 2 + 0.05, spec.dims.L / 2 + 0.05);
     this.hullBox = { x: spec.dims.W / 2, y0: 0.3, y1: spec.dims.hullH, z: spec.dims.L / 2 };
     const d = spec.dims; const tc = d.turretBoxZ || 0;
     this.turBox = { x: d.turretW / 2, y0: 0, y1: d.turretH, z0: tc - d.turretL / 2, z1: tc + d.turretL / 2 };
@@ -64,16 +66,51 @@ export class Tank {
     this.dispersionProgress = advanceDispersion(this.dispersionProgress, this.speed, dt, this.aimTime() * stabilization);
   }
   placeAt(x, z, heading) {
-    this.pos.set(x, this.game.world.groundHeight(x, z), z); this.heading = heading; this.turretYaw = 0; this.updateGround(1, true); this.syncModel();
+    this.pos.set(x, 0, z);
+    this.heading = heading;
+    this.turretYaw = 0;
+    this.rock = this.rockV = 0;
+    this._rockLift = 0;
+    this.vel.set(0, 0, 0);
+    this.updateGround(1, true);
+    this.syncModel();
   }
   setHeading(h) { this.heading = h; }
 
   update(dt, time) {
     if (!this.alive) return;
-    const s = this.spec, d = s.dims, W = this.game.world, T = W.terrain;
+    const d = this.spec.dims, W = this.game.world;
     this.equip.update(dt); if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
     if (this.trackRepair > 0) { this.trackRepair -= dt; if (this.trackRepair <= 0) { this.modules.tracks = 1; if (this.isPlayer) this.game.hud.message('Tracks repaired', '#9fd39f'); } }
     if (this.burning > 0) { this.burning -= dt; this.damage(this.maxHp * 0.012 * dt, this.lastAttacker, 'fire'); if (!this.alive) return; }
+    if (this.airborne) {
+      this.turnRate = 0;
+      const level = W.terrain.waterLevel(this.pos.x, this.pos.z);
+      this.inWater = level - this.pos.y > 0.15;
+    } else {
+      this.updateDrivetrain(dt);
+    }
+    const nfx = Math.sin(this.heading), nfz = Math.cos(this.heading);
+    const ox = this.pos.x, oz = this.pos.z;
+    this.pos.x += nfx * this.speed * dt; this.pos.z += nfz * this.speed * dt;
+    // knock trees
+    const kn = !this.airborne && W.veg.knock(this.pos.x + nfx * d.L * 0.42, this.pos.z + nfz * d.L * 0.42, d.W * 0.5, nfx * Math.sign(this.speed), nfz * Math.sign(this.speed), this.speed);
+    if (kn) { this.speed *= 0.82; if (this.isPlayer) this.game.audio.impact(this.pos, 'ground'); }
+    this.vel.set((this.pos.x - ox) / Math.max(dt, 1e-4), 0, (this.pos.z - oz) / Math.max(dt, 1e-4));
+    // running gear animation
+    const half = d.W / 2; updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
+    this.moved += Math.abs(this.speed) * dt;
+    this.updateDispersion(dt);
+    this.updateTurret(dt);
+    if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
+    if (this.abilities) this.abilities.update(dt);
+    this.recoil = Math.max(0, this.recoil - dt * 1.2);
+    // hull rocking spring (firing / braking)
+    const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
+    this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
+  }
+  updateDrivetrain(dt) {
+    const s = this.spec, d = s.dims, W = this.game.world, T = W.terrain;
     const mobile = this.modules.tracks > 0;
     const driver = this.crewAlive('Driver') ? 1 : 0.65;
     const thr = clamp(this.input.throttle, -1, 1), steer = clamp(this.input.steer, -1, 1);
@@ -100,24 +137,6 @@ export class Tank {
     this.turnRate = approach(this.turnRate, turnTarget, turnMax * 3 * dt + 0.001);
     if (Math.abs(steer) > 0.1 && Math.abs(thr) < 0.1) this.speed *= Math.pow(0.6, dt);
     this.heading = wrapAngle(this.heading + this.turnRate * dt);
-    const nfx = Math.sin(this.heading), nfz = Math.cos(this.heading);
-    const ox = this.pos.x, oz = this.pos.z;
-    this.pos.x += nfx * this.speed * dt; this.pos.z += nfz * this.speed * dt;
-    // knock trees
-    const kn = W.veg.knock(this.pos.x + nfx * d.L * 0.42, this.pos.z + nfz * d.L * 0.42, d.W * 0.5, nfx * Math.sign(this.speed), nfz * Math.sign(this.speed), this.speed);
-    if (kn) { this.speed *= 0.82; if (this.isPlayer) this.game.audio.impact(this.pos, 'ground'); }
-    this.vel.set((this.pos.x - ox) / Math.max(dt, 1e-4), 0, (this.pos.z - oz) / Math.max(dt, 1e-4));
-    // running gear animation
-    const half = d.W / 2; updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
-    this.moved += Math.abs(this.speed) * dt;
-    this.updateDispersion(dt);
-    this.updateTurret(dt);
-    if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
-    if (this.abilities) this.abilities.update(dt);
-    this.recoil = Math.max(0, this.recoil - dt * 1.2);
-    // hull rocking spring (firing / braking)
-    const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
-    this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
   }
   updateTurret(dt) {
     const s = this.spec, m = this.model;
@@ -152,17 +171,55 @@ export class Tank {
     this.aimError=Math.abs(wrapAngle(yawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
   }
   updateGround(dt, snap = false) {
-    const d = this.spec.dims, W = this.game.world; const T = { height: (x, z) => W.groundHeight(x, z) }; const fx = Math.sin(this.heading), fz = Math.cos(this.heading), rx = Math.cos(this.heading), rz = -Math.sin(this.heading);
+    if (dt <= 0) return;
+    const d = this.spec.dims, W = this.game.world;
+    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    const { x, z } = this.pos;
     const lx = d.L * 0.4, wx = d.W * 0.4;
-    const hf = T.height(this.pos.x + fx * lx, this.pos.z + fz * lx), hb = T.height(this.pos.x - fx * lx, this.pos.z - fz * lx);
-    const hl = T.height(this.pos.x + rx * wx, this.pos.z + rz * wx), hr = T.height(this.pos.x - rx * wx, this.pos.z - rz * wx);
-    const hc = T.height(this.pos.x, this.pos.z);
-    const pitchT = -Math.atan2(hf - hb, lx * 2), rollT = Math.atan2(hl - hr, wx * 2);
-    const yT = Math.max((hf + hb) / 2, (hl + hr) / 2, hc) - 0.02 + (this._rockLift || 0); this._rockLift = 0;
-    const k = snap ? 1 : Math.min(1, dt * 9);
-    this.pitch += (pitchT - this.pitch) * k; this.roll += (rollT - this.roll) * k; this.groundY = yT;
-    if (snap || yT > this.pos.y) this.pos.y = yT; else this.pos.y += (yT - this.pos.y) * Math.min(1, dt * 14);
-    _e.set(this.pitch + this.rock, this.heading, this.roll, 'YXZ'); this.quat.setFromEuler(_e);
+    const hf = W.groundHeight(x + fx * lx, z + fz * lx), hb = W.groundHeight(x - fx * lx, z - fz * lx);
+    const hl = W.groundHeight(x + fz * wx, z - fx * wx), hr = W.groundHeight(x - fz * wx, z + fx * wx);
+    const hc = W.groundHeight(x, z);
+    const pitch = -Math.atan2(hf - hb, lx * 2), roll = Math.atan2(hl - hr, wx * 2);
+    const ground = Math.max((hf + hb) / 2, (hl + hr) / 2, hc) - 0.02;
+    const rockLift = this._rockLift || 0;
+    this.landingSpeed = 0;
+    this._rockLift = 0;
+
+    // Continue along the old slope tangent when the surface drops faster than gravity.
+    const moving = Math.abs(this.speed) >= 4;
+    const nextY = this.pos.y + (this.verticalSpeed - GRAVITY * dt * 0.5) * dt;
+    const canLaunch = moving && rockLift === 0 && this._groundRockLift === 0;
+    const takingOff = canLaunch && nextY > ground &&
+      this.groundY + (this.verticalSpeed - GRAVITY * dt * 0.5) * dt > ground + 2 * dt * dt;
+    const inFlight = !snap && (this.airborne || takingOff);
+    const flightPitch = -Math.atan2(this.verticalSpeed * Math.sign(this.speed), Math.max(4, Math.abs(this.speed)));
+    this.pitch = snap ? pitch : lerp(this.pitch, inFlight ? flightPitch : pitch, Math.min(1, dt * (inFlight ? 2.8 : 16)));
+    this.roll = snap ? roll : lerp(this.roll, inFlight ? 0 : roll, Math.min(1, dt * (inFlight ? 2.4 : 16)));
+    const hullPitch = this.pitch + this.rock;
+    const frontOffset = -Math.sin(hullPitch) * lx;
+    const rightOffset = Math.sin(this.roll) * Math.cos(hullPitch) * wx;
+    // Clear the sampled supports even while the suspension is settling into a new attitude.
+    const support = Math.max(ground, hf - frontOffset - 0.08, hb + frontOffset - 0.08,
+      hl - rightOffset - 0.08, hr + rightOffset - 0.08) + rockLift;
+    const wasAirborne = this.airborne && !snap;
+    this.airborne = inFlight && nextY > support;
+    if (this.airborne) {
+      this.pos.y = nextY;
+      this.verticalSpeed -= GRAVITY * dt;
+    } else {
+      if (wasAirborne) {
+        this.landingSpeed = Math.max(0, GRAVITY * dt - this.verticalSpeed);
+        this.inWater = W.terrain.waterLevel(x, z) - support > 0.15;
+        this.rockV += Math.min(1.3, this.landingSpeed * 0.16) * Math.sign(this.speed);
+        this.speed *= 1 - Math.min(0.3, this.landingSpeed * 0.035);
+      }
+      this.pos.y = support;
+      this.verticalSpeed = moving && !snap && !wasAirborne ? clamp((ground - this.groundY) / dt, -12, 12) : 0;
+    }
+    this.vel.y = this.airborne ? this.verticalSpeed : 0;
+    this.groundY = ground;
+    this._groundRockLift = rockLift;
+    _e.set(hullPitch, this.heading, this.roll, 'YXZ'); this.quat.setFromEuler(_e);
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);

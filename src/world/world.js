@@ -468,8 +468,8 @@ export class World {
     return false;
   }
   // first structure hit along segment (t in 0..1) or -1
-  structureHit(ax, ay, az, bx, by, bz) {
-    let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz); if (t >= 0 && (best < 0 || t < best)) best = t; }
+  structureHit(ax, ay, az, bx, by, bz, padding = 0) {
+    let best = -1; for (const c of this.colGrid.querySegment(ax, az, bx, bz)) { const t = c.segment(ax, ay, az, bx, by, bz, padding); if (t >= 0 && (best < 0 || t < best)) best = t; }
     return best;
   }
   dispose() {

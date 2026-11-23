@@ -110,10 +110,29 @@ export class Effects {
       this.debris.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 18, 6 + Math.random() * 14, (Math.random() - 0.5) * 18), w: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8), t: 0 }); }
   }
   addBurner(obj, offset, dur = 40, intensity = 1) { this.burners.push({ obj, offset, t: 0, dur, k: intensity, acc: 0 }); }
-  trackDust(pos, speed, inWater) {
-    if (Math.random() > Math.min(1, Math.abs(speed) / 8) * 0.6) return;
+  trackDust(pos, speed, inWater, dt) {
+    const rate = 36 * Math.min(1, Math.abs(speed) / 8);
+    if (Math.random() >= Math.min(1, rate * dt)) return;
     if (inWater) { this.smoke.emit({ x: pos.x, y: pos.y + 0.3, z: pos.z, vx: (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 3, vz: (Math.random() - 0.5) * 2, life: 1, s0: 0.6, s1: 2, r: 0.9, g: 0.94, b: 0.97, a: 0.6, drag: 0.5, grav: 6 }); return; }
     this.smoke.emit({ x: pos.x + (Math.random() - 0.5), y: pos.y + 0.3, z: pos.z + (Math.random() - 0.5), vx: (Math.random() - 0.5) * 1.5, vy: 0.6 + Math.random(), vz: (Math.random() - 0.5) * 1.5, life: 2.5 + Math.random() * 2, s0: 1.2, s1: 5 + Math.abs(speed) * 0.25, r: this.dust[0], g: this.dust[1], b: this.dust[2], a: 0.22, drag: 0.5, grav: -0.05 });
+  }
+  landingDust(pos, heading, width, impactSpeed, inWater) {
+    const force = Math.min(1, impactSpeed / 7);
+    const sin = Math.sin(heading), cos = Math.cos(heading);
+    const tint = inWater ? [0.89, 0.93, 0.97] : this.dust;
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 2 + Math.floor(force * 4); i++) {
+        const lateral = side * (width * 0.4 + Math.random() * 0.25);
+        const along = (Math.random() - 0.5) * width;
+        const spray = side * (0.7 + force * (1 + Math.random() * 2));
+        this.smoke.emit({
+          x: pos.x + cos * lateral + sin * along, y: pos.y + 0.2, z: pos.z - sin * lateral + cos * along,
+          vx: cos * spray, vy: 0.7 + force * (1 + Math.random()), vz: -sin * spray,
+          life: inWater ? 0.85 : 1.7 + force, s0: 0.75, s1: 2 + force * 3,
+          r: tint[0], g: tint[1], b: tint[2], a: 0.24 + force * 0.12, drag: 0.75, grav: inWater ? 4 : 0.06,
+        });
+      }
+    }
   }
   exhaust(pos, load) { if (Math.random() > 0.35 + load * 0.5) return; this.smoke.emit({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 0.6, vy: 0.8 + load, vz: (Math.random() - 0.5) * 0.6, life: 1.4, s0: 0.4, s1: 1.8, r: 0.25, g: 0.24, b: 0.23, a: 0.25 + load * 0.25, drag: 0.6, grav: -0.3 }); }
   addTracer(shell) { const m = new THREE.Mesh(this.tracerGeo, this.tracerMat); m.renderOrder = 6; this.scene.add(m); shell.tracer = m; }

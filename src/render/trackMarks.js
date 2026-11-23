@@ -97,7 +97,7 @@ export class TrackMarks {
     for (let i = 0; i < this.tanks.length; i++) {
       const t = this.tanks[i], pos = t.pos, state = this.states[i];
       const dx = camera.x - pos.x, dz = camera.z - pos.z;
-      if (!t.alive || (!t.isPlayer && !t.model.root.visible) || dx * dx + dz * dz > this.range * this.range) {
+      if (!t.alive || t.airborne || (!t.isPlayer && !t.model.root.visible) || dx * dx + dz * dz > this.range * this.range) {
         state[0] = state[1] = null;
         continue;
       }

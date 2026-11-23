@@ -22,7 +22,15 @@ import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, dispersionPixels } from './combatMath.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
-function _segDist(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceTo(p); }
+function segmentDistanceSquared(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceToSquared(p); }
+
+function withinPathXZ(p, origin, dx, dz, radius) {
+  const x = p.x - origin.x, z = p.z - origin.z;
+  const lengthSquared = dx * dx + dz * dz;
+  const t = lengthSquared > 0 ? clamp((x * dx + z * dz) / lengthSquared, 0, 1) : 0;
+  const ex = x - dx * t, ez = z - dz * t;
+  return ex * ex + ez * ez <= radius * radius;
+}
 
 const ALLY_NAMES = ['Sgt. Miller', 'Cpl. Novak', 'Lt. Hayes', 'Sgt. Dubois', 'Pvt. Kowalski', 'Cpt. Reyes', 'Sgt. Okafor', 'Lt. Varga'];
 const ENEMY_NAMES = ['Lt. Weber', 'Sgt. Volkov', 'Cpt. Brandt', 'Sgt. Petrov', 'Uffz. Krüger', 'Lt. Orlov', 'Sgt. Haas', 'Cpl. Zaitsev'];
@@ -147,18 +155,35 @@ export class Game {
   }
   camDir(yaw = this.cam.yaw, pitch = this.cam.pitch) { return new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)); }
   // camera position for a view direction (no smoothing): scope at the gunner's sight, or chase camera with collision
-  camPosFor(dir, sniper, m = this.player.model) {
-    const T = this.world.terrain;
-    // scope: gunner's sight above the gun trunnion, placed along the VIEW yaw (not the lagging turret yaw) so the
-    // scope position depends only on the view direction and entering the scope keeps the exact aim point
-    if (sniper) { const gp = m.turret.getWorldPosition(new THREE.Vector3()); const hz = Math.hypot(dir.x, dir.z) || 1; gp.y += m.gun.position.y + 0.55; gp.x += (dir.x / hz) * m.gun.position.z; gp.z += (dir.z / hz) * m.gun.position.z; gp.addScaledVector(dir, 0.6); return gp; }
-    const c = this.cam; const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2;
-    let pos = focus.clone().addScaledVector(dir, -c.dist);
-    const W = this.world; let tHit = 1;
-    const tt = T.segmentHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z, 1); if (tt >= 0) tHit = Math.min(tHit, tt);
-    const ts = W.structureHit(focus.x, focus.y, focus.z, pos.x, pos.y, pos.z); if (ts >= 0) tHit = Math.min(tHit, ts);
-    if (tHit < 1) pos = focus.clone().addScaledVector(dir, -Math.max(2.5, c.dist * tHit - 0.6));
-    const gh = T.height(pos.x, pos.z) + 1.2; if (pos.y < gh) pos.y = gh;
+  camPosFor(dir, sniper, m = this.player.model, focus = null) {
+    const pivot = focus ?? m.turret.getWorldPosition(new THREE.Vector3());
+    if (sniper) {
+      // Follow the view yaw so zooming keeps the same world-space aim point.
+      pivot.y += m.gun.position.y + 0.55;
+      const hz = Math.hypot(dir.x, dir.z) || 1;
+      const pos = pivot.clone().add(new THREE.Vector3(dir.x / hz * m.gun.position.z, 0, dir.z / hz * m.gun.position.z));
+      return this.constrainCamera(pivot, pos.addScaledVector(dir, 0.6), 0.16);
+    }
+    if (!focus) {
+      pivot.y += 2.2;
+    }
+    const pos = pivot.clone().addScaledVector(dir, -this.cam.dist);
+    pos.y = Math.max(pos.y, this.world.terrain.height(pos.x, pos.z) + 1.2);
+    return this.constrainCamera(pivot, pos, 0.42);
+  }
+  constrainCamera(focus, pos, radius) {
+    const { x: ax, y: ay, z: az } = focus;
+    const { x: bx, y: by, z: bz } = pos;
+    const world = this.world;
+    const terrainHit = world.terrain.segmentHit(ax, ay - radius, az, bx, by - radius, bz, 0.65);
+    const structureHit = world.structureHit(ax, ay, az, bx, by, bz, radius);
+    let fraction = 1;
+    if (terrainHit >= 0) fraction = terrainHit;
+    if (structureHit >= 0) fraction = Math.min(fraction, structureHit);
+    if (fraction < 1) {
+      const length = focus.distanceTo(pos);
+      if (length > 0) pos.lerpVectors(focus, pos, Math.max(0, fraction - 0.05 / length));
+    }
     return pos;
   }
   alignCamTo(P) {
@@ -221,7 +246,7 @@ export class Game {
     if (!p.alive || this.ended) { p.input.throttle = 0; p.input.steer = 0; return; }
     p.input.throttle = (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0); p.input.steer = (k.KeyA ? 1 : 0) - (k.KeyD ? 1 : 0);
     if (this.touch) { p.input.throttle = clamp(p.input.throttle + this.touch.throttle,-1,1); p.input.steer = clamp(p.input.steer + this.touch.steer,-1,1); }
-    if (k.Space) { p.input.throttle = 0; p.speed *= 0.9; }
+    if (k.Space) { p.input.throttle = 0; if (!p.airborne) p.speed *= 0.9; }
     p.input.aim.copy(this.aimPoint);
     if (this.mouseDown || this.touch?.firing) p.tryFire(this.time);
   }
@@ -256,7 +281,7 @@ export class Game {
       let moved = false;
       for (const c of W.colGrid.query(t.pos.x, t.pos.z, hz + 2)) {
         if (c.kind === 'deck') continue;
-        if (c.y1 < t.pos.y + 0.3 || c.y0 > t.pos.y + d.hullH) continue; // e.g. under a bridge deck / below a parapet top
+        if (c.y1 < t.pos.y + 0.3 || c.y0 > t.pos.y + d.hullH + (t.turretGone ? 0 : d.turretH)) continue; // e.g. under a bridge deck / below a parapet top
         const res = Game.rectPush(t.pos.x, t.pos.z, hx, hz, t.heading, c); if (!res) continue;
         t.pos.x += res[0] * (res[2] + 0.002); t.pos.z += res[1] * (res[2] + 0.002); moved = true; hitAny = true;
         // kill the velocity component driving into the obstacle
@@ -271,25 +296,45 @@ export class Game {
     const T = this.tanks; const W = this.world;
     for (const t of T) {
       const d = t.spec.dims; const fx = Math.sin(t.heading), fz = Math.cos(t.heading); const r = d.W * 0.5;
-      this.resolveStructures(t);
       for (const off of [-d.L * 0.3, 0, d.L * 0.3]) {
         const cx = t.pos.x + fx * off, cz = t.pos.z + fz * off;
         for (const rk of W.veg.rockGrid.query(cx, cz, r + 3)) {
           const dx = cx - rk.x, dz = cz - rk.z; const dd = Math.hypot(dx, dz); const R = r + rk.s * 0.7;
           if (dd >= R || dd < 0.01) continue;
+          if (t.airborne && t.pos.y > W.terrain.height(rk.x, rk.z) + rk.s * 0.8) continue;
           if (rk.s < 2.4) { const lift = rk.s * 0.55 * (1 - dd / R); if (lift > (t._rockLift || 0)) t._rockLift = lift; t.speed *= 0.985; }
           else { t.pos.x += dx / dd * (R - dd); t.pos.z += dz / dd * (R - dd); t.speed *= 0.9; }
         }
       }
       const H = W.playHalf - 4; if (Math.abs(t.pos.x) > H) { t.pos.x = Math.sign(t.pos.x) * H; t.speed *= 0.8; } if (Math.abs(t.pos.z) > H) { t.pos.z = Math.sign(t.pos.z) * H; t.speed *= 0.8; }
+      this.resolveStructures(t);
     }
-    for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
-      const a = T[i], b = T[j]; const dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z; const d = Math.hypot(dx, dz);
-      const R = (a.spec.dims.L + b.spec.dims.L) * 0.36; if (d > R || d < 0.01) continue;
-      const push = (R - d); const ma = a.alive ? a.spec.mass : 200, mb = b.alive ? b.spec.mass : 200; const wa = mb / (ma + mb), wb = ma / (ma + mb);
-      a.pos.x -= dx / d * push * wa; a.pos.z -= dz / d * push * wa; b.pos.x += dx / d * push * wb; b.pos.z += dz / d * push * wb; a.speed *= 0.9; b.speed *= 0.9;
-      // tank-tank pushes must never shove a tank into a building
-      this.resolveStructures(a); this.resolveStructures(b);
+    // A second pass resolves most contacts in a pile-up or beside a wall.
+    for (let pass = 0; pass < 2; pass++) {
+      let contact = false;
+      for (let i = 0; i < T.length; i++) for (let j = i + 1; j < T.length; j++) {
+        const a = T[i], b = T[j], da = a.spec.dims, db = b.spec.dims;
+        const dx = a.pos.x - b.pos.x, dz = a.pos.z - b.pos.z;
+        const r = a.collisionRadius + b.collisionRadius + 0.1;
+        if (dx * dx + dz * dz > r * r) continue;
+        const topA = a.pos.y + da.hullH + (a.turretGone ? 0 : da.turretH);
+        const topB = b.pos.y + db.hullH + (b.turretGone ? 0 : db.turretH);
+        if (a.pos.y + 0.25 > topB || b.pos.y + 0.25 > topA) continue;
+        const box = { x: b.pos.x, z: b.pos.z, hx: db.W / 2 + 0.05, hz: db.L / 2 + 0.05,
+          c: Math.cos(b.heading), s: Math.sin(b.heading) };
+        const push = Game.rectPush(a.pos.x, a.pos.z, da.W / 2 + 0.05, da.L / 2 + 0.05, a.heading, box);
+        if (!push) continue;
+        contact = true;
+        const [nx, nz, depth] = push;
+        const ma = a.alive ? a.spec.mass : 200, mb = b.alive ? b.spec.mass : 200;
+        const wa = mb / (ma + mb), wb = 1 - wa;
+        const separation = depth + 0.002;
+        a.pos.x += nx * separation * wa; a.pos.z += nz * separation * wa;
+        b.pos.x -= nx * separation * wb; b.pos.z -= nz * separation * wb;
+        if (pass === 0) { a.speed *= 0.9; b.speed *= 0.9; }
+        this.resolveStructures(a); this.resolveStructures(b);
+      }
+      if (!contact) break;
     }
   }
   computeAim() {
@@ -308,7 +353,7 @@ export class Game {
     const W = this.world; const tt = W.terrain.segmentHit(o.x, o.y, o.z, e.x, e.y, e.z, 2); if (tt >= 0) best = tt;
     const ts = W.structureHit(o.x, o.y, o.z, e.x, e.y, e.z); if (ts >= 0 && ts < best) best = ts;
     this.aimTank = null; this.aimHit = null;
-    for (const t of this.tanks) { if (t === this.player) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; const h = t.rayTest(o, e); if (h && h.t < best) { best = h.t; this.aimTank = t; this.aimHit = h; } }
+    for (const t of this.tanks) { if (t === this.player) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; if (!withinPathXZ(t.pos, o, dir.x * far, dir.z * far, 12)) continue; const h = t.rayTest(o, e); if (h && h.t < best) { best = h.t; this.aimTank = t; this.aimHit = h; } }
     this.aimPoint.copy(o).addScaledVector(dir, far * best);
     this.aimDist = far * best;
   }
@@ -317,13 +362,16 @@ export class Game {
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
     const m = p.model; const pos = p.shotOrigin(m.muzzle.getWorldPosition(new THREE.Vector3())); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
     const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity).add(p.vel); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
-    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02;
-    for (let i = 0; i < 200 && !hitP; i++) {
+    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02, steps = 200;
+    const dx = v.x * h * steps, dz = v.z * h * steps;
+    const candidates = this.tanks.filter((t) => t !== p && (t.team === 0 || t.spotted[0] || !t.alive)
+      && withinPathXZ(t.pos, pos, dx, dz, 12));
+    for (let i = 0; i < steps && !hitP; i++) {
       a.copy(pos); v.y -= 9.81 * h; b.copy(pos).addScaledVector(v, h);
       let best = 2; const tt = W.terrain.segmentHit(a.x, a.y, a.z, b.x, b.y, b.z, 2); if (tt >= 0) best = tt;
       const ts = W.structureHit(a.x, a.y, a.z, b.x, b.y, b.z); if (ts >= 0 && ts < best) best = ts;
       let stepTank = null, stepInfo = null;
-      for (const t of this.tanks) { if (t === p) continue; if (t.team !== 0 && !t.spotted[0] && t.alive) continue; if (_segDist(t.pos, a, b) > 12) continue; const hh = t.rayTest(a, b); if (hh && hh.t < best) { best = hh.t; stepTank = t; stepInfo = hh; } }
+      for (const t of candidates) { if (segmentDistanceSquared(t.pos, a, b) > 144) continue; const hh = t.rayTest(a, b); if (hh && hh.t < best) { best = hh.t; stepTank = t; stepInfo = hh; } }
       if (best <= 1) { hitP = a.clone().lerp(b, best); dist += a.distanceTo(hitP); hitTank = stepTank; hitInfo = stepInfo; }
       else { dist += a.distanceTo(b); pos.copy(b); }
     }
@@ -355,19 +403,22 @@ export class Game {
   updateCamera(dt) {
     if (this.camOverride) { const o = this.camOverride; this.camera.position.set(o[0], o[1], o[2]); this.camera.fov = o[6] || 60; this.camera.updateProjectionMatrix(); this.camera.lookAt(o[3], o[4], o[5]); this.camera.updateMatrixWorld(); this.effects.setScale(innerHeight, this.camera.fov); for (const t of this.tanks) t.model.root.visible = t.team === 0 || !t.alive || t.spotted[0]; this.updateLOD(); return; }
     const c = this.cam; const f = c.follow && c.follow.alive ? c.follow : this.player.alive ? this.player : (this.tanks.find((t) => t.team === 0 && t.alive) || this.player); c.follow = f;
-    const m = f.model; const T = this.world.terrain;
+    const m = f.model;
+    const previousFov = this.camera.fov;
     const dir = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch));
     const sn = c.sniper && f === this.player && f.alive;
     m.root.visible = !sn;
     if (sn) {
       this.camera.position.copy(this.camPosFor(dir, true, m)); c.fov += (zoomFov(c.zoom) - c.fov) * Math.min(1, dt * 12); if (!this._wasSn) c.fov = zoomFov(c.zoom); this.camera.fov = c.fov;
     } else {
-      const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2; const pos = this.camPosFor(dir, false, m);
+      const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2; const pos = this.camPosFor(dir, false, m, focus);
       const pullIn = pos.distanceTo(focus) < this.camera.position.distanceTo(focus);
-      this.camera.position.lerp(pos, Math.min(1, dt * (pullIn ? 30 : 10) + (this._camInit ? 0 : 1))); this._camInit = true; c.fov = 60; this.camera.fov = 60;
+      this.camera.position.lerp(pos, Math.min(1, dt * (pullIn ? 30 : 10) + (this._camInit ? 0 : 1)));
+      if (!this.camera.position.equals(pos)) this.constrainCamera(focus, this.camera.position, 0.42);
+      this._camInit = true; c.fov = 60; this.camera.fov = 60;
     }
     this._wasSn = sn;
-    this.camera.updateProjectionMatrix();
+    if (this.camera.fov !== previousFov) this.camera.updateProjectionMatrix();
     this.camera.lookAt(this.camera.position.clone().add(dir));
     this.camera.updateMatrixWorld();
     this.effects.setScale(innerHeight, this.camera.fov);
@@ -390,14 +441,28 @@ export class Game {
     for (const t of this.tanks) if (!t.isPlayer && t.alive && !this.freezeAI) this.npcItems(t);
     for (const t of this.tanks) t.update(dt, this.time);
     this.resolveCollisions();
-    for (const t of this.tanks) { if (t.alive) t.updateGround(dt); t.syncModel(); }
+    for (const t of this.tanks) { if (t.alive || t.airborne) t.updateGround(dt); t.syncModel(); }
     this.ballistics.update(dt); this.spotting.update(dt, this.time);
     // render visibility: enemies only if spotted by our team
     for (const t of this.tanks) { if (t.team !== this.player.team && t.alive) t.model.root.visible = t.spotted[this.player.team]; }
-    // emitters (dust, exhaust)
+    // Keep distant track dust available through the scope, where it still covers pixels.
+    const dustRange = 230 * 60 / this.camera.fov;
+    const dustRangeSquared = dustRange * dustRange;
     for (const t of this.tanks) {
-      if (!t.alive) continue; const d = t.spec.dims; if (Math.abs(t.speed) > 1.5) { const back = t.model.root.localToWorld(new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * d.W * 0.4, 0.2, -d.L * 0.5)); this.effects.trackDust(back, t.speed, t.inWater); }
-      if (t.pos.distanceTo(this.camera.position) < 120) this.effects.exhaust(t.model.root.localToWorld(new THREE.Vector3(0.6, d.hullH + 0.2, -d.L * 0.47)), Math.abs(t.input.throttle));
+      if (!t.alive) continue;
+      const d = t.spec.dims, distanceSquared = t.pos.distanceToSquared(this.camera.position);
+      if (t.landingSpeed > 1.5 && distanceSquared < dustRangeSquared) {
+        this.effects.landingDust(t.pos, t.heading, d.W, t.landingSpeed, t.inWater);
+      }
+      if (!t.airborne && Math.abs(t.speed) > 1.5 && distanceSquared < dustRangeSquared) {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const back = t.model.root.localToWorld(new THREE.Vector3(side * d.W * 0.4, 0.2, -d.L * 0.5));
+        this.effects.trackDust(back, t.speed, t.inWater, dt);
+      }
+      if (distanceSquared < 120 * 120) {
+        const outlet = t.model.root.localToWorld(new THREE.Vector3(0.6, d.hullH + 0.2, -d.L * 0.47));
+        this.effects.exhaust(outlet, Math.abs(t.input.throttle));
+      }
     }
     for (let i = this.flying.length - 1; i >= 0; i--) { const f = this.flying[i]; f.t += dt; if (f.rest) continue; f.v.y -= 9.81 * dt; f.obj.position.addScaledVector(f.v, dt); f.obj.rotation.x += f.w.x * dt; f.obj.rotation.z += f.w.z * dt;
       const gy = this.world.terrain.height(f.obj.position.x, f.obj.position.z); if (f.obj.position.y < gy && f.v.y < 0) { f.obj.position.y = gy; f.rest = true; } }

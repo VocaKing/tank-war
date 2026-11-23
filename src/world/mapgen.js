@@ -174,9 +174,10 @@ export class MapBuilder {
   }
   // finalize: splat weights per grid vertex [A,B,rock,road] and tint
   finalize(maskBFn, tintFn) {
-    const t = this.t; const n = t.n; this.splat = new Float32Array(n * n * 4);
+    const t = this.t; const n = t.n; let maxHeight = -Infinity; this.splat = new Float32Array(n * n * 4);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i; const x = t.i2x(i), z = t.i2x(j);
+      maxHeight = Math.max(maxHeight, t.h[k]);
       const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(n - 1, j + 1);
       const gx = (t.h[j * n + i1] - t.h[j * n + i0]) / ((i1 - i0) * t.res), gz = (t.h[j1 * n + i] - t.h[j0 * n + i]) / ((j1 - j0) * t.res);
       const slope = Math.hypot(gx, gz);
@@ -187,5 +188,6 @@ export class MapBuilder {
       const s = wa + wb + wk + wr || 1; this.splat.set([wa / s, wb / s, wk / s, wr / s], k * 4);
       if (tintFn) { const c = tintFn(x, z, slope); t.tint[k * 3] = c[0]; t.tint[k * 3 + 1] = c[1]; t.tint[k * 3 + 2] = c[2]; }
     }
+    t.maxHeight = maxHeight;
   }
 }
