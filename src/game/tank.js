@@ -192,10 +192,10 @@ export class Tank {
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
   setSpade(deploy) {
-    if (!this.spec.artillery) return false;
+    if (!this.usesSpade()) return false;
     if (deploy) {
       if (Math.abs(this.speed) > 0.35 || Math.abs(this.turnRate) > 0.035) {
-        if (this.isPlayer) this.game.hud.message('Stop the vehicle before deploying the stabilizer spade', '#ffbd70');
+        if (this.isPlayer) this.game.hud.message('Stop the vehicle before deploying its firing brace', '#ffbd70');
         return false;
       }
       if (this.spadeState === 'stowed' || this.spadeState === 'retracting') this.spadeState = 'deploying';
@@ -205,62 +205,172 @@ export class Tank {
     return true;
   }
   toggleSpade() {
-    if (!this.spec.artillery) return false;
+    if (!this.usesSpade()) return false;
     const deploy = this.spadeState === 'stowed' || this.spadeState === 'retracting';
     return this.setSpade(deploy);
   }
   updateSpade(dt, time) {
-    const a = this.spec.artillery;
+    const a = this.spec.artillery?.spade ? this.spec.artillery : this.spec.recoilBrace;
     if (this.spadeState === 'deploying') {
       this.spadeProgress = Math.min(1, this.spadeProgress + dt / a.spadeDeploySeconds);
-      if (this.spadeProgress >= 1) { this.spadeState = 'deployed'; if (this.isPlayer) this.game.hud.message('Stabilizer spade locked · artillery ready', '#a9dca8'); }
+      if (this.spadeProgress >= 1) { this.spadeState = 'deployed'; if (this.isPlayer) this.game.hud.message(a === this.spec.recoilBrace ? 'Recoil brace locked · firing ready' : 'Stabilizer spade locked · artillery ready', '#a9dca8'); }
     } else if (this.spadeState === 'retracting') {
       this.spadeProgress = Math.max(0, this.spadeProgress - dt / a.spadeRetractSeconds);
-      if (this.spadeProgress <= 0) { this.spadeState = 'stowed'; if (this.isPlayer) this.game.hud.message('Stabilizer spade retracted', '#c8c8c8'); }
+      if (this.spadeProgress <= 0) { this.spadeState = 'stowed'; if (this.isPlayer) this.game.hud.message('Firing brace retracted', '#c8c8c8'); }
     }
     if (this.model.spade) this.model.spade.rotation.x = (1 - this.spadeProgress) * Math.PI / 2;
-    if (this.pendingFire && this.spadeState === 'deployed' && this.reloadLeft <= 0 && this.speed < 0.3 && Math.abs(this.turnRate) < 0.025 && this.aimError < 0.03) {
-      this.syncModel(); // use this frame's turret/gun solution for the queued shot
+    if (this.pendingFire && this.spadeState === 'deployed' && this.reloadLeft <= 0 && Math.abs(this.speed) < 0.3 && Math.abs(this.turnRate) < 0.025 && this.aimError < 0.03) {
+      this.syncModel();
       this.pendingFire = false; this.tryFire(time);
     }
   }
-  tryFire(time) {
-    if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
-    if (this.spec.artillery && this.spadeState !== 'deployed') {
-      if (!this.setSpade(true)) return false;
-      this.pendingFire = true;
-      if (this.isPlayer) this.game.hud.message('Deploying stabilizer spade · shot queued', '#ffcf78');
-      return false;
+  updateAutoArtillery(dt, time) {
+    const a = this.spec.artillery;
+    if (this.autoArtilleryState === 'deploying') {
+      this.autoArtilleryTimer -= dt;
+      if (this.autoArtilleryTimer <= 0) { this.autoArtilleryState = 'deployed'; if (this.isPlayer) this.game.hud.message('ARCHER firing position ready', '#a9dca8'); }
+    } else if (this.autoArtilleryState === 'packing') {
+      this.autoArtilleryTimer -= dt;
+      if (this.autoArtilleryTimer <= 0) {
+        this.autoArtilleryState = 'stowed'; this.autoArtilleryShots = 0;
+        if (this.isPlayer) this.game.hud.message('ARCHER packed · shoot-and-scoot ready', '#a9dca8');
+      }
     }
-    if (this.spec.artillery && (Math.abs(this.speed) > 0.3 || Math.abs(this.turnRate) > 0.025)) {
-      this.pendingFire = true;
-      if (this.isPlayer) this.game.hud.message('Artillery settling · shot queued', '#ffbd70');
-      return false;
+    if (this.autoArtilleryState === 'stowed' && this.pendingFire && Math.abs(this.speed) < 0.3 && Math.abs(this.turnRate) < 0.025) {
+      this.autoArtilleryState = 'deploying'; this.autoArtilleryTimer = a.deploySeconds;
+      if (this.isPlayer) this.game.hud.message('Automated firing position deploying', '#ffcf78');
     }
-    this.pendingFire = false;
-    const g = this.game; const sh = this.shell; const m = this.model;
-    const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3()); const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
-    // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
-    const disp = this.dispersion(); const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    if (this.autoArtilleryState === 'deployed' && this.pendingFire && this.reloadLeft <= 0 && Math.abs(this.speed) < 0.3 && Math.abs(this.turnRate) < 0.025 && this.aimError < 0.03) {
+      this.pendingFire = false; this.syncModel(); this.tryFire(time);
+    }
+  }
+  cycleWeaponMode() {
+    const modes = this.spec.multiTube?.modes;
+    if (!modes || modes.length < 2) return false;
+    this.weaponModeIndex = (this.weaponModeIndex + 1) % modes.length;
+    if (this.isPlayer) this.game.hud.message('WEAPON MODE · ' + modes[this.weaponModeIndex].name, '#9fd39f');
+    return true;
+  }
+  cycleArmorPackage() {
+    const packages = this.spec.armorPackages;
+    if (!packages || packages.length < 2) return false;
+    this.armorPackageIndex = (this.armorPackageIndex + 1) % packages.length;
+    const p = packages[this.armorPackageIndex], A = JSON.parse(JSON.stringify(this.spec.armor));
+    A.hull.front[0] += p.front; A.hull.side[0] += p.side;
+    A.turret.front[0] += p.front * 0.65; A.turret.side[0] += p.side * 0.65;
+    A.heatMult = p.heatMult;
+    this.armorProfile = A; this.activeMass = p.mass; this.activeMaxSpeed = this.spec.maxSpeed * p.speedMult;
+    if (this.isPlayer) this.game.hud.message('ARMOUR PACKAGE · ' + p.name, '#9fd39f');
+    return true;
+  }
+  toggleSuspension() {
+    const h = this.spec.hydroSuspension;
+    if (!h) return false;
+    const modes = ['normal', 'low', 'high'];
+    this.suspensionMode = modes[(modes.indexOf(this.suspensionMode) + 1) % modes.length];
+    this.suspensionOffset = this.suspensionMode === 'low' ? h.lowOffset : this.suspensionMode === 'high' ? h.highOffset : 0;
+    if (this.isPlayer) this.game.hud.message('HYDROPNEUMATIC SUSPENSION · ' + this.suspensionMode.toUpperCase(), '#9fd39f');
+    return true;
+  }
+  tryAPS(projectile, point) {
+    const a = this.spec.aps;
+    if (!a || this.apsCharges <= 0 || this.apsCooldown > 0 || !projectile || projectile.owner?.team === this.team) return false;
+    if (!(projectile.type?.heat || projectile.spec?.guided || projectile.spec?.apsThreat)) return false;
+    const centre = this.pos.clone(); centre.y += this.spec.dims.hullH * 0.62;
+    if (point.distanceTo(centre) > a.radius) return false;
+    this.apsCharges--; this.apsCooldown = a.cooldown;
+    if (this.isPlayer) this.game.hud.message('ACTIVE PROTECTION · THREAT INTERCEPTED · ' + this.apsCharges + ' CHARGES', '#7edcff');
+    return true;
+  }
+  spawnRound(time, shellIdx, offset = null) {
+    const g = this.game, sh = this.spec.shells[shellIdx], m = this.model;
+    const muzzle = offset ? m.gun.localToWorld(new THREE.Vector3(...offset)) : m.muzzle.getWorldPosition(new THREE.Vector3());
+    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
+    // Dispersion is sampled independently for every barrel, but remains bounded by the same
+    // configured circular cone. Zero balance dispersion therefore remains exactly deterministic.
+    const disp = this.dispersion(), up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const a = new THREE.Vector3().crossVectors(dir, up).normalize(), b = new THREE.Vector3().crossVectors(dir, a).normalize();
     let gx = g.rng.gauss() / 2.2, gy = g.rng.gauss() / 2.2; const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
-    // Sample a disk on the tangent plane: its boundary is exactly tan(disp).
     const radius = Math.tan(disp);
     dir.addScaledVector(a, gx * radius).addScaledVector(b, gy * radius).normalize();
     this.lastDeviation = Math.atan(Math.hypot(gx, gy) * radius);
     const vel = dir.clone().multiplyScalar(sh.velocity).add(this.vel);
     let fireShell = sh;
     if (this.abilities && this.abilities.overpenLeft > 0) {
-      const mult = this.abilities.consumeOverpen();
-      fireShell = { ...sh, pen: Math.round(sh.pen * mult) };
+      const mult = this.abilities.consumeOverpen(); fireShell = { ...sh, pen: Math.round(sh.pen * mult) };
+    }
+    if (sh.airburst) {
+      const range = muzzle.distanceTo(this.input.aim);
+      fireShell = { ...fireShell, fuseTime: Math.max(0.05, (range - (sh.fuseLeadDistance || 0)) / Math.max(1, sh.velocity)) };
     }
     g.ballistics.spawn(this, fireShell, muzzle, vel);
-    this.ammo[this.shellIdx]--; this.reloadLeft = this.reloadTime(); this.lastFired = time; this.stats.shots++;
+    return { muzzle, dir, caliber: sh.caliber };
+  }
+  fireBurstRound(time) {
+    const cfg = this.spec.burst, i = this.burstShellIdx;
+    if (!cfg || this.ammo[i] <= 0 || this.burstLeft <= 0) { this.burstLeft = 0; return; }
+    const offsets = cfg.offsets || [], offset = offsets.length ? offsets[this.burstOffsetIndex % offsets.length] : null;
+    const shot = this.spawnRound(time, i, offset); this.burstOffsetIndex++;
+    this.ammo[i]--; this.stats.shots++; this.lastFired = time; this.recoil = 0.35;
+    this.rockV -= (this.spec.shells[i].caliber / 100) * 1.4 * (40 / this.activeMass);
+    this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber); this.game.audio.gun(shot.muzzle, shot.caliber, this.isPlayer);
+    this.burstLeft--;
+    if (this.burstLeft > 0 && this.ammo[i] > 0) {
+      this.reloadLeft = cfg.interval; this.burstTimer = cfg.interval;
+    } else {
+      this.burstLeft = 0; this.reloadLeft = this.reloadTime();
+      if (this.ammo[i] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
+    }
+  }
+  tryFire(time) {
+    if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0 || this.burstLeft > 0) return false;
+    if (this.usesSpade() && this.spadeState !== 'deployed') {
+      if (!this.setSpade(true)) return false;
+      this.pendingFire = true;
+      if (this.isPlayer) this.game.hud.message('Deploying firing brace · shot queued', '#ffcf78');
+      return false;
+    }
+    if (this.usesSpade() && (Math.abs(this.speed) > 0.3 || Math.abs(this.turnRate) > 0.025)) {
+      this.pendingFire = true;
+      if (this.isPlayer) this.game.hud.message('Firing brace settling · shot queued', '#ffbd70');
+      return false;
+    }
+    if (this.spec.artillery?.autoDeploy && this.autoArtilleryState !== 'deployed') {
+      this.pendingFire = true;
+      if (this.isPlayer && Math.abs(this.speed) > 0.3) this.game.hud.message('Stop to deploy the automated gun system', '#ffbd70');
+      return false;
+    }
+    if (this.spec.artillery?.autoDeploy && (Math.abs(this.speed) > 0.3 || Math.abs(this.turnRate) > 0.025)) {
+      this.pendingFire = true; return false;
+    }
+    if (this.spec.fireArc && Math.abs(this.turretYaw) > this.spec.fireArc * DEG + 0.01) return false;
+    this.pendingFire = false;
+    const g = this.game, sh = this.shell;
+    const mode = this.spec.multiTube?.modes?.[this.weaponModeIndex] || { count: 1, reloadMult: 1 };
+    const count = Math.min(mode.count || 1, this.ammo[this.shellIdx]);
+    const offsets = this.spec.multiTube?.offsets || [];
+    let lastShot = null;
+    for (let n = 0; n < count; n++) {
+      const shot = this.spawnRound(time, this.shellIdx, offsets.length ? offsets[n % offsets.length] : null);
+      if (!lastShot) lastShot = shot;
+      g.effects.muzzle(shot.muzzle, shot.dir, shot.caliber);
+    }
+    this.ammo[this.shellIdx] -= count; this.reloadLeft = this.reloadTime() * (mode.reloadMult || 1); this.lastFired = time; this.stats.shots += count;
     if (this.abilities) this.abilities.onFire();
-    // Firing retains visual recoil, but does not inject a jump into the linear dispersion curve.
     this.recoil = 1;
-    this.rockV -= (sh.caliber / 100) * (this.spec.artillery ? 2.0 : 1.4) * (40 / this.spec.mass) * Math.cos(this.turretYaw);
-    g.effects.muzzle(muzzle, dir, sh.caliber); g.audio.gun(muzzle, sh.caliber, this.isPlayer);
+    this.rockV -= (sh.caliber / 100) * ((this.spec.artillery || this.spec.recoilBrace) ? 2.0 : 1.4) * (40 / this.activeMass) * Math.cos(this.turretYaw) * Math.sqrt(count);
+    g.audio.gun(lastShot.muzzle, sh.caliber, this.isPlayer);
+    if (this.spec.burst && this.spec.burst.shellIndices.includes(this.shellIdx)) {
+      this.burstLeft = Math.max(0, this.spec.burst.count - 1); this.burstShellIdx = this.shellIdx;
+      this.burstTimer = this.spec.burst.interval; this.burstOffsetIndex = 0;
+      if (this.burstLeft > 0) this.reloadLeft = this.spec.burst.interval;
+    }
+    if (this.spec.artillery?.autoDeploy) {
+      this.autoArtilleryShots++;
+      if (this.autoArtilleryShots >= this.spec.artillery.fireMissionRounds) {
+        this.autoArtilleryState = 'packing'; this.autoArtilleryTimer = this.spec.artillery.packSeconds; this.pendingFire = false;
+      }
+    }
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
     return true;
   }
