@@ -31,8 +31,13 @@ export class Tank {
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.bloom = 3; this.yawRate = 0; this.recoil = 0;
     this.spadeProgress = 0; this.spadeState = 'stowed'; this.pendingFire = false;
+    this.autoArtilleryState = 'stowed'; this.autoArtilleryTimer = 0; this.autoArtilleryShots = 0;
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
-    this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
+    this.modules = { engine: 1, tracks: 1, wheels: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
+    this.armorProfile = spec.armor; this.armorPackageIndex = 0; this.activeMass = spec.mass; this.activeMaxSpeed = spec.maxSpeed;
+    this.suspensionMode = 'normal'; this.suspensionOffset = 0; this.hydroPitch = 0;
+    this.weaponModeIndex = 0; this.burstLeft = 0; this.burstTimer = 0; this.burstShellIdx = 0; this.burstOffsetIndex = 0;
+    this.apsCharges = spec.aps?.charges || 0; this.apsCooldown = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
     this.input = { throttle: 0, steer: 0, aim: new THREE.Vector3(0, 0, 0) };
     this.lastFired = -100; this.inBush = null; this.visibleUntil = [0, 0]; this.spotted = [false, false]; this.lastSeenPos = [null, null];
@@ -49,13 +54,16 @@ export class Tank {
     return this.abilities?.overpenLeft > 0 ? { ...sh, pen: Math.round(sh.pen * (this.abilities.overpen.mult || 1.35)) } : sh;
   }
   crewAlive(role) { const c = this.crew.find((m) => m.role === role); return c ? c.alive : true; }
+  get mobilityModule() { return this.spec.runningGear === 'wheels' ? 'wheels' : 'tracks'; }
+  get mobilityLabel() { return this.mobilityModule === 'wheels' ? 'WHEELS' : 'TRACKS'; }
+  usesSpade() { return !!(this.spec.artillery?.spade || this.spec.recoilBrace); }
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
-  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= s.artillery ? 0.9 : 0.7; return r; }
+  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= (s.artillery || s.recoilBrace) ? 0.9 : 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
   // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
   baseDispersion() { let d = Math.atan(Math.max(MIN_DISPERSION_100M,this.spec.dispersion) / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
   // current dispersion-circle radius (radians); every shell lands inside this cone
-  dispersion() { return this.baseDispersion() * this.bloom; }
+  dispersion() { return this.baseDispersion() * this.bloom * (this.spec.hydroSuspension && this.suspensionMode === 'low' ? 0.88 : 1); }
   placeAt(x, z, heading) {
     this.pos.set(x, this.game.world.groundHeight(x, z), z); this.heading = heading; this.turretYaw = 0; this.updateGround(1, true); this.syncModel();
   }
