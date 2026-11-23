@@ -426,7 +426,7 @@ export class Game {
     const E = t.equip; const tryUse = (id) => { const i = E.find(id); if (i >= 0 && E.slots[i].charges > 0 && E.slots[i].cd <= 0) return this.useItem(i, t); return false; };
     t._itemT = (t._itemT || 0) - 1 / 30; if (t._itemT > 0) return; t._itemT = 0.8 + Math.random() * 0.8; // human-like reaction delay
     if (t.burning > 0 && tryUse('extinguisher')) return;
-    if ((t.modules.tracks < 1 || (t.modules.engine < 1 && t.modules.gun < 1) || (t.modules.gun < 1 && this.time - t.lastDamagedAt < 20)) && tryUse('repair')) return;
+    if ((t.modules[t.mobilityModule] < 1 || (t.modules.engine < 1 && t.modules.gun < 1) || (t.modules.gun < 1 && this.time - t.lastDamagedAt < 20)) && tryUse('repair')) return;
     if (t.crew.some((c) => !c.alive) && tryUse('medkit')) return;
     if (t.hp < t.maxHp * 0.35 && this.time - t.lastDamagedAt < 3 && tryUse('smoke')) return;
   }
