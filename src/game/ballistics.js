@@ -51,13 +51,13 @@ export class Ballistics {
           if (!done) { s.pos.copy(p); if (kind === 'water') s.pos.y -= 0.02; }
         } else { s.dist += _a.distanceTo(_b); s.pos.copy(_b); }
       }
-      if (!done && (s.life > 8 || s.pos.y < -200 || Math.abs(s.pos.x) > 1500 || Math.abs(s.pos.z) > 1500)) done = true;
+      if (!done && (s.life > (s.owner?.spec.artillery?.maxFlightSeconds || 8) || s.pos.y < -200 || Math.abs(s.pos.x) > 1500 || Math.abs(s.pos.z) > 1500)) done = true;
       if (done) { g.effects.removeTracer(s); this.shells.splice(i, 1); }
       else if (s.tracer) { const v = s.vel; const len = Math.min(18, v.length() * 0.012); s.tracer.position.copy(s.pos).addScaledVector(v, -0.5 * len / v.length()); s.tracer.scale.set(1, 1, len); s.tracer.lookAt(_b.copy(s.pos).add(v)); }
     }
   }
   heBlast(s, p) {
-    const g = this.game; const R = s.spec.caliber / 22;
+    const g = this.game; const R = s.spec.blastRadius || s.spec.caliber / 22;
     for (const t of g.tanks) { if (!t.alive) continue; const d = t.pos.distanceTo(p) - t.spec.dims.W * 0.5; if (d > R) continue;
       const top = t.spec.armor.hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
       if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
