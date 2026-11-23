@@ -13,7 +13,7 @@ export function waterPenFactor(type, metres) { return type.heat ? Math.max(0.25,
 export class Ballistics {
   constructor(game) { this.game = game; this.shells = []; }
   spawn(owner, spec, pos, vel) {
-    const s = { owner, spec, type: SHELL_TYPES[spec.type], pos: pos.clone(), vel: vel.clone(), dist: 0, life: 0, noDamage: false, ricochets: 0 };
+    const s = { owner, spec, type: SHELL_TYPES[spec.type], pos: pos.clone(), vel: vel.clone(), target: spec.guided ? owner.input.aim.clone() : null, dist: 0, life: 0, noDamage: false, ricochets: 0 };
     this.shells.push(s); this.game.effects.addTracer(s); return s;
   }
   // predict outcome vs a tank at a hit (used by HUD indicator and AI)
@@ -27,7 +27,12 @@ export class Ballistics {
       const s = this.shells[i], lifeStart = s.life; s.life += dt;
       const speed = s.vel.length(); const steps = Math.max(1, Math.ceil((speed * dt) / 30)); const h = dt / steps; let done = false;
       for (let k = 0; k < steps && !done; k++) {
-        _a.copy(s.pos); s.vel.y -= GRAVITY * h; _b.copy(s.pos).addScaledVector(s.vel, h);
+        _a.copy(s.pos);
+        if (s.spec.guided && s.target) {
+          const speed = s.vel.length(), desired = s.target.clone().sub(s.pos).normalize().multiplyScalar(speed);
+          s.vel.lerp(desired, clamp(dt * 1.6, 0, 1));
+        } else s.vel.y -= GRAVITY * h;
+        _b.copy(s.pos).addScaledVector(s.vel, h);
         // Hard-kill APS checks the incoming segment before ordinary armour collision.
         for (const t of g.tanks) {
           if (!t.alive || t.team === s.owner?.team || !t.spec.aps) continue;
@@ -70,7 +75,7 @@ export class Ballistics {
           if (!done) { s.pos.copy(p); if (kind === 'water') s.pos.y -= 0.02; }
         } else { s.dist += _a.distanceTo(_b); s.pos.copy(_b); }
       }
-      if (!done && (s.life > (s.owner?.spec.artillery?.maxFlightSeconds || 8) || s.pos.y < -200 || Math.abs(s.pos.x) > 1500 || Math.abs(s.pos.z) > 1500)) done = true;
+      if (!done && (s.life > (s.owner?.spec.artillery?.maxFlightSeconds || (s.spec.guided ? 12 : 8)) || s.pos.y < -200 || Math.abs(s.pos.x) > 1500 || Math.abs(s.pos.z) > 1500)) done = true;
       if (done) { g.effects.removeTracer(s); this.shells.splice(i, 1); }
       else if (s.tracer) { const v = s.vel; const len = Math.min(18, v.length() * 0.012); s.tracer.position.copy(s.pos).addScaledVector(v, -0.5 * len / v.length()); s.tracer.scale.set(1, 1, len); s.tracer.lookAt(_b.copy(s.pos).add(v)); }
     }
