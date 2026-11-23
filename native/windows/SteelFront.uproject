@@ -1,0 +1,15 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.7",
+  "Category": "Games",
+  "Description": "Steel Front Normandy driving and gunnery prototype for Windows",
+  "Modules": [
+    { "Name": "SteelFront", "Type": "Runtime", "LoadingPhase": "Default" },
+    { "Name": "SteelFrontEditor", "Type": "Editor", "LoadingPhase": "Default" }
+  ],
+  "Plugins": [
+    { "Name": "ProceduralMeshComponent", "Enabled": true },
+    { "Name": "PythonScriptPlugin", "Enabled": true },
+    { "Name": "EditorScriptingUtilities", "Enabled": true }
+  ]
+}
