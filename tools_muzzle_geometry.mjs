@@ -40,7 +40,7 @@ try {
   const muzzleWorldZ=pivotWorldZ+t72.barrel.position.z+t72.muzzle.position.z;
   return {out,t72:{pivotZ:t72.gun.position.z,clearancePivot:t72.gunClearance.pivot,front:t72.gunClearance.front,muzzleZ:muzzleWorldZ,pivotWorldZ,rearTubeVertices}};
  });
- assert.equal(result.out.length,16);
+ assert.equal(result.out.length,26);
  for(const x of result.out){
   assert.ok(x.removed>0, x.id+' has no open muzzle face');
   assert.ok(x.bore>0.025, x.id+' has no visible bore radius');
