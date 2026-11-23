@@ -30,10 +30,8 @@ try {
     game.tanks = [p, a];
     function simulate(speed, dt, start = -14, heading = 0, height = groundHeight) {
       world.groundHeight = height;
-      p.rock = 0;
-      p.rockV = 0;
-      p.placeAt(0, start, heading);
       p.speed = speed;
+      p.placeAt(0, start, heading);
       let flew = false, landed = false, landedSpeed = 0, airtime = 0, gap = 0, airControl = true;
       for (let i = 0; i < 5 / dt; i++) {
         if (!flew || !p.airborne) {
@@ -60,6 +58,32 @@ try {
     const reverse = simulate(-14, 1 / 60, -14, Math.PI);
     const flat = simulate(14, 1 / 60, -14, 0, () => 0);
     const overDrop = simulate(16, 1 / 60, -14, 0, (_, z) => -Math.max(0, z * 0.5));
+    function driveSlope(speed, dt, grade, roughness) {
+      const tile = 2;
+      world.groundHeight = (x, z) => {
+        const i = Math.floor(z / tile), frac = z / tile - i;
+        const bump = (i % 2 === 0 ? 1 : -1) * (1 - 2 * frac) * roughness;
+        return grade * z + 0.12 * x + bump;
+      };
+      p.speed = speed;
+      p.placeAt(0, -30, 0);
+      let hops = 0, maxStepNoise = 0, maxHeightOffset = 0;
+      for (let i = 0; i < 4 / dt; i++) {
+        const { y, z } = p.pos;
+        const wasAirborne = p.airborne;
+        p.pos.z += speed * dt;
+        p.updateGround(dt);
+        if (!wasAirborne && p.airborne) hops++;
+        maxStepNoise = Math.max(maxStepNoise, Math.abs(p.pos.y - y - grade * (p.pos.z - z)));
+        maxHeightOffset = Math.max(maxHeightOffset, Math.abs(p.pos.y - grade * p.pos.z));
+      }
+      return { speed, dt, grade, roughness, hops, maxStepNoise, maxHeightOffset };
+    }
+    const slopes = [30, 60, 120].flatMap(hz => [0.3, -0.3].flatMap(grade => [
+      driveSlope(14, 1 / hz, grade, 0),
+      driveSlope(14, 1 / hz, grade, 0.05),
+      driveSlope(3, 1 / hz, grade, 0.05),
+    ]));
     world.groundHeight = () => 0;
     p.placeAt(0, 0, 0);
     a.placeAt(0, spec.dims.L - 0.6, 0);
@@ -86,14 +110,18 @@ try {
       world.structureHit(0, 1, 0, 0, 1, -1.4),
       world.structureHit(0, 1, 0, 0, 1, -1.4, 0.42),
     ];
-    return { ramp, reverse, flat, overDrop, slow, nose, width: spec.dims.W, length: spec.dims.L,
+    return { ramp, reverse, flat, overDrop, slow, slopes, nose, width: spec.dims.W, length: spec.dims.L,
       stoppedSideGap, elevated, stackedSeparation, pos: pos.z, interpolated: interpolated.z, scope: scope.z, hits };
   }, base);
   for (const sample of [...report.ramp, report.reverse, report.overDrop]) {
-    assert.ok(sample.flew && sample.landed && sample.airControl && sample.airtime > 0.15);
+    assert.ok(sample.flew && sample.landed && sample.airControl && sample.airtime > 0.15, JSON.stringify(sample));
     assert.ok(sample.landedSpeed > 0 && sample.gap > 0.1);
   }
   assert.ok(!report.slow.flew && !report.flat.flew);
+  for (const sample of report.slopes) {
+    assert.equal(sample.hops, 0, JSON.stringify(sample));
+    assert.ok(sample.maxStepNoise < 0.035 && sample.maxHeightOffset < 0.18, JSON.stringify(sample));
+  }
   assert.ok(report.nose >= report.length);
   assert.equal(report.stoppedSideGap, report.width + 0.15);
   assert.deepEqual(report.elevated, [0, 0, 0, 0]);
@@ -104,5 +132,5 @@ try {
   assert.equal(report.hits[0], -1);
   assert.ok(report.hits[1] >= 0);
   assert.ok(Math.max(...report.ramp.map(r => r.airtime)) - Math.min(...report.ramp.map(r => r.airtime)) < 0.05);
-  console.log('Vehicle takeoff, landing, tank contact and camera collision checks passed.');
+  console.log('Stable slope travel, vehicle takeoff and landing, tank contact and camera collision checks passed.');
 } finally { await browser.close(); }

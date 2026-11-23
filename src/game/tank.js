@@ -185,41 +185,74 @@ export class Tank {
     this.landingSpeed = 0;
     this._rockLift = 0;
 
-    // Continue along the old slope tangent when the surface drops faster than gravity.
-    const moving = Math.abs(this.speed) >= 4;
-    const nextY = this.pos.y + (this.verticalSpeed - GRAVITY * dt * 0.5) * dt;
-    const canLaunch = moving && rockLift === 0 && this._groundRockLift === 0;
-    const takingOff = canLaunch && nextY > ground &&
-      this.groundY + (this.verticalSpeed - GRAVITY * dt * 0.5) * dt > ground + 2 * dt * dt;
-    const inFlight = !snap && (this.airborne || takingOff);
-    const flightPitch = -Math.atan2(this.verticalSpeed * Math.sign(this.speed), Math.max(4, Math.abs(this.speed)));
-    this.pitch = snap ? pitch : lerp(this.pitch, inFlight ? flightPitch : pitch, Math.min(1, dt * (inFlight ? 2.8 : 16)));
-    this.roll = snap ? roll : lerp(this.roll, inFlight ? 0 : roll, Math.min(1, dt * (inFlight ? 2.4 : 16)));
-    const hullPitch = this.pitch + this.rock;
-    const frontOffset = -Math.sin(hullPitch) * lx;
-    const rightOffset = Math.sin(this.roll) * Math.cos(hullPitch) * wx;
-    // Clear the sampled supports even while the suspension is settling into a new attitude.
-    const support = Math.max(ground, hf - frontOffset - 0.08, hb + frontOffset - 0.08,
-      hl - rightOffset - 0.08, hr + rightOffset - 0.08) + rockLift;
-    const wasAirborne = this.airborne && !snap;
-    this.airborne = inFlight && nextY > support;
-    if (this.airborne) {
-      this.pos.y = nextY;
-      this.verticalSpeed -= GRAVITY * dt;
-    } else {
+    const slopeVerticalSpeed = clamp((hf - hb) / (lx * 2) * this.speed, -12, 12);
+    const wasAirborne = !snap && this.airborne;
+    const verticalStep = (this.verticalSpeed - GRAVITY * dt * 0.5) * dt;
+    const nextY = this.pos.y + verticalStep;
+    const canLaunch = !snap && !wasAirborne && Math.abs(this.speed) >= 4 &&
+      rockLift === 0 && this._groundRockLift === 0 && this.groundY + verticalStep > ground + 2 * dt * dt;
+    let takingOff = false;
+    if (canLaunch) {
+      // Check for sustained clearance over the whole track length. Heightfield
+      // seams can briefly drop away even when the tank is on a continuous slope.
+      const previewTime = 0.26;
+      const travel = this.speed * (previewTime - dt);
+      const ax = x + fx * travel, az = z + fz * travel;
+      const ahead = W.groundHeight(ax, az);
+      const front = W.groundHeight(ax + fx * lx, az + fz * lx);
+      const rear = W.groundHeight(ax - fx * lx, az - fz * lx);
+      const offset = -Math.sin(this.pitch + this.rock) * lx;
+      const aheadGround = Math.max(ahead - 0.02, front - offset - 0.08, rear + offset - 0.08);
+      const flightHeight = this.groundY + (this.verticalSpeed - GRAVITY * previewTime * 0.5) * previewTime;
+      takingOff = flightHeight > aheadGround + 0.16;
+    }
+
+    const groundBlend = snap ? 1 : 1 - Math.exp(-16 * dt);
+    const groundPitch = lerp(this.pitch, pitch, groundBlend);
+    const groundRoll = lerp(this.roll, roll, groundBlend);
+    const clearance = (bodyPitch, bodyRoll) => {
+      const hullPitch = bodyPitch + this.rock;
+      const frontOffset = -Math.sin(hullPitch) * lx;
+      const rightOffset = Math.sin(bodyRoll) * Math.cos(hullPitch) * wx;
+      return Math.max(ground, hf - frontOffset - 0.08, hb + frontOffset - 0.08,
+        hl - rightOffset - 0.08, hr + rightOffset - 0.08) + rockLift;
+    };
+
+    this.airborne = false;
+    if (wasAirborne || takingOff) {
+      const flightPitch = -Math.atan2(this.verticalSpeed * Math.sign(this.speed), Math.max(4, Math.abs(this.speed)));
+      const airPitch = lerp(this.pitch, flightPitch, 1 - Math.exp(-2.8 * dt));
+      const airRoll = this.roll * Math.exp(-2.4 * dt);
+      if (nextY > clearance(airPitch, airRoll)) {
+        this.airborne = true;
+        this.pitch = airPitch;
+        this.roll = airRoll;
+        this.pos.y = nextY;
+        this.verticalSpeed -= GRAVITY * dt;
+      }
+    }
+    if (!this.airborne) {
+      this.pitch = groundPitch;
+      this.roll = groundRoll;
+      const support = clearance(groundPitch, groundRoll);
       if (wasAirborne) {
-        this.landingSpeed = Math.max(0, GRAVITY * dt - this.verticalSpeed);
+        this.landingSpeed = Math.max(0, slopeVerticalSpeed - (this.verticalSpeed - GRAVITY * dt));
         this.inWater = W.terrain.waterLevel(x, z) - support > 0.15;
         this.rockV += Math.min(1.3, this.landingSpeed * 0.16) * Math.sign(this.speed);
         this.speed *= 1 - Math.min(0.3, this.landingSpeed * 0.035);
       }
-      this.pos.y = support;
-      this.verticalSpeed = moving && !snap && !wasAirborne ? clamp((ground - this.groundY) / dt, -12, 12) : 0;
+      // Follow the slope tangent, easing small changes while maintaining track clearance.
+      const restingHeight = ground + rockLift;
+      const carriedHeight = this.pos.y + slopeVerticalSpeed * dt;
+      const settledHeight = lerp(carriedHeight, restingHeight, groundBlend);
+      this.pos.y = snap || wasAirborne ? support : Math.max(support, Math.min(restingHeight + 0.18, settledHeight));
+      const contactVerticalSpeed = clamp((ground - this.groundY) / dt, -12, 12);
+      this.verticalSpeed = snap || wasAirborne ? slopeVerticalSpeed : lerp(this.verticalSpeed, contactVerticalSpeed, groundBlend);
     }
     this.vel.y = this.airborne ? this.verticalSpeed : 0;
     this.groundY = ground;
     this._groundRockLift = rockLift;
-    _e.set(hullPitch, this.heading, this.roll, 'YXZ'); this.quat.setFromEuler(_e);
+    _e.set(this.pitch + this.rock, this.heading, this.roll, 'YXZ'); this.quat.setFromEuler(_e);
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
