@@ -1,21 +1,21 @@
-# Steel Front · Windows UE5 原型
+# Steel Front · Windows UE5 高画质原型 0.2
 
-试玩内容是一块约 360 × 360 米的诺曼底靶场。可以驾驶谢尔曼、在坡道上体验接地与短暂腾空、开镜瞄准并击倒靶板。打开程序后，主界面会显示 **Press ENTER to deploy**。
+试玩内容是一块 **480 × 480 米的诺曼底靶场**，外部还有约 1.68 公里宽的地形背景。可以驾驶谢尔曼、在坡道上体验接地与短暂腾空、开镜瞄准并击倒靶板。打开后，主界面会显示 **Press ENTER to deploy**。
 
-## 首次运行
+## Windows 上启动
 
-1. 在 Windows 10 或 11 的 PC 上，用 Epic Games Launcher 安装 **Unreal Engine 5.7**，并更新 NVIDIA 显卡驱动。
-2. 安装 **Visual Studio 2022 17.14**，在安装器里勾选 **Game development with C++**，同时保留 **MSVC v143** 和 **Windows SDK**（推荐 10.0.22621.0 或更新版）。
-3. 完整解压原型，双击 **Play-Windows.cmd**。脚本会编译项目、生成材质和静态网格，再直接启动游戏主界面。第一次处理网格和着色器时，窗口出现前需要等待一段时间。
-4. 按 **Enter** 出战。
+1. 用 Epic Games Launcher 安装 **Unreal Engine 5.7**，并更新 NVIDIA 驱动。
+2. 安装 **Visual Studio 2022 17.14**，勾选 **Game development with C++**，同时保留 **MSVC v143** 和 **Windows SDK**（推荐 10.0.22621.0 或更新版）。
+3. 将新版 ZIP 完整解压到新文件夹，双击 **Play-Windows.cmd**。首次启动会先编译工程，再生成图形材质、Nanite 数据和静态网格。生成期间可以在控制台查看进度。
+4. 主界面出现后按 **Enter** 出战。
 
-如果从 GitHub 下载的是整个仓库，启动文件在 `native/windows/Play-Windows.cmd`。如果 UE5.7 装在自定义位置，可以在 PowerShell 里指定引擎目录：
+默认以 **2560 × 1440、DX12 和 SM6** 启动，TSR 内部渲染比例为 77%。在解压后的工程目录运行下列命令，可使用原生 1440p：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Play-Windows.ps1 -EngineRoot 'D:\Epic Games\UE_5.7'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Play-Windows.ps1 -NativeResolution
 ```
 
-也可以用参数 `-Width 1920 -Height 1080` 改窗口大小，或加 `-Editor` 打开编辑器。编译和资产生成的日志位于 `Saved/Logs`。如果生成中断，修好错误后再次运行启动脚本即可继续处理缺失的资产。
+UE5.7 装在自定义位置时，追加 `-EngineRoot 'D:\Epic Games\UE_5.7'`。也可以用 `-Width 1920 -Height 1080` 调整窗口大小，或用 `-Editor` 打开编辑器。编译和资产生成的日志位于 `Saved/Logs`。
 
 ## 操作
 
@@ -31,13 +31,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Scripts\Play-Windows.p
 | R | 重置全部靶板 |
 | Esc | 释放鼠标 |
 
-## 画质与工程
+## 画质与数据来源
 
-默认以 **2560 × 1440、DX12 和 SM6** 启动。配置开启了 Lumen 硬件光追、虚拟阴影贴图以及 TSR（77% 内部渲染比例）。地形、建筑和植被启用 Nanite，光照包含动态阳光、天光和体积雾。RTX 5060 Ti 16 GB 是目标显卡，实际帧率待以 Windows 上的试玩结果为准。
+- 地表使用网页版高画质的四套材质、2K 漫反射与法线、粗糙度与环境遮蔽数据。保留网页地形的混合权重、道路车辙、岸边潮湿过渡，以及用于减少可见地形和碰撞差异的网格细分。
+- 建筑沿用网页几何、UV、颜色变化和贴图。树木、灌木、碎石、草丛和车辆标识同样从网页资产生成。草地使用实例化和距离剔除。
+- 谢尔曼的路轮、主动轮和履带分开导入。转向时两侧的履带相对运动，履带节沿原版模型提供的闭合轨迹移动。
+- 水面采用双层动态波纹和 Single Layer Water。场景使用 Nanite、Lumen 硬件光追、虚拟阴影贴图和动态日光。
+- 地表、岩石、建筑及金属纹理来自 [Poly Haven](https://polyhaven.com/license)，采用 CC0。植被卡片、水面法线、模型和地图数据由本项目生成。
 
-- `Content/Prototype/Normandy.sfbin` 包含从网页版导出的地形、建筑、植被、坦克网格及碰撞数据。
-- `SteelFrontBake` 是 UE 编辑器命令，生成静态网格及 Nanite 数据。材质脚本会导入随包提供的纹理。
-- 在仓库根目录运行 `node native/windows/verify-slice.mjs` 可验证资产数据。要重新导出，先运行 `npm ci` 和 `npx playwright install chromium`，再运行 `node native/windows/export-slice.mjs`。资产已经包含在试玩包内。
-- 地表、石墙及金属纹理来自 [Poly Haven](https://polyhaven.com/license)，采用 CC0。水面法线、模型和地图数据由本项目生成。
+`Content/Prototype/Normandy.sfbin` 是自包含的压缩网格数据。`ArtSource/NormandyMaterials.json` 指定纹理和材质。从仓库根目录可以运行 `node native/windows/verify-slice.mjs` 校验两者。重新导出需要 `npm ci` 和 `npx playwright install chromium`，然后运行 `node native/windows/export-slice.mjs`。
 
-当前交付为 UE5 C++ 源码工程。本次使用 Linux 验证了地图数据、靶位的视线和启动脚本流程。Windows 上的 UE 编译、实际画面和显卡帧率仍待运行确认。
+试玩包包含源码和资产，由 Windows 启动脚本在本机编译。已验证地图保真数据、独立地表着色器和启动脚本的顺序。实际 UE5 画面与 RTX 5060 Ti 的帧率仍需在 Windows 上实测。

@@ -4,11 +4,13 @@
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/HUD.h"
 #include "GameFramework/Pawn.h"
+#include "SteelFrontSlice.h"
 #include "SteelFrontMode.generated.h"
 
 class UBoxComponent;
 class UCameraComponent;
 class UInputComponent;
+class UInstancedStaticMeshComponent;
 class UPrimitiveComponent;
 class USceneComponent;
 class USpringArmComponent;
@@ -30,6 +32,7 @@ public:
     bool IsReloading() const { return Reload > 0.0; }
     double AimDistanceMetres() const { return AimDistance * 0.01; }
     void SetGunMount(const FVector& Mount);
+    bool SetupRunningGear(const SteelFront::FRunningGear& Gear);
 
     UPROPERTY()
     TObjectPtr<USceneComponent> Hull;
@@ -51,6 +54,7 @@ private:
     void LookYaw(float Value);
     void LookPitch(float Value);
     void Drive(double Step);
+    void UpdateRunningGear(double Travel, double TurnArc);
     void UpdateAim(double Step);
     void Fire();
     void ToggleScope();
@@ -67,6 +71,18 @@ private:
     UPROPERTY()
     TObjectPtr<UCameraComponent> Camera;
 
+    UPROPERTY()
+    TObjectPtr<UInstancedStaticMeshComponent> RoadWheels;
+
+    UPROPERTY()
+    TObjectPtr<UInstancedStaticMeshComponent> Sprockets;
+
+    UPROPERTY()
+    TObjectPtr<UInstancedStaticMeshComponent> TrackLinks;
+
+    SteelFront::FRunningGear RunningGear;
+    TArray<FTransform> GearTransforms;
+    double TrackTravel[2] = {0.0, 0.0};
     FVector GunMount = FVector::ZeroVector;
     float Throttle = 0;
     float Steer = 0;

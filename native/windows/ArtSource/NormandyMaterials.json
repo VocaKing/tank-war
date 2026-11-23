@@ -1,0 +1,680 @@
+{
+  "rawBytes": 126097845,
+  "stats": {
+    "Terrain": {
+      "vertices": 60131,
+      "triangles": 119300,
+      "materials": 1
+    },
+    "Buildings": {
+      "vertices": 731400,
+      "triangles": 243800,
+      "materials": 13
+    },
+    "Water": {
+      "vertices": 7660,
+      "triangles": 3830,
+      "materials": 1
+    },
+    "Hull": {
+      "vertices": 20864,
+      "triangles": 6956,
+      "materials": 8
+    },
+    "Turret": {
+      "vertices": 9896,
+      "triangles": 3300,
+      "materials": 7
+    },
+    "Gun": {
+      "vertices": 3876,
+      "triangles": 1292,
+      "materials": 4
+    },
+    "Foliage": {
+      "vertices": 915864,
+      "triangles": 305288,
+      "materials": 9
+    },
+    "Walls": {
+      "vertices": 2088,
+      "triangles": 1044,
+      "materials": 1
+    },
+    "Decks": {
+      "vertices": 40,
+      "triangles": 20,
+      "materials": 1
+    },
+    "Grass": {
+      "vertices": 18,
+      "triangles": 6,
+      "materials": 1
+    },
+    "Pebbles": {
+      "vertices": 313680,
+      "triangles": 104560,
+      "materials": 1
+    },
+    "Horizon": {
+      "vertices": 45481,
+      "triangles": 82200,
+      "materials": 1
+    },
+    "RoadWheel": {
+      "vertices": 7488,
+      "triangles": 2496,
+      "materials": 1
+    },
+    "Sprocket": {
+      "vertices": 1764,
+      "triangles": 588,
+      "materials": 1
+    },
+    "TrackLink": {
+      "vertices": 528,
+      "triangles": 176,
+      "materials": 1
+    }
+  },
+  "grassInstances": 189859,
+  "textures": [
+    "aerial_rocks_02_arm.jpg",
+    "aerial_rocks_02_diff_2k.jpg",
+    "aerial_rocks_02_nor_2k.jpg",
+    "bark_brown_02_diff.jpg",
+    "bark_brown_02_nor.jpg",
+    "brown_planks_05_arm.jpg",
+    "brown_planks_05_diff.jpg",
+    "brown_planks_05_nor.jpg",
+    "clay_roof_tiles_02_arm.jpg",
+    "clay_roof_tiles_02_diff.jpg",
+    "clay_roof_tiles_02_nor.jpg",
+    "forest_ground_04_arm.jpg",
+    "forest_ground_04_diff_2k.jpg",
+    "forest_ground_04_nor_2k.jpg",
+    "gravel_road_arm.jpg",
+    "gravel_road_diff_2k.jpg",
+    "gravel_road_nor_2k.jpg",
+    "leafy_grass_arm.jpg",
+    "leafy_grass_diff_2k.jpg",
+    "leafy_grass_nor_2k.jpg",
+    "plastered_stone_wall_arm.jpg",
+    "plastered_stone_wall_diff.jpg",
+    "plastered_stone_wall_nor.jpg",
+    "red_brick_03_arm.jpg",
+    "red_brick_03_diff.jpg",
+    "red_brick_03_nor.jpg",
+    "rusty_metal_02_arm.jpg",
+    "rusty_metal_02_diff.jpg",
+    "rusty_metal_02_nor.jpg"
+  ],
+  "materials": [
+    {
+      "name": "NormandyGround",
+      "layers": [
+        {
+          "diffuse": "leafy_grass_diff_2k.jpg",
+          "normal": "leafy_grass_nor_2k.jpg",
+          "arm": "leafy_grass_arm.jpg"
+        },
+        {
+          "diffuse": "forest_ground_04_diff_2k.jpg",
+          "normal": "forest_ground_04_nor_2k.jpg",
+          "arm": "forest_ground_04_arm.jpg"
+        },
+        {
+          "diffuse": "aerial_rocks_02_diff_2k.jpg",
+          "normal": "aerial_rocks_02_nor_2k.jpg",
+          "arm": "aerial_rocks_02_arm.jpg"
+        },
+        {
+          "diffuse": "gravel_road_diff_2k.jpg",
+          "normal": "gravel_road_nor_2k.jpg",
+          "arm": "gravel_road_arm.jpg"
+        }
+      ],
+      "tintA": [
+        0.64,
+        0.86,
+        0.52
+      ],
+      "tintB": [
+        0.9,
+        0.85,
+        0.75
+      ]
+    },
+    {
+      "name": "NormandyWater",
+      "diffuse": null,
+      "normal": "NormandyWater_Normal.png",
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.12,
+      "metalness": 0.02,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": true,
+      "kind": "water"
+    },
+    {
+      "name": "Structure_stone",
+      "diffuse": "plastered_stone_wall_diff.jpg",
+      "normal": "plastered_stone_wall_nor.jpg",
+      "arm": "plastered_stone_wall_arm.jpg",
+      "roughMap": null,
+      "roughness": 0.92,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_slate",
+      "diffuse": "clay_roof_tiles_02_diff.jpg",
+      "normal": "clay_roof_tiles_02_nor.jpg",
+      "arm": "clay_roof_tiles_02_arm.jpg",
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": true,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_castle",
+      "diffuse": "plastered_stone_wall_diff.jpg",
+      "normal": "plastered_stone_wall_nor.jpg",
+      "arm": "plastered_stone_wall_arm.jpg",
+      "roughMap": null,
+      "roughness": 0.95,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_window",
+      "diffuse": "Structure_window_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": "Structure_window_Rough.png",
+      "roughness": 1,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "window"
+    },
+    {
+      "name": "Structure_dark",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.9,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_burnt",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 1,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.42,
+      "doubleSided": true,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_metal",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.6,
+      "metalness": 0.6,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_roof",
+      "diffuse": "clay_roof_tiles_02_diff.jpg",
+      "normal": "clay_roof_tiles_02_nor.jpg",
+      "arm": "clay_roof_tiles_02_arm.jpg",
+      "roughMap": null,
+      "roughness": 0.85,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": true,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_paintwood",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_wood",
+      "diffuse": "brown_planks_05_diff.jpg",
+      "normal": "brown_planks_05_nor.jpg",
+      "arm": "brown_planks_05_arm.jpg",
+      "roughMap": null,
+      "roughness": 1,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_rust",
+      "diffuse": "rusty_metal_02_diff.jpg",
+      "normal": "rusty_metal_02_nor.jpg",
+      "arm": "rusty_metal_02_arm.jpg",
+      "roughMap": null,
+      "roughness": 0.85,
+      "metalness": 0.3,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_paintwhite",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.85,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_brick",
+      "diffuse": "red_brick_03_diff.jpg",
+      "normal": "red_brick_03_nor.jpg",
+      "arm": "red_brick_03_arm.jpg",
+      "roughMap": null,
+      "roughness": 0.9,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Structure_hay",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 1,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.42,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Bark_oak",
+      "diffuse": "bark_brown_02_diff.jpg",
+      "normal": "bark_brown_02_nor.jpg",
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.95,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Leaves_oak",
+      "diffuse": "Leaves_oak_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.85,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.45,
+      "doubleSided": true,
+      "kind": "leaf"
+    },
+    {
+      "name": "Bark_broadleaf",
+      "diffuse": "bark_brown_02_diff.jpg",
+      "normal": "bark_brown_02_nor.jpg",
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.95,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Leaves_broadleaf",
+      "diffuse": "Leaves_broadleaf_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.85,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.45,
+      "doubleSided": true,
+      "kind": "leaf"
+    },
+    {
+      "name": "Bark_birch",
+      "diffuse": "bark_brown_02_diff.jpg",
+      "normal": "bark_brown_02_nor.jpg",
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.95,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Leaves_birch",
+      "diffuse": "Leaves_birch_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.85,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.45,
+      "doubleSided": true,
+      "kind": "leaf"
+    },
+    {
+      "name": "Bark_bush",
+      "diffuse": "Bark_bush_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 1,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Leaves_bush",
+      "diffuse": "Leaves_bush_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.85,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.45,
+      "doubleSided": true,
+      "kind": "leaf"
+    },
+    {
+      "name": "NormandyRock",
+      "diffuse": "aerial_rocks_02_diff_2k.jpg",
+      "normal": "aerial_rocks_02_nor_2k.jpg",
+      "arm": "aerial_rocks_02_arm.jpg",
+      "roughMap": null,
+      "roughness": 1,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false
+    },
+    {
+      "name": "NormandyPebble",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.97,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false
+    },
+    {
+      "name": "NormandyGrass",
+      "diffuse": "NormandyGrass_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.9,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.5,
+      "doubleSided": true,
+      "kind": "grass"
+    },
+    {
+      "name": "RoadWheel",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0.25,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "instanced": true
+    },
+    {
+      "name": "Sprocket",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0.25,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "instanced": true
+    },
+    {
+      "name": "TrackLink",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.72,
+      "metalness": 0.45,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "instanced": true
+    },
+    {
+      "name": "TankPaint",
+      "diffuse": "TankPaint_Color.png",
+      "normal": "rusty_metal_02_nor.jpg",
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.74,
+      "metalness": 0.2,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "armor"
+    },
+    {
+      "name": "Tank_metal",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.55,
+      "metalness": 0.65,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Tank_dark",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.6,
+      "metalness": 0.3,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Tank_glass",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.08,
+      "metalness": 0.9,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Tank_wood",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.9,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Tank_rubber",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.95,
+      "metalness": 0,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Tank_track",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.62,
+      "metalness": 0.6,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Tank_bore",
+      "diffuse": null,
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.96,
+      "metalness": 0.08,
+      "masked": false,
+      "cutoff": 0.45,
+      "doubleSided": true,
+      "kind": "surface"
+    },
+    {
+      "name": "Decal_995",
+      "diffuse": "Decal_995_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.4,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Decal_996",
+      "diffuse": "Decal_995_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.4,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Decal_997",
+      "diffuse": "Decal_995_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.4,
+      "doubleSided": false,
+      "kind": "surface"
+    },
+    {
+      "name": "Decal_998",
+      "diffuse": "Decal_995_Color.png",
+      "normal": null,
+      "arm": null,
+      "roughMap": null,
+      "roughness": 0.8,
+      "metalness": 0,
+      "masked": true,
+      "cutoff": 0.4,
+      "doubleSided": false,
+      "kind": "surface"
+    }
+  ]
+}

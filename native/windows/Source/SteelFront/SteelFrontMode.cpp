@@ -7,6 +7,8 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -14,6 +16,7 @@
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/PointLight.h"
+#include "Engine/PostProcessVolume.h"
 #include "Engine/SkyAtmosphere.h"
 #include "Engine/SkyLight.h"
 #include "Engine/StaticMesh.h"
@@ -26,7 +29,7 @@
 namespace
 {
 constexpr double RideHeight = 85.0;
-constexpr double Boundary = 17400.0;
+constexpr double Boundary = 23400.0;
 constexpr double Gravity = 980.0;
 constexpr ECollisionChannel GroundChannel = ECC_GameTraceChannel1;
 constexpr const TCHAR* CubePath = TEXT("/Engine/BasicShapes/Cube.Cube");
@@ -36,7 +39,11 @@ UStaticMeshComponent* AddShape(AActor& Actor, USceneComponent* Parent, UStaticMe
 {
     auto* Shape = NewObject<UStaticMeshComponent>(&Actor);
     Actor.AddInstanceComponent(Shape);
-    if (Parent) Shape->SetupAttachment(Parent);
+    if (Parent)
+    {
+        Shape->SetupAttachment(Parent);
+        Shape->SetMobility(Parent->Mobility);
+    }
     else Actor.SetRootComponent(Shape);
     Shape->SetStaticMesh(Mesh);
     Shape->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -45,27 +52,50 @@ UStaticMeshComponent* AddShape(AActor& Actor, USceneComponent* Parent, UStaticMe
     return Shape;
 }
 
-void AddSection(AActor& Owner, USceneComponent* Parent, const SteelFront::FSliceMesh& Data,
+UStaticMesh* GetBakedMesh(SteelFront::ESection Index)
+{
+    const TCHAR* Name = SteelFront::SectionNames[Index];
+    const FString Path = FString::Printf(TEXT("/Game/Prototype/Quality/Meshes/SM_%s.SM_%s"), Name, Name);
+    return LoadObject<UStaticMesh>(nullptr, *Path);
+}
+
+UInstancedStaticMeshComponent* AddInstances(AActor& Owner, USceneComponent* Parent, SteelFront::ESection Index,
+    bool bGrass)
+{
+    UStaticMesh* Mesh = GetBakedMesh(Index);
+    if (!Mesh) return nullptr;
+    auto* Component = bGrass ? NewObject<UHierarchicalInstancedStaticMeshComponent>(&Owner) :
+        NewObject<UInstancedStaticMeshComponent>(&Owner);
+    Owner.AddInstanceComponent(Component);
+    Component->SetupAttachment(Parent);
+    Component->SetMobility(Parent->Mobility);
+    Component->SetStaticMesh(Mesh);
+    Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Component->SetCanEverAffectNavigation(false);
+    if (bGrass)
+    {
+        Component->SetCullDistances(5600, 8200);
+        Component->SetCastShadow(false);
+        // Reserve the ray tracing scene for buildings, terrain and large foliage.
+        Component->SetVisibleInRayTracing(false);
+        Component->SetAffectDistanceFieldLighting(false);
+    }
+    Component->RegisterComponent();
+    return Component;
+}
+
+bool AddSection(AActor& Owner, USceneComponent* Parent, const SteelFront::FSliceMesh& Data,
     SteelFront::ESection Index)
 {
     const TCHAR* Name = SteelFront::SectionNames[Index];
     const bool bRoad = Index == SteelFront::Terrain || Index == SteelFront::Decks;
     const bool bBarrier = Index == SteelFront::Walls;
-    const bool bVisible = Index != SteelFront::Walls && Index != SteelFront::Decks;
-    UMaterialInterface* Material = nullptr;
-    UStaticMesh* StaticMesh = nullptr;
-    if (bVisible)
+    if (!bBarrier && Index != SteelFront::Decks)
     {
-        const FString MeshPath = FString::Printf(TEXT("/Game/Prototype/Meshes/SM_%s.SM_%s"), Name, Name);
-        StaticMesh = LoadObject<UStaticMesh>(nullptr, *MeshPath, nullptr, LOAD_NoWarn);
-        const TCHAR* Surface = Index == SteelFront::Terrain ? TEXT("Terrain") :
-            Index == SteelFront::Buildings ? TEXT("Stone") : Index == SteelFront::Water ? TEXT("Water") :
-            Index == SteelFront::Foliage ? TEXT("Foliage") : TEXT("Armor");
-        const FString MaterialPath = FString::Printf(TEXT("/Game/Prototype/Materials/M_%s.M_%s"), Surface, Surface);
-        Material = LoadObject<UMaterialInterface>(nullptr, *MaterialPath, nullptr, LOAD_NoWarn);
-        if (StaticMesh) AddShape(Owner, Parent, StaticMesh, Material);
-        if (StaticMesh && !bRoad) return;
+        if (UStaticMesh* Mesh = GetBakedMesh(Index)) AddShape(Owner, Parent, Mesh);
+        else return false;
     }
+    if (!bRoad && !bBarrier) return true;
     auto* Component = NewObject<UProceduralMeshComponent>(&Owner, FName(Name));
     Owner.AddInstanceComponent(Component);
     Component->SetupAttachment(Parent);
@@ -82,12 +112,12 @@ void AddSection(AActor& Owner, USceneComponent* Parent, const SteelFront::FSlice
     }
     if (bBarrier) Component->SetCollisionResponseToChannel(GroundChannel, ECR_Ignore);
     Component->SetCollisionObjectType(ECC_WorldStatic);
-    Component->SetHiddenInGame(!bVisible || StaticMesh != nullptr);
-    Component->SetCastShadow(bVisible && StaticMesh == nullptr);
+    Component->SetHiddenInGame(true);
+    Component->SetCastShadow(false);
     Component->RegisterComponent();
     Component->CreateMeshSection_LinearColor(0, Data.Positions, Data.Indices, Data.Normals,
-        {}, {}, {}, {}, Data.Colors, {}, bRoad || bBarrier, false);
-    if (Material && !StaticMesh) Component->SetMaterial(0, Material);
+        {}, {}, {}, {}, {}, {}, true, false);
+    return true;
 }
 
 bool GroundAt(UWorld& World, const FVector& Point, const AActor* Ignore, double& Height)
@@ -108,13 +138,15 @@ double Ease(double Rate, double Step)
 void AddLighting(UWorld& World)
 {
     FActorSpawnParameters Params;
-    if (auto* Sun = World.SpawnActor<ADirectionalLight>(FVector::ZeroVector, FRotator(-37, -138, 0), Params))
+    const FVector NormandySun(0.377, 0.555, 0.742);
+    if (auto* Sun = World.SpawnActor<ADirectionalLight>(FVector::ZeroVector, (-NormandySun).Rotation(), Params))
     {
         auto* Light = CastChecked<UDirectionalLightComponent>(Sun->GetLightComponent());
         Light->SetMobility(EComponentMobility::Movable);
         Light->SetAtmosphereSunLight(true);
-        Light->SetIntensity(6.8f);
-        Light->SetLightColor(FLinearColor(1.0f, 0.89f, 0.75f));
+        Light->SetIntensity(7.0f);
+        Light->SetLightColor(FLinearColor(0.993f, 1.0f, 0.909f), false);
+        Light->SetLightSourceAngle(0.72f);
     }
     World.SpawnActor<ASkyAtmosphere>();
     if (auto* Sky = World.SpawnActor<ASkyLight>())
@@ -126,11 +158,26 @@ void AddLighting(UWorld& World)
     if (auto* Fog = World.SpawnActor<AExponentialHeightFog>())
     {
         auto* Component = Fog->FindComponentByClass<UExponentialHeightFogComponent>();
-        Component->SetFogDensity(0.016f);
+        Component->SetFogDensity(0.0105f);
         Component->SetFogHeightFalloff(0.35f);
         Component->SetFogInscatteringColor(FLinearColor(0.43f, 0.51f, 0.60f));
         Component->SetStartDistance(650.0f);
         Component->SetVolumetricFog(true);
+    }
+    if (auto* Volume = World.SpawnActor<APostProcessVolume>())
+    {
+        Volume->bUnbound = true;
+        FPostProcessSettings& Settings = Volume->Settings;
+        Settings.bOverride_LumenSceneLightingQuality = true;
+        Settings.LumenSceneLightingQuality = 1.55f;
+        Settings.bOverride_LumenSceneDetail = true;
+        Settings.LumenSceneDetail = 1.30f;
+        Settings.bOverride_LumenFinalGatherQuality = true;
+        Settings.LumenFinalGatherQuality = 1.35f;
+        Settings.bOverride_BloomIntensity = true;
+        Settings.BloomIntensity = 0.30f;
+        Settings.bOverride_MotionBlurAmount = true;
+        Settings.MotionBlurAmount = 0.0f;
     }
 }
 
@@ -138,7 +185,7 @@ void ShowTrace(UWorld& World, const FVector& Start, const FVector& End)
 {
     const FVector Segment = End - Start;
     if (Segment.IsNearlyZero()) return;
-    static const auto TracerPath = TEXT("/Game/Prototype/Materials/M_Tracer.M_Tracer");
+    static const auto TracerPath = TEXT("/Game/Prototype/Quality/Materials/M_Tracer.M_Tracer");
     auto* Material = LoadObject<UMaterialInterface>(nullptr, TracerPath, nullptr, LOAD_NoWarn);
     auto* Mesh = LoadObject<UStaticMesh>(nullptr, CubePath);
     if (Material && Mesh)
@@ -241,11 +288,71 @@ void ASteelFrontTank::Tick(float DeltaSeconds)
     if (!Player || Player->bShowMouseCursor || !bStarted || DeltaSeconds <= 0) return;
 
     const double Step = FMath::Min(double(DeltaSeconds), 0.05);
+    const FVector Start = GetActorLocation();
+    const double Heading = GetActorRotation().Yaw;
     Drive(Step);
+    const double Travel = FVector::DotProduct(GetActorLocation() - Start, GetActorForwardVector());
+    const double TurnArc = FMath::DegreesToRadians(FMath::FindDeltaAngleDegrees(Heading, GetActorRotation().Yaw)) * RunningGear.HalfSpan;
+    if (FMath::Abs(Travel) + FMath::Abs(TurnArc) > 0.001) UpdateRunningGear(Travel, TurnArc);
     Dispersion = FMath::FInterpConstantTo(Dispersion, Speed == 0 ? 0.0 : 1.0, Step, 1.0 / 1.25);
     Reload = FMath::Max(0.0, Reload - Step);
     Recoil *= FMath::Exp(-13.0 * Step);
     UpdateAim(Step);
+}
+
+bool ASteelFrontTank::SetupRunningGear(const SteelFront::FRunningGear& Gear)
+{
+    RunningGear = Gear;
+    RoadWheels = AddInstances(*this, Hull, SteelFront::RoadWheel, false);
+    Sprockets = AddInstances(*this, Hull, SteelFront::Sprocket, false);
+    TrackLinks = AddInstances(*this, Hull, SteelFront::TrackLink, false);
+    if (!RoadWheels || !Sprockets || !TrackLinks) return false;
+    GearTransforms.Init(FTransform::Identity, Gear.Wheels.Num());
+    RoadWheels->AddInstances(GearTransforms, false);
+    GearTransforms.Init(FTransform::Identity, Gear.Sprockets.Num());
+    Sprockets->AddInstances(GearTransforms, false);
+    GearTransforms.Init(FTransform::Identity, Gear.LinksPerTrack * 2);
+    TrackLinks->AddInstances(GearTransforms, false);
+    UpdateRunningGear(0, 0);
+    return true;
+}
+
+void ASteelFrontTank::UpdateRunningGear(double Travel, double TurnArc)
+{
+    if (!TrackLinks || !RoadWheels || !Sprockets) return;
+    TrackTravel[0] += Travel + TurnArc;
+    TrackTravel[1] += Travel - TurnArc;
+    const auto UpdateWheels = [&](UInstancedStaticMeshComponent& Instances, const TArray<SteelFront::FWheel>& Wheels)
+    {
+        GearTransforms.Reset(Wheels.Num());
+        for (const SteelFront::FWheel& Wheel : Wheels)
+        {
+            const double Radius = Wheel.RadiusMetres;
+            const double Angle = FMath::Fmod(TrackTravel[Wheel.Center.Y < 0 ? 0 : 1] / (Radius * 100.0), UE_DOUBLE_PI * 2);
+            GearTransforms.Emplace(FQuat(FVector::RightVector, Angle), Wheel.Center, FVector(Radius, Wheel.WidthMetres, Radius));
+        }
+        Instances.BatchUpdateInstancesTransforms(0, GearTransforms, false, true, true);
+    };
+    UpdateWheels(*RoadWheels, RunningGear.Wheels);
+    UpdateWheels(*Sprockets, RunningGear.Sprockets);
+    GearTransforms.Reset(RunningGear.LinksPerTrack * 2);
+    const int32 Samples = RunningGear.Loop.Num();
+    const double Length = RunningGear.Length, Step = Length / Samples, LinkStep = Length / RunningGear.LinksPerTrack;
+    for (int32 Side = 0; Side < 2; ++Side)
+    {
+        const double Lateral = Side == 0 ? -RunningGear.HalfSpan : RunningGear.HalfSpan;
+        for (int32 Link = 0; Link < RunningGear.LinksPerTrack; ++Link)
+        {
+            double Distance = FMath::Fmod(Link * LinkStep - TrackTravel[Side], Length);
+            if (Distance < 0) Distance += Length;
+            const int32 Index = FMath::Min(Samples - 1, FMath::FloorToInt(Distance / Step));
+            const FVector2D A = RunningGear.Loop[Index], B = RunningGear.Loop[(Index + 1) % Samples];
+            const FVector2D Position = FMath::Lerp(A, B, (Distance - Index * Step) / Step);
+            const double Angle = FMath::RadiansToDegrees(FMath::Atan2(B.Y - A.Y, B.X - A.X));
+            GearTransforms.Emplace(FRotator(Angle, 0, 0), FVector(Position.X, Lateral, Position.Y));
+        }
+    }
+    TrackLinks->BatchUpdateInstancesTransforms(0, GearTransforms, false, true, true);
 }
 
 void ASteelFrontTank::Drive(double Step)
@@ -509,19 +616,30 @@ void ASteelFrontMode::StartPlay()
     auto* Root = NewObject<USceneComponent>(Environment, TEXT("Normandy"));
     Environment->AddInstanceComponent(Root);
     Environment->SetRootComponent(Root);
+    Root->SetMobility(EComponentMobility::Static);
     Root->RegisterComponent();
     for (const auto Index : {SteelFront::Terrain, SteelFront::Buildings, SteelFront::Water,
-        SteelFront::Foliage, SteelFront::Walls, SteelFront::Decks})
-        AddSection(*Environment, Root, Slice.Sections[Index], Index);
+        SteelFront::Foliage, SteelFront::Walls, SteelFront::Decks, SteelFront::Pebbles, SteelFront::Horizon})
+    {
+        if (!AddSection(*Environment, Root, Slice.Sections[Index], Index)) return;
+    }
+    if (UInstancedStaticMeshComponent* Grass = AddInstances(*Environment, Root, SteelFront::Grass, true))
+        Grass->AddInstances(Slice.GrassTransforms, false);
+    else return;
 
     FActorSpawnParameters Spawn;
     Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     const FRotator Rotation(0, Slice.Heading, 0);
     auto* Tank = World->SpawnActor<ASteelFrontTank>(Slice.Spawn, Rotation, Spawn);
     if (!Tank) return;
-    AddSection(*Tank, Tank->Hull, Slice.Sections[SteelFront::Hull], SteelFront::Hull);
-    AddSection(*Tank, Tank->Turret, Slice.Sections[SteelFront::Turret], SteelFront::Turret);
-    AddSection(*Tank, Tank->Gun, Slice.Sections[SteelFront::Gun], SteelFront::Gun);
+    if (!AddSection(*Tank, Tank->Hull, Slice.Sections[SteelFront::Hull], SteelFront::Hull)
+        || !AddSection(*Tank, Tank->Turret, Slice.Sections[SteelFront::Turret], SteelFront::Turret)
+        || !AddSection(*Tank, Tank->Gun, Slice.Sections[SteelFront::Gun], SteelFront::Gun)
+        || !Tank->SetupRunningGear(Slice.RunningGear))
+    {
+        Tank->Destroy();
+        return;
+    }
     Tank->Turret->SetRelativeLocation(Slice.TurretMount);
     Tank->SetGunMount(Slice.GunMount);
     Tank->Muzzle->SetRelativeLocation(FVector(Slice.BarrelLength, 0, 0));
@@ -535,8 +653,8 @@ void ASteelFrontMode::StartPlay()
 void ASteelFrontMode::CreateTargets(const FVector& Spawn, const FRotator& Rotation)
 {
     auto* Cube = LoadObject<UStaticMesh>(nullptr, CubePath);
-    auto* Stand = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Prototype/Materials/M_Stand.M_Stand"), nullptr, LOAD_NoWarn);
-    auto* Marker = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Prototype/Materials/M_Target.M_Target"), nullptr, LOAD_NoWarn);
+    auto* Stand = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Prototype/Quality/Materials/M_Stand.M_Stand"), nullptr, LOAD_NoWarn);
+    auto* Marker = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Prototype/Quality/Materials/M_Target.M_Target"), nullptr, LOAD_NoWarn);
     if (!Cube) return;
     const FVector Forward = Rotation.Vector(), Right = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
     const FCollisionQueryParams Query(SCENE_QUERY_STAT(SteelFrontTargetSites), true);

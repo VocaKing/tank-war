@@ -5,6 +5,7 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/StaticMesh.h"
 #include "MeshDescription.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
 #include "Misc/PackageName.h"
 #include "Misc/Parse.h"
@@ -17,17 +18,7 @@
 
 namespace
 {
-FVector2f SurfaceUV(const FVector& Position, const FVector& Face, double Repeat)
-{
-    const FVector Normal = Face.GetAbs();
-    if (Normal.Z >= Normal.X && Normal.Z >= Normal.Y)
-        return FVector2f(Position.X / Repeat, Position.Y / Repeat);
-    if (Normal.X >= Normal.Y)
-        return FVector2f(Position.Y / Repeat, -Position.Z / Repeat);
-    return FVector2f(Position.X / Repeat, -Position.Z / Repeat);
-}
-
-void WriteDescription(FMeshDescription& Description, const SteelFront::FSliceMesh& Source, double Repeat)
+bool WriteDescription(FMeshDescription& Description, UStaticMesh& Mesh, const SteelFront::FSliceMesh& Source)
 {
     FStaticMeshAttributes Attributes(Description);
     Attributes.Register();
@@ -35,9 +26,7 @@ void WriteDescription(FMeshDescription& Description, const SteelFront::FSliceMes
     auto Normals = Attributes.GetVertexInstanceNormals();
     auto Colors = Attributes.GetVertexInstanceColors();
     auto Uvs = Attributes.GetVertexInstanceUVs();
-    Uvs.SetNumChannels(1);
-    const FPolygonGroupID Group = Description.CreatePolygonGroup();
-    Attributes.GetPolygonGroupMaterialSlotNames()[Group] = FName(TEXT("Surface"));
+    Uvs.SetNumChannels(5);
 
     TArray<FVertexID> Vertices;
     Vertices.Reserve(Source.Positions.Num());
@@ -47,34 +36,56 @@ void WriteDescription(FMeshDescription& Description, const SteelFront::FSliceMes
         Positions[Vertex] = FVector3f(Position);
         Vertices.Add(Vertex);
     }
-    for (int32 Offset = 0; Offset < Source.Indices.Num(); Offset += 3)
+
+    for (const SteelFront::FMaterialRange& Range : Source.Materials)
     {
-        const int32* Indices = Source.Indices.GetData() + Offset;
-        const FVector Cross = FVector::CrossProduct(Source.Positions[Indices[1]] - Source.Positions[Indices[0]],
-            Source.Positions[Indices[2]] - Source.Positions[Indices[0]]);
-        if (Cross.IsNearlyZero(1e-6)) continue;
-        const FVector Face = Cross.GetSafeNormal();
-        FVertexInstanceID Corners[3];
-        // Unreal's static mesh convention uses clockwise faces.
-        for (int32 Corner = 0; Corner < 3; ++Corner)
+        const FName Slot = Range.Name;
+        const FString Name = Slot.ToString();
+        const FString Path = FString::Printf(TEXT("/Game/Prototype/Quality/Materials/M_%s.M_%s"), *Name, *Name);
+        auto* Material = LoadObject<UMaterialInterface>(nullptr, *Path);
+        if (!Material)
         {
-            const int32 Index = Indices[2 - Corner];
-            const auto Instance = Description.CreateVertexInstance(Vertices[Index]);
-            Corners[Corner] = Instance;
-            const FVector Normal = Source.Normals[Index].IsNearlyZero() ? Face : Source.Normals[Index];
-            Normals[Instance] = FVector3f(Normal);
-            const FLinearColor& Color = Source.Colors[Index];
-            Colors[Instance] = FVector4f(Color.R, Color.G, Color.B, Color.A);
-            Uvs.Set(Instance, 0, SurfaceUV(Source.Positions[Index], Face, Repeat));
+            UE_LOG(LogTemp, Error, TEXT("Missing baked material at %s"), *Path);
+            return false;
         }
-        Description.CreateTriangle(Group, MakeArrayView(Corners));
+        Mesh.GetStaticMaterials().Add(FStaticMaterial(Material, Slot, Slot));
+        const FPolygonGroupID Group = Description.CreatePolygonGroup();
+        Attributes.GetPolygonGroupMaterialSlotNames()[Group] = Slot;
+        for (int32 Offset = Range.FirstIndex; Offset < Range.FirstIndex + Range.NumIndices; Offset += 3)
+        {
+            const int32* Indices = Source.Indices.GetData() + Offset;
+            const FVector Cross = FVector::CrossProduct(Source.Positions[Indices[1]] - Source.Positions[Indices[0]],
+                Source.Positions[Indices[2]] - Source.Positions[Indices[0]]);
+            if (Cross.IsNearlyZero(1e-6)) continue;
+            const FVector Face = Cross.GetSafeNormal();
+            FVertexInstanceID Corners[3];
+            // Unreal's static mesh convention uses clockwise faces.
+            for (int32 Corner = 0; Corner < 3; ++Corner)
+            {
+                const int32 Index = Indices[2 - Corner];
+                const auto Instance = Description.CreateVertexInstance(Vertices[Index]);
+                Corners[Corner] = Instance;
+                Normals[Instance] = FVector3f(Source.Normals[Index].IsNearlyZero() ? Face : Source.Normals[Index]);
+                const FLinearColor& Color = Source.Colors[Index];
+                Colors[Instance] = FVector4f(Color.R, Color.G, Color.B, Color.A);
+                const FLinearColor& Extra = Source.Extra[Index];
+                const FVector3f& Road = Source.Road[Index];
+                Uvs.Set(Instance, 0, Source.UV[Index]);
+                Uvs.Set(Instance, 1, FVector2f(Extra.R, Extra.G));
+                Uvs.Set(Instance, 2, FVector2f(Extra.B, Extra.A));
+                Uvs.Set(Instance, 3, FVector2f(Road.X, Road.Y));
+                Uvs.Set(Instance, 4, FVector2f(Road.Z, float(Source.Positions[Index].Z * 0.01)));
+            }
+            Description.CreateTriangle(Group, MakeArrayView(Corners));
+        }
     }
+    return true;
 }
 
 bool Bake(const SteelFront::FSliceMesh& Source, SteelFront::ESection Section)
 {
     const FString Name = FString(TEXT("SM_")) + SteelFront::SectionNames[Section];
-    const FString LongName = FString(TEXT("/Game/Prototype/Meshes/")) + Name;
+    const FString LongName = FString(TEXT("/Game/Prototype/Quality/Meshes/")) + Name;
     FString Filename;
     if (!FPackageName::TryConvertLongPackageNameToFilename(LongName, Filename, FPackageName::GetAssetPackageExtension()))
         return false;
@@ -84,16 +95,15 @@ bool Bake(const SteelFront::FSliceMesh& Source, SteelFront::ESection Section)
     UPackage* Package = CreatePackage(*LongName);
     auto* Mesh = NewObject<UStaticMesh>(Package, FName(*Name), RF_Public | RF_Standalone);
     Mesh->SetNumSourceModels(1);
-    Mesh->GetStaticMaterials().Add(FStaticMaterial(nullptr, FName(TEXT("Surface")), FName(TEXT("Surface"))));
     FMeshDescription* Description = Mesh->CreateMeshDescription(0);
-    if (!Description) return false;
-    WriteDescription(*Description, Source, Section == SteelFront::Terrain ? 390.0 :
-        Section == SteelFront::Water ? 420.0 : 210.0);
+    if (!Description || !WriteDescription(*Description, *Mesh, Source)) return false;
     FStaticMeshSourceModel& Model = Mesh->GetSourceModel(0);
     Model.BuildSettings.bRecomputeNormals = false;
     Model.BuildSettings.bRecomputeTangents = true;
     Model.BuildSettings.bGenerateLightmapUVs = false;
-    if (Section == SteelFront::Terrain || Section == SteelFront::Buildings || Section == SteelFront::Foliage)
+    Model.BuildSettings.bUseFullPrecisionUVs = true;
+    if (Section == SteelFront::Terrain || Section == SteelFront::Buildings || Section == SteelFront::Foliage
+        || Section == SteelFront::Horizon || Section == SteelFront::Pebbles)
     {
         const auto* Nanite = FindFProperty<FStructProperty>(UStaticMesh::StaticClass(), TEXT("NaniteSettings"));
         if (!Nanite || Nanite->Struct != FMeshNaniteSettings::StaticStruct())
@@ -134,7 +144,9 @@ int32 USteelFrontBakeCommandlet::Main(const FString& Params)
         return 1;
     }
     for (const auto Section : {SteelFront::Terrain, SteelFront::Buildings, SteelFront::Water,
-        SteelFront::Hull, SteelFront::Turret, SteelFront::Gun, SteelFront::Foliage})
+        SteelFront::Hull, SteelFront::Turret, SteelFront::Gun, SteelFront::Foliage,
+        SteelFront::Grass, SteelFront::Pebbles, SteelFront::Horizon,
+        SteelFront::RoadWheel, SteelFront::Sprocket, SteelFront::TrackLink})
     {
         if (!Bake(Slice.Sections[Section], Section))
         {
