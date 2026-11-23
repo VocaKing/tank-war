@@ -71,7 +71,7 @@ export class AIController {
       if (!e.alive || e.team === t.team || !e.spotted[t.team]) continue;
       const d = t.pos.distanceTo(e.pos); if (d > 900) continue;
       const eye = t.model.gun.getWorldPosition(_p);
-      const los = !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH * 0.7, e.pos.z) || !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH + e.spec.dims.turretH * 0.6, e.pos.z);
+      const los = t.spec.artillery || !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH * 0.7, e.pos.z) || !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH + e.spec.dims.turretH * 0.6, e.pos.z);
       if (!los) continue;
       let s = 600 / (d + 50) + (1 - e.hp / e.maxHp) * 1.2 + (e === this.target ? 1.0 : 0) + (e.lastAttacker === t ? 0.3 : 0) + (t.lastAttacker === e ? 1.2 : 0);
       if (s > bs) { bs = s; best = e; }
