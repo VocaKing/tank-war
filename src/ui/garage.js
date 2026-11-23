@@ -6,19 +6,27 @@ import { loadMausModel } from '../models/mausModel.js';
 import { applyArmorPreview, clearArmorPreview } from './armorPreview.js';
 import { pbrTex } from '../world/textures.js';
 
+// Frame the entire lineup at the same metres per pixel. Position the orbit a
+// little forward of the hull centre to leave room for the longest gun.
+const ORBIT_TARGET = new THREE.Vector3(0, 1.4, 1.0);
+const ORBIT_RADIUS = 18;
+const GARAGE_WIDTH = 13.6;
+const GARAGE_HEIGHT = 7.6;
+
 export class Garage {
   constructor(renderer) {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x1b1d1f);
     this.scene.fog = new THREE.Fog(0x1b1d1f, 18, 45);
-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+    this.camera = new THREE.OrthographicCamera(-7, 7, 4, -4, 0.1, 1200);
     this.models = {};
     this.angle = 0.6; this.current = null; this.drag = null; this.armorMode = false;
     const pm = new THREE.PMREMGenerator(renderer);
     new RGBELoader().load('./tex/studio_1k.hdr', (hdr) => { hdr.mapping = THREE.EquirectangularReflectionMapping; this.scene.environment = pm.fromEquirectangular(hdr).texture; this.scene.environmentIntensity = 0.55; hdr.dispose(); });
-    const floorTex = pbrTex('gravel_road', 'diff', 6), floorN = pbrTex('gravel_road', 'nor', 6);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorN, color: 0x8a8580, roughness: 0.95 }));
+    // The larger floor keeps the same texel density and fills an orthographic view at low angles.
+    const floorTex = pbrTex('gravel_road', 'diff', 40), floorN = pbrTex('gravel_road', 'nor', 40);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(200, 64), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorN, color: 0x8a8580, roughness: 0.95 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; this.scene.add(floor);
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 5.8, 0.12, 64), new THREE.MeshStandardMaterial({ color: 0x2b2c2e, roughness: 0.8, metalness: 0.3 }));
     plinth.position.y = 0.06; plinth.receiveShadow = true; this.scene.add(plinth);
@@ -79,13 +87,46 @@ export class Garage {
     if (on) return applyArmorPreview(this.current, this.spec, this.refShell);
     clearArmorPreview(this.current); return { n: 0, pen: 0 };
   }
-  resize(w, h) { this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); }
+  setSidePanels(list, stats) {
+    this.sidePanels = [list, stats];
+    this.resize(this.width, this.height);
+  }
+  resize(w, h) {
+    this.width = w;
+    this.height = h;
+    let stageWidth = w;
+    let centerX = w / 2;
+    if (this.sidePanels) {
+      const [list, stats] = this.sidePanels.map(panel => panel.getBoundingClientRect());
+      const left = list.right + 12;
+      const right = stats.left - 12;
+      if (right > left) {
+        stageWidth = right - left;
+        centerX = (left + right) / 2;
+      }
+    }
+    const metresPerPixel = Math.max(GARAGE_WIDTH / stageWidth, GARAGE_HEIGHT / h);
+    this.camera.left = -centerX * metresPerPixel;
+    this.camera.right = (w - centerX) * metresPerPixel;
+    this.camera.top = h / 2 * metresPerPixel;
+    this.camera.bottom = -this.camera.top;
+    this.camera.updateProjectionMatrix();
+  }
   render(dt) {
     if (!this.drag) this.angle += dt * 0.18;
-    const L = this.spec ? this.spec.dims.L : 6;
-    const dist = (L * 1.65 + 3) * (this.distMul || 1);
-    this.camera.position.set(Math.sin(this.angle) * dist, (2.6 + L * 0.12) * (this.hMul || 1), Math.cos(this.angle) * dist);
-    this.camera.lookAt(0, 1.1, 0);
+    const rise = 3.2 * (this.hMul || 1);
+    // Orthographic distance leaves scale unchanged. Pull the camera back
+    // enough that the entire near plane sits above the showroom floor.
+    const setback = Math.max(1, (this.camera.top + 1) / rise);
+    this.camera.position.set(
+      Math.sin(this.angle) * ORBIT_RADIUS,
+      rise,
+      Math.cos(this.angle) * ORBIT_RADIUS,
+    ).multiplyScalar(setback).add(ORBIT_TARGET);
+    this.camera.lookAt(ORBIT_TARGET);
+    const distance = Math.hypot(ORBIT_RADIUS, rise) * setback;
+    this.scene.fog.near = distance;
+    this.scene.fog.far = distance + 27;
     this.renderer.render(this.scene, this.camera);
   }
 }

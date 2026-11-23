@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OCC } from '../world/mapgen.js';
+import { trackCenterOffset } from '../game/vehicleDimensions.js';
 
 const CAPACITY = { high: 2200, medium: 1400, low: 660 };
 const RANGE = { high: 160, medium: 120, low: 88 };
@@ -102,7 +103,7 @@ export class TrackMarks {
         continue;
       }
       const d = t.spec.dims;
-      const spread = (d.W - d.trackW) / 2;
+      const spread = trackCenterOffset(d);
       const ux = Math.cos(t.heading) * spread, uz = -Math.sin(t.heading) * spread;
       for (let side = 0; side < 2; side++) {
         const sign = side * 2 - 1;

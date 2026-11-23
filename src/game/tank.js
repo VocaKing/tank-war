@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
 import { DEG, clamp, lerp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
+import { trackCenterOffset } from './vehicleDimensions.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
 import { advanceDispersion, impactDrop, incidence } from './combatMath.js';
@@ -78,7 +79,7 @@ export class Tank {
     const W = this.game.world, d = this.spec.dims;
     const fx = Math.sin(heading), fz = Math.cos(heading);
     // Fit the spawn pose once. All motion after placement comes from the rigid body.
-    const length = d.L * 0.42, width = (d.W - d.trackW) / 2;
+    const length = d.L * 0.42, width = trackCenterOffset(d);
     const front = W.groundHeight(x + fx * length, z + fz * length);
     const rear = W.groundHeight(x - fx * length, z - fz * length);
     const right = W.groundHeight(x + fz * width, z - fx * width);
@@ -135,7 +136,7 @@ export class Tank {
   updateAfterMotion(dt) {
     if (this.alive) {
       this.abilities.updateDozer(dt);
-      const half = (this.spec.dims.W - this.spec.dims.trackW) / 2;
+      const half = trackCenterOffset(this.spec.dims);
       updateRunningGear(this.model,
         this.trackRepairs[0] > 0 ? 0 : (this.speed + this.turnRate * half) * dt,
         this.trackRepairs[1] > 0 ? 0 : (this.speed - this.turnRate * half) * dt);

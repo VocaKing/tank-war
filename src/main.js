@@ -61,7 +61,7 @@ function start(opts, gesture = true) {
       const needsMaus = Game.matchmake(opts.tankId, new RNG(seed)).includes('mauseng');
       const [physicsEngine] = await Promise.all([initPhysics(), needsMaus ? loadMausModel() : null]);
       resizeRenderer(opts.quality);
-      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); garage.resize(innerWidth, innerHeight); menu.show(true); } });
+      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); menu.show(true); garage.resize(innerWidth, innerHeight); } });
       window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';

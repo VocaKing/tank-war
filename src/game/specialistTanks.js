@@ -7,7 +7,7 @@ export const SPECIALIST_TANKS = [
     mass: 188, power: 1250, maxSpeed: 19, reverseSpeed: 6, hullTraverse: 12, turretTraverse: 12, gunSpeed: 4,
     gunDepression: 7, gunElevation: 18, hp: 2200, viewRange: 390, reload: 18, aimTime: 3.1, dispersion: 2.7, stabilizer: 1,
     dozer: { speed: 8, travel: 2.6, cooldown: 30, charges: 3 },
-    dims: { L: 9.0, W: 3.7, hullH: 2.08, clearance: 0.48, trackW: 1.02, turretZ: -0.87, turretL: 3.65, turretW: 2.85, turretH: 1.17, gunLen: 4.3 },
+    dims: { L: 9.034, W: 3.67, hullH: 2.155, clearance: 0.48, trackW: 1.02, turretZ: -0.87, turretL: 3.65, turretW: 2.85, turretH: 1.31, gunLen: 4.87, gunForwardL: 10.085 },
     armor: {
       hull: { front: [162, 25], side: [115, 0], rear: [92, 12], top: [42, 0], bottom: [38, 0] },
       turret: { front: [185, 12], side: [132, 4], rear: [112, 5], top: [45, 0] },
@@ -31,7 +31,7 @@ export const SPECIALIST_TANKS = [
       reload: 2.7, rounds: 36, length: 1.48, offset: 0.46,
       shell: { name: '37 mm M51 APC', type: 'APCBC', caliber: 37, pen: 68, velocity: 880, damage: 80 },
     },
-    dims: { L: 7.58, W: 3.12, hullH: 2.02, clearance: 0.47, trackW: 0.62, turretZ: 0.36, turretL: 2.7, turretW: 2.45, turretH: 0.92, gunLen: 3.7 },
+    dims: { L: 7.544, W: 3.124, hullH: 2.02, clearance: 0.521, trackW: 0.65, trackGauge: 2.39, turretZ: 0.36, turretL: 2.7, turretW: 2.45, turretH: 0.977, gunLen: 3.7, gunForwardL: 8.433 },
     armor: {
       hull: { front: [89, 28], side: [68, 0], rear: [45, 5], top: [25, 0], bottom: [22, 0] },
       turret: { front: [101, 14], side: [75, 8], rear: [56, 8], top: [26, 0] },

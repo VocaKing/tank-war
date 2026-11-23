@@ -12,7 +12,7 @@ try {
   await delay(250);
  }
  assert.ok(ready,'Vite server did not start');
- browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+ browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:5173/balance.html');
@@ -21,6 +21,7 @@ try {
   const {TANKS}=await import('/src/game/tankData.js');
   const {fields}=await import('/src/game/balanceConfig.js');
   const buttons=[...document.querySelectorAll('#list .tank')],report=[];
+  if(buttons.length!==TANKS.length)throw new Error('Balance editor vehicle count differs from the roster');
   for(let i=0;i<TANKS.length;i++){
    buttons[i].click();
    const expected=new Map();
@@ -49,7 +50,7 @@ try {
   const cells=[...section.querySelectorAll('.field')];
   return {report,desktopColumns:getComputedStyle(section.querySelector('.fields')).gridTemplateColumns.split(' ').length,frontCellRows:new Set(cells.map(x=>Math.round(x.getBoundingClientRect().top))).size};
  });
- assert.equal(desktop.report.length,15);
+ assert.ok(desktop.report.length>=15);
  assert.equal(desktop.desktopColumns,4,'Desktop armor row should have four columns');
  assert.ok(desktop.frontCellRows<=1,'Front armor fields should fit on one desktop row');
  await page.setViewportSize({width:390,height:844});

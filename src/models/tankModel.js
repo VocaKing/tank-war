@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { camoTexture, trackTexture, decalTexture } from '../world/textures.js';
 import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
+import { trackCenterOffset } from '../game/vehicleDimensions.js';
 
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, castLoft, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
@@ -232,9 +233,9 @@ function buildSherman(d) {
   for (const z of [-2.05, -0.15, 1.75]) for (const s of [-1, 1]) { P.add('hull', 'paint', box(0.35, 0.4, 1.05, s * (hw - 0.32), 0.55, z)); P.add('hull', 'metal', cylZ(0.07, 0.7, 8, s * (hw - 0.32), 0.82, z, 0.07, 0.4)); }
   // turret (cast, T23)
   const tp = superEllipse(d.turretW / 2, 1.0, 1.25, 2.4, 64, (x, z) => [x * (z > 0.4 ? 1 - (z - 0.4) * 0.25 : 1), z]);
-  P.add('turret', 'paint', castLoft(tp,0.78,0.84,0.86));
+  P.add('turret', 'paint', castLoft(tp, d.turretH, 0.84, 0.86));
   P.add('gun','paint',box(1.25,0.56,0.32,0,0,0.05)); P.add('gun','paint',cylX(0.29,1.24,32,0,0,0.12));
-  P.add('turret', 'paint', cylY(0.33, 0.22, 16, 0.42, 0.88, -0.25)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; P.add('turret', 'glass', box(0.1, 0.07, 0.03, 0.42 + Math.cos(a) * 0.33, 0.9, -0.25 + Math.sin(a) * 0.33, 0, -a + Math.PI / 2)); }
+  P.add('turret', 'paint', cylY(0.33, 0.24, 16, 0.42, 0.93, -0.25)); for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; P.add('turret', 'glass', box(0.1, 0.07, 0.03, 0.42 + Math.cos(a) * 0.33, 0.95, -0.25 + Math.sin(a) * 0.33, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', box(0.5, 0.05, 0.6, -0.42, 0.8, -0.2)); P.add('turret', 'dark', cylY(0.1, 0.12, 8, -0.1, 0.82, -0.7));
   P.add('turret', 'metal', cylY(0.012, 1.8, 4, -0.6, 1.6, -0.8)); // antenna
   P.add('turret', 'dark', cylZ(0.022, 1.1, 6, 0.42, 1.12, 0.1)); P.add('turret', 'metal', box(0.12, 0.2, 0.25, 0.42, 1.05, -0.3)); // .50 cal
@@ -250,29 +251,31 @@ function buildSherman(d) {
   return {
     P, wheels: [-2.35, -1.75, -0.45, 0.15, 1.45, 2.05].map((z) => ({ z, y: 0.31, r: 0.26, w: 0.5 })),
     sprockets: [{ z: 2.85, y: 0.95, r: 0.33 }], idlers: [{ z: -2.75, y: 0.6, r: 0.3 }], rollers: [-2.0, -0.15, 1.75].map((z) => ({ z, y: 1.03, r: 0.09 })),
-    turretPos: [0, 1.92, d.turretZ], gunPos: [0, 0.4, 1.0],
+    turretPos: [0, d.hullH, d.turretZ], gunPos: [0, 0.38, 1.0],
     decals: [{ kind: 'usstar', part: 'hull', pos: [1.32, 1.55, -1.2], ry: Math.PI / 2, s: 0.7 }, { kind: 'usstar', part: 'hull', pos: [-1.32, 1.55, -1.2], ry: -Math.PI / 2, s: 0.7 }, { kind: 'usstar', part: 'turret', pos: [0.9, 0.42, -0.35], ry: Math.PI / 2, s: 0.5 }, { kind: 'usstar', part: 'turret', pos: [-0.9, 0.42, -0.35], ry: -Math.PI / 2, s: 0.5 }],
   };
 }
 function buildTiger(d) {
-  const P = new Parts(); const hw = d.W / 2;
+  const P = new Parts();
+  const H = d.hullH;
+  const deckShift = H - 1.95;
   // superstructure (overhangs tracks) and lower hull
-  P.add('hull', 'paint', sideExtrude([[-3.0, 1.0], [2.95, 1.0], [2.8, 1.95], [-2.85, 1.95], [-3.0, 1.5]], 3.52, 0, 0.03));
+  P.add('hull', 'paint', sideExtrude([[-3.0, 1.0], [2.95, 1.0], [2.8, H], [-2.85, H], [-3.0, 1.5]], 3.52, 0, 0.03));
   P.add('hull', 'paint', sideExtrude([[-3.05, 0.55], [2.6, 0.5], [3.15, 0.9], [3.1, 1.02], [-3.1, 1.02]], 1.85, 0, 0.03));
-  P.add('hull', 'paint', box(3.52, 0.06, 0.4, 0, 1.0, 3.12)); // front mudguards
-  for (const s of [-1, 1]) { P.add('hull', 'metal', cylZ(0.1, 0.25, 10, s * 1.0, 0.95, 3.1)); P.add('hull', 'metal', box(0.8, 0.05, 0.06, s * 0.9, 1.9, 2.85)); }
-  P.add('hull', 'dark', box(0.32, 0.08, 0.04, 0.6, 1.62, 2.88, -9 * DEG)); P.add('hull', 'paint', cylZ(0.11, 0.12, 12, -0.75, 1.55, 2.9)); P.add('hull', 'dark', cylZ(0.03, 0.3, 6, -0.75, 1.55, 3.0));
-  P.add('hull', 'metal', cylZ(0.09, 0.18, 10, -0.35, 1.8, 2.93)); // headlight
-  for (const x of [-0.8, 0.8]) P.add('hull', 'paint', cylY(0.3, 0.06, 14, x, 1.97, 1.95));
+  P.add('hull', 'paint', box(d.W, 0.06, 0.4, 0, 1.0, 3.12)); // front mudguards
+  for (const s of [-1, 1]) { P.add('hull', 'metal', cylZ(0.1, 0.25, 10, s * 1.0, 0.95, 3.1)); P.add('hull', 'metal', box(0.8, 0.05, 0.06, s * 0.9, H - 0.05, 2.85)); }
+  P.add('hull', 'dark', box(0.32, 0.08, 0.04, 0.6, 1.62 + deckShift, 2.88, -9 * DEG)); P.add('hull', 'paint', cylZ(0.11, 0.12, 12, -0.75, 1.55 + deckShift, 2.9)); P.add('hull', 'dark', cylZ(0.03, 0.3, 6, -0.75, 1.55 + deckShift, 3.0));
+  P.add('hull', 'metal', cylZ(0.09, 0.18, 10, -0.35, H - 0.15, 2.93)); // headlight
+  for (const x of [-0.8, 0.8]) P.add('hull', 'paint', cylY(0.3, 0.06, 14, x, H + 0.02, 1.95));
   // engine deck, Feifel air filters, exhausts with guards, tow cable, jack
-  P.add('hull', 'dark', box(1.6, 0.03, 1.1, 0, 1.96, -1.95)); for (let i = 0; i < 5; i++) P.add('hull', 'paint', box(1.6, 0.05, 0.05, 0, 1.98, -1.5 - i * 0.22));
+  P.add('hull', 'dark', box(1.6, 0.03, 1.1, 0, H + 0.01, -1.95)); for (let i = 0; i < 5; i++) P.add('hull', 'paint', box(1.6, 0.05, 0.05, 0, H + 0.03, -1.5 - i * 0.22));
   for (const s of [-1, 1]) { P.add('hull', 'metal', cylY(0.11, 0.55, 12, s * 0.5, 1.45, -3.15)); P.add('hull', 'metal', box(0.32, 0.5, 0.04, s * 0.5, 1.45, -3.28)); P.add('hull', 'paint', cylX(0.22, 0.4, 14, s * 1.15, 1.5, -3.1)); }
-  P.add('hull', 'metal', box(0.04, 0.04, 4.8, 1.45, 1.97, -0.2)); P.add('hull', 'wood', box(0.12, 0.12, 0.9, -1.4, 1.97, -0.9));
+  P.add('hull', 'metal', box(0.04, 0.04, 4.8, 1.45, H + 0.02, -0.2)); P.add('hull', 'wood', box(0.12, 0.12, 0.9, -1.4, H + 0.02, -0.9));
   // turret horseshoe
   const tp = [];
   for (let i = 0; i <= 48; i++) { const a = Math.PI * (i / 48); tp.push([Math.cos(a) * 1.25, -0.2 - Math.sin(a) * 1.25]); }
   tp.push([-1.25, 1.1], [1.25, 1.1]); tp.reverse();
-  P.add('turret', 'paint', castLoft(tp,0.82,0.94,0.96,0));
+  P.add('turret', 'paint', castLoft(tp, d.turretH, 0.94, 0.96));
   P.add('gun','paint',box(1.75,0.78,0.32,0,0,0)); P.add('gun','paint',cylX(0.38,1.74,32,0,0,0.13));
   P.add('gun','paint',cylZ(0.20,0.35,24,0,0,0.35)); P.add('gun','dark',box(0.12,0.08,0.05,0.42,0.22,0.17));
   P.add('turret', 'paint', box(1.7, 0.45, 0.55, 0, 0.42, -1.72)); // Rommelkiste
@@ -282,7 +285,7 @@ function buildTiger(d) {
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.18, r1: 0.075, brake: { type: 'double', r: 0.135, len: 0.42 } });
   // Tiger I prototype: visual-only fittings, merged by existing Parts pipeline.
   for (const side of [-1, 1]) {
-    const x = side * 1.53;
+    const x = side * (d.W / 2 - 0.055);
     // Segmented side fender strips and fasteners.
     for (let i = 0; i < 6; i++) {
       const z = -2.45 + i * 0.96;
@@ -290,10 +293,10 @@ function buildTiger(d) {
       P.add('hull', 'metal', box(0.035, 0.06, 0.045, x, 1.065, z - 0.42));
     }
     // Hatch rims, hinges and grab handles.
-    P.add('hull', 'metal', cylY(0.315, 0.025, 24, side * 0.8, 1.956, 1.95));
-    P.add('hull', 'paint', box(0.22, 0.07, 0.08, side * 0.8, 2.005, 1.72));
-    P.add('hull', 'metal', box(0.18, 0.026, 0.03, side * 0.8, 2.065, 2.05));
-    for (const dx of [-0.075, 0.075]) P.add('hull', 'metal', box(0.026, 0.065, 0.03, side * 0.8 + dx, 2.035, 2.05));
+    P.add('hull', 'metal', cylY(0.315, 0.025, 24, side * 0.8, H + 0.006, 1.95));
+    P.add('hull', 'paint', box(0.22, 0.07, 0.08, side * 0.8, H + 0.055, 1.72));
+    P.add('hull', 'metal', box(0.18, 0.026, 0.03, side * 0.8, H + 0.115, 2.05));
+    for (const dx of [-0.075, 0.075]) P.add('hull', 'metal', box(0.026, 0.065, 0.03, side * 0.8 + dx, H + 0.085, 2.05));
     // Exhaust heat shield fasteners and dark open outlet.
     for (const y of [1.25, 1.65]) for (const dx of [-0.12, 0.12]) P.add('hull', 'metal', cylZ(0.022, 0.018, 6, side * 0.5 + dx, y, -3.307));
     P.add('hull', 'dark', cylY(0.075, 0.018, 16, side * 0.5, 1.732, -3.15));
@@ -302,11 +305,9 @@ function buildTiger(d) {
     P.add('turret', 'paint', box(0.12, 0.04, 0.08, side * 0.58, 0.665, -1.75));
   }
   // Engine deck grille cross braces and small service fasteners.
-  for (const x of [-0.72, 0, 0.72]) P.add('hull', 'paint', box(0.045, 0.035, 1.08, x, 2.01, -1.95));
-  for (const x of [-0.92, 0.92]) for (let i = 0; i < 5; i++) P.add('hull', 'metal', cylY(0.024, 0.018, 6, x, 1.962, -1.4 - i * 0.27));
-  // Commander's cupola lid and loader hatch hinges.
-  P.add('turret', 'paint', cylY(0.33, 0.055, 24, -0.6, 1.16, -0.85));
-  P.add('turret', 'metal', box(0.18, 0.065, 0.08, -0.6, 1.19, -1.12));
+  for (const x of [-0.72, 0, 0.72]) P.add('hull', 'paint', box(0.045, 0.035, 1.08, x, H + 0.06, -1.95));
+  for (const x of [-0.92, 0.92]) for (let i = 0; i < 5; i++) P.add('hull', 'metal', cylY(0.024, 0.018, 6, x, H + 0.012, -1.4 - i * 0.27));
+  // Loader hatch hinges.
   for (const x of [0.37, 0.73]) P.add('turret', 'paint', box(0.09, 0.065, 0.12, x, 0.92, -0.59));
   P.add('turret', 'metal', box(0.17, 0.035, 0.04, 0.55, 0.945, -0.08));
   // Early Tiger I running gear: 24 rubber-tyred road wheels per side in three interleaved rows.
@@ -316,7 +317,7 @@ function buildTiger(d) {
   }
   return {
     P, wheels, sprockets: [{ z: 2.75, y: 0.8, r: 0.42 }], idlers: [{ z: -2.88, y: 0.7, r: 0.3 }], rollers: [], wheelType: 'single',
-    turretPos: [0, 1.95, d.turretZ], gunPos: [0, 0.42, 1.25],
+    turretPos: [0, H + 0.01, d.turretZ], gunPos: [0, 0.42, 1.25],
     decals: [{ kind: 'cross', part: 'hull', pos: [1.565, 1.5, -0.6], ry: Math.PI / 2, s: 0.55 }, { kind: 'cross', part: 'hull', pos: [-1.565, 1.5, -0.6], ry: -Math.PI / 2, s: 0.55 }, { kind: 'text', text: '131', part: 'turret', pos: [1.26, 0.45, -0.4], ry: Math.PI / 2, s: 0.75 }, { kind: 'text', text: '131', part: 'turret', pos: [-1.26, 0.45, -0.4], ry: -Math.PI / 2, s: 0.75 }],
   };
 }
@@ -341,9 +342,9 @@ function buildT34(d) {
   P.add('hull', 'wood', cylX(0.1, 2.0, 8, 0, 1.4, -3.05));
   // turret (cast)
   const tp = superEllipse(1.07, 1.25, 1.2, 2.2, 64, (x, z) => [x * (z > 0.3 ? 1 - (z - 0.3) * 0.22 : 1), z]);
-  P.add('turret', 'paint', castLoft(tp,0.78,0.8,0.86));
+  P.add('turret', 'paint', castLoft(tp, d.turretH, 0.8, 0.86));
   P.add('gun','paint',taper(box(1.2,0.6,0.35,0,0,0.15),-0.3,0.3,0.9,1)); P.add('gun','paint',cylX(0.3,0.9,32,0,0,0.25));
-  P.add('turret', 'paint', cylY(0.33, 0.25, 16, -0.42, 0.9, -0.45)); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; P.add('turret', 'glass', box(0.08, 0.06, 0.03, -0.42 + Math.cos(a) * 0.335, 0.93, -0.45 + Math.sin(a) * 0.335, 0, -a + Math.PI / 2)); }
+  P.add('turret', 'paint', cylY(0.33, 0.26, 16, -0.42, 0.91, -0.45)); for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; P.add('turret', 'glass', box(0.08, 0.06, 0.03, -0.42 + Math.cos(a) * 0.335, 0.93, -0.45 + Math.sin(a) * 0.335, 0, -a + Math.PI / 2)); }
   P.add('turret', 'paint', cylY(0.23, 0.05, 12, 0.42, 0.8, -0.3)); for (const x of [-0.2, 0.55]) P.add('turret', 'metal', box(0.1, 0.12, 0.18, x, 0.84, 0.45));
   for (const s of [-1, 1]) P.add('turret', 'metal', cylZ(0.018, 0.8, 4, s * 0.95, 0.55, -0.2));
   P.add('turret', 'dark', cylY(0.09, 0.14, 8, 0.0, 0.84, -0.95));
@@ -379,9 +380,9 @@ function cutTurretGunPort(geometry, center, radius) {
 }
 
 function buildT72(d) {
-  const P = new Parts(); const hw = d.W / 2;
-  P.add('hull', 'paint', sideExtrude([[-3.35, 0.5], [3.1, 0.5], [3.45, 0.62], [3.43, 0.92], [1.93, 1.5], [-3.32, 1.5], [-3.45, 1.2]], 2.3, 0, 0.02));
-  for (const s of [-1, 1]) { P.add('hull', 'paint', box(0.66, 0.04, 6.4, s * 1.48, 1.05, -0.05)); P.add('hull', 'rubber', box(0.04, 0.32, 1.9, s * 1.79, 0.86, 2.2)); P.add('hull', 'rubber', box(0.04, 0.28, 0.4, s * 1.79, 0.86, -3.05)); }
+  const P = new Parts(); const hw = d.W / 2, hl = d.L / 2;
+  P.add('hull', 'paint', sideExtrude([[-hl + 0.09, 0.5], [hl - 0.35, 0.5], [hl - 0.02, 0.62], [hl - 0.04, 0.92], [1.93, d.hullH], [-3.32, d.hullH], [-hl + 0.02, 1.2]], d.trackGauge - d.trackW - 0.04, 0, 0.02));
+  for (const s of [-1, 1]) { P.add('hull', 'paint', box(0.67, 0.04, 6.4, s * (hw - 0.335), 1.05, -0.05)); P.add('hull', 'rubber', box(0.04, 0.32, 1.9, s * (hw - 0.02), 0.86, 2.2)); P.add('hull', 'rubber', box(0.04, 0.28, 0.4, s * (hw - 0.02), 0.86, -3.05)); }
   // fender stowage & fuel boxes (right), toolbox, unditching log, fuel drums
   for (let i = 0; i < 4; i++) P.add('hull', 'paint', box(0.55, 0.42, 0.9, 1.43, 1.28, 1.2 - i * 1.0));
   for (let i = 0; i < 3; i++) P.add('hull', 'paint', box(0.55, 0.36, 0.95, -1.43, 1.25, -0.3 - i * 1.0));
@@ -396,7 +397,7 @@ function buildT72(d) {
   P.add('hull', 'metal', box(2.2, 0.06, 0.12, 0, 1.05, 3.12, gl)); // splash guard
   for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.1, 10, s * 0.95, 1.05, 3.3));
   // turret dome
-  let dome = new THREE.SphereGeometry(1, 96, 48, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, 0.72, 1.28);
+  let dome = new THREE.SphereGeometry(1, 96, 48, 0, Math.PI * 2, 0, Math.PI / 2); dome.scale(1.12, d.turretH, 1.28);
   { const p = dome.attributes.position; for (let i = 0; i < p.count; i++) { if (p.getZ(i) > 0.4) p.setZ(i, 0.4 + (p.getZ(i) - 0.4) * 0.85); } dome.computeVertexNormals(); }
   // Remove a real circular aperture at the forward trunnion; the mantlet ring
   // and breech pass through this opening instead of intersecting the cast dome.
@@ -417,19 +418,22 @@ function buildT72(d) {
   return {
     P, wheels: [-2.55, -1.62, -0.69, 0.24, 1.17, 2.1].map((z) => ({ z, y: 0.4, r: 0.375, w: 0.46 })),
     sprockets: [{ z: -3.15, y: 0.62, r: 0.33 }], idlers: [{ z: 2.95, y: 0.56, r: 0.31 }], rollers: [-1.6, 0.0, 1.5].map((z) => ({ z, y: 0.98, r: 0.075 })),
-    turretPos: [0, 1.5, d.turretZ], gunPos: [0, 0.34, 1.05], gunMountZ: 1.05, gunMountNoCollar: true,
+    turretPos: [0, d.hullH, d.turretZ], gunPos: [0, 0.34, 1.05], gunMountZ: 1.05, gunMountNoCollar: true,
     decals: [{ kind: 'text', text: '214', part: 'turret', pos: [-0.85, 0.42, -0.6], ry: -Math.PI / 2 - 0.5, s: 0.5 }, { kind: 'text', text: '214', part: 'turret', pos: [0.85, 0.42, -0.6], ry: Math.PI / 2 + 0.5, s: 0.5 }],
   };
 }
 function buildAbrams(d) {
-  const P = new Parts(); const hw = d.W / 2;
-  P.add('hull', 'paint', sideExtrude([[-3.9, 0.55], [3.6, 0.55], [3.98, 0.72], [4.0, 1.02], [1.5, 1.52], [-3.75, 1.52], [-3.98, 1.4]], 3.3, 0, 0.02));
+  const P = new Parts(); const hw = d.W / 2, hl = d.L / 2;
+  const nose = hl - 0.02, rear = -hl + 0.02;
+  const H = d.hullH;
+  P.add('hull', 'paint', sideExtrude([[rear + 0.08, 0.55], [nose - 0.36, 0.55], [nose, 0.72], [nose, 1.02], [1.5, H], [rear + 0.23, H], [rear, 1.40]], d.trackGauge - d.trackW - 0.04, 0, 0.02));
+  P.add('hull', 'paint', sideExtrude([[rear, 1.11], [nose - 0.45, 1.11], [1.5, H], [rear + 0.23, H], [rear, 1.40]], d.W - 0.34, 0, 0.02));
   // side skirts (front sections thicker) and rear grille
   for (const s of [-1, 1]) {
-    P.add('hull', 'paint', box(0.07, 0.62, 5.4, s * 1.8, 0.92, -1.0)); P.add('hull', 'paint', box(0.14, 0.7, 2.2, s * 1.78, 0.9, 2.6));
-    P.add('hull', 'paint', box(0.14, 0.2, 0.6, s * 1.78, 0.62, 3.75, -0.5));
-    for (let i = 0; i < 6; i++) P.add('hull', 'dark', box(0.08, 0.02, 0.02, s * 1.84, 1.1 - i * 0.0, -3.3 + i * 0.9));
-    P.add('hull', 'metal', box(0.25, 0.15, 0.1, s * 1.3, 1.25, 4.0)); P.add('hull', 'glass', box(0.18, 0.08, 0.02, s * 1.3, 1.25, 4.06));
+    P.add('hull', 'paint', box(0.07, 0.62, 5.4, s * (hw - 0.035), 0.92, -1.0)); P.add('hull', 'paint', box(0.14, 0.7, 2.2, s * (hw - 0.07), 0.9, 2.6));
+    P.add('hull', 'paint', box(0.14, 0.2, 0.6, s * (hw - 0.07), 0.62, 3.64, -0.5));
+    for (let i = 0; i < 6; i++) P.add('hull', 'dark', box(0.012, 0.02, 0.02, s * hw, 1.1, -3.3 + i * 0.9));
+    P.add('hull', 'metal', box(0.25, 0.15, 0.1, s * 1.3, 1.25, hl - 0.07)); P.add('hull', 'glass', box(0.18, 0.08, 0.02, s * 1.3, 1.25, hl - 0.01));
     P.add('hull', 'metal', cylY(0.06, 0.3, 8, s * 1.55, 1.5, -3.85));
   }
   P.add('hull', 'dark', box(2.6, 0.55, 0.05, 0, 1.1, -3.98)); for (let i = 0; i < 6; i++) P.add('hull', 'metal', box(2.6, 0.03, 0.06, 0, 0.88 + i * 0.09, -4.0));
@@ -437,12 +441,12 @@ function buildAbrams(d) {
   P.add('hull', 'paint', box(0.7, 0.05, 0.5, 0, 1.43, 2.1, 0.2)); for (let i = 0; i < 3; i++) P.add('hull', 'glass', box(0.12, 0.05, 0.03, -0.18 + i * 0.18, 1.45, 2.38, 0.2));
   // M1 removable skirt panels: visible joints and recessed hinge brackets.
   for(const side of [-1,1])for(const z of [-3.2,-2.3,-1.4,-0.5,0.4,1.3,2.4,3.25]){
-    P.add('hull','dark',box(0.010,0.48,0.018,side*(z>1.7?1.855:1.84),0.93,z));
-    P.add('hull','paint',box(0.04,0.08,0.13,side*(z>1.7?1.86:1.845),1.16,z));
+    P.add('hull','dark',box(0.010,0.48,0.018,side * hw,0.93,z));
+    P.add('hull','paint',box(0.04,0.08,0.13,side * (hw - 0.015),1.16,z));
   }
   // turret: angular faceted wedge with bustle
   const tp = [[0.95, 2.05], [1.72, 0.55], [1.72, -1.2], [1.55, -2.3], [-1.55, -2.3], [-1.72, -1.2], [-1.72, 0.55], [-0.95, 2.05]];
-  P.add('turret', 'paint', taper(topExtrude(tp,0.72,0,0.035,2),0,0.72,0.95,0.97));
+  P.add('turret', 'paint', taper(topExtrude(tp, d.turretH, 0, 0.035, 2), 0, d.turretH, 0.95, 0.97));
   P.add('gun','dark',box(0.75,0.6,0.2,0,-0.02,0)); P.add('gun','paint',box(0.62,0.5,0.35,0,0,0.10));
   P.add('turret', 'paint', box(0.65, 0.42, 0.75, 0.95, 0.9, 1.15)); P.add('turret', 'glass', box(0.5, 0.25, 0.03, 0.95, 0.92, 1.53)); // GPS doghouse
   P.add('turret', 'paint', cylY(0.22, 0.35, 12, -0.55, 0.88, -0.6)); P.add('turret', 'paint', box(0.42, 0.35, 0.42, -0.55, 1.15, -0.6)); P.add('turret', 'glass', box(0.3, 0.18, 0.02, -0.55, 1.17, -0.38)); // CITV
@@ -458,7 +462,7 @@ function buildAbrams(d) {
   return {
     P, wheels: [-2.75, -1.88, -1.01, -0.14, 0.73, 1.6, 2.47].map((z) => ({ z, y: 0.37, r: 0.32, w: 0.52 })),
     sprockets: [{ z: -3.55, y: 0.62, r: 0.34 }], idlers: [{ z: 3.45, y: 0.62, r: 0.32 }], rollers: [-1.4, 1.2].map((z) => ({ z, y: 0.98, r: 0.08 })),
-    turretPos: [0, 1.52, d.turretZ], gunPos: [0, 0.38, 1.95], decals: [],
+    turretPos: [0, d.hullH, d.turretZ], gunPos: [0, 0.38, 1.95], decals: [],
   };
 }
 const BUILDERS = { sherman: buildSherman, tiger: buildTiger, t34: buildT34, t72: buildT72, m1a2: buildAbrams };
@@ -480,14 +484,14 @@ const EXTRAS = {
     K.spareLinks(P, 'hull', 0.75, 1.33, 2.12, 3, 0.5, 0.17, 0, 0.5); K.spareLinks(P, 'hull', -0.95, 1.2, 2.35, 2, 0.5, 0.17, 0, 0.5);
     for (const s of [-1, 1]) K.towCable(P, 'hull', s * 1.3, 1.02, -2.6, 0.8);
     K.tools(P, 'hull', 1.25, 1.0, 1.6, 1); K.stowageBox(P, 'hull', -1.25, 1.18, 1.3, 0.4, 0.32, 0.8);
-    K.periscope(P, 'turret', -0.42, 1.17, -0.45, 0, 0.7); K.hatch(P, 'turret', 0.42, 0.82, -0.3, 0.22);
+    K.periscope(P, 'turret', -0.42, 0.983, -0.45, 0, 0.7); K.hatch(P, 'turret', 0.42, 0.82, -0.3, 0.22);
     for (const s of [-1, 1]) K.grabRail(P, 'turret', [s * 0.98, 0.52, -0.7], [s * 0.98, 0.52, 0.3], 0.0);
     Object.assign(b, { wheelType: 'spoked', cast: 0.35, castTurret: 1.0 });
   },
   tiger(P, d, b) {
-    for (const s of [-1, 1]) { K.towCable(P, 'hull', s * 1.575, 1.6, -2.4, 1.6); K.spareLinks(P, 'turret', s * 1.27, 0.45, 0.35, 3, 0.72, 0.13, s * R90, R90); K.periscope(P, 'hull', s * 0.8, 2.0, 2.3, 0, 0.8); }
-    K.tools(P, 'hull', 0.9, 1.95, 1.4, 1); K.tools(P, 'hull', -0.9, 1.95, 1.4, -1);
-    K.cupola(P, 'turret', -0.6, 0.83, -0.85, 0.33, 0.24, 7, 'ww2'); K.mg(P, 'turret', -0.6, 1.25, -0.85, 0, 'mg34');
+    for (const s of [-1, 1]) { K.towCable(P, 'hull', s * 1.575, 1.6, -2.4, 1.6); K.spareLinks(P, 'turret', s * 1.27, 0.45, 0.35, 3, 0.72, 0.13, s * R90, R90); K.periscope(P, 'hull', s * 0.8, d.hullH + 0.05, 2.3, 0, 0.8); }
+    K.tools(P, 'hull', 0.9, d.hullH, 1.4, 1); K.tools(P, 'hull', -0.9, d.hullH, 1.4, -1);
+    K.cupola(P, 'turret', -0.6, d.turretH, -0.85, 0.33, 0.27, 7, 'ww2'); K.mg(P, 'turret', -0.6, 1.25, -0.85, 0, 'mg34');
     K.liftHooks(P, 'turret', [[-0.9, 0.86, 0.4], [0.9, 0.86, 0.4], [0, 0.86, -1.3]]);
     Object.assign(b, { wheelType: 'single', cast: 0.3, castTurret: 0.35 });
   },
@@ -536,7 +540,7 @@ function linkGeometry(w, pitch, th, id) {
 // track-tension adjuster at the idler and tow shackles on the rear plate.
 function finishDetails(P, d, b, spec) {
   const hl = d.L / 2; const circ = [...b.wheels, ...b.sprockets, ...b.idlers, ...b.rollers];
-  const fy = Math.max(...circ.map((c) => c.y + c.r)) + 0.075; const tx = d.W / 2 - d.trackW / 2; const rearZ = Math.min(...circ.map((c) => c.z - c.r)) - 0.1;
+  const fy = Math.max(...circ.map((c) => c.y + c.r)) + 0.075; const tx = trackCenterOffset(d); const rearZ = Math.min(...circ.map((c) => c.z - c.r)) - 0.1;
   const modern = spec.era !== 'WWII'; const sponson = ['sherman', 'tiger', 't34'].includes(spec.id);
   for (const s of [-1, 1]) {
     // tail light cluster on the rear fender end
@@ -683,22 +687,23 @@ export function createTankModel(spec, opts = {}) {
   }
   const sight = new THREE.Object3D(); sight.position.set(0.35, 0.25, 0.2); gun.add(sight);
   // tracks: textured ribbon (LOD far) + individual instanced links (LOD near)
+  const trackX = trackCenterOffset(d);
   const tracks = [], links = [], trackTex = [];
   for (const s of [-1, 1]) {
     const tex = trackTexture().clone();
     const tm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0.55, color: 0x9a948c, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(tpl.track.geo, tm); m.position.x = s * (d.W / 2 - d.trackW / 2); m.castShadow = true; m.receiveShadow = true; body.add(m); tracks.push(m); meshes.push(m); trackTex.push(tex);
+    const m = new THREE.Mesh(tpl.track.geo, tm); m.position.x = s * trackX; m.castShadow = true; m.receiveShadow = true; body.add(m); tracks.push(m); meshes.push(m); trackTex.push(tex);
     const li = new THREE.InstancedMesh(tpl.linkGeo, tpl.linkMat, tpl.nLinks); li.position.x = m.position.x; li.castShadow = true; li.receiveShadow = true; li.visible = false; li.frustumCulled = false; body.add(li); links.push(li); meshes.push(li);
   }
   // wheels: instanced (road wheels + idlers + return rollers) and sprockets
   const wl = [];
   for (const s of [-1, 1]) {
-    for (const w of b.wheels) wl.push({ x: s * (d.W / 2 - d.trackW / 2) + (w.xo || 0) * s, y: w.y, z: w.z, r: w.r, w: w.w ?? d.trackW * 0.8, side: s });
-    for (const w of b.idlers) wl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.6, side: s });
-    for (const w of b.rollers) wl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.5, side: s });
+    for (const w of b.wheels) wl.push({ x: s * (trackX + (w.xo || 0)), y: w.y, z: w.z, r: w.r, w: w.w ?? d.trackW * 0.8, side: s });
+    for (const w of b.idlers) wl.push({ x: s * trackX, y: w.y, z: w.z, r: w.r, w: d.trackW * 0.6, side: s });
+    for (const w of b.rollers) wl.push({ x: s * trackX, y: w.y, z: w.z, r: w.r, w: d.trackW * 0.5, side: s });
   }
   const wheels = new THREE.InstancedMesh(tpl.wheelGeoLo, tpl.wheelMat, wl.length); wheels.castShadow = true; wheels.receiveShadow = true; body.add(wheels); meshes.push(wheels);
-  const sl = []; for (const s of [-1, 1]) for (const w of b.sprockets) sl.push({ x: s * (d.W / 2 - d.trackW / 2), y: w.y, z: w.z, r: w.r, w: d.trackW * 0.7, side: s });
+  const sl = []; for (const s of [-1, 1]) for (const w of b.sprockets) sl.push({ x: s * trackX, y: w.y, z: w.z, r: w.r, w: d.trackW * 0.7, side: s });
   const sprockets = new THREE.InstancedMesh(tpl.sprocketGeo, tpl.wheelMat, sl.length); sprockets.castShadow = true; body.add(sprockets); meshes.push(sprockets);
   // decals
   for (const dc of b.decals) {

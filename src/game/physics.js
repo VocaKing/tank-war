@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DEG, clamp } from '../util.js';
+import { trackCenterOffset } from './vehicleDimensions.js';
 
 export const GRAVITY = 9.81;
 export const PHYSICS_STEP = 1 / 120;
@@ -112,7 +113,7 @@ export class BattlefieldPhysics {
       .setTranslation(0, base + halfHeight, 0).setMass(mass)
       .setFriction(0.6).setContactSkin(0.012).setCollisionGroups(filter), body);
     const turret = this.world.createCollider(ColliderDesc.cuboid(d.turretW * 0.46, d.turretH / 2, d.turretL * 0.45)
-      .setTranslation(0, d.hullH + d.turretH / 2, d.turretBoxZ || 0).setMass(0)
+      .setTranslation(0, d.hullH + d.turretH / 2, (d.turretZ ?? 0) + (d.turretBoxZ ?? 0)).setMass(0)
       .setFriction(0.6).setCollisionGroups(filter), body);
     const vehicle = { tank, body, turret, mass, contact: 0, unsupported: 0,
       inertiaYaw: mass * (d.L * d.L + d.W * d.W) / 12 };
@@ -193,7 +194,7 @@ export class BattlefieldPhysics {
     const stiffness = springMass * SPRING_FREQUENCY ** 2;
     const damping = 2 * springMass * SPRING_FREQUENCY * 0.94;
     const maxImpulse = springMass * GRAVITY * 5 * dt;
-    const side = (d.W - d.trackW) / 2;
+    const side = trackCenterOffset(d);
     let load = 0, leftLoad = 0;
     let support = 0;
     for (const x of [-side, side]) for (const station of STATIONS) {
@@ -298,7 +299,7 @@ export class BattlefieldPhysics {
     const commanded = tank.hullAiming ? clamp(aimError / 0.12, -turnLimit, turnLimit) :
       steer * turnLimit * (mobile && longitudinal < -0.3 ? -1 : 1);
     // Keep the disabled side nearly stationary as the hull swings around it.
-    const pivotSpeed = brokenSide ? commanded * brokenSide * (s.dims.W - s.dims.trackW) / 2 : 0;
+    const pivotSpeed = brokenSide ? commanded * brokenSide * trackCenterOffset(s.dims) : 0;
     const holding = !throttle && Math.abs(longitudinal) < 0.45;
     const neutralBrake = holding ? 6 : 0.75 + Math.abs(longitudinal) * 0.07;
     const driveBrake = throttle * longitudinal < 0 ? 5 : 3.2;

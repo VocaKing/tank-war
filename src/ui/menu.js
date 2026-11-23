@@ -50,6 +50,7 @@ export class Menu {
       </div>
       <button class="mobile-deploy" id="m-mobile-deploy" aria-label="进入战斗">进入战斗 · BATTLE</button>
       <div class="overlay" id="m-tbl"></div><div class="overlay" id="m-lo"></div><div class="overlay" id="m-maps"></div>`;
+    if (!this.mobile) this.garage.setSidePanels(this.root.querySelector('.tanklist'), this.root.querySelector('.stats'));
     this.root.querySelectorAll('.tcard').forEach((b) => (b.onclick = () => this.select(b.dataset.id)));
     this.root.querySelector('#m-battle').onclick = () => this.showMapSelect(true);
     this.root.querySelector('#m-mobile-deploy').onclick = () => this.showMapSelect(true);
@@ -172,7 +173,10 @@ export class Menu {
     const rows = [['Nation / era', (t) => `${t.nation} · ${t.era} (${t.year})`], ['Mass / power', (t) => `${t.mass} t · ${t.power} hp`], ['Hit points', (t) => t.hp], ['Main gun shell', (t) => t.shells[0].name], ['Damage (AP / alt / HE)', (t) => t.shells.map((s) => s.damage).join(' / ')], ['Penetration mm @100 m', (t) => t.shells.map((s) => s.pen).join(' / ')], ['Muzzle velocity m/s', (t) => t.shells.map((s) => s.velocity).join(' / ')],
       ['Hull armor F/S/R mm', (t) => ['front', 'side', 'rear'].map((k) => t.armor.hull[k][0] + (t.armor.hull[k][1] ? '@' + t.armor.hull[k][1] + '°' : '')).join(' / ')], ['Turret armor F/S/R mm', (t) => ['front', 'side', 'rear'].map((k) => t.armor.turret[k][0] + (t.armor.turret[k][1] ? '@' + t.armor.turret[k][1] + '°' : '')).join(' / ')],
       ['Effective hull front (LOS)', (t) => los(t.armor.hull.front) + ' mm'], ['Reload', (t) => t.reload + ' s'], ['Aim time / dispersion', (t) => `${t.aimTime} s / ${t.dispersion}–${t.maxDispersion} m @100 m`], ['Top speed fwd / rev', (t) => `${t.maxSpeed} / ${t.reverseSpeed} km/h`], ['Hull / turret traverse', (t) => `${t.hullTraverse} / ${t.turretTraverse} °/s`], ['Gun depression / elevation', (t) => `−${t.gunDepression}° / +${t.gunElevation}°`], ['View range', (t) => t.viewRange + ' m'], ['Crew', (t) => t.crew.length + (t.autoloader ? ' (autoloader)' : '')]];
-    rows.unshift(['Tier / class', (t) => `${['I', 'II', 'III', 'IV'][t.tier - 1]} · ${t.cls}`]);
+    rows.unshift(
+      ['Tier / class', (t) => `${['I', 'II', 'III', 'IV'][t.tier - 1]} · ${t.cls}`],
+      ['Chassis L × W (m)', (t) => `${t.dims.L.toFixed(2)} × ${t.dims.W.toFixed(2)}`],
+    );
     o.innerHTML = `<div class="box wide"><h2>Tank comparison (${TANKS.length} tanks)</h2><div class="cmpwrap"><table class="cmp"><tr><th>Tank</th>${rows.map(([l]) => `<th>${l}</th>`).join('')}</tr>${TANKS.map((t) => `<tr class="${t.id === this.tank ? 'me' : ''}"><td><b>${t.short}</b></td>${rows.map(([, f]) => `<td>${f(t)}</td>`).join('')}</tr>`).join('')}</table></div>
       <p class="note">Penetration falls with range (AP −18%/km, APCR −35%/km, APFSDS −6%/km, HEAT constant). Effective armor = thickness ÷ cos(impact angle). Ricochet above ${SHELL_TYPES.APCBC.ricochet}° (AP), ${SHELL_TYPES.APDS.ricochet}° (APDS), ${SHELL_TYPES.APFSDS.ricochet}° (APFSDS); HEAT/HESH ignore ricochet but are stopped by ERA, composite (×HEAT multiplier) and spaced skirts. Penetration rolls ±${Math.round(8)}% unless the shell caliber overmatches the plate (3×).</p><button id="m-close">Close</button></div>`;
     o.style.display = 'flex'; o.querySelector('#m-close').onclick = () => this.showTable(false);
