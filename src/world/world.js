@@ -485,7 +485,7 @@ export class World {
     for (const material of [
       this.sky.material, this.terrainMat, this.far.material, this.waterMat,
       ...Object.values(this.structureMaterials), ...Object.values(this.veg.mats).flat(),
-      ...Object.values(this.veg.ghostMats), this.veg.rockMat,
+      ...Object.values(this.veg.ghostMats).flat(), this.veg.rockMat,
     ]) material.dispose();
     for (const { ring, pole, flag } of this.baseMarkers) {
       ring.material.dispose(); pole.material.dispose(); flag.material.dispose();
