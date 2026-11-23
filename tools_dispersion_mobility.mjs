@@ -10,11 +10,11 @@ page.on('pageerror', (e) => errors.push(e.message));
 await page.addInitScript(() => {
   localStorage.setItem('tw_balance_v1', JSON.stringify({
     version: 1,
-    tanks: { sherman: { dispersion: 0.01, aimTime: 1.0 } }
+    tanks: { tiger: { dispersion: 0.01, aimTime: 1.0 } }
   }));
 });
-await page.goto(`${base}?autostart=1&map=village&tank=sherman&q=low&seed=1944`);
-await page.waitForFunction(() => window.__game && window.__game.player?.spec.id === 'sherman', null, { timeout: 180000 });
+await page.goto(`${base}?autostart=1&map=forest&tank=tiger&q=low&seed=1901`);
+await page.waitForFunction(() => window.__game && window.__game.player?.spec.id === 'tiger', null, { timeout: 180000 });
 
 const report = await page.evaluate(() => {
   const g = window.__game, p = g.player;
@@ -31,12 +31,18 @@ const report = await page.evaluate(() => {
     deviations.push(p.lastDeviation);
   }
 
-  // Choose a real, non-ford section of the generated Normandy river.
+  // Choose a real river section away from the two designed fords.
   const river = g.world.mb.rivers.find((r) => !r.dry);
   const pts = river.pts;
-  let k = 0;
-  for (let i = 1; i < pts.length; i++) if (Math.abs(pts[i][1]) < Math.abs(pts[k][1])) k = i;
-  const prev = pts[Math.max(0, k - 2)], next = pts[Math.min(pts.length - 1, k + 2)], center = pts[k];
+  const fords = g.world.mb.fords || [];
+  let k = 0, best = -Infinity;
+  for (let i = 2; i < pts.length - 2; i++) {
+    const [x,z] = pts[i];
+    const fordGap = fords.length ? Math.min(...fords.map(f => Math.hypot(x-f.x,z-f.z))) : 1e6;
+    const score = fordGap - Math.abs(z) * 0.02;
+    if (score > best) { best = score; k = i; }
+  }
+  const prev = pts[k - 2], next = pts[k + 2], center = pts[k];
   const tx = next[0] - prev[0], tz = next[1] - prev[1];
   const tangent = Math.atan2(tx, tz);
   const heading = tangent + Math.PI / 2;
@@ -46,8 +52,17 @@ const report = await page.evaluate(() => {
     const x = center[0] + Math.sin(heading) * d, z = center[1] + Math.cos(heading) * d;
     profile.push({ d, h: g.world.terrain.height(x, z), water: g.world.terrain.waterLevel(x, z) });
   }
+
   p.modules.tracks = 1; p.modules.engine = 1; p.speed = 0; p.turnRate = 0;
   p.placeAt(start[0], start[1], heading);
+  const beforeHeading = p.heading;
+  g.keys.KeyD = true;
+  g.debug.simulate(2, 1 / 30);
+  g.keys.KeyD = false;
+  const turnDelta = Math.atan2(Math.sin(p.heading - beforeHeading), Math.cos(p.heading - beforeHeading));
+  const turnState = { deltaRadians: turnDelta, degrees: turnDelta * 180 / Math.PI, turnRate: p.turnRate, tracks: p.modules.tracks, inWater: p.inWater, speed: p.speed };
+
+  p.speed = 0; p.turnRate = 0; p.placeAt(start[0], start[1], heading);
   const before = p.pos.clone();
   g.keys.KeyW = true;
   g.debug.simulate(8, 1 / 30);
@@ -55,21 +70,12 @@ const report = await page.evaluate(() => {
   const forwardDelta = (p.pos.x - before.x) * Math.sin(heading) + (p.pos.z - before.z) * Math.cos(heading);
   const forwardState = { delta: forwardDelta, speed: p.speed, turnRate: p.turnRate, x: p.pos.x, z: p.pos.z, groundY: p.groundY, inWater: p.inWater };
 
-  p.speed = 0; p.turnRate = 0; p.heading = heading; p.updateGround(1, true);
-  const beforeHeading = p.heading;
-  g.keys.KeyD = true;
-  g.debug.simulate(2, 1 / 30);
-  g.keys.KeyD = false;
-  const turnDelta = Math.atan2(Math.sin(p.heading - beforeHeading), Math.cos(p.heading - beforeHeading));
-  const turnState = { deltaRadians: turnDelta, degrees: turnDelta * 180 / Math.PI, turnRate: p.turnRate, tracks: p.modules.tracks, inWater: p.inWater };
-
-  // Test backing away from the bank after the forward traversal attempt.
-  p.speed = 0; p.turnRate = 0; p.heading = heading + Math.PI; p.updateGround(1, true);
+  p.speed = 0; p.turnRate = 0; p.placeAt(start[0], start[1], heading);
   const backStart = p.pos.clone();
-  g.keys.KeyW = true;
-  g.debug.simulate(4, 1 / 30);
-  g.keys.KeyW = false;
-  const reverseDelta = (p.pos.x - backStart.x) * Math.sin(heading + Math.PI) + (p.pos.z - backStart.z) * Math.cos(heading + Math.PI);
+  g.keys.KeyS = true;
+  g.debug.simulate(8, 1 / 30);
+  g.keys.KeyS = false;
+  const reverseDelta = -((p.pos.x - backStart.x) * Math.sin(heading) + (p.pos.z - backStart.z) * Math.cos(heading));
   return {
     balance: { specDispersion, baseDispersion, currentDispersion, expected, maxShotDeviation: Math.max(...deviations), minShotDeviation: Math.min(...deviations) },
     river: { center: start, width: river.width, profile, forwardState, turnState, reverseDelta },
