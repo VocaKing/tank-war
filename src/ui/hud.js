@@ -141,15 +141,13 @@ export class HUD {
     const st = this.$('h-status'); const sinceFire = G.time - p.lastFired;
     if (!p.alive) { st.textContent = ''; st.className = 'status'; }
     else {
-      if (p.isArtillery) {
-        st.textContent = `SPG · ${p.spadeState} · ${p.spadeDeployment >= 0.96 ? 'READY TO FIRE' : 'FIRING LOCKED'} · ${p.reloadLeft > 0 ? 'RELOADING ' + p.reloadLeft.toFixed(1) + 's' : 'LOADED'}`;
-        st.className = 'status ' + (p.spadeDeployment >= 0.96 ? 'hidden' : 'revealed');
-      }
+      const artilleryStatus = p.isArtillery ? `SPG · ${p.spadeState} · ${p.spadeDeployment >= 0.96 ? 'READY TO FIRE' : 'FIRING LOCKED'} · ${p.reloadLeft > 0 ? 'RELOADING ' + p.reloadLeft.toFixed(1) + 's' : 'LOADED'}` : '';
       const cam = Math.round((p.camo || 0) * 100); const vr = Math.round(Math.max(50, 400 * (1 - (p.camo || 0))));
       const why = `${p.inBush ? '🌿 IN BUSH' : 'IN THE OPEN'}${Math.abs(p.speed) > 1 ? ' · moving' : ''}${p.equip.has('camonet') && G.time - (p.lastMoving ?? G.time) > 3 ? ' · net' : ''}`;
-      if (sinceFire < 5) { st.textContent = `${why} — CAMO ${cam}% (firing: revealed ${(5 - sinceFire).toFixed(1)}s) · seen within ~${vr} m`; st.className = 'status revealed'; }
+      if (p.isArtillery) { st.textContent = artilleryStatus; st.className = 'status ' + (p.spadeDeployment >= 0.96 ? 'hidden' : 'revealed'); }
+      else if (sinceFire < 5) { st.textContent = `${why} — CAMO ${cam}% (firing: revealed ${(5 - sinceFire).toFixed(1)}s) · seen within ~${vr} m`; st.className = 'status revealed'; }
       else if (p.inBush || cam >= 30) { st.textContent = `${why} — CAMO ${cam}% · seen within ~${vr} m (always within 50 m)`; st.className = 'status hidden'; }
-      else if (!p.isArtillery) { st.textContent = ''; st.className = 'status'; }
+      else { st.textContent = ''; st.className = 'status'; }
     }
     this.$('h-spotted').style.display = p.alive && p.spotted[1] ? 'block' : 'none';
     // damage direction
