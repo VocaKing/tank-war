@@ -73,15 +73,16 @@ export class Tank {
     if (!this.alive) return;
     const s = this.spec, d = s.dims, W = this.game.world, T = W.terrain;
     this.equip.update(dt); if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
-    if (this.trackRepair > 0) { this.trackRepair -= dt; if (this.trackRepair <= 0) { this.modules.tracks = 1; if (this.isPlayer) this.game.hud.message('Tracks repaired', '#9fd39f'); } }
+    if (this.trackRepair > 0) { this.trackRepair -= dt; if (this.trackRepair <= 0) { this.modules[this.mobilityModule] = 1; if (this.isPlayer) this.game.hud.message(this.mobilityLabel + ' repaired', '#9fd39f'); } }
+    if (this.apsCooldown > 0) this.apsCooldown = Math.max(0, this.apsCooldown - dt);
     if (this.burning > 0) { this.burning -= dt; this.damage(this.maxHp * 0.012 * dt, this.lastAttacker, 'fire'); if (!this.alive) return; }
-    const mobile = this.modules.tracks > 0;
+    const mobile = this.modules[this.mobilityModule] > 0;
     const driver = this.crewAlive('Driver') ? 1 : 0.65;
     const thr = clamp(this.input.throttle, -1, 1), steer = clamp(this.input.steer, -1, 1);
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
     const hf = W.groundHeight(this.pos.x + fx * d.L * 0.4, this.pos.z + fz * d.L * 0.4), hb = W.groundHeight(this.pos.x - fx * d.L * 0.4, this.pos.z - fz * d.L * 0.4);
     const grade = (hf - hb) / (d.L * 0.8);
-    const ptw = s.power / s.mass;
+    const ptw = s.power / this.activeMass;
     // Use the commanded direction immediately when changing gears; speed inertia must not
     // keep applying the old uphill penalty while the player is trying to reverse.
     const dir = Math.abs(thr) > 0.1 ? Math.sign(thr) : Math.abs(this.speed) > 0.2 ? Math.sign(this.speed) : 0;
@@ -92,20 +93,21 @@ export class Tank {
     const slopeF = uphill > 0 ? clamp(1 - uphill * 0.9 * climbFactor, 0.25, 1) : 1 + Math.min(0.25, -uphill * 0.8);
     const wl = T.waterLevel(this.pos.x, this.pos.z); const depth = wl - this.groundY; this.inWater = depth > 0.15;
     // Deep water remains a meaningful slowdown, but must not reduce either gear to a crawl.
-    const waterF = depth > 0 ? clamp(1 - depth * 0.18, 0.5, 1) : 1;
+    const waterF = s.amphibious ? 1 : depth > 0 ? clamp(1 - depth * 0.18, 0.5, 1) : 1;
     const ri = T.x2i(this.pos.x), rj = T.x2i(this.pos.z); const onRoad = T.inside(ri, rj) ? T.road[T.idx(ri, rj)] : 0;
-    const terrF = 0.78 + 0.22 * Math.min(1, onRoad * 1.5);
+    const terrF = s.runningGear === 'wheels' ? (onRoad > 0.12 ? (0.88 + 0.34 * Math.min(1, onRoad)) * (s.roadSpeedMult || 1) : (s.offRoadSpeedMult || 0.72)) : 0.78 + 0.22 * Math.min(1, onRoad * 1.5);
     const od = this.equip.active('overdrive'); const lf = this.equip.factor;
-    const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1) * (this.abilities ? this.abilities.speedMult : 1);
+    const vmax = ((thr >= 0 ? this.activeMaxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1) * (this.abilities ? this.abilities.speedMult : 1);
     let target = mobile ? thr * vmax * slopeF * waterF * terrF : 0;
-    if (s.artillery) {
+    if (this.usesSpade()) {
       if ((Math.abs(thr) > 0.08 || Math.abs(steer) > 0.10) && this.spadeState !== 'stowed') this.setSpade(false);
-      if (this.spadeState !== 'stowed') target = 0; // hold the chassis still until the spade is fully retracted
+      if (this.spadeState !== 'stowed') target = 0; // hold the chassis still until the brace/spade is fully retracted
     }
+    if (s.artillery?.autoDeploy && this.autoArtilleryState !== 'stowed') target = 0;
     const light = s.cls === 'Light' ? 2.4 : 1; const accel = clamp(ptw * 0.075, 0.6, 2.2) * light * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
     const braking = Math.sign(target) !== Math.sign(this.speed) || Math.abs(target) < Math.abs(this.speed);
     this.speed = approach(this.speed, target, (braking ? (mobile ? 3.0 : 6) : accel) * dt);
-    const vmaxF = (s.maxSpeed / 3.6) * lf;
+    const vmaxF = (this.activeMaxSpeed / 3.6) * lf;
     const turnMax = s.hullTraverse * DEG * driver * (mobile ? 1 : 0) * (1 - 0.45 * Math.min(1, Math.abs(this.speed) / vmaxF)) * (this.inWater ? 0.8 : 1);
     // A/D always mean left/right relative to the hull, including while reversing or sliding.
     const turnTarget = steer * turnMax;
@@ -125,8 +127,10 @@ export class Tank {
     this.updateTurret(dt);
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
     if (this.abilities) this.abilities.update(dt);
-    if (s.artillery) this.updateSpade(dt, time);
-    this.recoil = Math.max(0, this.recoil - dt * (s.artillery?.recoilRecovery || 1.2));
+    if (this.usesSpade()) this.updateSpade(dt, time);
+    if (s.artillery?.autoDeploy) this.updateAutoArtillery(dt, time);
+    if (this.burstLeft > 0) { this.burstTimer -= dt; if (this.burstTimer <= 0 && this.reloadLeft <= 0) this.fireBurstRound(time); }
+    this.recoil = Math.max(0, this.recoil - dt * (s.artillery?.recoilRecovery || s.recoilBrace?.recoilRecovery || 1.2));
     // hull rocking spring (firing / braking)
     const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
     this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
