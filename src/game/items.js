@@ -41,7 +41,11 @@ export class Equipment {
     let msg = '';
     if (s.id === 'repair') {
       const broken = Object.entries(t.modules).filter(([, v]) => v < 1).map(([k]) => k); if (!broken.length) return [false, 'Nothing to repair'];
-      for (const k of broken) t.modules[k] = 1; t.trackRepair = 0; msg = 'Repaired: ' + broken.join(', ');
+      for (const k of broken) {
+        if (k === 'tracks') t.repairTracks();
+        else t.modules[k] = 1;
+      }
+      msg = 'Repaired: ' + broken.join(', ');
     } else if (s.id === 'medkit') {
       const dead = t.crew.filter((c) => !c.alive); if (!dead.length) return [false, 'Crew is fine'];
       for (const c of dead) c.alive = true; msg = 'Crew healed: ' + dead.map((c) => c.role).join(', ');

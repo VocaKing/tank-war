@@ -11,6 +11,7 @@ import { GRAVITY } from './physics.js';
 
 export { GRAVITY };
 let NEXT_ID = 1;
+const TRACK_REPAIR_TIME = 9;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
 export function ballisticAngle(v, R, dy) {
@@ -32,7 +33,8 @@ export class Tank {
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.dispersionProgress = 0; this.yawRate = 0; this.recoil = 0;
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
-    this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
+    this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 };
+    this.trackRepairs = [0, 0]; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
     this.input = { throttle: 0, steer: 0, brake: false, driveHeld: false, aim: new THREE.Vector3() };
     this.hullAiming = false;
@@ -97,11 +99,13 @@ export class Tank {
     if (!this.alive) return;
     this.equip.update(dt);
     if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
-    if (this.trackRepair > 0) {
-      this.trackRepair -= dt;
-      if (this.trackRepair <= 0) {
-        this.modules.tracks = 1;
-        if (this.isPlayer) this.game.hud.message('Tracks repaired', '#9fd39f');
+    if (this.modules.tracks < 1) {
+      const previous = this.modules.tracks;
+      this.trackRepairs[0] = Math.max(0, this.trackRepairs[0] - dt);
+      this.trackRepairs[1] = Math.max(0, this.trackRepairs[1] - dt);
+      this.updateTrackCondition();
+      if (this.isPlayer && this.modules.tracks > previous) {
+        this.game.hud.message(this.modules.tracks === 1 ? 'Tracks repaired' : 'One track repaired', '#9fd39f');
       }
     }
     if (this.burning > 0) {
@@ -117,7 +121,9 @@ export class Tank {
   updateAfterMotion(dt) {
     if (this.alive) {
       const half = (this.spec.dims.W - this.spec.dims.trackW) / 2;
-      updateRunningGear(this.model, (this.speed + this.turnRate * half) * dt, (this.speed - this.turnRate * half) * dt);
+      updateRunningGear(this.model,
+        this.trackRepairs[0] > 0 ? 0 : (this.speed + this.turnRate * half) * dt,
+        this.trackRepairs[1] > 0 ? 0 : (this.speed - this.turnRate * half) * dt);
       this.moved += Math.abs(this.speed) * dt;
       this.updateDispersion(dt);
       this.updateTurret(dt);
@@ -304,14 +310,16 @@ export class Tank {
     g.onKill(attacker, this, cause);
   }
   // apply a resolved hit (penetration or HE blast) with module & crew effects
-  applyPenetration(hit, shellSpec, attacker, dmg) {
+  applyPenetration(hit, shellSpec, attacker, dmg, trackHit = false) {
     const g = this.game; const r = g.rng; const msgs = [];
     const L = this.spec.dims.L; const lz = hit.local.z;
     if (hit.part === 'hull') {
       if ((this.spec.engineZone === 'rear' && (lz < -L * 0.22 || hit.face === 'rear')) || (this.spec.engineZone === 'front' && (lz > L * 0.22 || hit.face === 'front'))) { if (this.modules.engine === 1) msgs.push('Engine damaged'); this.modules.engine = 0.5; if (r.next() < 0.22) { this.burning = 7; msgs.push('Fire!'); } }
       const ar = this.spec.ammoRack;
       if (!ar.turretBustle && lz > ar.zMin && lz < ar.zMax && hit.local.y < ar.yMax && r.next() < ar.chance * (shellSpec.type === 'HEAT' ? 1.3 : 1)) { this.damage(this.hp + 1, attacker, 'ammo'); return ['AMMO RACK DETONATED']; }
-      if (hit.tracks || hit.local.y < this.spec.dims.clearance + 0.5) { this.breakTracks(); msgs.push('Tracks destroyed'); }
+      if (trackHit || hit.local.y < this.spec.dims.clearance + 0.5) {
+        msgs.push(this.breakTracks(hit.sideSign || Math.sign(hit.local.x)));
+      }
     } else {
       if (hit.face === 'front' && r.next() < 0.35) { if (this.modules.gun === 1) msgs.push('Gun damaged'); this.modules.gun = 0.5; }
       if ((hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
@@ -322,7 +330,25 @@ export class Tank {
     this.damage(dmg, attacker, 'pen');
     return msgs;
   }
-  breakTracks() { this.modules.tracks = 0; this.trackRepair = 9; }
+  get brokenTrackSide() {
+    if (this.modules.tracks !== 0.5) return 0;
+    return this.trackRepairs[0] > 0 ? -1 : 1;
+  }
+  updateTrackCondition() {
+    this.modules.tracks = (Number(this.trackRepairs[0] === 0) + Number(this.trackRepairs[1] === 0)) / 2;
+  }
+  breakTracks(side = 0) {
+    if (side <= 0) this.trackRepairs[0] = TRACK_REPAIR_TIME;
+    if (side >= 0) this.trackRepairs[1] = TRACK_REPAIR_TIME;
+    this.updateTrackCondition();
+    if (side < 0) return 'Left track broken';
+    if (side > 0) return 'Right track broken';
+    return 'Both tracks broken';
+  }
+  repairTracks() {
+    this.trackRepairs.fill(0);
+    this.updateTrackCondition();
+  }
 }
 
 // slab test: returns {t, axis, sign} where sign is outward direction of entered face

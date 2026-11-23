@@ -191,7 +191,7 @@ export class BattlefieldPhysics {
     const damping = 2 * springMass * SPRING_FREQUENCY * 0.94;
     const maxImpulse = springMass * GRAVITY * 5 * dt;
     const side = (d.W - d.trackW) / 2;
-    let load = 0;
+    let load = 0, leftLoad = 0;
     let support = 0;
     for (const x of [-side, side]) for (const station of STATIONS) {
       _origin.set(x, ANCHOR_HEIGHT, station * d.L).applyQuaternion(tank.quat).add(tank.pos);
@@ -208,6 +208,7 @@ export class BattlefieldPhysics {
       if (!impulse) continue;
       support++;
       load += impulse;
+      if (x < 0) leftLoad += impulse;
       _impulse.copy(_contactNormal).multiplyScalar(impulse);
       _normal.add(_impulse);
       _forceSum.add(_impulse);
@@ -227,15 +228,18 @@ export class BattlefieldPhysics {
     tank.airborne = false;
     body.applyImpulse(_forceSum, true);
     body.applyTorqueImpulse(_momentSum, true);
-    this.applyTraction(vehicle, load, waterDepth);
+    this.applyTraction(vehicle, load, leftLoad, waterDepth);
   }
 
-  applyTraction(vehicle, load, waterDepth) {
+  applyTraction(vehicle, load, leftLoad, waterDepth) {
     const { tank, body, mass, inertiaYaw } = vehicle;
     const s = tank.spec, dt = PHYSICS_STEP, input = tank.input, T = this.battlefield.terrain;
-    const mobile = tank.alive && tank.modules.tracks > 0;
+    const mobile = tank.alive && tank.modules.tracks === 1;
+    const brokenSide = tank.alive ? tank.brokenTrackSide : 0;
+    const intactLoad = brokenSide === -1 ? load - leftLoad : brokenSide === 1 ? leftLoad : 0;
+    const canPivot = intactLoad > 0 && !input.brake;
     const throttle = mobile ? clamp(input.throttle, -1, 1) : 0;
-    const steer = mobile ? clamp(input.steer, -1, 1) : 0;
+    const steer = mobile || canPivot ? clamp(input.steer, -1, 1) : 0;
     const driver = tank.crewAlive('Driver') ? 1 : 0.65;
     const fullSpeed = s.maxSpeed / 3.6, water = clamp(1 - Math.max(0, waterDepth) * 0.38, 0.2, 1);
     const i = T.x2i(tank.pos.x), j = T.x2i(tank.pos.z);
@@ -252,12 +256,24 @@ export class BattlefieldPhysics {
     _tangent.copy(_forward).addScaledVector(_normal, -_forward.dot(_normal)).normalize();
     _side.crossVectors(_normal, _tangent).normalize();
     const longitudinal = tank.vel.dot(_tangent), sideways = tank.vel.dot(_side);
+    const turnMax = s.hullTraverse * DEG * driver * (1 - 0.45 * Math.min(1, Math.abs(tank.speed) / fullSpeed)) *
+      (tank.inWater ? 0.6 : 1);
+    // A damaged track can serve as a pivot after the hull slows down. The intact track supplies the grip.
+    const pivotMax = canPivot ? turnMax * 0.25 * engine * clamp((2 - Math.abs(longitudinal)) / 1.55, 0, 1) : 0;
+    const turnLimit = mobile ? turnMax : pivotMax;
+    tank.hullAiming = !!(s.fixedGun && turnLimit > 0 && !input.driveHeld && !throttle && !steer);
+    const aimError = tank.hullAiming ? tank.fixedGunHeadingError() : 0;
+    const commanded = tank.hullAiming ? clamp(aimError / 0.12, -turnLimit, turnLimit) :
+      steer * turnLimit * (mobile && longitudinal < -0.3 ? -1 : 1);
+    // Keep the disabled side nearly stationary as the hull swings around it.
+    const pivotSpeed = brokenSide ? commanded * brokenSide * (s.dims.W - s.dims.trackW) / 2 : 0;
     const holding = !throttle && Math.abs(longitudinal) < 0.45;
     const neutralBrake = holding ? 6 : 0.75 + Math.abs(longitudinal) * 0.07;
     const driveBrake = throttle * longitudinal < 0 ? 5 : 3.2;
     const brake = input.brake || !mobile ? 7 : (throttle ? driveBrake : neutralBrake);
-    const speedError = throttle * speedLimit - longitudinal;
-    const acceleration = throttle && Math.sign(speedError) === Math.sign(throttle) ? driveLimit : brake;
+    const speedError = throttle * speedLimit + pivotSpeed - longitudinal;
+    const acceleration = pivotSpeed ? intactLoad * grip * 0.35 / (mass * dt) :
+      throttle && Math.sign(speedError) === Math.sign(throttle) ? driveLimit : brake;
     // The drivetrain brakes at low speed on grades. At speed the slope supplies acceleration.
     const parkAssist = holding ? GRAVITY * _tangent.y : 0;
     const drive = clamp(speedError / dt + parkAssist, -acceleration, acceleration) * mass * dt;
@@ -267,14 +283,9 @@ export class BattlefieldPhysics {
     _scrub.clampLength(0, maxTraction);
     body.applyImpulse(_scrub, true);
 
-    const turnMax = s.hullTraverse * DEG * driver * (1 - 0.45 * Math.min(1, Math.abs(tank.speed) / fullSpeed)) *
-      (tank.inWater ? 0.6 : 1);
     const angularSpeed = _angular.dot(_normal);
-    tank.hullAiming = !!(s.fixedGun && mobile && !input.driveHeld && !throttle && !steer);
-    const aimError = tank.hullAiming ? tank.fixedGunHeadingError() : 0;
-    const commanded = tank.hullAiming ? clamp(aimError / 0.12, -turnMax, turnMax) :
-      steer * turnMax * (longitudinal < -0.3 ? -1 : 1);
-    const torqueLimit = maxTraction * s.dims.W * (mobile ? 0.53 : 0.82);
+    const turnTraction = commanded && !mobile ? intactLoad * grip : maxTraction;
+    const torqueLimit = turnTraction * s.dims.W * (mobile ? 0.53 : 0.82);
     const response = tank.hullAiming ? 0.085 : steer ? 0.105 : 0.065;
     const torque = clamp((commanded - angularSpeed) * dt / response * inertiaYaw, -torqueLimit, torqueLimit);
     body.applyTorqueImpulse(_impulse.copy(_normal).multiplyScalar(torque), true);

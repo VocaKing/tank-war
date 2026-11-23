@@ -5,7 +5,7 @@ import { SHELL_TYPES, penAtRange, PEN_RNG } from './tankData.js';
 import { GRAVITY } from './tank.js';
 import { clamp } from '../util.js';
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _blastLocal = new THREE.Vector3();
 // Water never makes a tank immune: a shell that enters water keeps flying and loses penetration per metre of water
 // it travels through (kinetic rounds −12 %/m, HEAT jets −30 %/m), down to a floor of 35 % / 25 %.
 export function waterPenFactor(type, metres) { return type.heat ? Math.max(0.25, 1 - 0.3 * metres) : Math.max(0.35, 1 - 0.12 * metres); }
@@ -61,7 +61,11 @@ export class Ballistics {
     for (const t of g.tanks) { if (!t.alive) continue; const d = t.pos.distanceTo(p) - t.spec.dims.W * 0.5; if (d > R) continue;
       const top = t.spec.armor.hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
       if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
-      if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) t.breakTracks(); }
+      if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) {
+        const x = _blastLocal.copy(p).applyMatrix4(t.inv).x;
+        t.breakTracks(Math.abs(x) < t.spec.dims.trackW / 2 ? 0 : Math.sign(x));
+      }
+    }
   }
   // returns true if the shell is consumed
   onImpact(s, kind, p, tank, hit) {
@@ -92,7 +96,7 @@ export class Ballistics {
     if (roll >= ev.eff) {
       const mult = s.type.he ? 1.0 : 1.0; const dmg = s.spec.damage * mult * g.rng.range(0.85, 1.15);
       g.effects.penetration(p); g.audio.impact(p, 'metal');
-      const msgs = tank.applyPenetration(hit, s.spec, shooter, dmg);
+      const msgs = tank.applyPenetration(hit, s.spec, shooter, dmg, ev.tracks);
       if (shooter && shooter.team !== tank.team) shooter.stats.pens++;
       if (fromPlayer) g.hud.hitMarker('pen', Math.round(dmg), msgs, tank); if (toPlayer) g.hud.damageFrom(shooter, Math.round(dmg), msgs.join(', '));
       if (he) this.heBlast(s, p);
@@ -104,7 +108,10 @@ export class Ballistics {
     if (he) { dmg = s.spec.damage * 0.45 * clamp(1 - ev.eff / (s.spec.caliber * 1.2), 0, 1); if (dmg > 1) tank.damage(dmg, shooter, 'he'); g.effects.impactGround(p, s.spec.caliber, true);
       // HE/HESH blast wrecks external modules even without penetrating
       if (tank.alive && g.rng.next() < 0.4) { const m = ['gun', 'turret', 'engine'][Math.floor(g.rng.next() * 3)]; if (tank.modules[m] === 1) { tank.modules[m] = 0.5; if (toPlayer) g.hud.message(m[0].toUpperCase() + m.slice(1) + ' damaged by HE blast', '#ffb060'); } } }
-    if (ev.tracks && g.rng.next() < 0.45) { tank.breakTracks(); if (toPlayer) g.hud.message('Tracks destroyed! Repairing…', '#ffb060'); }
+    if (tank.alive && ev.tracks && g.rng.next() < 0.45) {
+      const message = tank.breakTracks(hit.sideSign);
+      if (toPlayer) g.hud.message(message + ' · Repairing…', '#ffb060');
+    }
     if (fromPlayer) g.hud.hitMarker(dmg > 1 ? 'blast' : 'nonpen', Math.round(dmg)); if (toPlayer) g.hud.damageFrom(shooter, Math.round(dmg), dmg > 1 ? 'HE blast' : 'Hit – not penetrated');
     return true;
   }

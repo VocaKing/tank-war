@@ -123,9 +123,10 @@ export class HUD {
     // vehicle panel
     if (doPanel) {
     const s = p.spec; const mod = (k, label) => `<span class="mod ${p.modules[k] >= 1 ? 'ok' : p.modules[k] > 0 ? 'dmg' : 'dead'}">${label}</span>`;
+    const trackStatus = p.trackRepairs.map((time, i) => time > 0 ? `${i === 0 ? 'L' : 'R'} ${Math.ceil(time)}s` : '').filter(Boolean).join(' · ');
     this.$('h-veh').innerHTML = `<div class="vn">${s.short} <small>${s.nation} · ${s.era}</small></div>
       <div class="hpwrap"><div class="hpbar"><i style="width:${p.hp / p.maxHp * 100}%"></i><span>${Math.ceil(p.hp)} / ${p.maxHp}</span></div>${(p.abilities && p.abilities.magazine) ? `<div class="magfan" title="magazine">${Array.from({length: p.abilities.magazine.size}, (_, i) => `<i class="${i < p.abilities.magLeft ? 'on' : ''}"></i>`).join('')}</div>` : ''}</div>
-      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod('tracks', p.trackRepair > 0 ? 'TRACKS ' + Math.ceil(p.trackRepair) + 's' : 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
+      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod('tracks', trackStatus || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`;
     // equipment slots (keys 4/5/6)

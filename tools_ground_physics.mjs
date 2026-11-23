@@ -124,4 +124,29 @@ for (const steer of [-0.6, 0.6]) {
   physics.free();
 }
 
-console.log('Rapier downhill steering, fixed timestep, airborne inertia, contacts, and bridge checks passed.');
+for (const brokenSide of [-1, 1]) {
+  for (const steer of [-1, 1]) {
+    const { physics, spawn } = makeWorld(() => 0);
+    const tank = spawn(0, 0);
+    tank.modules.tracks = 0.5;
+    tank.brokenTrackSide = brokenSide;
+    tank.input.steer = steer;
+    for (let i = 0; i < 240; i++) physics.advance(PHYSICS_STEP);
+    assert.ok(tank.heading * steer > 0.2 && tank.heading * steer < 0.3, tank.heading);
+    assert.ok(tank.pos.z * brokenSide * steer > 0.1, 'the hull arcs around the disabled side');
+    assert.ok(Math.abs(tank.speed) < 0.4);
+    physics.free();
+  }
+}
+
+{
+  const { physics, spawn } = makeWorld(() => 0);
+  const tank = spawn(0, 0);
+  tank.modules.tracks = 0;
+  tank.input.steer = tank.input.throttle = 1;
+  for (let i = 0; i < 240; i++) physics.advance(PHYSICS_STEP);
+  assert.ok(Math.abs(tank.heading) < 0.01 && tank.pos.length() < 0.1);
+  physics.free();
+}
+
+console.log('Rapier downhill, airborne, collision, bridge, and damaged-track steering checks passed.');
