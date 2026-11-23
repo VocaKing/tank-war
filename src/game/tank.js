@@ -11,10 +11,11 @@ export const GRAVITY = 9.81;
 let NEXT_ID = 1;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
-export function ballisticAngle(v, R, dy) {
+export function ballisticAngle(v, R, dy, highArc = false) {
   const g = GRAVITY; const v2 = v * v; const disc = v2 * v2 - g * (g * R * R + 2 * dy * v2);
-  if (disc < 0 || R < 0.01) return Math.atan2(dy, Math.max(R, 0.01)) + 0.0;
-  return Math.atan((v2 - Math.sqrt(disc)) / (g * R));
+  if (disc < 0 || R < 0.01) return Math.atan2(dy, Math.max(R, 0.01));
+  const root = Math.sqrt(disc);
+  return Math.atan((v2 + (highArc ? root : -root)) / (g * R));
 }
 
 export class Tank {
@@ -29,6 +30,7 @@ export class Tank {
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0; this.rock = 0; this.rockV = 0;
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.bloom = 3; this.yawRate = 0; this.recoil = 0;
+    this.spadeProgress = 0; this.spadeState = 'stowed'; this.pendingFire = false;
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
     this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 }; this.trackRepair = 0; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
@@ -48,7 +50,7 @@ export class Tank {
   }
   crewAlive(role) { const c = this.crew.find((m) => m.role === role); return c ? c.alive : true; }
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
-  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
+  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= s.artillery ? 0.9 : 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
   // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
   baseDispersion() { let d = Math.atan(Math.max(MIN_DISPERSION_100M,this.spec.dispersion) / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
@@ -81,6 +83,10 @@ export class Tank {
     const od = this.equip.active('overdrive'); const lf = this.equip.factor;
     const vmax = ((thr >= 0 ? s.maxSpeed : s.reverseSpeed) / 3.6) * (this.modules.engine < 1 ? 0.5 : 1) * driver * lf * (od ? 1.2 : 1) * (this.abilities ? this.abilities.speedMult : 1);
     let target = mobile ? thr * vmax * slopeF * waterF * terrF : 0;
+    if (s.artillery) {
+      if ((Math.abs(thr) > 0.08 || Math.abs(steer) > 0.10) && this.spadeState !== 'stowed') this.setSpade(false);
+      if (this.spadeState !== 'stowed') target = 0; // hold the chassis still until the spade is fully retracted
+    }
     if (uphill > 0.75) target = Math.min(target, 0) - 0.5; // too steep: slide back
     const light = s.cls === 'Light' ? 2.4 : 1; const accel = clamp(ptw * 0.075, 0.6, 2.2) * light * (this.modules.engine < 1 ? 0.5 : 1) * lf * (od ? 1.35 : 1);
     const braking = Math.sign(target) !== Math.sign(this.speed) || Math.abs(target) < Math.abs(this.speed);
@@ -104,7 +110,8 @@ export class Tank {
     this.updateTurret(dt);
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
     if (this.abilities) this.abilities.update(dt);
-    this.recoil = Math.max(0, this.recoil - dt * 1.2);
+    if (s.artillery) this.updateSpade(dt, time);
+    this.recoil = Math.max(0, this.recoil - dt * (s.artillery?.recoilRecovery || 1.2));
     // hull rocking spring (firing / braking)
     const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
     this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
@@ -113,7 +120,7 @@ export class Tank {
     const s = this.spec; const aim = this.input.aim; const gunW = this.model.gun.getWorldPosition(_v);
     const dx = aim.x - gunW.x, dy = aim.y - gunW.y, dz = aim.z - gunW.z; const R = Math.hypot(dx, dz);
     if (!Number.isFinite(dx + dy + dz)) return; // ignore an invalid aim point instead of poisoning the turret state
-    const th = ballisticAngle(this.shell.velocity, R, dy);
+    const th = ballisticAngle(this.shell.velocity, R, dy, !!s.artillery?.highArc);
     _v2.set((dx / (R || 1)) * Math.cos(th), Math.sin(th), (dz / (R || 1)) * Math.cos(th));
     _q.copy(this.quat).invert(); _v2.applyQuaternion(_q);
     const yawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
@@ -146,10 +153,54 @@ export class Tank {
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
     m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
+    if (m.spade) m.spade.rotation.x = (1 - this.spadeProgress) * Math.PI / 2;
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
+  }
+  setSpade(deploy) {
+    if (!this.spec.artillery) return false;
+    if (deploy) {
+      if (Math.abs(this.speed) > 0.35 || Math.abs(this.turnRate) > 0.035) {
+        if (this.isPlayer) this.game.hud.message('Stop the vehicle before deploying the stabilizer spade', '#ffbd70');
+        return false;
+      }
+      if (this.spadeState === 'stowed' || this.spadeState === 'retracting') this.spadeState = 'deploying';
+    } else {
+      if (this.spadeState !== 'stowed') { this.spadeState = 'retracting'; this.pendingFire = false; }
+    }
+    return true;
+  }
+  toggleSpade() {
+    if (!this.spec.artillery) return false;
+    const deploy = this.spadeState === 'stowed' || this.spadeState === 'retracting';
+    return this.setSpade(deploy);
+  }
+  updateSpade(dt, time) {
+    const a = this.spec.artillery;
+    if (this.spadeState === 'deploying') {
+      this.spadeProgress = Math.min(1, this.spadeProgress + dt / a.spadeDeploySeconds);
+      if (this.spadeProgress >= 1) { this.spadeState = 'deployed'; if (this.isPlayer) this.game.hud.message('Stabilizer spade locked · artillery ready', '#a9dca8'); }
+    } else if (this.spadeState === 'retracting') {
+      this.spadeProgress = Math.max(0, this.spadeProgress - dt / a.spadeRetractSeconds);
+      if (this.spadeProgress <= 0) { this.spadeState = 'stowed'; if (this.isPlayer) this.game.hud.message('Stabilizer spade retracted', '#c8c8c8'); }
+    }
+    if (this.model.spade) this.model.spade.rotation.x = (1 - this.spadeProgress) * Math.PI / 2;
+    if (this.pendingFire && this.spadeState === 'deployed' && this.reloadLeft <= 0 && this.speed < 0.3 && this.aimError < 0.03) {
+      this.pendingFire = false; this.tryFire(time);
+    }
   }
   tryFire(time) {
     if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
+    if (this.spec.artillery && this.spadeState !== 'deployed') {
+      if (!this.setSpade(true)) return false;
+      this.pendingFire = true;
+      if (this.isPlayer) this.game.hud.message('Deploying stabilizer spade · shot queued', '#ffcf78');
+      return false;
+    }
+    if (this.spec.artillery && (Math.abs(this.speed) > 0.3 || Math.abs(this.turnRate) > 0.025)) {
+      if (this.isPlayer) this.game.hud.message('Artillery must be stationary to fire', '#ffbd70');
+      return false;
+    }
+    this.pendingFire = false;
     const g = this.game; const sh = this.shell; const m = this.model;
     const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3()); const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
     // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
@@ -171,7 +222,7 @@ export class Tank {
     if (this.abilities) this.abilities.onFire();
     // Firing retains visual recoil, but does not inject a jump into the linear dispersion curve.
     this.recoil = 1;
-    this.rockV -= (sh.caliber / 100) * 1.4 * (40 / this.spec.mass) * Math.cos(this.turretYaw);
+    this.rockV -= (sh.caliber / 100) * (this.spec.artillery ? 2.0 : 1.4) * (40 / this.spec.mass) * Math.cos(this.turretYaw);
     g.effects.muzzle(muzzle, dir, sh.caliber); g.audio.gun(muzzle, sh.caliber, this.isPlayer);
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
     return true;
