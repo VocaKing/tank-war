@@ -34,3 +34,5 @@ jobs:
         run: node tools_spg.mjs http://127.0.0.1:5173/
       - name: Verify live balance dispersion and river mobility
         run: node tools_dispersion_mobility.mjs http://127.0.0.1:5173/
+      - name: Verify ten specialist vehicle systems
+        run: node tools_vehicle_systems.mjs http://127.0.0.1:5173/
