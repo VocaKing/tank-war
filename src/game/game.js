@@ -96,6 +96,10 @@ export class Game {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
       if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
       if (e.code === 'KeyE') this.toggleLock();
+      if (e.code === 'KeyB' && p.isArtillery) {
+        if (Math.abs(p.speed) > 0.35) this.hud.message('Stop the vehicle before deploying stabilizers', '#ffb45b');
+        else { p.spadeTarget = p.spadeTarget > 0.5 ? 0 : 1; this.hud.message(p.spadeTarget ? 'Deploying rear stabilizers…' : 'Retracting stabilizers…', '#d8d1ad'); }
+      }
       if (e.code === 'KeyG') { if (p.tryAbility && p.tryAbility()) { /* ok */ } else if (p.abilities && p.abilities.kind) this.hud.message(p.abilities.kind + ' not ready', '#c8c8c8'); }
       const slot = { Digit4: 0, Digit5: 1, Digit6: 2, KeyR: p.equip.find('repair'), KeyF: p.equip.find('extinguisher') }[e.code];
       if (slot !== undefined && slot >= 0) this.useItem(slot);
