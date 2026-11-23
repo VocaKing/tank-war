@@ -15,7 +15,7 @@ small{opacity:.7}
 .tanklist .tier{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);opacity:.85;margin:6px 0 0}
 .tcard em{float:right;font-style:normal;font-size:10px;opacity:.6;font-weight:400;margin-top:4px}
 .tcard,.tbl-btn{background:var(--panel);border:1px solid var(--line);color:#eee;text-align:left;padding:6px 12px;border-radius:6px;backdrop-filter:blur(6px);transition:.15s}
-.tcard b{display:block;font-size:15px}.tcard small{font-size:11px}
+.tcard b{display:block;font-size:15px}.tcard small{font-size:11px}.tcard .tcard-system{display:block;margin-top:3px;color:#d8bb78;font-size:9px;letter-spacing:.035em;line-height:1.2}
 .tcard:hover{border-color:rgba(227,181,74,.6)}.tcard.sel{border-color:var(--acc);background:rgba(60,48,20,.8);box-shadow:0 0 0 1px var(--acc) inset}
 .tbl-btn{margin-top:8px;text-align:center}
 .menutools{position:absolute;left:24px;width:240px;bottom:190px;display:flex;flex-direction:column;gap:6px;z-index:30;pointer-events:auto}
