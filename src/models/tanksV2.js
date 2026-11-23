@@ -628,7 +628,54 @@ function merkava4(d) {
   return { P, ...g, wheelType: 'disc', cast: 0.15, castTurret: 0.1, turretPos: [0, H, d.turretZ], gunPos: [0, 0.38, bz + tl - 1.0], decals: decalsSide('text', '3', 'turret', tw * 0.88 + 0.05, th * 0.4, bz - 1.2, 0.45) };
 }
 
-const V2 = { panther, is2, pershing, centurion, leo1, leo2a6, t90m, chally2, type99a, merkava4 };
+// PzH 2000-inspired artillery builder: long tracked hull, tall enclosed turret and 155 mm howitzer.
+function pzh2000(d) {
+  const P = new Parts(); const hl = d.L / 2, H = d.hullH, c = d.clearance;
+  const g = gear({ n: 7, z0: -2.75, z1: 2.65, r: 0.38, w: 0.52, rollers: [-2.2, -0.75, 0.75, 2.2], ry: 1.08, spr: { z: -hl + 0.42, y: 0.72, r: 0.36 }, idl: { z: hl - 0.42, y: 0.70, r: 0.34 } });
+  const fy = trackTop(g);
+  const prof = [[-hl + 0.20,c],[hl - 0.72,c],[hl,0.98],[hl - 1.62,H],[-hl + 0.12,H],[-hl,H - 0.12],[-hl,c + 0.22]];
+  const inner = hullShell(P,d,prof,fy,{});
+  torsionArms(P,inner,g,c);
+  for (const s of [-1,1]) {
+    K.skirt(P,s * (d.W / 2 + 0.03),fy + 0.02,-hl + 0.25,hl - 0.25,0.58,7,0.055);
+    K.headlight(P,'hull',s * 1.42,H - 0.05,hl - 1.25);
+    K.stowageBox(P,'hull',s * 1.30,H - 0.24,-hl + 0.22,0.72,0.45,0.26);
+    K.towCable(P,'hull',s * 1.25,H - 0.18,-2.0,1.0);
+    K.tools(P,'hull',s * 1.12,H,0.8,s);
+  }
+  // Rear engine deck and large cooling grilles.
+  deckGrilles(P,-1.25,-0.12,H,-hl + 0.25,-hl + 2.15,12);
+  deckGrilles(P,0.12,1.25,H,-hl + 0.25,-hl + 2.15,12);
+  K.hatchRect(P,'hull',-0.72,H,hl - 1.55,0.62,0.58);
+  for(let i=0;i<4;i++) K.periscope(P,'hull',-0.88 + i*0.18,H + 0.02,hl - 1.30,0,0.8);
+  K.antenna(P,'hull',1.25,H,-hl + 1.0,1.8);
+  // Broad, tall, box-like enclosed artillery turret with rear bustle.
+  const tw=d.turretW/2, tl=d.turretL/2, bz=d.turretBoxZ||0, th=d.turretH;
+  turretBody(P,[[-tw+0.18,bz+tl],[tw-0.18,bz+tl],[tw,bz+tl-0.32],[tw,bz-tl+0.30],[tw-0.20,bz-tl],[-tw+0.20,bz-tl],[-tw,bz-tl+0.30],[-tw,bz+tl-0.32]],th,0.97,0.98,bz);
+  P.add('turret','paint',box(tw*1.78,0.40,1.0,0,th*0.54,bz-tl+0.55));
+  P.add('turret','dark',box(tw*1.48,0.04,0.75,0,th*0.54 + 0.22,bz-tl+0.54));
+  for(const s of [-1,1]) {
+    P.add('turret','paint',box(0.16,0.62,1.75,s*(tw+0.04),th*0.46,bz-0.05));
+    K.boltRow(P,'turret',[s*(tw+0.13),th*0.25,bz-0.82],[s*(tw+0.13),th*0.25,bz+0.82],7,0.018,'x');
+    K.smokeDischargers(P,'turret',s*(tw-0.18),th*0.72,bz+0.82,s*Math.PI/2,4,0.10,0.22,0.04);
+  }
+  K.hatch(P,'turret',-0.82,th,bz-0.85,0.34,{periscope:true});
+  K.hatch(P,'turret',0.78,th,bz-0.82,0.34);
+  K.cupola(P,'turret',0.88,th,bz+0.42,0.34,0.20,8,'modern');
+  K.mg(P,'turret',0.88,th+0.34,bz+0.60,0,'mag');
+  K.antenna(P,'turret',-1.28,th,bz-1.15,2.1);
+  K.antenna(P,'turret',1.28,th,bz-1.10,1.7);
+  for(let i=0;i<6;i++) {
+    P.add('turret','metal',box(0.035,0.34,0.035,-1.25+i*0.50,th*0.55,bz-tl-0.12));
+  }
+  // Large-bore howitzer breech and long barrel with a heavy muzzle brake.
+  P.add('gun','paint',box(0.78,0.72,0.68,0,0,0));
+  P.add('gun','rubber',cylZ(0.25,0.38,16,0,0,0.34));
+  K.barrel(P,'barrel',d.gunLen,{r0:0.17,r1:0.135,evac:{z:3.65,r:0.205,len:0.68},sleeve:7,mrs:true});
+  return {P,...g,wheelType:'modern',cast:0.2,castTurret:0.18,turretPos:[0,H,d.turretZ],gunPos:[0,0.48,bz+tl-0.62],decals:decalsSide('text','2000','turret',tw+0.10,0.50,bz-0.65,0.36)};
+}
+
+const V2 = { panther, is2, pershing, centurion, leo1, leo2a6, t90m, chally2, type99a, merkava4, pzh2000 };
 export function buildV2(d, spec) {
   const f = V2[spec && spec.id]; if (!f) throw new Error('No builder for ' + (spec && spec.id));
   return f(d);
