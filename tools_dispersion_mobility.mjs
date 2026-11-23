@@ -38,7 +38,7 @@ const report = await page.evaluate(() => {
   let k = 0, best = -Infinity;
   for (let i = 2; i < pts.length - 2; i++) {
     const [x,z] = pts[i];
-    if (Math.abs(x) > 520 || Math.abs(z) > 520) continue;
+    if (Math.abs(x) > 520 || Math.abs(z) > 520 || g.world.terrain.waterLevel(x,z) < -1e8) continue;
     const fordGap = fords.length ? Math.min(...fords.map(f => Math.hypot(x-f.x,z-f.z))) : 1e6;
     const score = fordGap - Math.abs(z) * 0.02;
     if (score > best) { best = score; k = i; }
