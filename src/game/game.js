@@ -96,7 +96,16 @@ export class Game {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
       if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
       if (e.code === 'KeyE') this.toggleLock();
-      if (!e.repeat && e.code === 'KeyB' && p.spec.artillery) p.toggleSpade();
+      if (!e.repeat && e.code === 'KeyB') {
+        if (p.usesSpade()) p.toggleSpade();
+        else if (p.spec.artillery?.autoDeploy) {
+          if (p.autoArtilleryState === 'stowed' && Math.abs(p.speed) < 0.3) { p.pendingFire = false; p.autoArtilleryState = 'deploying'; p.autoArtilleryTimer = p.spec.artillery.deploySeconds; this.hud.message('Automated firing position deploying', '#ffcf78'); }
+          else if (p.autoArtilleryState === 'deployed') { p.pendingFire = false; p.autoArtilleryState = 'packing'; p.autoArtilleryTimer = p.spec.artillery.packSeconds; }
+        }
+      }
+      if (!e.repeat && e.code === 'KeyV') p.cycleWeaponMode();
+      if (!e.repeat && e.code === 'KeyN') p.cycleArmorPackage();
+      if (!e.repeat && e.code === 'KeyH') p.toggleSuspension();
       if (e.code === 'KeyG') { if (p.tryAbility && p.tryAbility()) { /* ok */ } else if (p.abilities && p.abilities.kind) this.hud.message(p.abilities.kind + ' not ready', '#c8c8c8'); }
       const slot = { Digit4: 0, Digit5: 1, Digit6: 2, KeyR: p.equip.find('repair'), KeyF: p.equip.find('extinguisher') }[e.code];
       if (slot !== undefined && slot >= 0) this.useItem(slot);
