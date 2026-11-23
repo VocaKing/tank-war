@@ -140,16 +140,32 @@ export class Tank {
     const dx = aim.x - gunW.x, dy = aim.y - gunW.y, dz = aim.z - gunW.z; const R = Math.hypot(dx, dz);
     if (!Number.isFinite(dx + dy + dz)) return; // ignore an invalid aim point instead of poisoning the turret state
     const th = ballisticAngle(this.shell.velocity, R, dy, !!s.artillery?.highArc);
+    if (s.casemate) {
+      // Strv 103-style fixed gun: traverse the entire hull and pitch the hull on its
+      // hydraulic suspension. There is deliberately no independent turret movement.
+      const targetHeading = Math.atan2(dx, dz), prevHeading = this.heading;
+      this.heading = wrapAngle(approachAngle(this.heading, targetHeading, s.casemate.hullAimRate * DEG * dt));
+      this.turretYaw = 0; this.yawRate = Math.abs(wrapAngle(this.heading - prevHeading)) / Math.max(dt, 1e-4);
+      const desiredHydro = clamp(th - this.pitch, -s.gunDepression * DEG, s.gunElevation * DEG);
+      this.hydroPitch = approach(this.hydroPitch, desiredHydro, Math.max(0.1, s.casemate.hydroRate || 0) * DEG * dt);
+      this.gunPitch = 0;
+      this.aimError = Math.abs(wrapAngle(targetHeading - this.heading)) + Math.abs(desiredHydro - this.hydroPitch);
+      const moving = Math.abs(this.speed) > 0.001 || Math.abs(this.turnRate) > 0.001;
+      this.bloom = advanceBloom(this.bloom, moving, dt, this.aimTime());
+      if (this.abilities && this.abilities.isStabilized) this.bloom = Math.min(this.bloom, 1.05);
+      return;
+    }
     _v2.set((dx / (R || 1)) * Math.cos(th), Math.sin(th), (dz / (R || 1)) * Math.cos(th));
     _q.copy(this.quat).invert(); _v2.applyQuaternion(_q);
-    const yawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
+    const rawYawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
+    const yawT = s.fireArc ? clamp(wrapAngle(rawYawT), -s.fireArc * DEG, s.fireArc * DEG) : rawYawT;
     const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
     const prev = this.turretYaw; this.turretYaw = wrapAngle(approachAngle(this.turretYaw, yawT, rate * dt));
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
     const minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
     const desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
     this.gunPitch=clamp(approach(this.gunPitch,desiredPitch,s.gunSpeed*DEG*dt),minPitch,s.gunElevation*DEG);
-    this.aimError=Math.abs(wrapAngle(yawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
+    this.aimError=Math.abs(wrapAngle(rawYawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
     // Constant and symmetric rate from fully aimed to maximum bloom.
     // Turning in place is motion too; small numerical residuals are ignored.
     const moving = Math.abs(this.speed) > 0.001 || Math.abs(this.turnRate) > 0.001;
@@ -163,11 +179,11 @@ export class Tank {
     const hl = T.height(this.pos.x + rx * wx, this.pos.z + rz * wx), hr = T.height(this.pos.x - rx * wx, this.pos.z - rz * wx);
     const hc = T.height(this.pos.x, this.pos.z);
     const pitchT = -Math.atan2(hf - hb, lx * 2), rollT = Math.atan2(hl - hr, wx * 2);
-    const yT = Math.max((hf + hb) / 2, (hl + hr) / 2, hc) - 0.02 + (this._rockLift || 0); this._rockLift = 0;
+    const yT = Math.max((hf + hb) / 2, (hl + hr) / 2, hc) - 0.02 + (this._rockLift || 0) + this.suspensionOffset; this._rockLift = 0;
     const k = snap ? 1 : Math.min(1, dt * 9);
     this.pitch += (pitchT - this.pitch) * k; this.roll += (rollT - this.roll) * k; this.groundY = yT;
     if (snap || yT > this.pos.y) this.pos.y = yT; else this.pos.y += (yT - this.pos.y) * Math.min(1, dt * 14);
-    _e.set(this.pitch + this.rock, this.heading, this.roll, 'YXZ'); this.quat.setFromEuler(_e);
+    _e.set(this.pitch + this.hydroPitch + this.rock, this.heading, this.roll, 'YXZ'); this.quat.setFromEuler(_e);
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
