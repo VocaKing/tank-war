@@ -17,11 +17,25 @@ small{opacity:.7}
 .tcard,.tbl-btn{background:var(--panel);border:1px solid var(--line);color:#eee;text-align:left;padding:6px 12px;border-radius:6px;backdrop-filter:blur(6px);transition:.15s}
 .tcard b{display:block;font-size:15px}.tcard small{font-size:11px}
 .tcard:hover{border-color:rgba(227,181,74,.6)}.tcard.sel{border-color:var(--acc);background:rgba(60,48,20,.8);box-shadow:0 0 0 1px var(--acc) inset}
+.tank-ability-labels{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px}
+.tank-ability-label{display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:1.4;color:#f1ede3}
+.ability-badge{display:inline-block;flex-shrink:0;padding:1px 5px;border:1px solid;border-radius:4px;font-size:11px;font-weight:700;line-height:1.35}
+.ability-badge.active{color:#ffdc85;background:#372b17;border-color:#96743b}
+.ability-badge.passive{color:#afe3ef;background:#192f37;border-color:#4d8292}
 .tbl-btn{margin-top:8px;text-align:center}
 .menutools{position:absolute;left:24px;width:240px;bottom:190px;display:flex;flex-direction:column;gap:6px;z-index:30;pointer-events:auto}
 .menutools .tbl-btn{margin:0;width:100%}
-.stats{position:absolute;right:24px;top:20px;width:400px;max-height:calc(100% - 250px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px;backdrop-filter:blur(6px)}
+.stats{position:absolute;right:24px;top:76px;width:400px;max-height:calc(100% - 306px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 18px;backdrop-filter:blur(6px)}
 .stats h2{margin:0 0 2px;font-size:19px;color:var(--acc)}.stats .tag{font-size:12px;opacity:.75}.stats p{font-size:12.5px;line-height:1.4;opacity:.9}
+.vehicle-skills{margin-top:12px}
+.vehicle-skills h3{margin:0 0 6px;font-size:13px;color:#eee7d8}
+.vehicle-skills ul{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.vehicle-skills li{padding:8px 10px;border:1px solid #63532f;border-left:3px solid #e3b54a;border-radius:5px;background:#282114}
+.vehicle-skills li.passive{border-color:#345c66;border-left-color:#76b9cc;background:#16262d}
+.ability-title{display:flex;align-items:center;gap:7px;font-size:14px}
+.vehicle-skills p,.stats .vehicle-skills p{margin:5px 0 4px;font-size:13px;line-height:1.45;opacity:1;color:#eee7da}
+.ability-use{font-size:12px;line-height:1.45;color:#cec9bf}
+.ability-use kbd{display:inline-block;padding:0 4px;border:1px solid #96743b;border-radius:3px;color:#ffdc85;font:inherit;font-weight:700}
 .bar{display:grid;grid-template-columns:120px 1fr 74px;align-items:center;gap:8px;font-size:12px;margin:4px 0}
 .bar div{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#b88a2a,var(--acc))}
 .bar b{text-align:right;font-weight:600}

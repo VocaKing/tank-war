@@ -71,6 +71,8 @@ html.mobile-device .mobile-garage-hint{order:1;display:block;font-size:12px}
 html.mobile-device .menu>#m-balance{order:2;min-height:44px}
 html.mobile-device .menu>.tanklist{order:3;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-height:170px;overflow-y:auto;touch-action:pan-y}
 html.mobile-device .tanklist .tier{grid-column:1/-1}
+html.mobile-device .tank-ability-label{font-size:12px}
+html.mobile-device .menu>#m-mobile-skills{order:4;margin:0}
 html.mobile-device .menu>.mobile-inspect{order:4;min-height:48px}
 html.mobile-device .menu>.bottom{order:5;display:block}
 html.mobile-device .menu .go{width:100%;box-sizing:border-box;padding:10px;background:rgba(12,14,16,.88);gap:6px}
