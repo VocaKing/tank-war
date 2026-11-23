@@ -13,7 +13,7 @@ await page.addInitScript(() => {
     tanks: { tiger: { dispersion: 0.01, aimTime: 1.0 } }
   }));
 });
-await page.goto(`${base}?autostart=1&map=forest&tank=tiger&q=low&seed=1901`);
+await page.goto(`${base}?autostart=1&map=village&tank=tiger&q=low&seed=1944`);
 await page.waitForFunction(() => window.__game && window.__game.player?.spec.id === 'tiger', null, { timeout: 180000 });
 
 const report = await page.evaluate(() => {
@@ -38,9 +38,10 @@ const report = await page.evaluate(() => {
   let k = 0, best = -Infinity;
   for (let i = 2; i < pts.length - 2; i++) {
     const [x,z] = pts[i];
-    if (Math.abs(x) > 520 || Math.abs(z) > 520 || g.world.terrain.waterLevel(x,z) < -1e8) continue;
+    const water = g.world.terrain.waterLevel(x,z), depth = water - g.world.terrain.height(x,z);
+    if (Math.abs(x) > 520 || Math.abs(z) > 520 || water < -1e8 || depth < 0.5) continue;
     const fordGap = fords.length ? Math.min(...fords.map(f => Math.hypot(x-f.x,z-f.z))) : 1e6;
-    const score = fordGap - Math.abs(z) * 0.02;
+    const score = fordGap - Math.abs(z) * 0.05;
     if (score > best) { best = score; k = i; }
   }
   const prev = pts[k - 2], next = pts[k + 2], center = pts[k];
@@ -66,7 +67,7 @@ const report = await page.evaluate(() => {
   p.speed = 0; p.turnRate = 0; p.placeAt(start[0], start[1], heading);
   const before = p.pos.clone();
   g.keys.KeyW = true;
-  g.debug.simulate(8, 1 / 30);
+  g.debug.simulate(20, 1 / 30);
   g.keys.KeyW = false;
   const forwardDelta = (p.pos.x - before.x) * Math.sin(heading) + (p.pos.z - before.z) * Math.cos(heading);
   const forwardState = { delta: forwardDelta, speed: p.speed, turnRate: p.turnRate, x: p.pos.x, z: p.pos.z, groundY: p.groundY, inWater: p.inWater };
@@ -74,12 +75,12 @@ const report = await page.evaluate(() => {
   p.speed = 0; p.turnRate = 0; p.placeAt(start[0], start[1], heading);
   const backStart = p.pos.clone();
   g.keys.KeyS = true;
-  g.debug.simulate(8, 1 / 30);
+  g.debug.simulate(12, 1 / 30);
   g.keys.KeyS = false;
   const reverseDelta = -((p.pos.x - backStart.x) * Math.sin(heading) + (p.pos.z - backStart.z) * Math.cos(heading));
   return {
     balance: { specDispersion, baseDispersion, currentDispersion, expected, maxShotDeviation: Math.max(...deviations), minShotDeviation: Math.min(...deviations) },
-    river: { center: start, width: river.width, profile, forwardState, turnState, reverseDelta },
+    river: { center: start, width: river.width, profile, centerWaterDepth: g.world.terrain.waterLevel(start[0],start[1]) - g.world.terrain.height(start[0],start[1]), forwardState, turnState, reverseDelta },
     errors: []
   };
 });
@@ -89,7 +90,7 @@ console.log(JSON.stringify(report, null, 2));
 assert.equal(report.balance.specDispersion, 0.01, 'local balance dispersion did not reach the live tank spec');
 assert.ok(Math.abs(report.balance.baseDispersion - report.balance.expected) < 1e-10, 'base dispersion did not use the configured value');
 assert.ok(report.balance.maxShotDeviation <= report.balance.expected * 1.00001, 'actual shot deviation exceeded configured cone');
-assert.ok(report.river.forwardState.delta > 3, 'tank could not make forward progress across the river section');
+assert.ok(report.river.forwardState.delta > 8, 'tank could not climb out of the deep river channel');
 assert.ok(Math.abs(report.river.turnState.degrees) > 5, 'tank could not turn while in the river section');
-assert.ok(report.river.reverseDelta > 2, 'tank could not reverse away from the river bank');
+assert.ok(report.river.reverseDelta > 4, 'tank could not reverse away from the deep river bank');
 assert.equal(report.errors.length, 0, 'browser runtime errors detected');
