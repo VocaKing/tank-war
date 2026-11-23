@@ -24,7 +24,7 @@ export class HUD {
       <div class="panel items" id="h-items"></div>
       <div class="panel ammo" id="h-ammo"></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire · B deploy/retract SPG spades<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
@@ -141,11 +141,15 @@ export class HUD {
     const st = this.$('h-status'); const sinceFire = G.time - p.lastFired;
     if (!p.alive) { st.textContent = ''; st.className = 'status'; }
     else {
+      if (p.isArtillery) {
+        st.textContent = `SPG · ${p.spadeState} · ${p.spadeDeployment >= 0.96 ? 'READY TO FIRE' : 'FIRING LOCKED'} · ${p.reloadLeft > 0 ? 'RELOADING ' + p.reloadLeft.toFixed(1) + 's' : 'LOADED'}`;
+        st.className = 'status ' + (p.spadeDeployment >= 0.96 ? 'hidden' : 'revealed');
+      }
       const cam = Math.round((p.camo || 0) * 100); const vr = Math.round(Math.max(50, 400 * (1 - (p.camo || 0))));
       const why = `${p.inBush ? '🌿 IN BUSH' : 'IN THE OPEN'}${Math.abs(p.speed) > 1 ? ' · moving' : ''}${p.equip.has('camonet') && G.time - (p.lastMoving ?? G.time) > 3 ? ' · net' : ''}`;
       if (sinceFire < 5) { st.textContent = `${why} — CAMO ${cam}% (firing: revealed ${(5 - sinceFire).toFixed(1)}s) · seen within ~${vr} m`; st.className = 'status revealed'; }
       else if (p.inBush || cam >= 30) { st.textContent = `${why} — CAMO ${cam}% · seen within ~${vr} m (always within 50 m)`; st.className = 'status hidden'; }
-      else { st.textContent = ''; st.className = 'status'; }
+      else if (!p.isArtillery) { st.textContent = ''; st.className = 'status'; }
     }
     this.$('h-spotted').style.display = p.alive && p.spotted[1] ? 'block' : 'none';
     // damage direction
