@@ -24,7 +24,7 @@ export class HUD {
       <div class="panel items" id="h-items"></div>
       <div class="panel ammo" id="h-ammo"></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · B artillery spade · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
@@ -128,6 +128,10 @@ export class HUD {
       <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod('tracks', p.trackRepair > 0 ? 'TRACKS ' + Math.ceil(p.trackRepair) + 's' : 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`;
+    if (s.artillery) {
+      const state = p.spadeState === 'deployed' ? 'DEPLOYED · READY' : p.spadeState.toUpperCase();
+      this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">SPADE ${state} · ${Math.round(p.spadeProgress * 100)}% · HIGH-ARC 155 mm</div>`);
+    }
     // equipment slots (keys 4/5/6)
     const E = p.equip; const lf = E.factor;
     this.$('h-items').innerHTML = E.slots.map((it, i) => { const ready = it.def.passive || (it.charges > 0 && it.cd <= 0); const st = it.def.passive ? 'PASSIVE' : it.active > 0 ? `ACTIVE ${Math.ceil(it.active)}s` : it.charges <= 0 ? 'EMPTY' : it.cd > 0 ? `${Math.ceil(it.cd)}s` : 'READY';
