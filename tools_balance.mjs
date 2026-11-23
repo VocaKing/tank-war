@@ -2,13 +2,14 @@
 // with a simulated browser storage, including a second load (refresh).
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {SPECIALIST_TANKS} from './src/game/specialistTanks.js';
 const source=await readFile(new URL('./src/game/tankData.js',import.meta.url),'utf8');
 const config=await readFile(new URL('./src/game/balanceConfig.js',import.meta.url),'utf8');
 const strip=s=>s.replace(/^import .*$/gm,'').replace(/^export /gm,'');
 const store=new Map(),env={localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)}};
 const api=new Function('globalThis',strip(config)+'\nreturn {STORAGE_KEY,EMPTY,clone,effective,legacyMaxDispersion,loadLocal,saveLocal,diff};')(env);
 function load(published=api.EMPTY()){
- return new Function('publishedBalance','clone','effective','legacyMaxDispersion','loadLocal','EMPTY',strip(source)+'\nreturn {TANKS,TANK_BY_ID,STOCK_TANKS,armorZone,penAtRange,sanitizeLoadout,BALANCE_STATUS};')(published,api.clone,api.effective,api.legacyMaxDispersion,api.loadLocal,api.EMPTY);
+ return new Function('publishedBalance','clone','effective','legacyMaxDispersion','loadLocal','EMPTY','SPECIALIST_TANKS',strip(source)+'\nreturn {TANKS,TANK_BY_ID,STOCK_TANKS,armorZone,penAtRange,sanitizeLoadout,BALANCE_STATUS};')(published,api.clone,api.effective,api.legacyMaxDispersion,api.loadLocal,api.EMPTY,SPECIALIST_TANKS);
 }
 const stock=load().STOCK_TANKS,cfg=api.EMPTY();
 const stockTiger=stock.find(t=>t.id==='tiger');
@@ -41,4 +42,20 @@ assert.equal(load().TANK_BY_ID.tiger.dispersion,0);
 assert.equal(load().TANK_BY_ID.tiger.maxDispersion,0);
 api.saveLocal({version:1,tanks:{tiger:{dispersion:0,maxDispersion:2}}},stock);
 assert.equal(load().TANK_BY_ID.tiger.maxDispersion,2);
+const specialists = {
+  version: 1,
+  tanks: {
+    mauseng: { 'dozer.travel': 4.8, 'dozer.charges': 5 },
+    m6a1: { 'secondary.reload': 3.2, 'secondary.rounds': 42, 'secondary.shell.damage': 64 },
+    r17: { 'rearDriver.maxSpeed': 47 },
+    at52: { 'amphibious.speed': 14 },
+  },
+};
+api.saveLocal(specialists, stock);
+const adjusted = load();
+assert.equal(adjusted.TANK_BY_ID.mauseng.dozer.travel, 4.8);
+assert.equal(adjusted.TANK_BY_ID.m6a1.secondary.shell.damage, 64);
+assert.equal(adjusted.TANK_BY_ID.r17.rearDriver.maxSpeed, 47);
+assert.equal(adjusted.TANK_BY_ID.at52.amphibious.speed, 14);
+assert.deepEqual(api.diff(stock, adjusted.TANKS), specialists);
 console.log('Balance integration checks passed.');
