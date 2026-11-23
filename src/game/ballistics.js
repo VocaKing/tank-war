@@ -24,10 +24,23 @@ export class Ballistics {
   update(dt) {
     const g = this.game, W = g.world;
     for (let i = this.shells.length - 1; i >= 0; i--) {
-      const s = this.shells[i]; s.life += dt;
+      const s = this.shells[i], lifeStart = s.life; s.life += dt;
       const speed = s.vel.length(); const steps = Math.max(1, Math.ceil((speed * dt) / 30)); const h = dt / steps; let done = false;
       for (let k = 0; k < steps && !done; k++) {
         _a.copy(s.pos); s.vel.y -= GRAVITY * h; _b.copy(s.pos).addScaledVector(s.vel, h);
+        // Hard-kill APS checks the incoming segment before ordinary armour collision.
+        for (const t of g.tanks) {
+          if (!t.alive || t.team === s.owner?.team || !t.spec.aps) continue;
+          const dx = _b.x - _a.x, dy = _b.y - _a.y, dz = _b.z - _a.z;
+          const l2 = dx*dx + dy*dy + dz*dz;
+          const u = l2 > 1e-9 ? clamp(((t.pos.x-_a.x)*dx + (t.pos.y+t.spec.dims.hullH*0.62-_a.y)*dy + (t.pos.z-_a.z)*dz) / l2, 0, 1) : 0;
+          const closest = _a.clone().addScaledVector(new THREE.Vector3(dx,dy,dz), u);
+          if (t.tryAPS(s, closest)) {
+            g.effects.explosion(closest, false); g.audio.impact(closest, 'explosion');
+            done = true; break;
+          }
+        }
+        if (done) break;
         let bestT = 2, kind = null, hitTank = null, hitInfo = null;
         const tt = W.terrain.segmentHit(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z, 1.5); if (tt >= 0 && tt < bestT) { bestT = tt; kind = 'ground'; }
         const ts = W.structureHit(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z); if (ts >= 0 && ts < bestT) { bestT = ts; kind = 'structure'; }
@@ -45,7 +58,13 @@ export class Ballistics {
           { const da = _a.y - wla, yb = _a.y + (_b.y - _a.y) * tEnd, db = yb - wlb;
             const frac = da <= 0 && db <= 0 ? 1 : da > 0 && db > 0 ? 0 : da <= 0 ? da / (da - db) : db / (db - da);
             s.waterDist += _a.distanceTo(_b) * tEnd * Math.max(0, Math.min(1, frac)); if (s.waterDist > 15) { done = true; break; } } }
-        if (kind) {
+        const stepLife = lifeStart + k * h;
+        const fuseFrac = Number.isFinite(s.spec.fuseTime) ? (s.spec.fuseTime - stepLife) / h : Infinity;
+        if (fuseFrac >= 0 && fuseFrac <= 1 && fuseFrac < bestT) {
+          const p = new THREE.Vector3().lerpVectors(_a, _b, fuseFrac); s.dist += _a.distanceTo(p);
+          g.effects.impactGround(p, s.spec.caliber, true); g.audio.impact(p, 'explosion'); this.heBlast(s, p);
+          done = true;
+        } else if (kind) {
           const p = new THREE.Vector3().lerpVectors(_a, _b, bestT); s.dist += _a.distanceTo(p);
           done = this.onImpact(s, kind, p, hitTank, hitInfo);
           if (!done) { s.pos.copy(p); if (kind === 'water') s.pos.y -= 0.02; }
@@ -59,7 +78,7 @@ export class Ballistics {
   heBlast(s, p) {
     const g = this.game; const R = s.spec.blastRadius || s.spec.caliber / 22;
     for (const t of g.tanks) { if (!t.alive) continue; const d = t.pos.distanceTo(p) - t.spec.dims.W * 0.5; if (d > R) continue;
-      const top = t.spec.armor.hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
+      const top = (t.armorProfile || t.spec.armor).hull.top[0]; const exposure = t.spec.openTop ? 1.55 : 1; const dmg = s.spec.damage * 0.25 * exposure * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
       if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
       if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) t.breakTracks(); }
   }
