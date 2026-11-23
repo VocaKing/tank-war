@@ -19,6 +19,9 @@ await page.waitForFunction(() => window.__game && window.__game.player?.spec.id 
 const report = await page.evaluate(() => {
   const g = window.__game, p = g.player;
   g.debug.freeze(true);
+  p.speed = 0; p.turnRate = 0; p.bloom = 4.5;
+  for (let i = 0; i < 60; i++) p.updateTurret(1 / 60);
+  const settledBloom = p.bloom;
   p.bloom = 1;
   const specDispersion = p.spec.dispersion;
   const baseDispersion = p.baseDispersion();
@@ -78,9 +81,16 @@ const report = await page.evaluate(() => {
   g.debug.simulate(12, 1 / 30);
   g.keys.KeyS = false;
   const reverseDelta = -((p.pos.x - backStart.x) * Math.sin(heading) + (p.pos.z - backStart.z) * Math.cos(heading));
+
+  p.speed = -1; p.turnRate = 0; p.placeAt(start[0], start[1], heading);
+  const reverseHeadingBefore = p.heading;
+  g.keys.KeyD = true;
+  g.debug.simulate(0.5, 1 / 30);
+  g.keys.KeyD = false;
+  const reverseTurnDelta = Math.atan2(Math.sin(p.heading - reverseHeadingBefore), Math.cos(p.heading - reverseHeadingBefore));
   return {
-    balance: { specDispersion, baseDispersion, currentDispersion, expected, maxShotDeviation: Math.max(...deviations), minShotDeviation: Math.min(...deviations) },
-    river: { center: start, width: river.width, profile, centerWaterDepth: g.world.terrain.waterLevel(start[0],start[1]) - g.world.terrain.height(start[0],start[1]), forwardState, turnState, reverseDelta },
+    balance: { specDispersion, baseDispersion, currentDispersion, expected, settledBloom, maxShotDeviation: Math.max(...deviations), minShotDeviation: Math.min(...deviations) },
+    river: { center: start, width: river.width, profile, centerWaterDepth: g.world.terrain.waterLevel(start[0],start[1]) - g.world.terrain.height(start[0],start[1]), forwardState, turnState, reverseDelta, reverseTurnDelta },
     errors: []
   };
 });
@@ -90,7 +100,9 @@ console.log(JSON.stringify(report, null, 2));
 assert.equal(report.balance.specDispersion, 0.01, 'local balance dispersion did not reach the live tank spec');
 assert.ok(Math.abs(report.balance.baseDispersion - report.balance.expected) < 1e-10, 'base dispersion did not use the configured value');
 assert.ok(report.balance.maxShotDeviation <= report.balance.expected * 1.00001, 'actual shot deviation exceeded configured cone');
+assert.ok(report.balance.settledBloom <= 1.000001, 'stationary bloom did not settle to minimum dispersion');
 assert.ok(report.river.forwardState.delta > 8, 'tank could not climb out of the deep river channel');
 assert.ok(Math.abs(report.river.turnState.degrees) > 5, 'tank could not turn while in the river section');
 assert.ok(report.river.reverseDelta > 4, 'tank could not reverse away from the deep river bank');
+assert.ok(Math.sign(report.river.reverseTurnDelta) === Math.sign(report.river.turnState.deltaRadians), 'left/right steering inverted while reversing');
 assert.equal(report.errors.length, 0, 'browser runtime errors detected');
