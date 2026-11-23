@@ -184,7 +184,8 @@ export class Tank {
       if (this.spadeProgress <= 0) { this.spadeState = 'stowed'; if (this.isPlayer) this.game.hud.message('Stabilizer spade retracted', '#c8c8c8'); }
     }
     if (this.model.spade) this.model.spade.rotation.x = (1 - this.spadeProgress) * Math.PI / 2;
-    if (this.pendingFire && this.spadeState === 'deployed' && this.reloadLeft <= 0 && this.speed < 0.3 && this.aimError < 0.03) {
+    if (this.pendingFire && this.spadeState === 'deployed' && this.reloadLeft <= 0 && this.speed < 0.3 && Math.abs(this.turnRate) < 0.025 && this.aimError < 0.03) {
+      this.syncModel(); // use this frame's turret/gun solution for the queued shot
       this.pendingFire = false; this.tryFire(time);
     }
   }
@@ -197,7 +198,8 @@ export class Tank {
       return false;
     }
     if (this.spec.artillery && (Math.abs(this.speed) > 0.3 || Math.abs(this.turnRate) > 0.025)) {
-      if (this.isPlayer) this.game.hud.message('Artillery must be stationary to fire', '#ffbd70');
+      this.pendingFire = true;
+      if (this.isPlayer) this.game.hud.message('Artillery settling · shot queued', '#ffbd70');
       return false;
     }
     this.pendingFire = false;
