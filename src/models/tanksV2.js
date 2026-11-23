@@ -628,7 +628,7 @@ function merkava4(d) {
   return { P, ...g, wheelType: 'disc', cast: 0.15, castTurret: 0.1, turretPos: [0, H, d.turretZ], gunPos: [0, 0.38, bz + tl - 1.0], decals: decalsSide('text', '3', 'turret', tw * 0.88 + 0.05, th * 0.4, bz - 1.2, 0.45) };
 }
 
-const V2 = { panther, is2, pershing, centurion, leo1, leo2a6, t90m, chally2, type99a, merkava4 };
+const V2 = { pzh2000: leo2a6, panther, is2, pershing, centurion, leo1, leo2a6, t90m, chally2, type99a, merkava4 };
 export function buildV2(d, spec) {
   const f = V2[spec && spec.id]; if (!f) throw new Error('No builder for ' + (spec && spec.id));
   return f(d);
