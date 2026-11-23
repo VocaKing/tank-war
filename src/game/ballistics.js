@@ -89,7 +89,7 @@ export class Ballistics {
   }
   // returns true if the shell is consumed
   onImpact(s, kind, p, tank, hit) {
-    const g = this.game; const he = !!s.type.he; g.lastImpact = { kind, p: p.clone(), owner: s.owner, tank: tank || null };
+    const g = this.game; const he = !!(s.type.he || s.type.hesh); g.lastImpact = { kind, p: p.clone(), owner: s.owner, tank: tank || null };
     if (kind === 'ground') { g.effects.impactGround(p, s.spec.caliber, he); g.audio.impact(p, he ? 'explosion' : 'ground'); if (he && !s.noDamage) this.heBlast(s, p); return true; }
     if (kind === 'structure') { g.effects.impactStructure(p); g.audio.impact(p, he ? 'explosion' : 'ground'); if (he && !s.noDamage) this.heBlast(s, p); return true; }
     if (kind === 'water') {
