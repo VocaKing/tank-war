@@ -128,6 +128,10 @@ export class Tank {
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
     if (this.abilities) this.abilities.update(dt);
     this.recoil = Math.max(0, this.recoil - dt * (this.isArtillery ? 0.48 : 1.2));
+    if (this.isArtillery && !this.isPlayer) {
+      const rangeToAim = Math.hypot(this.input.aim.x-this.pos.x,this.input.aim.z-this.pos.z);
+      this.spadeTarget = Math.abs(this.speed) < 0.25 && rangeToAim < 850 ? 1 : 0;
+    }
     if (this.isArtillery) {
       const rate = this.spadeTarget > this.spadeDeployment ? 0.72 : 0.95;
       this.spadeDeployment += Math.sign(this.spadeTarget-this.spadeDeployment) * Math.min(Math.abs(this.spadeTarget-this.spadeDeployment), rate*dt);
@@ -177,7 +181,7 @@ export class Tank {
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
-    m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
+    m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil * (this.isArtillery ? 1.7 : 1);
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
   tryFire(time) {
