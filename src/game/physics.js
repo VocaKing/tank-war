@@ -61,14 +61,7 @@ export class BattlefieldPhysics {
     }
     fixed(ColliderDesc.heightfield(terrain.n - 1, terrain.n - 1, heights,
       { x: terrain.half * 2, y: 1, z: terrain.half * 2 }, HeightFieldFlags.FIX_INTERNAL_EDGES), SURFACE);
-    for (const c of B.colliders) {
-      if (c.kind === 'deck') continue;
-      const half = (c.y1 - c.y0) / 2;
-      if (half <= 0) continue;
-      _rotation.setFromEuler(_yaw.set(0, c.rot, 0));
-      fixed(ColliderDesc.cuboid(c.hx, half, c.hz)
-        .setTranslation(c.x, c.y0 + half, c.z).setRotation(_rotation), OBSTACLE);
-    }
+    for (const c of B.colliders) if (c.kind !== 'deck') this.addObstacle(c);
     // Follow the actual bridge profile; the map's OBBs for bullet tests use a flat top.
     for (const deck of B.decks) {
       const verts = [], indices = [];
@@ -96,6 +89,15 @@ export class BattlefieldPhysics {
       fixed(ColliderDesc.cuboid(1, 160, limit + 1).setTranslation(sign * (limit + 1), 20, 0), OBSTACLE);
       fixed(ColliderDesc.cuboid(limit + 1, 160, 1).setTranslation(0, 20, sign * (limit + 1)), OBSTACLE);
     }
+  }
+
+  addObstacle(c) {
+    const half = (c.y1 - c.y0) / 2;
+    if (half <= 0) return;
+    _rotation.setFromEuler(_yaw.set(0, c.rot, 0));
+    return this.world.createCollider(this.engine.ColliderDesc.cuboid(c.hx, half, c.hz)
+      .setTranslation(c.x, c.y0 + half, c.z).setRotation(_rotation)
+      .setFriction(0.72).setCollisionGroups(groups(OBSTACLE, VEHICLE)));
   }
 
   attach(tank) {
@@ -186,6 +188,7 @@ export class BattlefieldPhysics {
     _normal.set(0, 0, 0); _forceSum.set(0, 0, 0); _momentSum.set(0, 0, 0);
     const com = body.worldCom();
     _angular.copy(body.angvel());
+    const floatLoad = tank.spec.amphibious ? this.applyBuoyancy(vehicle, waterDepth) : 0;
     const springMass = mass / WHEEL_COUNT;
     const stiffness = springMass * SPRING_FREQUENCY ** 2;
     const damping = 2 * springMass * SPRING_FREQUENCY * 0.94;
@@ -216,6 +219,15 @@ export class BattlefieldPhysics {
     }
 
     vehicle.contact = support;
+    if (tank.afloat && floatLoad > load) {
+      vehicle.unsupported = 0;
+      tank.airborne = false;
+      _normal.set(0, 1, 0);
+      body.applyImpulse(_forceSum, true);
+      body.applyTorqueImpulse(_momentSum, true);
+      this.applyTraction(vehicle, floatLoad * 0.52, floatLoad * 0.26, waterDepth, true);
+      return;
+    }
     if (!support) {
       vehicle.unsupported += dt;
       tank.airborne = vehicle.unsupported >= 0.025;
@@ -231,7 +243,23 @@ export class BattlefieldPhysics {
     this.applyTraction(vehicle, load, leftLoad, waterDepth);
   }
 
-  applyTraction(vehicle, load, leftLoad, waterDepth) {
+  applyBuoyancy({ tank, body, mass, inertiaYaw }, depth) {
+    const draft = tank.spec.amphibious.draft;
+    const immersion = clamp((depth - 0.1) / (draft * 0.57), 0, 1);
+    tank.afloat = immersion >= 0.8;
+    if (immersion === 0) return 0;
+    const dt = PHYSICS_STEP;
+    const load = clamp(GRAVITY + (depth - draft) * 24 - tank.vel.y * 7, 0, GRAVITY * 2.3)
+      * immersion * mass * dt;
+    body.applyImpulse(_impulse.set(0, load, 0), true);
+    // The hull rights itself with damped torque while crossing the water surface.
+    _forward.set(0, 1, 0).applyQuaternion(tank.quat);
+    _impulse.set(-_forward.z * 4 - _angular.x * 2.7, 0, _forward.x * 4 - _angular.z * 2.7);
+    body.applyTorqueImpulse(_impulse.multiplyScalar(inertiaYaw * dt * immersion), true);
+    return load;
+  }
+
+  applyTraction(vehicle, load, leftLoad, waterDepth, floating = false) {
     const { tank, body, mass, inertiaYaw } = vehicle;
     const s = tank.spec, dt = PHYSICS_STEP, input = tank.input, T = this.battlefield.terrain;
     const mobile = tank.alive && tank.modules.tracks === 1;
@@ -240,15 +268,19 @@ export class BattlefieldPhysics {
     const canPivot = intactLoad > 0 && !input.brake;
     const throttle = mobile ? clamp(input.throttle, -1, 1) : 0;
     const steer = mobile || canPivot ? clamp(input.steer, -1, 1) : 0;
-    const driver = tank.crewAlive('Driver') ? 1 : 0.65;
+    const rearDriving = !!(s.rearDriver && throttle < 0 && tank.crewAlive('Rear driver'));
+    const driver = rearDriving || tank.crewAlive('Driver') ? 1 : 0.65;
     const fullSpeed = s.maxSpeed / 3.6, water = clamp(1 - Math.max(0, waterDepth) * 0.38, 0.2, 1);
     const i = T.x2i(tank.pos.x), j = T.x2i(tank.pos.z);
     const road = T.inside(i, j) ? T.road[T.idx(i, j)] : 0;
     const grip = 0.82 + road * 0.21;
     const overdrive = tank.equip.active('overdrive'), loadFactor = tank.equip.factor;
     const engine = tank.modules.engine < 1 ? 0.5 : 1;
-    const speedLimit = (throttle < 0 ? s.reverseSpeed / 3.6 : fullSpeed) * engine * driver * loadFactor *
+    const reverse = rearDriving ? s.rearDriver.maxSpeed : s.reverseSpeed;
+    let speedLimit = (throttle < 0 ? reverse / 3.6 : fullSpeed) * engine * driver * loadFactor *
       water * (0.78 + 0.22 * Math.min(1, road * 1.5)) * (overdrive ? 1.2 : 1) * (tank.abilities?.speedMult ?? 1);
+    if (floating) speedLimit = s.amphibious.speed / 3.6 * engine * driver * (throttle < 0 ? 0.52 : 1);
+    if (tank.abilities?.dozerActive) speedLimit = Math.min(speedLimit, s.dozer.speed / 3.6);
     const lowGear = 4.3 * Math.max(0, 1 - Math.abs(tank.speed) / 9) ** 2;
     const driveLimit = (lowGear + clamp(s.power / s.mass * 0.075, 0.6, 2.2) * (s.cls === 'Light' ? 2.4 : 1)) *
       engine * loadFactor * (overdrive ? 1.35 : 1);
@@ -257,7 +289,7 @@ export class BattlefieldPhysics {
     _side.crossVectors(_normal, _tangent).normalize();
     const longitudinal = tank.vel.dot(_tangent), sideways = tank.vel.dot(_side);
     const turnMax = s.hullTraverse * DEG * driver * (1 - 0.45 * Math.min(1, Math.abs(tank.speed) / fullSpeed)) *
-      (tank.inWater ? 0.6 : 1);
+      (floating ? 0.48 : tank.inWater ? 0.6 : 1);
     // A damaged track can serve as a pivot after the hull slows down. The intact track supplies the grip.
     const pivotMax = canPivot ? turnMax * 0.25 * engine * clamp((2 - Math.abs(longitudinal)) / 1.55, 0, 1) : 0;
     const turnLimit = mobile ? turnMax : pivotMax;

@@ -48,6 +48,33 @@ export function describeTankAbilities(spec) {
       timing: `强化炮弹打完后冷却 ${overpen.cooldown || defaults.cooldown} 秒`,
     });
   }
+  if (spec.dozer) {
+    const d = spec.dozer;
+    abilities.push({
+      type: 'active', name: '工程推土铲',
+      effect: `放下铲具后以最高 ${d.speed} km/h 前进，推过 ${d.travel} 米后可在平坦的空地上筑起一段挡弹土堤。`,
+      timing: `每场 ${d.charges} 次 · 冷却 ${d.cooldown} 秒`,
+    });
+  }
+  if (spec.secondary) {
+    const d = spec.secondary;
+    abilities.push({
+      type: 'active', name: '双武器切换',
+      effect: `在主炮与 ${d.shell.name} 副炮之间切换。副炮装填 ${d.reload} 秒，携带 ${d.rounds} 发，主炮继续独立装填。`,
+    });
+  }
+  if (spec.rearDriver) {
+    abilities.push({
+      type: 'passive', name: '后向驾驶席',
+      effect: `倒车时由后向驾驶员接管，最高 ${spec.rearDriver.maxSpeed} km/h。前驾驶员失能后，后驾驶员仍可全速倒车撤离。`,
+    });
+  }
+  if (spec.amphibious) {
+    abilities.push({
+      type: 'passive', name: '两栖浮渡',
+      effect: `自动在深水中浮航，水上前进最高 ${spec.amphibious.speed} km/h，驶回陆地后恢复主炮射击。`,
+    });
+  }
   if (magazine) {
     abilities.push({
       type: 'passive', name: '弹夹装填',
@@ -100,6 +127,11 @@ export class Abilities {
     this.speedUntil = 0;
     this.overpenLeft = 0;
     this.scanRevealed = [];
+    this.dozerActive = false;
+    this.dozerTravel = 0;
+    this.dozerCooldown = 0;
+    this.dozerCharges = this.tank.spec.dozer?.charges ?? 0;
+    this.usingSecondary = false;
     if (this.magazine) this.magLeft = this.magazine.size;
   }
   get kind() {
@@ -109,6 +141,8 @@ export class Abilities {
     if (this.stabilize) return 'stabilize';
     if (this.overspeed) return 'overspeed';
     if (this.overpen) return 'overpen';
+    if (this.tank.spec.dozer) return 'dozer';
+    if (this.tank.spec.secondary) return 'secondary';
     return null;
   }
   get ready() {
@@ -120,10 +154,12 @@ export class Abilities {
     if (k === 'stabilize') return this.stabCd <= 0;
     if (k === 'overspeed') return this.speedCd <= 0;
     if (k === 'overpen') return this.overpenCd <= 0 && this.overpenLeft <= 0;
+    if (k === 'dozer') return this.dozerActive || (this.dozerCharges > 0 && this.dozerCooldown <= 0);
+    if (k === 'secondary') return true;
     return false;
   }
   get cooldownLeft() {
-    return Math.max(this.scanCd, this.stabCd, this.speedCd, this.overpenCd);
+    return Math.max(this.scanCd, this.stabCd, this.speedCd, this.overpenCd, this.dozerCooldown);
   }
   get speedMult() {
     return this.isOverspeed ? (this.overspeed.mult || ABILITY_DEFAULTS.overspeed.mult) : 1;
@@ -135,6 +171,7 @@ export class Abilities {
     if (this.stabCd > 0) this.stabCd -= dt;
     if (this.speedCd > 0) this.speedCd -= dt;
     if (this.overpenCd > 0) this.overpenCd -= dt;
+    if (this.dozerCooldown > 0) this.dozerCooldown = Math.max(0, this.dozerCooldown - dt);
     const now = this.tank.game.time;
     this.scanRevealed = this.scanRevealed.filter((r) => now < r.until);
   }
@@ -167,7 +204,38 @@ export class Abilities {
     if (k === 'stabilize') return this.tryStabilize();
     if (k === 'overspeed') return this.tryOverspeed();
     if (k === 'overpen') return this.tryOverpen();
+    if (k === 'dozer') return this.toggleDozer();
+    if (k === 'secondary') {
+      this.usingSecondary = !this.usingSecondary;
+      if (t.isPlayer) g.hud.message(this.usingSecondary ? '副炮已选中' : '主炮已选中', '#ffdc85');
+      return true;
+    }
     return false;
+  }
+  toggleDozer() {
+    if (!this.ready) return false;
+    this.dozerActive = !this.dozerActive;
+    this.dozerTravel = 0;
+    if (this.tank.isPlayer) this.tank.game.hud.message(this.dozerActive ? '推土铲已放下 · 向前驾驶筑堤' : '推土铲已收起', '#ffdc85');
+    return true;
+  }
+  updateDozer(dt) {
+    if (!this.dozerActive) return;
+    const t = this.tank, d = t.spec.dozer;
+    if (t.input.throttle < 0 || t.inWater || t.modules.tracks < 1) {
+      this.toggleDozer();
+      return;
+    }
+    if (t.airborne || t.input.throttle <= 0 || t.speed <= 0) return;
+    this.dozerTravel += Math.min(t.speed, d.speed / 3.6) * dt;
+    if (this.dozerTravel < d.travel) return;
+    const built = t.game.buildEarthwork(t);
+    this.dozerActive = false;
+    if (built) {
+      this.dozerCharges--;
+      this.dozerCooldown = d.cooldown;
+    }
+    if (t.isPlayer) t.game.hud.message(built ? '土堤已筑成' : '需要平坦、开阔的陆地筑堤', built ? '#9fd39f' : '#ffb060');
   }
   tryScan() {
     if (!this.scan || this.scanCd > 0) return false;

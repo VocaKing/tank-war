@@ -85,12 +85,18 @@ export class AIController {
     const muzzle = t.model.gun.getWorldPosition(new THREE.Vector3());
     const cands = [new THREE.Vector3(0, d.hullH * 0.62, 0), new THREE.Vector3(0, d.hullH + d.turretH * 0.5, d.turretZ), new THREE.Vector3(0, d.clearance + 0.75, d.L * 0.25), new THREE.Vector3(0, d.hullH * 0.62, -d.L * 0.3)];
     let best = { ratio: -1 }; let curBest = -1;
+    let auxiliary = null;
+    const secondary = t.secondaryRounds > 0 && t.secondaryReloadLeft + 0.8 < t.reloadLeft ? t.spec.secondary : null;
     for (const c of cands) {
       const w = e.model.root.localToWorld(c.clone());
       if (g.world.losBlocked(muzzle.x, muzzle.y, muzzle.z, w.x, w.y, w.z)) continue;
       const dir = w.clone().sub(muzzle); const dist = dir.length(); dir.normalize();
       const hit = e.rayTest(muzzle.clone().addScaledVector(dir, Math.max(0, dist - 8)), w.clone().addScaledVector(dir, 6));
       if (!hit) continue;
+      if (secondary) {
+        const ev = g.ballistics.evaluate(e, hit, secondary.shell, dist);
+        if (!ev.ricochet && ev.ratio > Math.max(1.05, auxiliary?.ratio ?? 0)) auxiliary = { ratio: ev.ratio, local: c };
+      }
       for (let si = 0; si < t.spec.shells.length; si++) {
         if (t.ammo[si] <= 0) continue; const sh = t.spec.shells[si]; const ev = g.ballistics.evaluate(e, hit, sh, dist);
         let ratio = ev.ricochet ? 0.05 : ev.ratio; if (sh.type === 'HE') ratio = ev.ratio > 1 ? ratio : Math.min(0.7, sh.damage * 0.45 * (1 - ev.eff / (sh.caliber * 1.2)) / 150);
@@ -98,6 +104,12 @@ export class AIController {
         if (score > (best.score ?? -9)) best = { score, ratio, si, local: c, dist };
         if (si === t.shellIdx && ratio > curBest) curBest = ratio;
       }
+    }
+    if (t.abilities.usingSecondary !== !!auxiliary) t.tryAbility();
+    if (auxiliary) {
+      this.bestRatio = auxiliary.ratio;
+      this.aimLocal.copy(auxiliary.local);
+      return;
     }
     if (best.ratio < 0) { this.bestRatio = 0; this.aimLocal.set(0, d.hullH * 0.62, 0); return; }
     this.bestRatio = best.ratio; this.aimLocal.copy(best.local);
@@ -166,13 +178,14 @@ export class AIController {
       const flight = dTgt / t.shell.velocity; const w = tgt.model.root.localToWorld(_q.copy(this.aimLocal));
       w.addScaledVector(tgt.vel, flight * (0.7 + 0.3 * this.skill)); w.x += this.aimErr.x * dTgt; w.y += this.aimErr.y * dTgt; w.z += this.aimErr.z * dTgt;
       t.input.aim.copy(w);
-      const ready = t.reloadLeft <= 0 && g.time > this.reactUntil && t.aimError < 0.004 + 0.002 / this.skill && t.dispersionProgress < (t.spec.stabilizer < 0.5 ? 0.46 : 0.2);
+      const ready = t.fireReloadLeft <= 0 && g.time > this.reactUntil && t.aimError < 0.004 + 0.002 / this.skill && t.dispersionProgress < (t.spec.stabilizer < 0.5 ? 0.46 : 0.2);
       const worth = this.bestRatio > 0.85 || (this.bestRatio > 0.55 && g.time - (this.recentlyHit || -99) < 6) || dTgt < 60;
       const concealOK = !t.inBush || this.bestRatio > 1.0 || dTgt < 250 || this.role !== 'sniper';
       if (ready && worth && concealOK && !this.allyInLine(tgt)) { if (t.tryFire(g.time)) this.resampleError(); }
     } else {
       this.idleScan += dt * 0.25; const base = this.enemyBase; const h = Math.atan2(base.x - t.pos.x, base.z - t.pos.z) + Math.sin(this.idleScan) * 0.6;
       t.input.aim.set(t.pos.x + Math.sin(h) * 300, t.pos.y + 2, t.pos.z + Math.cos(h) * 300);
+      if (t.abilities.usingSecondary) t.tryAbility();
       // keep a reasonable round loaded
       if (t.shellIdx !== 0 && t.ammo[0] > 0 && t.reloadLeft <= 0) t.selectShell(0);
     }

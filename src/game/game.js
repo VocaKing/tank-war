@@ -116,7 +116,7 @@ export class Game {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
       if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
       if (e.code === 'KeyE') this.toggleLock();
-      if (e.code === 'KeyG') { if (p.tryAbility && p.tryAbility()) { /* ok */ } else if (p.abilities && p.abilities.kind) this.hud.message(p.abilities.kind + ' not ready', '#c8c8c8'); }
+      if (e.code === 'KeyG' && !e.repeat) { if (p.tryAbility && p.tryAbility()) { /* ok */ } else if (p.abilities && p.abilities.kind) this.hud.message(p.abilities.kind + ' not ready', '#c8c8c8'); }
       const slot = { Digit4: 0, Digit5: 1, Digit6: 2, KeyR: p.equip.find('repair'), KeyF: p.equip.find('extinguisher') }[e.code];
       if (slot !== undefined && slot >= 0) this.useItem(slot);
     });
@@ -287,7 +287,7 @@ export class Game {
     if (this.lock) {
       const t = this.lock; if (!t.alive || !t.spotted[this.player.team] || !this.player.alive) { this.lock = null; }
       else {
-        const c = t.model.root.localToWorld(new THREE.Vector3(0, t.spec.dims.hullH * 0.62, 0)); const mz = this.player.model.muzzle.getWorldPosition(new THREE.Vector3());
+        const c = t.model.root.localToWorld(new THREE.Vector3(0, t.spec.dims.hullH * 0.62, 0)); const mz = this.player.muzzleNode.getWorldPosition(new THREE.Vector3());
         const tof = c.distanceTo(mz) / this.player.shell.velocity; c.addScaledVector(t.vel, tof);
         this.aimPoint.copy(c); this.aimTank = t; this.aimDist = c.distanceTo(mz); return;
       }
@@ -305,7 +305,8 @@ export class Game {
   updateReticle() {
     // simulate actual gun trajectory to find where the shell would land
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
-    const m = p.model; const pos = p.shotOrigin(m.muzzle.getWorldPosition(new THREE.Vector3())); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
+    const pos = p.shotOrigin(p.muzzleNode.getWorldPosition(new THREE.Vector3()));
+    const q = p.gunMount.getWorldQuaternion(new THREE.Quaternion());
     const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity).add(p.vel); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
     let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02, steps = 200;
     const dx = v.x * h * steps, dz = v.z * h * steps;
@@ -341,7 +342,8 @@ export class Game {
       else { state = 'red'; text = `NO PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
       text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(dist)} m`;
     }
-    if (p.reloadLeft > 0) state += ' reloading';
+    if (p.afloat) { state = 'neutral'; text = '浮航中 · 主炮锁定'; }
+    if (p.fireReloadLeft > 0 || p.afloat) state += ' reloading';
     if (this.lock) state += ' locked';
     hud.setReticle(sx, sy, radPx, state, text);
   }
@@ -376,6 +378,14 @@ export class Game {
     const cp = this.camera.position; const k = this.camera.fov / 60; const near = this.quality === 'low' ? 22 : this.quality === 'high' ? 60 : 40;
     for (const t of this.tanks) { if (!t.model.links) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
   }
+  buildEarthwork(tank) {
+    const shape = this.world.addEarthwork(tank, this.tanks);
+    if (!shape) return false;
+    this.physics.addObstacle(shape);
+    this.nav.penalize(shape.x, shape.z, 32);
+    return true;
+  }
+
   update(dt) {
     this.touch?.update();
     if (this.paused) return;
@@ -388,7 +398,7 @@ export class Game {
     this.physics.advance(dt);
     for (const t of this.tanks) {
       t.updateAfterMotion(dt);
-      if (!t.alive || t.airborne || Math.abs(t.speed) < 0.6) continue;
+      if (!t.alive || t.airborne || t.afloat || Math.abs(t.speed) < 0.6) continue;
       const d = t.spec.dims, dir = Math.sign(t.speed);
       const fx = Math.sin(t.heading) * dir, fz = Math.cos(t.heading) * dir;
       const knocked = this.world.veg.knock(t.pos.x + fx * d.L * 0.42, t.pos.z + fz * d.L * 0.42, d.W / 2, fx, fz, t.speed);
@@ -466,7 +476,7 @@ export class Game {
       simulate: (sec, dt = 1 / 30) => { const t0 = performance.now(); const n = Math.round(sec / dt); for (let i = 0; i < n && !this.ended; i++) this.update(dt); return { ms: Math.round(performance.now() - t0), perFrame: +((performance.now() - t0) / n).toFixed(2), ended: this.ended, result: this.result }; },
       look: (dx, dy) => this.mouseLook(dx, dy),
       assist: () => { const a = this.assist; return { enabled: a.enabled, locked: !!a.target, target: a.target ? this.tanks.indexOf(a.target) : -1, focus: a.focus ? this.tanks.indexOf(a.focus) : -1, outline: this.outline && this.outline.lastDrawn ? this.tanks.indexOf(this.outline.lastDrawn) : -1, offPx: +a.offPx().toFixed(1), drag: +a.dragFactor().toFixed(3), lastBreak: a.lastBreak, stats: { ...a.stats }, yaw: this.cam.yaw, pitch: this.cam.pitch, aimTank: this.aimTank ? this.tanks.indexOf(this.aimTank) : -1 }; },
-      fire: () => { this.player.reloadLeft = 0; return this.player.tryFire(this.time); },
+      fire: () => { this.player.reloadLeft = this.player.secondaryReloadLeft = 0; return this.player.tryFire(this.time); },
       aim: (x, y, z) => { if (x === null) { this.debugAim = null; return; } this.debugAim = new THREE.Vector3(x, y, z); this.aimPoint.set(x, y, z); this.player.input.aim.set(x, y, z); },
       tank: (i) => this.tanks[i],
       camAt: (a) => { this.camOverride = a; for (const id of ['h-markers', 'h-ret', 'h-cross']) { const e = document.getElementById(id); if (e) e.style.visibility = a ? 'hidden' : ''; } },

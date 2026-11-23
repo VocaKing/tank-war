@@ -1,3 +1,4 @@
+import { SPECIALIST_TANKS } from './specialistTanks.js';
 import publishedBalance from './balanceDefaults.json';
 import { clone, effective, legacyMaxDispersion, loadLocal } from './balanceConfig.js';
 // Tank specifications. Figures are grounded in published real-world data
@@ -315,6 +316,7 @@ export const TANKS = [
     paint: { base: '#8d8a72', camo: null, accent: '#75725c' },
     desc: 'Crew survivability first: front-mounted engine, modular wedge armor with a long sloped turret, rear hatch and ball-and-chain curtains under the bustle.',
   },
+  ...SPECIALIST_TANKS,
 ];
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // ---- v3 ammunition balance & loadouts ----

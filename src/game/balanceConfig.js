@@ -41,6 +41,22 @@ export function fields(t){
  for(const [key,values] of Object.entries({magazine:{size:['弹夹容量','发',1,30,1],intraReload:['连发间隔','s',0.1,30,0.1],fullReload:['弹夹装填','s',0.1,120,0.1]},scan:{cooldown:['冷却','s',0.1,300,0.1],maxTargets:['最大扫描目标','辆',1,14,1],range:['扫描范围','m',50,1500,1]},overpen:{shots:['强化发数','发',1,30,1],mult:['穿深倍率','×',1,5,0.01],cooldown:['冷却','s',0.1,300,0.1]},overspeed:{mult:['速度倍率','×',1,5,0.01],duration:['持续时间','s',0.1,120,0.1],cooldown:['冷却','s',0.1,300,0.1]},stabilize:{duration:['持续时间','s',0.1,120,0.1],cooldown:['冷却','s',0.1,300,0.1]},selfDestruct:{radius:['范围','m',1,100,0.1]}})){
   if(t[key])for(const [k,v] of Object.entries(values))if(k in t[key])out.push(def(key+'.'+k,...v,'特殊技能'));
  }
+ const specialist = {
+  dozer: { speed: ['施工限速', 'km/h', 2, 20, 0.1], travel: ['施工行程', 'm', 0.5, 15, 0.1],
+    cooldown: ['施工冷却', 's', 0.1, 300, 0.1], charges: ['土堤数量', '次', 1, 8, 1] },
+  secondary: { reload: ['副炮装填', 's', 0.1, 60, 0.1], rounds: ['副炮备弹', '发', 1, 150, 1] },
+  rearDriver: { maxSpeed: ['后驾驶席倒车限速', 'km/h', 1, 100, 0.1] },
+  amphibious: { speed: ['浮航限速', 'km/h', 1, 25, 0.1] },
+ };
+ for (const [key, section] of Object.entries(specialist)) {
+  if (!t[key]) continue;
+  for (const [field, values] of Object.entries(section)) out.push(def(key + '.' + field, ...values, '特殊技能'));
+ }
+ if (t.secondary) {
+  out.push(def('secondary.shell.pen','副炮穿深','mm',1,3000,1,'副炮'),
+   def('secondary.shell.damage','副炮伤害','HP',1,10000,1,'副炮'),
+   def('secondary.shell.velocity','副炮初速','m/s',100,2500,1,'副炮'));
+ }
  return out;
 }
 export const read=(obj,path)=>path.split('.').reduce((v,k)=>v[k],obj);

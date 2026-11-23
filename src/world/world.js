@@ -10,7 +10,7 @@ import { GroundDetails } from './groundDetails.js';
 import { coarseTerrainIndices, updateTerrainLOD } from './terrainLod.js';
 import { pbrTex, waterNormalTexture, setTexQuality } from './textures.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import { Grid2D } from './terrain.js';
+import { Grid2D, OBB } from './terrain.js';
 import { DEG, ridged, smoothstep } from '../util.js';
 
 function terrainMaterial(def, quality) {
@@ -461,6 +461,43 @@ export class World {
     waterTime.value = time;
     for (const b of this.baseMarkers) { const p = b.flag.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i) + 1.3; p.setZ(i, Math.sin(time * 4 + x * 2.2) * 0.12 * x); } p.needsUpdate = true; }
   }
+  addEarthwork(tank, vehicles) {
+    const yaw = tank.heading, dx = Math.sin(yaw), dz = Math.cos(yaw);
+    const reach = tank.spec.dims.L / 2 + 1.9;
+    const x = tank.pos.x + reach * dx, z = tank.pos.z + reach * dz;
+    const hx = 2.45, hz = 0.68, radius = Math.hypot(hx, hz);
+    if (Math.abs(x) + radius > this.playHalf - 4 || Math.abs(z) + radius > this.playHalf - 4) return null;
+    const samples = [[x, z]];
+    for (const u of [-hx, hx]) for (const v of [-hz, hz]) samples.push([x + dz * u + dx * v, z - dx * u + dz * v]);
+    const heights = samples.map(([sx, sz]) => this.terrain.height(sx, sz));
+    if (samples.some(([sx, sz], i) => this.terrain.waterLevel(sx, sz) > heights[i] - 0.04
+      || this.deckAt(sx, sz) > heights[i])) return null;
+    const y0 = Math.min(...heights) - 0.08;
+    if (Math.max(...heights) - y0 > 0.38) return null;
+    if (this.colGrid.query(x, z, radius).some(c => c.circle(x, z, radius))) return null;
+    if (this.veg.rockGrid.query(x, z, radius).some(r => Math.hypot(r.x - x, r.z - z) < r.s + radius)) return null;
+    if (this.veg.treeGrid.query(x, z, radius).some(r => r.alive && Math.hypot(r.x - x, r.z - z) < radius)) return null;
+    if (vehicles.some(other => other !== tank &&
+      Math.hypot(other.pos.x - x, other.pos.z - z) < radius + Math.hypot(other.spec.dims.W, other.spec.dims.L) / 2)) return null;
+
+    const height = 1.62, y1 = y0 + height;
+    const shape = new OBB(x, z, hx, hz, yaw, y0, y1, 'earthwork');
+    this.earthworkMaterial ??= new THREE.MeshStandardMaterial({
+      color: new THREE.Color(...this.def.farColor).multiplyScalar(0.66), roughness: 1,
+      map: pbrTex(this.def.layers.A, 'diff'),
+    });
+    const geometry = new THREE.BoxGeometry(hx * 2, height, hz * 2);
+    const mesh = new THREE.Mesh(geometry, this.earthworkMaterial);
+    mesh.position.set(x, (y0 + y1) / 2, z);
+    mesh.rotation.y = yaw;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    this.colliders.push(shape);
+    this.colGrid.insert(shape, x, z, radius);
+    this.sun.shadow.needsUpdate = true;
+    return shape;
+  }
   // line of sight blocked by terrain or structures? (eye -> target)
   losBlocked(ax, ay, az, bx, by, bz) {
     if (this.terrain.segmentHit(ax, ay, az, bx, by, bz, 4) >= 0) return true;
@@ -475,6 +512,7 @@ export class World {
   dispose() {
     this.disposed = true;
     this.bgTex?.dispose();
+    this.earthworkMaterial?.dispose();
     this.grass.dispose(); this.groundDetails.dispose();
     const geometries = new Set();
     this.scene.traverse(o => {

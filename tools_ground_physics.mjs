@@ -9,10 +9,12 @@ const spec = {
   dims: { W: 3, L: 6.27, trackW: 0.58, hullH: 1.9, turretW: 2.1, turretL: 2.3, turretH: 0.78 },
 };
 
-function makeWorld(height, colliders = [], decks = [], deckHeight = () => -Infinity) {
+function makeWorld(height, colliders = [], decks = [], deckHeight = () => -Infinity, water = () => -1e9) {
   const terrain = new Terrain(100, 2);
   for (let z = 0; z < terrain.n; z++) for (let x = 0; x < terrain.n; x++) {
-    terrain.h[terrain.idx(x, z)] = height(terrain.i2x(x), terrain.i2x(z));
+    const idx = terrain.idx(x, z), wx = terrain.i2x(x), wz = terrain.i2x(z);
+    terrain.h[idx] = height(wx, wz);
+    terrain.water[idx] = water(wx, wz);
   }
   const groundHeight = (x, z) => Math.max(terrain.height(x, z), deckHeight(x, z));
   const physics = new BattlefieldPhysics(engine, { terrain, playHalf: 100, colliders, decks,
@@ -149,4 +151,27 @@ for (const brokenSide of [-1, 1]) {
   physics.free();
 }
 
-console.log('Rapier downhill, airborne, collision, bridge, and damaged-track steering checks passed.');
+{
+  const height = (_, z) => -Math.max(0, Math.min(3, (z + 6) * 0.24, (26 - z) * 0.24));
+  const water = (_, z) => z >= -6 && z <= 26 ? 0 : -1e9;
+  const { physics, spawn } = makeWorld(height, [], [], () => -Infinity, water);
+  const tank = spawn(-12, 2);
+  tank.spec = { ...spec, amphibious: { speed: 12, draft: 0.55 } };
+  tank.input.throttle = 1;
+  let afloatSteps = 0, floatBeforeExit = false;
+  for (let i = 0; i < 1900; i++) {
+    physics.advance(PHYSICS_STEP);
+    if (tank.afloat && !tank.vehicle.contact && tank.pos.z > 4 && tank.pos.z < 16) {
+      afloatSteps++;
+      assert.ok(tank.pos.y > -0.8 && tank.pos.y < -0.35 && !tank.airborne);
+      assert.ok(Math.abs(tank.speed) < 3.7);
+    }
+    if (tank.afloat && tank.pos.z > 17) floatBeforeExit = true;
+    if (tank.pos.z > 33) break;
+  }
+  assert.ok(afloatSteps > 120 && floatBeforeExit);
+  assert.ok(tank.pos.z > 33 && !tank.afloat && tank.vehicle.contact > 0, 'swims onto the far bank');
+  physics.free();
+}
+
+console.log('Rapier downhill, airborne, collision, bridge, damaged-track steering, and amphibious crossing checks passed.');

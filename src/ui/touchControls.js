@@ -54,8 +54,10 @@ export class TouchControls {
   this.root.classList.toggle('touch-paused',g.paused||g.ended||!p.alive);
   if(g.paused||g.ended||!p.alive)this.clear();
   for(const b of this.root.querySelectorAll('button')){const a=b.dataset.action;if(a==='scope')label(b,g.cam.sniper?'退出开镜':'开镜');if(a==='zoom')label(b,g.cam.sniper?'×'+g.cam.zoom:'倍率');if(a==='armor')b.classList.toggle('active',g.armorView.enabled);if(a==='lock')b.classList.toggle('active',!!g.lock);
-   if(a.startsWith('ammo')){const i=+a.slice(4);label(b,'弹 '+(i+1)+' · '+(p.ammo[i]??0));b.classList.toggle('active',p.shellIdx===i);}
-   if(a==='fire')label(b,p.reloadLeft>0?p.reloadLeft.toFixed(1)+'s':'开火');
+   if(a.startsWith('ammo')){const i=+a.slice(4);label(b,'弹 '+(i+1)+' · '+(p.ammo[i]??0));b.classList.toggle('active',!p.abilities.usingSecondary&&p.shellIdx===i);}
+   if(a==='ability'&&p.spec.secondary){label(b,p.abilities.usingSecondary?'副炮 · '+p.secondaryRounds:'切副炮');b.classList.toggle('active',p.abilities.usingSecondary);}
+   if(a==='ability'&&p.spec.dozer){label(b,p.abilities.dozerActive?'收起推土铲':'推土铲');b.classList.toggle('active',p.abilities.dozerActive);}
+   if(a==='fire')label(b,p.afloat?'浮航':p.fireReloadLeft>0?p.fireReloadLeft.toFixed(1)+'s':'开火');
   }
  }
  dispose(){this.clear();for(const off of this.listeners)off();this.root.remove();}

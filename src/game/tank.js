@@ -28,12 +28,14 @@ export class Tank {
     if (this.abilities.magazine) this.reloadLeft = 0;
     this.model = createTankModel(spec); game.scene.add(this.model.root);
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
-    this.airborne = false; this.landingSpeed = 0;
+    this.airborne = false; this.afloat = false; this.landingSpeed = 0;
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0;
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.dispersionProgress = 0; this.yawRate = 0; this.recoil = 0;
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
     this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 };
+    this.secondaryRounds = spec.secondary?.rounds ?? 0;
+    this.secondaryReloadLeft = 0;
     this.trackRepairs = [0, 0]; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
     this.input = { throttle: 0, steer: 0, brake: false, driveHeld: false, aim: new THREE.Vector3() };
@@ -46,7 +48,10 @@ export class Tank {
     this.turBox = { x: d.turretW / 2, y0: 0, y1: d.turretH, z0: tc - d.turretL / 2, z1: tc + d.turretL / 2 };
     this.inv = new THREE.Matrix4(); this.equip = new Equipment(this, items);
   }
-  get shell() { return this.spec.shells[this.shellIdx]; }
+  get shell() { return this.abilities.usingSecondary ? this.spec.secondary.shell : this.spec.shells[this.shellIdx]; }
+  get fireReloadLeft() { return this.abilities.usingSecondary ? this.secondaryReloadLeft : this.reloadLeft; }
+  get gunMount() { return this.abilities.usingSecondary ? this.model.secondaryGun : this.model.gun; }
+  get muzzleNode() { return this.abilities.usingSecondary ? this.model.secondaryMuzzle : this.model.muzzle; }
   get previewShell() {
     const sh = this.shell;
     return this.abilities?.overpenLeft > 0 ? { ...sh, pen: Math.round(sh.pen * (this.abilities.overpen.mult || 1.35)) } : sh;
@@ -87,6 +92,7 @@ export class Tank {
     this.turretYaw = 0;
     this.hullAiming = false;
     this.turnRate = 0;
+    this.afloat = false;
     this.airborne = false;
     this.landingSpeed = 0;
     this.vel.set(0, 0, 0);
@@ -114,12 +120,19 @@ export class Tank {
       if (!this.alive) return;
     }
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
+    if (this.secondaryReloadLeft > 0) this.secondaryReloadLeft = Math.max(0, this.secondaryReloadLeft - dt);
+    if (this.model.blade) {
+      this.model.blade.position.y = approach(this.model.blade.position.y, this.abilities.dozerActive ? 0.48 : 1.22, dt * 2.5);
+      this.model.blade.rotation.x = approach(this.model.blade.rotation.x, this.abilities.dozerActive ? 0.13 : -0.35, dt * 1.5);
+    }
+    if (this.model.trim) this.model.trim.rotation.x = approach(this.model.trim.rotation.x, this.afloat ? -0.45 : 0.45, dt * 2);
     this.abilities.update(dt);
     this.recoil = Math.max(0, this.recoil - dt * 1.2);
   }
 
   updateAfterMotion(dt) {
     if (this.alive) {
+      this.abilities.updateDozer(dt);
       const half = (this.spec.dims.W - this.spec.dims.trackW) / 2;
       updateRunningGear(this.model,
         this.trackRepairs[0] > 0 ? 0 : (this.speed + this.turnRate * half) * dt,
@@ -159,7 +172,7 @@ export class Tank {
     // Solve around the turret axis. The trunnion moves as the turret turns,
     // so aiming from its current position can oscillate at point-blank range.
     const range = Math.hypot(aim.x, aim.z);
-    const mount = m.gun.position;
+    const mount = this.gunMount.position;
     const yaw = range > 1e-4
       ? Math.atan2(aim.x, aim.z) - Math.asin(clamp(mount.x / range, -1, 1))
       : this.turretYaw;
@@ -168,7 +181,7 @@ export class Tank {
     const forward = aim.x * sin + aim.z * cos - mount.z;
     // Converge upwards no closer than the muzzle. Nearby surfaces above the
     // gun pivot would otherwise demand steep angles for tiny height changes.
-    const aimRange = Math.max(forward, rise > 0 ? m.muzzle.position.z : 0.01);
+    const aimRange = Math.max(forward, rise > 0 ? this.muzzleNode.position.z : 0.01);
     _v2.set(sin * aimRange, rise, cos * aimRange).applyQuaternion(pose);
     const { x: dx, y: dy, z: dz } = _v2;
     const horizontal = Math.hypot(dx, dz);
@@ -190,12 +203,14 @@ export class Tank {
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
     m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
+    if (m.secondaryGun) m.secondaryGun.rotation.x = -this.gunPitch;
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
   shotOrigin(muzzle) {
-    const pivot = this.model.gun.getWorldPosition(new THREE.Vector3());
+    const pivot = this.gunMount.getWorldPosition(new THREE.Vector3());
     const reach = pivot.distanceTo(muzzle);
-    let first = 1;
+    const structure = this.game.world?.structureHit?.(pivot.x, pivot.y, pivot.z, muzzle.x, muzzle.y, muzzle.z) ?? -1;
+    let first = structure >= 0 ? structure : 1;
     for (const t of this.game.tanks) {
       if (t === this) continue;
       const d = t.spec.dims;
@@ -206,12 +221,15 @@ export class Tank {
     }
     // The visual barrel can overlap an adjacent vehicle. Launch just before
     // its first plate so the normal hit test sees the entry surface.
-    return first < 1 ? pivot.lerp(muzzle, Math.max(0, first - 0.05 / reach)) : muzzle;
+    return first < 1 && reach > 0 ? pivot.lerp(muzzle, Math.max(0, first - 0.05 / reach)) : muzzle;
   }
   tryFire(time) {
-    if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
-    const g = this.game; const sh = this.shell; const m = this.model;
-    const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3()); const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
+    const secondary = this.abilities.usingSecondary;
+    const rounds = secondary ? this.secondaryRounds : this.ammo[this.shellIdx];
+    if (!this.alive || this.afloat || this.fireReloadLeft > 0 || rounds <= 0) return false;
+    const g = this.game; const sh = this.shell;
+    const muzzle = this.muzzleNode.getWorldPosition(new THREE.Vector3());
+    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.gunMount.getWorldQuaternion(_q)).normalize();
     // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
     const disp = this.dispersion(); const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const a = new THREE.Vector3().crossVectors(dir, up).normalize(), b = new THREE.Vector3().crossVectors(dir, a).normalize();
@@ -228,17 +246,27 @@ export class Tank {
     }
     const origin = this.shotOrigin(muzzle);
     g.ballistics.spawn(this, fireShell, origin, vel);
-    this.ammo[this.shellIdx]--; this.reloadLeft = this.reloadTime(); this.lastFired = time; this.stats.shots++;
-    if (this.abilities) this.abilities.onFire();
-    // Firing retains visual recoil, but does not inject a jump into the linear dispersion curve.
-    this.recoil = 1;
-    g.physics?.recoil(this, m.gun.getWorldPosition(_v), dir, sh.caliber);
+    this.lastFired = time; this.stats.shots++;
+    if (secondary) {
+      this.secondaryRounds--;
+      this.secondaryReloadLeft = this.spec.secondary.reload * (this.modules.gun < 1 ? 1.3 : 1);
+    } else {
+      this.ammo[this.shellIdx]--;
+      this.reloadLeft = this.reloadTime();
+      this.abilities.onFire();
+      this.recoil = 1;
+      if (this.ammo[this.shellIdx] <= 0) {
+        const next = this.ammo.findIndex(count => count > 0);
+        if (next >= 0) this.shellIdx = next;
+      }
+    }
+    g.physics?.recoil(this, this.gunMount.getWorldPosition(_v), dir, sh.caliber);
     g.effects.muzzle(origin, dir, sh.caliber); g.audio.gun(origin, sh.caliber, this.isPlayer);
-    if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
     return true;
   }
   tryAbility() { return this.abilities ? this.abilities.tryActivate() : false; }
   selectShell(i) {
+    this.abilities.usingSecondary = false;
     if (i === this.shellIdx || !this.spec.shells[i] || this.ammo[i] <= 0) return;
     this.shellIdx = i; this.reloadLeft = Math.max(this.reloadLeft, this.reloadTime() * (this.reloadLeft > 0 ? 1 : 0.85));
   }
