@@ -224,13 +224,16 @@ for side in (-1, 1):
 # and the Model 1944 enlarged/bulged forward casting. This replaces the crude
 # polygonal turret silhouette in the original Three.js-only asset.
 turret_sections = [
-    # z, x-radius, y-radius, center-x, center-y, exponent
-    (1.62, 1.22, 1.32,  0.00, 0.12, 3.8),
-    (1.82, 1.30, 1.40,  0.00, 0.12, 3.8),
-    (2.18, 1.31, 1.40, -0.02, 0.12, 3.8),
-    (2.40, 1.28, 1.36, -0.05, 0.10, 3.6),
-    (2.54, 1.22, 1.30, -0.08, 0.08, 3.5),
-    (2.60, 1.15, 1.24, -0.08, 0.08, 3.4),
+    # z, x-radius, y-radius, center-x, center-y, exponent.
+    # The 1944 casting has a broad lower cheek, a distinctly drawn-in roof,
+    # a fuller rear bustle and a steeper front face. Avoid a uniform capsule.
+    (1.62, 1.18, 1.25,  0.00, 0.02, 3.0),
+    (1.78, 1.30, 1.38,  0.00, 0.02, 3.2),
+    (2.04, 1.31, 1.34, -0.01, 0.00, 3.0),
+    (2.24, 1.28, 1.25, -0.03, -0.02, 2.8),
+    (2.40, 1.21, 1.14, -0.06, -0.05, 2.6),
+    (2.50, 1.12, 1.05, -0.08, -0.07, 2.4),
+    (2.55, 1.04, 0.98, -0.08, -0.07, 2.2),
 ]
 N = 64
 tv = []
@@ -240,9 +243,15 @@ for z, rx, ry, cx, cy, expn in turret_sections:
         ca, sa = math.cos(a), math.sin(a)
         x = cx + rx * math.copysign(abs(ca)**(2/expn), ca)
         y = cy + ry * math.copysign(abs(sa)**(2/expn), sa)
-        # Push the forward center slightly outward to form the rounded cheeks.
+        # Build the characteristic forward cheek swell only in the lower
+        # casting. The front face then draws inward toward the roof instead
+        # of remaining a symmetric rounded capsule.
         if sa > 0.55:
-            x += 0.055 * (sa-0.55)/0.45 * (1 if ca >= 0 else -1)
+            cheek = max(0.0, 1.0 - abs(z - 1.92) / 0.42)
+            x += 0.075 * cheek * (sa-0.55)/0.45 * (1 if ca >= 0 else -1)
+        # Rear bustle remains fuller than the forward roof transition.
+        if sa < -0.55:
+            y -= 0.045 * max(0.0, 1.0 - abs(z - 2.02) / 0.48)
         tv.append((x, y, z))
 tf = []
 for j in range(len(turret_sections)-1):
@@ -252,9 +261,10 @@ for j in range(len(turret_sections)-1):
 tf.append(tuple((len(turret_sections)-1)*N+i for i in range(N)))
 turret_body = mesh_object("Turret_cast_1944_loft", tv, tf, CAST, True)
 
-# Turret mantlet: cast rounded shield, with a pronounced gun opening and separate
-# coaxial/sight apertures. Its position and shape remain distinct from the turret.
-mantlet = add_uv_sphere("D25T_cast_mantlet", (0.0, 1.39, 2.17), (0.83, 0.265, 0.37), CAST)
+# D-25T mantlet: flattened, broad cast shield with a sloping lower edge.
+# The asymmetry and raised shoulders keep it from reading as a spherical knob.
+mantlet = add_uv_sphere("D25T_cast_mantlet", (0.0, 1.31, 2.13), (0.82, 0.235, 0.32), CAST)
+mantlet.rotation_euler[0] = math.radians(-7)
 cylinder("Main_gun_recess", (0.0, 1.625, 2.17), 0.19, 0.025, DARK, "Y", 40, 0.0)
 torus("Main_gun_mantlet_collar", (0.0, 1.64, 2.17), 0.19, 0.035, STEEL, "Y")
 cylinder("Coaxial_DT_aperture", (-0.43, 1.62, 2.11), 0.055, 0.03, DARK, "Y", 24, 0.0)
@@ -306,9 +316,11 @@ cylinder("Loader_hatch_lid", (0.56, -0.62, 2.66), 0.25, 0.045, PAINT, "Z", 40)
 box("Loader_hatch_handle", (0.56, -0.62, 2.70), (0.22, 0.035, 0.035), STEEL, 0.012)
 
 # Rear turret DT ball mount on the right half of the bustle (rear faces -Y).
-add_uv_sphere("Turret_rear_DT_ball_mount", (0.57, -1.16, 2.12), (0.14, 0.10, 0.13), CAST)
-cylinder("Turret_rear_DT_aperture", (0.57, -1.255, 2.12), 0.043, 0.03, DARK, "Y", 20, 0.0)
-cylinder("Turret_rear_DT_barrel", (0.57, -1.34, 2.12), 0.024, 0.17, STEEL, "Y", 16)
+# The 1944 wartime turret retains the rear DT position; do not substitute the
+# post-1954 IS-2M ventilator fitting.
+add_uv_sphere("Turret_rear_DT_ball_mount", (0.57, -1.12, 2.02), (0.135, 0.095, 0.12), CAST)
+cylinder("Turret_rear_DT_aperture", (0.57, -1.215, 2.02), 0.041, 0.03, DARK, "Y", 20, 0.0)
+cylinder("Turret_rear_DT_barrel", (0.57, -1.30, 2.02), 0.022, 0.17, STEEL, "Y", 16)
 
 # Road wheels: six twin stations per side, 550 mm diameter. Each station is a
 # pair of separate cast wheels with dished faces, rims and central hubs.
