@@ -452,7 +452,7 @@ export class Game {
     // player bush ghosting
     const pb = this.player.alive ? this.player.inBush : null; this.world.veg.setPlayerBush(pb && !this.cam.sniper ? pb : pb);
     this.world.updateShadowCenter(this.cam.follow.pos, this.time); this.world.update(dt, this.time, this.camera.position);
-    this.effects.update(dt, (x, z) => this.world.terrain.height(x, z));
+    this.effects.update(dt, (x, z) => this.world.terrain.height(x, z), this.camera);
     this.audio.setListener(this.camera.position);
     if (this.player.alive && !this.ended) this.audio.engine(Math.abs(this.player.input.throttle), this.player.speed); else this.audio.stopEngine();
     this.hud.update(dt, this.camera);

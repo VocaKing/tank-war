@@ -9,6 +9,7 @@ export class MapBuilder {
     this.def = def; this.rng = new RNG(def.seed); this.noise = makeNoise2D(def.seed); this.noise2 = makeNoise2D(def.seed * 7 + 3);
     this.t = new Terrain(def.terrainHalf || 700, 2);
     this.roadDetail = new Float32Array(this.t.n * this.t.n * 3);
+    this.roadSurface = new Int8Array(this.t.n * this.t.n);
     this.play = def.playHalf || 600;
     this.buildings = []; this.walls = []; this.trees = []; this.bushes = []; this.rocks = []; this.props = []; this.rivers = []; this.lakes = []; this.bridges = []; this.roads = [];
     this.bases = []; this.lanes = []; this.quality = quality;
@@ -95,6 +96,7 @@ export class MapBuilder {
     const pts = this._dense(points, opts.smooth ?? 10);
     const t = this.t; const N = t.n * t.n; const dist = new Float32Array(N).fill(1e9), lvl = new Float32Array(N);
     const half = width / 2, R = half + 7;
+    const surface = kind === 'asphalt' ? 1 : kind === 'dirt' ? -1 : 0;
     let bridgeStart = -1;
     pts.forEach(([x, z], i) => {
       const onWater = t.waterLevel(x, z) > -1e8 || t.occAt(x, z) === OCC.WATER;
@@ -125,6 +127,7 @@ export class MapBuilder {
         this.roadDetail[detail] = lateral[k];
         this.roadDetail[detail + 1] = along[k];
         this.roadDetail[detail + 2] = strength;
+        this.roadSurface[k] = surface;
       }
       if (d < half) { t.h[k] = h; t.road[k] = Math.max(t.road[k], 1 - smoothstep(half * 0.7, half, d) * 0.6); if (t.occ[k] === OCC.WATER) t.water[k] = -1e9; t.occ[k] = OCC.ROAD; }
       else { const f = smoothstep(half, R, d); t.h[k] = lerp(h, t.h[k], f); t.road[k] = Math.max(t.road[k], (1 - f) * 0.25); }

@@ -1,8 +1,8 @@
 // GPU point-sprite particle systems + light flashes + tracers + debris
 import * as THREE from 'three';
 import { softSprite } from '../world/textures.js';
+import { ArtilleryVfx } from './artilleryVfx.js';
 
-const UP = new THREE.Vector3(0, 1, 0);
 const VS = `
 attribute float aSize; attribute vec4 aColor; attribute float aRot;
 varying vec4 vColor; varying float vRot; uniform float uScale;
@@ -59,6 +59,7 @@ class Particles {
 export class Effects {
   constructor(scene, renderer, dustColor = [0.55, 0.5, 0.42], quality = 'high') {
     this.scene = scene; this.smoke = new Particles(scene, 5000, false); this.fire = new Particles(scene, 2500, true);
+    this.artillery = new ArtilleryVfx(scene, quality, dustColor);
     this.dust = dustColor; this.lights = []; this.burners = []; this.tracers = []; this.debris = [];
     const flashes = quality === 'high' ? 4 : quality === 'medium' ? 2 : 1;
     for (let i = 0; i < flashes; i++) { const l = new THREE.PointLight(0xffaa55, 0, 60, 1.6); scene.add(l); this.lights.push({ l, t: 0, max: 0.1, i0: 0 }); }
@@ -69,7 +70,7 @@ export class Effects {
   }
   setScale(h, fovDeg) { const s = h * this.renderer.getPixelRatio() / (2 * Math.tan((fovDeg * Math.PI) / 360)); this.smoke.mat.uniforms.uScale.value = s; this.fire.mat.uniforms.uScale.value = s; }
   dispose() {
-    this.smoke.dispose(); this.fire.dispose();
+    this.smoke.dispose(); this.fire.dispose(); this.artillery.dispose();
     this.tracerGeo.dispose(); this.tracerMat.dispose();
     this.debrisGeo.dispose(); this.debrisMat.dispose();
   }
@@ -95,55 +96,20 @@ export class Effects {
   impactWater(pos) { for (let i = 0; i < 40; i++) this.smoke.emit({ x: pos.x + (Math.random() - 0.5), y: pos.y, z: pos.z + (Math.random() - 0.5), vx: (Math.random() - 0.5) * 3, vy: 6 + Math.random() * 10, vz: (Math.random() - 0.5) * 3, life: 1.5, s0: 0.6, s1: 2.5, r: 0.9, g: 0.94, b: 0.97, a: 0.8, drag: 0.6, grav: 9 }); }
   impactStructure(pos) { this.impactGround(pos, 80); for (let i = 0; i < 20; i++) this.smoke.emit({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 8, vy: Math.random() * 6, vz: (Math.random() - 0.5) * 8, life: 3, s0: 1.5, s1: 5, r: 0.75, g: 0.72, b: 0.66, a: 0.5, drag: 0.3 }); }
   artilleryImpact(pos, normal, surface) {
-    const water = surface === 'water';
-    const spread = new THREE.Quaternion().setFromUnitVectors(UP, normal);
-    const origin = pos.clone().addScaledVector(normal, 0.65);
-    const { x, y, z } = origin;
-    const v = new THREE.Vector3();
-
-    this.flash(origin, 480, 0.2, 0xffad64);
-    this.fire.emit({ x, y, z, life: 0.18, s0: 3.4, s1: 6.8, r: 1, g: 0.9, b: 0.63, a: 1, fadeIn: 0 });
-    for (let i = 0; i < (water ? 12 : 24); i++) {
-      v.set(Math.random() - 0.5, 0.16 + Math.random() * 0.64, Math.random() - 0.5)
-        .normalize().multiplyScalar(5 + Math.random() * 9).applyQuaternion(spread);
+    const origin = pos.clone().addScaledVector(normal, 1.2);
+    this.flash(origin, 720, 0.17, 0xff973d);
+    this.artillery.burst(pos, normal, surface);
+    if (surface === 'water') return;
+    const count = this.artillery.budget.fire * 2;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 9 + Math.random() * 19;
       this.fire.emit({
-        x, y, z, vx: v.x, vy: v.y + 1.1, vz: v.z, life: 0.26 + Math.random() * 0.27,
-        s0: 1.5 + Math.random(), s1: 4 + Math.random() * 2.5,
-        r: 1, g: 0.52 + Math.random() * 0.22, b: 0.19, r1: 0.65, g1: 0.16, b1: 0.03,
-        a: 0.64, drag: 0.15, fadeIn: 0.02,
+        x: origin.x, y: origin.y, z: origin.z,
+        vx: Math.cos(angle) * speed + normal.x * 5, vy: 4 + Math.random() * 15, vz: Math.sin(angle) * speed + normal.z * 5,
+        life: 0.38 + Math.random() * 0.68, s0: 0.32 + Math.random() * 0.20, s1: 0.09,
+        r: 1, g: 0.78, b: 0.38, r1: 0.92, g1: 0.26, b1: 0.035, drag: 0.31, grav: 15, fadeIn: 0.015,
       });
-    }
-
-    if (surface === 'ground' || surface === 'structure') {
-      const [r, g, b] = surface === 'ground' ? this.dust : [0.66, 0.62, 0.56];
-      for (let i = 0; i < 22; i++) {
-        const angle = Math.PI * 2 * (i + Math.random()) / 22;
-        const speed = 5 + Math.random() * 8;
-        v.set(Math.cos(angle) * speed, 1.5 + Math.random() * 4, Math.sin(angle) * speed).applyQuaternion(spread);
-        this.smoke.emit({
-          x, y, z, vx: v.x, vy: v.y, vz: v.z, life: 1.6 + Math.random() * 1.1,
-          s0: 1.3, s1: 6.2, r, g, b, a: 0.54, drag: 0.12, fadeIn: 0.13,
-        });
-      }
-    }
-
-    const [r, g, b] = water ? [0.73, 0.79, 0.83] : [0.15, 0.13, 0.12];
-    for (let i = 0; i < 20; i++) {
-      v.set((Math.random() - 0.5) * 9, Math.random() * 6, (Math.random() - 0.5) * 9).applyQuaternion(spread);
-      this.smoke.emit({
-        x, y, z, vx: v.x, vy: v.y + 2.8, vz: v.z, life: (water ? 1.3 : 2.5) + Math.random() * 1.4,
-        s0: 1, s1: 5 + Math.random() * 3, r, g, b, a: 0.64, drag: 0.33, grav: -0.35, fadeIn: 0.16,
-      });
-    }
-    if (!water) {
-      for (let i = 0; i < 16; i++) {
-        v.set(Math.random() - 0.5, 0.1 + Math.random() * 0.55, Math.random() - 0.5)
-          .normalize().multiplyScalar(10 + Math.random() * 21).applyQuaternion(spread);
-        this.fire.emit({
-          x, y, z, vx: v.x, vy: v.y, vz: v.z, life: 0.23 + Math.random() * 0.4,
-          s0: 0.24, s1: 0.1, r: 1, g: 0.68, b: 0.27, a: 1, drag: 0.38, grav: 10,
-        });
-      }
     }
   }
   sparks(pos, n = 30, color = [1, 0.8, 0.4], dir) {
@@ -190,7 +156,7 @@ export class Effects {
   exhaust(pos, load) { if (Math.random() > 0.35 + load * 0.5) return; this.smoke.emit({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 0.6, vy: 0.8 + load, vz: (Math.random() - 0.5) * 0.6, life: 1.4, s0: 0.4, s1: 1.8, r: 0.25, g: 0.24, b: 0.23, a: 0.25 + load * 0.25, drag: 0.6, grav: -0.3 }); }
   addTracer(shell) { const m = new THREE.Mesh(this.tracerGeo, this.tracerMat); m.renderOrder = 6; this.scene.add(m); shell.tracer = m; }
   removeTracer(shell) { if (shell.tracer) { this.scene.remove(shell.tracer); shell.tracer = null; } }
-  update(dt, ground) {
+  update(dt, ground, camera) {
     for (const L of this.lights) { if (L.t < L.max) { L.t += dt; L.l.intensity = L.i0 * Math.max(0, 1 - L.t / L.max); } else L.l.intensity = 0; }
     for (let i = this.burners.length - 1; i >= 0; i--) { const b = this.burners[i]; b.t += dt; if (b.t > b.dur) { this.burners.splice(i, 1); continue; }
       const p = b.obj.localToWorld(b.offset.clone()); const fade = 1 - b.t / b.dur; b.acc += dt * 30 * b.k;
@@ -201,6 +167,6 @@ export class Effects {
     for (let i = this.debris.length - 1; i >= 0; i--) { const d = this.debris[i]; d.t += dt; d.v.y -= 9.81 * dt; d.m.position.addScaledVector(d.v, dt); d.m.rotation.x += d.w.x * dt; d.m.rotation.y += d.w.y * dt;
       const gy = ground(d.m.position.x, d.m.position.z); if (d.m.position.y < gy + 0.1) { d.m.position.y = gy + 0.1; d.v.multiplyScalar(0.3); d.v.y = Math.abs(d.v.y) * 0.3; d.w.multiplyScalar(0.5); }
       if (d.t > 25) { this.scene.remove(d.m); this.debris.splice(i, 1); } }
-    this.smoke.update(dt); this.fire.update(dt);
+    this.smoke.update(dt); this.fire.update(dt); this.artillery.update(dt, camera);
   }
 }

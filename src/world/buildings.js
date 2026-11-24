@@ -12,7 +12,19 @@ function boxUV(w, h, d, tile = 3, uo = 0) {
   for (let i = 0; i < uv.count; i++) { const f = Math.floor(i / 4); uv.setXY(i, uv.getX(i) * dims[f][0] / tile + uo, uv.getY(i) * dims[f][1] / tile); }
   return g;
 }
-function clean(g) { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (!['position', 'normal', 'uv'].includes(k)) n.deleteAttribute(k); if (!n.attributes.uv) n.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n.attributes.position.count * 2), 2)); return n; }
+function clean(g) {
+  const count = g.attributes.position.count;
+  // Keep shared vertices on the repeated boxes, arches, cylinders and trim.
+  if (!g.index) {
+    const Indices = count > 65536 ? Uint32Array : Uint16Array;
+    g.setIndex(new THREE.BufferAttribute(Indices.from({ length: count }, (_, i) => i), 1));
+  }
+  for (const key of Object.keys(g.attributes)) {
+    if (!['position', 'normal', 'uv'].includes(key)) g.deleteAttribute(key);
+  }
+  if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(count * 2), 2));
+  return g;
+}
 function gableRoof(w, d, H, R, o, tile = 2.5) {
   const hw = w / 2 + o, hd = d / 2 + o, ey = H - o * R / (w / 2), ry = H + R;
   const slope = Math.hypot(hw, ry - ey);
@@ -155,10 +167,17 @@ export function buildStructures(mb, scene, terrain) {
       if (b.style === 'stone' && !b.ruined && r.next() < 0.6) for (const s of [-1, 1]) { const sh = boxUV(0.5, wh + 0.1, 0.05, 1); const so = off + 0.03; if (axis === 'x') place(sh, b, sign * so, y, t + s * (ww / 2 + 0.27), Math.PI / 2); else place(sh, b, t + s * (ww / 2 + 0.27), y, sign * so, 0); B.add('paintwood', sh); }
     }
   };
-  const addArch = (b, x, y, z, yaw, width, height, frame, fill) => {
+  const addArch = (b, x, y, z, yaw, width, height, frame, fill, louvers = false) => {
     const { molding, glazing } = archedOpening(width, height, frame);
     B.add('castle', place(molding, b, x, y, z, yaw));
     B.add(fill, place(glazing, b, x, y, z, yaw));
+    if (louvers && mb.quality !== 'low') {
+      const depth = 0.052, insetWidth = width - frame * 2;
+      for (let offset = -height / 2 + frame * 1.75; offset < height / 2 - width / 2; offset += 0.22) {
+        B.add('wood', place(boxUV(insetWidth, 0.134, 0.14, 1),
+          b, x + Math.sin(yaw) * depth, y + offset, z + Math.cos(yaw) * depth, yaw, -0.24));
+      }
+    }
   };
   for (const b of mb.buildings) {
     B.tint = pickTint(r, b.style);
@@ -188,10 +207,11 @@ export function buildStructures(mb, scene, terrain) {
       }
       const steepleZ = -b.d / 2 - 2.5;
       for (const side of [-1, 1]) {
-        addArch(b, side * 2.77, 16.1, steepleZ, side * Math.PI / 2, 1.24, 2.82, 0.18, 'dark');
-        addArch(b, 0, 16.1, steepleZ + side * 2.77, side > 0 ? 0 : Math.PI, 1.24, 2.82, 0.18, 'dark');
+        addArch(b, side * 2.77, 16.1, steepleZ, side * Math.PI / 2, 1.24, 2.82, 0.18, 'dark', true);
+        addArch(b, 0, 16.1, steepleZ + side * 2.77, side > 0 ? 0 : Math.PI, 1.24, 2.82, 0.18, 'dark', true);
       }
       B.add('castle', place(boxUV(5.82, 0.27, 5.82, 2), b, 0, 19.82, steepleZ));
+      for (const y of [5.18, 13.97]) B.add('castle', place(boxUV(5.64, 0.17, 5.64, 2), b, 0, y, steepleZ));
       addArch(b, 0, 1.87, steepleZ - 2.77, Math.PI, 2.43, 3.62, 0.23, 'dark');
       colliders.push(new OBB(b.x, b.z, b.w / 2, b.d / 2, b.rot, b.y - 2, b.y + H + 5));
       const tc = Math.cos(b.rot), ts = Math.sin(b.rot); const tz = -b.d / 2 - 2.5;
@@ -202,6 +222,17 @@ export function buildStructures(mb, scene, terrain) {
       H = 10; const g = boxUV(b.w, H, b.d, 3); place(g, b, 0, H / 2, 0); B.add('plaster', g);
       const drum = new THREE.CylinderGeometry(7.5, 7.5, 2.5, 32); place(drum, b, 0, H + 1.25, 0); B.add('plaster', drum);
       const dome = new THREE.SphereGeometry(7.5, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2); place(dome, b, 0, H + 2.5, 0); B.add('dome', dome);
+      if (mb.quality !== 'low') {
+        // Shallow ribs following the shell and a moulded ring at the springline.
+        const ring = new THREE.TorusGeometry(7.50, 0.103, 6, 40).rotateX(Math.PI / 2);
+        B.add('castle', place(ring, b, 0, H + 2.51, 0));
+        const points = Array.from({ length: 12 }, (_, i) => {
+          const angle = i / 12 * (Math.PI / 2);
+          return new THREE.Vector3(0, 7.54 * Math.sin(angle), 7.54 * Math.cos(angle));
+        });
+        const rib = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 12, 0.047, 4, false);
+        for (let i = 0; i < 16; i++) B.add('dome', place(rib.clone(), b, 0, H + 2.5, 0, i * Math.PI / 8));
+      }
       const min = new THREE.CylinderGeometry(1.4, 1.8, 32, 16); place(min, b, b.w / 2 + 3, 16, b.d / 2 + 3); B.add('plaster', min);
       const bal = new THREE.CylinderGeometry(2.4, 2.0, 1.0, 16); place(bal, b, b.w / 2 + 3, 26, b.d / 2 + 3); B.add('plaster', bal);
       const cap = new THREE.ConeGeometry(1.6, 4, 16); place(cap, b, b.w / 2 + 3, 34, b.d / 2 + 3); B.add('dome', cap);
@@ -271,10 +302,13 @@ export function buildStructures(mb, scene, terrain) {
       const edge = ww / 2 + 0.45;
       const tiles = Math.ceil((dd + 0.7) / 0.54);
       for (const side of [-1, 1]) {
-        B.add('wood', place(boxUV(Math.hypot(edge, edge * Math.tan(slope)), 0.19, 0.08, 2),
-          b, Math.cos(ry) * side * edge / 2 + Math.sin(ry) * (dd / 2 + 0.44),
-          H + R - edge * Math.tan(slope) / 2,
-          Math.cos(ry) * (dd / 2 + 0.44) - Math.sin(ry) * side * edge / 2, ry, 0, -side * slope));
+        for (const end of [-1, 1]) {
+          const halfSlopeX = side * edge / 2, vergeZ = end * (dd / 2 + 0.44);
+          B.add('wood', place(boxUV(Math.hypot(edge, edge * Math.tan(slope)), 0.19, 0.08, 2),
+            b, Math.cos(ry) * halfSlopeX + Math.sin(ry) * vergeZ,
+            H + R - edge * Math.tan(slope) / 2,
+            Math.cos(ry) * vergeZ - Math.sin(ry) * halfSlopeX, ry, 0, -side * slope));
+        }
         for (let k = 0; k < tiles; k++) {
           const x = side * (edge - 0.16), z = ((k + 0.5) / tiles - 0.5) * (dd + 0.73);
           const ey = H + R - Math.abs(x) * Math.tan(slope);
@@ -300,7 +334,23 @@ export function buildStructures(mb, scene, terrain) {
     if (b.door) { const dw = b.barn ? 3.4 : 1.1, dh = b.barn ? 3.4 : 2.2; const dg = boxUV(dw, dh, 0.14, 1); place(dg, b, b.door * (b.w / 2 + 0.02), dh / 2 + 0.4, 0, Math.PI / 2); B.add(b.barn ? 'wood' : 'paintwood', dg);
       const fr = (w2, h2, ox, oy) => { const f = boxUV(w2, h2, 0.18, 1); place(f, b, b.door * (b.w / 2 + 0.05), oy, ox, Math.PI / 2); B.add(b.style === 'desert' ? 'wood' : 'castle', f); };
       fr(dw + 0.3, 0.16, 0, dh + 0.48); fr(0.15, dh, -dw / 2 - 0.07, dh / 2 + 0.4); fr(0.15, dh, dw / 2 + 0.07, dh / 2 + 0.4);
-      if (!b.barn) { const st = boxUV(0.5, 0.2, 1.6, 1); place(st, b, b.door * (b.w / 2 + 0.25), 0.3, 0); B.add('castle', st); }
+      if (!b.barn) {
+        const stepMat = b.style === 'desert' ? 'damaged' : 'castle';
+        B.add(stepMat, place(boxUV(0.95, 0.16, 1.66, 1), b, b.door * (b.w / 2 + 0.42), 0.08, 0));
+        B.add(stepMat, place(boxUV(0.68, 0.15, 1.56, 1), b, b.door * (b.w / 2 + 0.29), 0.23, 0));
+        B.add(stepMat, place(boxUV(0.39, 0.09, 1.42, 1), b, b.door * (b.w / 2 + 0.15), 0.345, 0));
+        if (mb.quality !== 'low') {
+          const face = b.door * (b.w / 2 + 0.091);
+          for (const y of [0.79, 1.97]) {
+            B.add('dark', place(boxUV(0.036, 0.07, 0.28, 1), b, face, y, -b.door * 0.37));
+          }
+          B.add('metal', place(boxUV(0.038, 0.17, 0.12, 1), b, face, 1.4, b.door * 0.35));
+          B.add('metal', place(boxUV(0.13, 0.035, 0.13, 1), b, face, 1.42, b.door * 0.31));
+          for (const y of [0.88, 1.98]) {
+            B.add('paintwood', place(boxUV(0.031, 0.095, dw - 0.08, 1), b, face, y, 0));
+          }
+        }
+      }
       else for (let k = 0; k < 2; k++) { const br2 = boxUV(0.06, 0.12, dw * 1.05, 1); place(br2, b, b.door * (b.w / 2 + 0.1), 0.4 + dh * (0.3 + k * 0.4), 0, 0, 0, k ? 0.6 : -0.6); B.add('dark', br2); } }
     // garden fences / picket fences around village houses
     if ((b.style === 'stone' || b.style === 'brick') && !b.barn && r.next() < 0.55) {
@@ -368,6 +418,15 @@ export function buildStructures(mb, scene, terrain) {
       if (!causeway) for (const sd of [-1, 1]) {
         const ox = sd * (hw + 0.25); const px = mx + ox * Math.cos(rot), pz = mz - ox * Math.sin(rot);
         const pg = boxUV(0.5, 1.0, sl, 2.5); pg.translate(0, 0.45, 0); pg.rotateX(-tilt); xf(pg, px, my, pz, rot); B.add('castle', pg);
+        if (mb.quality !== 'low') {
+          const blocks = Math.ceil(sg.l / 1.35);
+          for (let i = 0; i < blocks; i++) {
+            const position = (i + 0.5) / blocks - 0.5;
+            const cap = boxUV(0.61, 0.115, sg.l / blocks * 0.98, 1.1).rotateX(-tilt);
+            B.add('stone', xf(cap, px + sg.ux * sg.l * position, my + 0.916 + (y1 - y0) * position,
+              pz + sg.uz * sg.l * position, rot));
+          }
+        }
         const lowT = Math.min(terrain.height(px, pz), my - 1);
         const sw = boxUV(0.5, my - lowT, sl, 2.5); xf(sw, px, (my + lowT) / 2 - 0.45, pz, rot); B.add('castle', sw);
         colliders.push(new OBB(px, pz, 0.25, sg.l / 2 + 0.1, rot, lowT - 1, Math.max(y0, y1) + 0.95, 'wall'));
@@ -459,7 +518,7 @@ export function buildStructures(mb, scene, terrain) {
     const material = M[key];
     material.vertexColors = true;
     const cells = new Map();
-    const split = list.reduce((count, part) => count + part.attributes.position.count, 0) > 66_000;
+    const split = list.reduce((count, part) => count + part.index.count, 0) > 66_000;
     for (const part of list) {
       const pos = part.attributes.position;
       // Split busy materials so buildings outside both the camera and light
