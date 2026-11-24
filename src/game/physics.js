@@ -252,7 +252,7 @@ export class BattlefieldPhysics {
 
     // The chassis can carry the tank on a bank even with every suspension ray unloaded.
     const recovering = vehicle.recoveryTime >= RECOVERY_DELAY;
-    const pushing = tank.alive && tank.modules.tracks === 1 && !brake &&
+    const pushing = tank.alive && tank.modules[tank.mobilityModule] === 1 && !brake &&
       Math.max(Math.abs(throttle), Math.abs(steer)) > 0.1;
     const stalled = pushing && tank.vel.lengthSq() < (recovering ? 6 : 0.36) &&
       (recovering || _angular.lengthSq() < 0.25);
@@ -323,7 +323,7 @@ export class BattlefieldPhysics {
   }
 
   applyBuoyancy({ tank, body, mass, inertiaYaw }, depth) {
-    const draft = tank.spec.amphibious.draft;
+    const draft = tank.spec.amphibious.draft || 1.2;
     const immersion = clamp((depth - 0.1) / (draft * 0.57), 0, 1);
     tank.afloat = immersion >= 0.8;
     if (immersion === 0) return 0;
@@ -341,24 +341,36 @@ export class BattlefieldPhysics {
   applyTraction(vehicle, load, leftLoad, waterDepth, floating = false, crawl = false) {
     const { tank, body, mass, inertiaYaw } = vehicle;
     const s = tank.spec, dt = PHYSICS_STEP, input = tank.input, T = this.battlefield.terrain;
-    const mobile = tank.alive && tank.modules.tracks === 1;
+    const mobile = tank.alive && tank.modules[tank.mobilityModule] === 1;
+    const movingInput = Math.max(Math.abs(input.throttle), Math.abs(input.steer)) > 0.08;
+    if (tank.usesSpade?.() && movingInput && tank.spadeState !== 'stowed') tank.setSpade(false);
+    if (s.artillery?.autoDeploy && movingInput && tank.autoArtilleryState !== 'stowed') {
+      tank.pendingFire = false; tank.autoArtilleryState = 'packing'; tank.autoArtilleryTimer = s.artillery.packSeconds || 1;
+    }
+    const braced = tank.usesSpade?.() && tank.spadeState !== 'stowed' || s.artillery?.autoDeploy && tank.autoArtilleryState !== 'stowed';
     const brokenSide = tank.alive ? tank.brokenTrackSide : 0;
     const intactLoad = brokenSide === -1 ? load - leftLoad : brokenSide === 1 ? leftLoad : 0;
     const canPivot = intactLoad > 0 && !input.brake;
-    const throttle = mobile ? clamp(input.throttle, -1, 1) : 0;
-    const steer = mobile || canPivot ? clamp(input.steer, -1, 1) : 0;
+    const throttle = mobile && !braced ? clamp(input.throttle, -1, 1) : 0;
+    const steer = (mobile && !braced) || canPivot && !braced ? clamp(input.steer, -1, 1) : 0;
     const rearDriving = !!(s.rearDriver && throttle < 0 && tank.crewAlive('Rear driver'));
     const driver = rearDriving || tank.crewAlive('Driver') ? 1 : 0.65;
-    const fullSpeed = s.maxSpeed / 3.6, water = clamp(1 - Math.max(0, waterDepth) * 0.38, 0.2, 1);
+    const fullSpeed = (tank.activeMaxSpeed || s.maxSpeed) / 3.6, water = s.amphibious ? 1 : clamp(1 - Math.max(0, waterDepth) * 0.38, 0.2, 1);
     const i = T.x2i(tank.pos.x), j = T.x2i(tank.pos.z);
     const road = T.inside(i, j) ? T.road[T.idx(i, j)] : 0;
     const grip = 0.82 + road * 0.21;
     const overdrive = tank.equip.active('overdrive'), loadFactor = tank.equip.factor;
     const engine = tank.modules.engine < 1 ? 0.5 : 1;
     const reverse = rearDriving ? s.rearDriver.maxSpeed : s.reverseSpeed;
+    const terrainSpeed = s.runningGear === 'wheels'
+      ? (road > 0.12 ? (0.88 + 0.34 * Math.min(1, road)) * (s.roadSpeedMult || 1) : (s.offRoadSpeedMult || 0.72))
+      : 0.78 + 0.22 * Math.min(1, road * 1.5);
     let speedLimit = (throttle < 0 ? reverse / 3.6 : fullSpeed) * engine * driver * loadFactor *
-      water * (0.78 + 0.22 * Math.min(1, road * 1.5)) * (overdrive ? 1.2 : 1) * (tank.abilities?.speedMult ?? 1);
-    if (floating) speedLimit = s.amphibious.speed / 3.6 * engine * driver * (throttle < 0 ? 0.52 : 1);
+      water * terrainSpeed * (overdrive ? 1.2 : 1) * (tank.abilities?.speedMult ?? 1);
+    if (floating) speedLimit = (s.amphibious.speed || s.maxSpeed * 0.22) / 3.6 * engine * driver * (throttle < 0 ? 0.52 : 1);
+    const uphill = Math.max(0, _tangent.y * Math.sign(throttle));
+    if (s.dozerAssist) speedLimit *= 1 + Math.min(0.28, uphill * s.dozerAssist);
+    if (braced) speedLimit = 0;
     if (tank.abilities?.dozerActive) speedLimit = Math.min(speedLimit, s.dozer.speed / 3.6);
     if (crawl) speedLimit = Math.min(speedLimit, 1.5);
     const lowGear = 4.3 * Math.max(0, 1 - Math.abs(tank.speed) / 9) ** 2;
