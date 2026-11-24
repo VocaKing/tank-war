@@ -3,6 +3,7 @@ import { TANKS, TANK_BY_ID, SHELL_TYPES, TIER_NAMES, sanitizeLoadout } from '../
 import { ITEMS, ITEM_IDS, ITEM_SLOTS, sanitizeItems, itemsKg, loadFactor, LOAD_AMPLIFY } from '../game/items.js';
 import { describeTankAbilities } from '../game/abilities.js';
 import { MAPS } from '../world/maps.js';
+import { equipmentIcon } from './equipment.js';
 
 const los = (a) => Math.round(a[0] / Math.cos((a[1] * Math.PI) / 180));
 const typeBadge = (type) => `<span class="ability-badge ${type}">${type === 'active' ? '主动' : '被动'}</span>`;
@@ -42,11 +43,12 @@ export class Menu {
       <div class="brand"><h1>STEEL FRONT</h1><span>3D Tank War · v3.0</span></div>
       <div class="tanklist">${[1, 2, 3, 4].map((tier) => `<div class="tier">Tier ${['I', 'II', 'III', 'IV'][tier - 1]} · ${TIER_NAMES[tier] || ''}</div>` + TANKS.filter((t) => t.tier === tier).map(tankCard).join('')).join('')}</div>
       ${this.mobile ? '<section id="m-mobile-skills" class="vehicle-skills" lang="zh-CN" aria-label="车辆技能" hidden></section>' : ''}
-      <button id="m-balance" class="balance-menu-btn" style="position:absolute;top:24px;right:24px;z-index:40;pointer-events:auto;padding:10px 16px;border:1px solid #8ca7bc;border-radius:6px;background:#263b4e;color:#fff;font:inherit;cursor:pointer">⚙ 游戏平衡编辑器 / Balance Editor</button>\n      <div class="menutools"><button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
+      <button id="m-balance" class="tbl-btn balance-menu-btn">游戏平衡编辑器 / Balance Editor</button>
+      <div class="menutools"><button class="tbl-btn" id="m-table">Compare all tanks</button><button class="tbl-btn" id="m-armor" aria-pressed="false">Armor Preview</button></div>
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
         <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to soft-lock the camera on it; mouse input is dampened near the target, pull away firmly to break"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
-        <div class="mode">Team Battle · 7 vs 7 · Base capture · tier-matched</div><div class="losum" id="m-losum"></div><button class="tbl-btn lo-btn" id="m-lo-btn">🎒 Ammo &amp; equipment</button><button class="battle" id="m-battle">BATTLE!</button></div>
+        <div class="mode">Team Battle · 7 vs 7 · Base capture · tier-matched</div><div class="losum" id="m-losum"></div><button class="tbl-btn lo-btn" id="m-lo-btn">Ammo &amp; equipment</button><button class="battle" id="m-battle">BATTLE!</button></div>
       </div>
       <button class="mobile-deploy" id="m-mobile-deploy" aria-label="进入战斗">进入战斗 · BATTLE</button>
       <div class="overlay" id="m-tbl"></div><div class="overlay" id="m-lo"></div><div class="overlay" id="m-maps"></div>`;
@@ -78,7 +80,7 @@ export class Menu {
     let info = { n: 0, pen: 0 };
     try { if (this.garage && this.garage.setArmorMode) info = this.garage.setArmorMode(this.armorOn, shell) || info; } catch (e) { console.warn('armor preview', e); }
     const btn = this.root.querySelector('#m-armor');
-    if (btn) { btn.classList.toggle('sel', this.armorOn); btn.textContent = this.armorOn ? '🛡️ Armor Preview ON' : '🛡️ Armor Preview'; }
+    if (btn) { btn.classList.toggle('sel', this.armorOn); btn.setAttribute('aria-pressed', String(this.armorOn)); }
     let ban = this.root.querySelector('#m-armor-ban');
     if (this.armorOn) {
       if (!ban) { ban = document.createElement('div'); ban.id = 'm-armor-ban'; ban.className = 'armor-ban'; this.root.appendChild(ban); }
@@ -139,20 +141,26 @@ export class Menu {
   items() { let a = null; try { a = JSON.parse(localStorage.getItem('tw_items')); } catch (e) { a = null; } return sanitizeItems(a); }
   summary() {
     const t = TANK_BY_ID[this.tank]; const lo = this.loadout(); const it = this.items(); const kg = itemsKg(it); const f = loadFactor(t.mass, kg);
-    const el = this.root.querySelector('#m-losum'); if (el) el.innerHTML = `Ammo ${lo.join(' / ')} of ${t.ammoCap} · ${it.map((i) => ITEMS[i].icon + ' ' + ITEMS[i].name).join(', ') || 'no items'} · ${kg} kg → ${(t.maxSpeed * f).toFixed(1)} km/h`;
+    const el = this.root.querySelector('#m-losum');
+    if (el) el.innerHTML = `<span class="loadout-summary">${it.map(id => `<span class="loadout-summary-item" title="${ITEMS[id].name}">${equipmentIcon(id)}<span class="equipment-visually-hidden">${ITEMS[id].name}</span></span>`).join('')}<span>Ammo ${lo.join(' / ')} of ${t.ammoCap}<small>${kg} kg · ${(t.maxSpeed * f).toFixed(1)} km/h</small></span></span>`;
   }
   showLoadout(v) {
     const o = this.root.querySelector('#m-lo'); if (!v) { o.style.display = 'none'; this.summary(); return; }
     const t = TANK_BY_ID[this.tank]; let lo = this.loadout(); let it = this.items();
     const draw = () => {
       const sum = lo.reduce((a, b) => a + b, 0); const kg = itemsKg(it); const f = loadFactor(t.mass, kg);
-      o.innerHTML = `<div class="box lo"><h2>${t.short} — ammunition &amp; equipment</h2>
+      o.innerHTML = `<div class="box lo" role="dialog" aria-modal="true" aria-labelledby="m-lo-title"><h2 id="m-lo-title">${t.short} — ammunition &amp; equipment</h2>
         <h3>Ammunition <small>(fixed stowage: ${t.ammoCap} rounds — every round you add to one type is taken from another)</small></h3>
         ${t.shells.map((sh, i) => `<div class="lorow"><b>${i + 1}</b><div><b>${sh.name}</b> <small>${sh.type} · pen ${sh.pen} mm · ${sh.damage} dmg · ${sh.velocity} m/s</small><small class="role">${sh.role || ''}</small></div>
           <button data-a="${i}" data-d="-5">−5</button><button data-a="${i}" data-d="-1">−</button><input data-i="${i}" type="number" min="0" max="${t.ammoCap}" value="${lo[i]}"><button data-a="${i}" data-d="1">+</button><button data-a="${i}" data-d="5">+5</button></div>`).join('')}
         <div class="losum2 ${sum === t.ammoCap ? 'ok' : 'bad'}">Total ${sum} / ${t.ammoCap}</div>
         <h3>Equipment <small>(${ITEM_SLOTS} slots · keys 4 / 5 / 6 in battle · weight slows the tank)</small></h3>
-        <div class="loitems">${[0, 1, 2].map((k) => `<label>Slot ${k + 4}<select data-s="${k}"><option value="">— empty —</option>${ITEM_IDS.map((id) => `<option value="${id}" ${it[k] === id ? 'selected' : ''} ${it.includes(id) && it[k] !== id ? 'disabled' : ''}>${ITEMS[id].icon} ${ITEMS[id].name} (${ITEMS[id].kg} kg)</option>`).join('')}</select><small>${it[k] ? ITEMS[it[k]].desc + (ITEMS[it[k]].passive ? '' : ` ${ITEMS[it[k]].charges}× · cooldown ${ITEMS[it[k]].cd} s`) : ''}</small></label>`).join('')}</div>
+        <div class="loitems">${Array.from({ length: ITEM_SLOTS }, (_, k) => {
+          const item = ITEMS[it[k]];
+          return `<label class="loadout-item"><span class="loadout-item-heading">${equipmentIcon(it[k])}<span><strong>${item?.name ?? 'Empty slot'}</strong><small>${item ? (item.passive ? 'Passive' : `${item.charges} uses · ${item.cd}s cooldown`) : ''}</small></span><kbd>${k + 4}</kbd></span>
+            <select data-s="${k}" aria-label="Equipment slot ${k + 4}"><option value="">— empty —</option>${ITEM_IDS.map(id => `<option value="${id}" ${it[k] === id ? 'selected' : ''} ${it.includes(id) && it[k] !== id ? 'disabled' : ''}>${ITEMS[id].name} (${ITEMS[id].kg} kg)</option>`).join('')}</select>
+            ${item ? `<small class="loadout-item-description">${item.desc}</small>` : ''}</label>`;
+        }).join('')}</div>
         <div class="loweight">Carried load <b>${kg} kg</b> on ${t.mass} t → top speed <b>${(t.maxSpeed * f).toFixed(1)} km/h</b> (−${((1 - f) * 100).toFixed(1)} %), acceleration −${((1 - f) * 100).toFixed(1)} % <small>(gear counts ×${LOAD_AMPLIFY} its mass: external stowage drag &amp; suspension load)</small></div>
         <div class="lobtns"><button id="lo-def">Reset to default</button><button id="lo-ok">Save &amp; close</button></div></div>`;
       o.querySelectorAll('button[data-a]').forEach((b) => (b.onclick = () => {
@@ -163,7 +171,15 @@ export class Menu {
         lo[i] += delta; lo = sanitizeLoadout(t, lo); save(); draw(); }));
       o.querySelectorAll('input[data-i]').forEach((inp) => (inp.onchange = () => { const i = +inp.dataset.i; lo[i] = Math.max(0, Math.min(t.ammoCap, Math.floor(+inp.value || 0))); let over = lo.reduce((a, b) => a + b, 0) - t.ammoCap;
         for (const k of [0, 1, 2].filter((x) => x !== i)) { if (over <= 0) break; const d = Math.min(lo[k], over); lo[k] -= d; over -= d; } lo = sanitizeLoadout(t, lo); save(); draw(); }));
-      o.querySelectorAll('select[data-s]').forEach((sel) => (sel.onchange = () => { const k = +sel.dataset.s; const arr = [it[0] || '', it[1] || '', it[2] || '']; arr[k] = sel.value; it = arr.filter(Boolean); localStorage.setItem('tw_items', JSON.stringify(it)); draw(); }));
+      o.querySelectorAll('select[data-s]').forEach((sel) => (sel.onchange = () => {
+        const k = +sel.dataset.s;
+        const arr = [it[0] || '', it[1] || '', it[2] || ''];
+        arr[k] = sel.value;
+        it = arr.filter(Boolean);
+        localStorage.setItem('tw_items', JSON.stringify(it));
+        draw();
+        o.querySelector(`select[data-s="${k}"]`).focus({ preventScroll: true });
+      }));
       o.querySelector('#lo-def').onclick = () => { lo = t.defaultLoadout.slice(); it = sanitizeItems(null); localStorage.setItem('tw_items', JSON.stringify(it)); save(); draw(); };
       o.querySelector('#lo-ok').onclick = () => this.showLoadout(false);
     };

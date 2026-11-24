@@ -2,14 +2,14 @@
 // the total carried load lowers top speed and acceleration (see loadFactor). Passive items work automatically.
 export const ITEM_SLOTS = 3;
 export const ITEMS = {
-  repair: { name: 'Repair kit', icon: '🔧', kg: 260, charges: 2, cd: 45, desc: 'Instantly repairs every damaged or destroyed module (engine, tracks, gun, turret ring).' },
-  medkit: { name: 'First-aid kit', icon: '✚', kg: 40, charges: 2, cd: 40, desc: 'Brings knocked-out crew members back to their stations.' },
-  extinguisher: { name: 'Fire extinguisher', icon: '🧯', kg: 90, charges: 2, cd: 15, desc: 'Puts out an engine fire immediately.' },
-  reload: { name: 'Reload booster', icon: '⚡', kg: 120, charges: 2, cd: 75, dur: 20, desc: 'Ready-rack drill: −30 % reload time for 20 s (also cuts the current reload).' },
-  overdrive: { name: 'Engine overdrive', icon: '🔥', kg: 180, charges: 2, cd: 60, dur: 15, desc: 'Water-injection boost: +20 % top speed and +35 % acceleration for 15 s.' },
-  smoke: { name: 'Smoke grenades', icon: '☁', kg: 150, charges: 3, cd: 25, dur: 22, desc: 'Fires a smoke screen ~15 m ahead of the turret that blocks line of sight for 22 s.' },
-  camonet: { name: 'Camouflage net', icon: '🕸', kg: 220, passive: true, desc: 'Passive: +12 % camouflage after standing still for 3 s.' },
-  optics: { name: 'Coated optics', icon: '🔭', kg: 60, passive: true, desc: 'Passive: +10 % view range.' },
+  repair: { name: 'Repair kit', kg: 260, charges: 2, cd: 45, desc: 'Instantly repairs every damaged or destroyed module (engine, tracks, gun, turret ring).' },
+  medkit: { name: 'First-aid kit', kg: 40, charges: 2, cd: 40, desc: 'Brings knocked-out crew members back to their stations.' },
+  extinguisher: { name: 'Fire extinguisher', kg: 90, charges: 2, cd: 15, desc: 'Puts out an engine fire immediately.' },
+  reload: { name: 'Reload booster', kg: 120, charges: 2, cd: 75, dur: 20, desc: 'Ready-rack drill: −30 % reload time for 20 s (also cuts the current reload).' },
+  overdrive: { name: 'Engine overdrive', kg: 180, charges: 2, cd: 60, dur: 15, desc: 'Water-injection boost: +20 % top speed and +35 % acceleration for 15 s.' },
+  smoke: { name: 'Smoke grenades', kg: 150, charges: 3, cd: 25, dur: 22, desc: 'Fires a smoke screen ~15 m ahead of the turret that blocks line of sight for 22 s.' },
+  camonet: { name: 'Camouflage net', kg: 220, passive: true, desc: 'Passive: +12 % camouflage after standing still for 3 s.' },
+  optics: { name: 'Coated optics', kg: 60, passive: true, desc: 'Passive: +10 % view range.' },
 };
 export const ITEM_IDS = Object.keys(ITEMS);
 export const DEFAULT_ITEMS = ['repair', 'extinguisher', 'medkit'];

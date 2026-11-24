@@ -1,6 +1,8 @@
 // In-game HUD (DOM overlay)
 import * as THREE from 'three';
+import { ITEM_SLOTS } from '../game/items.js';
 import { TANKS } from '../game/tankData.js';
+import { equipmentIcon, equipmentStatus } from './equipment.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 
@@ -18,11 +20,9 @@ export class HUD {
       <div class="reticle" id="h-ret"><div class="ring"></div><div class="dot"></div><div class="lockbr"></div><div class="pen" id="h-pen"></div></div>
       <div class="msgs" id="h-msgs"></div>
       <div class="dmgdir" id="h-dmgdir"></div>
-      <div class="status" id="h-status"></div>
       <div class="spotted" id="h-spotted">⚠ SPOTTED</div>
       <div class="panel left" id="h-veh"></div>
-      <div class="panel items" id="h-items"></div>
-      <div class="panel ammo" id="h-ammo"></div>
+      <div class="combat-deck"><div class="status" id="h-status"></div><div class="panel items" id="h-items"></div><div class="panel ammo" id="h-ammo"></div></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
       <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>G vehicle ability · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
@@ -138,9 +138,13 @@ export class HUD {
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`;
     // equipment slots (keys 4/5/6)
     const E = p.equip; const lf = E.factor;
-    this.$('h-items').innerHTML = E.slots.map((it, i) => { const ready = it.def.passive || (it.charges > 0 && it.cd <= 0); const st = it.def.passive ? 'PASSIVE' : it.active > 0 ? `ACTIVE ${Math.ceil(it.active)}s` : it.charges <= 0 ? 'EMPTY' : it.cd > 0 ? `${Math.ceil(it.cd)}s` : 'READY';
-      return `<div class="item ${ready ? 'ok' : 'cd'} ${it.active > 0 ? 'on' : ''}"><b>${i + 4}</b><span class="ic">${it.def.icon}</span><div>${it.def.name}<small>${st}${it.def.passive ? '' : ' · ×' + it.charges}</small></div>${!it.def.passive && it.cd > 0 ? `<i style="width:${(1 - it.cd / it.def.cd) * 100}%"></i>` : ''}</div>`; }).join('') +
-      `<div class="load">Load ${E.kg} kg · speed ×${lf.toFixed(3)}</div>`;
+    this.$('h-items').innerHTML = Array.from({ length: ITEM_SLOTS }, (_, i) => {
+      const slot = E.slots[i];
+      const { state, label, count } = equipmentStatus(slot);
+      const name = slot?.def.name ?? 'Empty slot';
+      const cooldown = state === 'cooldown' ? `<i style="width:${(1 - slot.cd / slot.def.cd) * 100}%"></i>` : '';
+      return `<div class="item equipment-state-${state}" title="${name}"><kbd>${i + 4}</kbd>${equipmentIcon(slot?.id)}<div class="item-info"><span class="item-name">${name}</span>${slot ? `<small>${label}${count ? ` · ${count}` : ''}</small>` : ''}</div>${cooldown}</div>`;
+    }).join('') + `<div class="load">Load ${E.kg} kg · speed ×${lf.toFixed(3)}</div>`;
     // ammo
     this.$('h-ammo').innerHTML = s.shells.map((sh, i) => `<div class="slot ${!ability.usingSecondary && i === p.shellIdx ? 'sel' : ''} ${p.ammo[i] ? '' : 'empty'}"><b>${i + 1}</b><div>${sh.name}<small>${sh.type} · ${sh.pen} mm · ${sh.damage} dmg · ${sh.velocity} m/s</small></div><span>${p.ammo[i]}</span></div>`).join('') +
       (s.secondary ? `<div class="slot ${ability.usingSecondary ? 'sel' : ''} ${p.secondaryRounds ? '' : 'empty'}"><b>G</b><div>${s.secondary.shell.name}<small>副炮 · ${p.secondaryReloadLeft > 0 ? p.secondaryReloadLeft.toFixed(1) + 's' : '就绪'}</small></div><span>${p.secondaryRounds}</span></div>` : '') +

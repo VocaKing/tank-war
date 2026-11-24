@@ -1,4 +1,15 @@
 // Touch controls use the same vehicle inputs, aiming and firing logic as desktop.
+import { equipmentIcon, equipmentStatus } from './equipment.js';
+
+function updateEquipmentButton(button, slot) {
+ const { state, label, count } = equipmentStatus(slot);
+ const key = `${slot?.id ?? ''}/${state}/${label}/${count}`;
+ if (button.dataset.equipment === key) return;
+ button.dataset.equipment = key;
+ button.dataset.state = state;
+ button.setAttribute('aria-label', slot ? `${slot.def.name} · ${label} ${count}`.trim() : 'Empty equipment slot');
+ button.innerHTML = `${equipmentIcon(slot?.id)}<span>${state === 'ready' ? count : label}</span>`;
+}
 export const isMobile = () => {
  const forced=new URLSearchParams(location.search).get('mobile');
  if(forced==='0')return false;
@@ -55,6 +66,7 @@ export class TouchControls {
   if(g.paused||g.ended||!p.alive)this.clear();
   for(const b of this.root.querySelectorAll('button')){const a=b.dataset.action;if(a==='scope')label(b,g.cam.sniper?'退出开镜':'开镜');if(a==='zoom')label(b,g.cam.sniper?'×'+g.cam.zoom:'倍率');if(a==='armor')b.classList.toggle('active',g.armorView.enabled);if(a==='lock')b.classList.toggle('active',!!g.lock);
    if(a.startsWith('ammo')){const i=+a.slice(4);label(b,'弹 '+(i+1)+' · '+(p.ammo[i]??0));b.classList.toggle('active',!p.abilities.usingSecondary&&p.shellIdx===i);}
+   if(a.startsWith('item'))updateEquipmentButton(b,p.equip.slots[+a.slice(4)]);
    if(a==='ability'&&p.spec.secondary){label(b,p.abilities.usingSecondary?'副炮 · '+p.secondaryRounds:'切副炮');b.classList.toggle('active',p.abilities.usingSecondary);}
    if(a==='ability'&&p.spec.dozer){label(b,p.abilities.dozerActive?'收起推土铲':'推土铲');b.classList.toggle('active',p.abilities.dozerActive);}
    if(a==='fire')label(b,p.afloat?'浮航':p.fireReloadLeft>0?p.fireReloadLeft.toFixed(1)+'s':'开火');
