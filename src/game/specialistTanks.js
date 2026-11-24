@@ -154,7 +154,7 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'm50ontos', tier: 2, cls: 'Tank Destroyer', name: 'M50 Ontos', short: 'M50 Ontos', nation: 'USA', era: 'Cold War', year: 1956,
-    crew: ['Commander', 'Gunner', 'Driver', 'Loader'], autoloader: false, openTop: true, casemate: { hullAimRate: 58, hydroRate: 0 }, modelBaseId: 'sherman',
+    crew: ['Commander', 'Gunner', 'Driver', 'Loader'], autoloader: false, openTop: true, fixedGun: true, casemate: { hullAimRate: 58, hydroRate: 0 }, modelBaseId: 'sherman',
     mass: 9.0, power: 361, maxSpeed: 48, reverseSpeed: 12, hullTraverse: 65, turretTraverse: 0, gunSpeed: 5,
     gunDepression: 10, gunElevation: 20, hp: 570, viewRange: 390, reload: 5.5, aimTime: 2.3, dispersion: 2.4, stabilizer: 0,
     multiTube: {
