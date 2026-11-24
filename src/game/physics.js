@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DEG, clamp } from '../util.js';
+import { DEG, clamp, lerp } from '../util.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 
 export const GRAVITY = 9.81;
@@ -13,6 +13,8 @@ const SPRING_FREQUENCY = 9;
 const SPRING_REST = ANCHOR_HEIGHT + GRAVITY / (SPRING_FREQUENCY ** 2);
 const REBOUND_TRAVEL = 0.105;
 const RECOVERY_DELAY = 0.4;
+const AUTO_BRAKE_BUILDUP = 0.28;
+const AUTO_BRAKE_DECELERATION = 4.4;
 // Five suspension stations per track, with the end stations close to its idlers.
 const STATIONS = [-0.42, -0.21, 0, 0.21, 0.42];
 const WHEEL_COUNT = STATIONS.length * 2;
@@ -125,7 +127,7 @@ export class BattlefieldPhysics {
     const turret = this.world.createCollider(ColliderDesc.cuboid(d.turretW * 0.46, d.turretH / 2, d.turretL * 0.45)
       .setTranslation(0, d.hullH + d.turretH / 2, (d.turretZ ?? 0) + (d.turretBoxZ ?? 0)).setMass(0)
       .setFriction(0.6).setCollisionGroups(filter), body);
-    const vehicle = { tank, body, hull, turret, mass, contact: 0, unsupported: 0, recoveryTime: 0, righting: false,
+    const vehicle = { tank, body, hull, turret, mass, contact: 0, unsupported: 0, recoveryTime: 0, righting: false, autoBrake: 0,
       inertiaYaw: mass * (d.L * d.L + d.W * d.W) / 12 };
     this.vehicles.push(vehicle);
     tank.vehicle = vehicle;
@@ -144,6 +146,7 @@ export class BattlefieldPhysics {
     vehicle.unsupported = 0;
     vehicle.recoveryTime = 0;
     vehicle.righting = false;
+    vehicle.autoBrake = 0;
     tank.vel.copy(_forward);
     tank.speed = speed;
   }
@@ -193,6 +196,9 @@ export class BattlefieldPhysics {
     if (tank.turretGone && turret.isEnabled()) turret.setEnabled(false);
     const d = tank.spec.dims, dt = PHYSICS_STEP;
     const T = this.battlefield.terrain;
+    const { throttle, steer, brake, driveHeld } = tank.input;
+    const driveReleased = !driveHeld && !throttle && !steer && !brake;
+    vehicle.autoBrake = driveReleased ? Math.min(1, vehicle.autoBrake + dt / AUTO_BRAKE_BUILDUP) : 0;
     const waterDepth = T.waterLevel(tank.pos.x, tank.pos.z) - tank.pos.y;
     tank.inWater = waterDepth > 0.15;
     tank.groundY = this.battlefield.groundHeight(tank.pos.x, tank.pos.z);
@@ -245,7 +251,6 @@ export class BattlefieldPhysics {
     }
 
     // The chassis can carry the tank on a bank even with every suspension ray unloaded.
-    const { throttle, steer, brake } = tank.input;
     const recovering = vehicle.recoveryTime >= RECOVERY_DELAY;
     const pushing = tank.alive && tank.modules.tracks === 1 && !brake &&
       Math.max(Math.abs(throttle), Math.abs(steer)) > 0.1;
@@ -376,14 +381,18 @@ export class BattlefieldPhysics {
     // Keep the disabled side nearly stationary as the hull swings around it.
     const pivotSpeed = brokenSide ? commanded * brokenSide * trackCenterOffset(s.dims) : 0;
     const holding = !throttle && Math.abs(longitudinal) < 0.45;
-    const neutralBrake = holding ? 6 : 0.75 + Math.abs(longitudinal) * 0.07;
+    const gradeAcceleration = -GRAVITY * _tangent.y;
+    const coastBrake = holding ? 6 : 0.75 + Math.abs(longitudinal) * 0.07;
+    // Counter downhill acceleration as the brakes engage, subject to the contact patch's grip.
+    const downhillAcceleration = Math.max(0, Math.sign(longitudinal) * gradeAcceleration);
+    const autoBrakeLimit = Math.max(coastBrake, AUTO_BRAKE_DECELERATION + downhillAcceleration);
+    const neutralBrake = floating ? coastBrake : lerp(coastBrake, autoBrakeLimit, vehicle.autoBrake);
     const driveBrake = throttle * longitudinal < 0 ? 5 : 3.2;
     const brake = input.brake || !mobile ? 7 : (throttle ? driveBrake : neutralBrake);
     const speedError = throttle * speedLimit + pivotSpeed - longitudinal;
     const acceleration = pivotSpeed ? intactLoad * grip * 0.35 / (mass * dt) :
       throttle && Math.sign(speedError) === Math.sign(throttle) ? driveLimit : brake;
-    // The drivetrain brakes at low speed on grades. At speed the slope supplies acceleration.
-    const parkAssist = holding ? GRAVITY * _tangent.y : 0;
+    const parkAssist = holding ? -gradeAcceleration : 0;
     const drive = clamp(speedError / dt + parkAssist, -acceleration, acceleration) * mass * dt;
     const lateral = (-sideways / 0.075 + GRAVITY * _side.y) * mass * dt;
     const maxTraction = load * grip;

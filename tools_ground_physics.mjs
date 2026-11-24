@@ -60,6 +60,36 @@ for (const steer of [-0.6, 0.6]) {
   assert.deepEqual(path[0], path[2]);
 }
 
+for (const [grade, speed] of [[0, 10], [0, -6], [0.34, 10]]) {
+  const { physics, spawn } = makeWorld((_, z) => -grade * z);
+  const tank = spawn(-22, speed);
+  tank.input.driveHeld = true;
+  physics.advance(0.1);
+  assert.equal(tank.vehicle.autoBrake, 0, 'a held direction control does not engage the automatic brake');
+
+  const start = tank.pos.clone(), initialSpeed = Math.abs(tank.speed);
+  tank.input.driveHeld = false;
+  physics.advance(0.1);
+  assert.ok(tank.vehicle.autoBrake > 0 && tank.vehicle.autoBrake < 1);
+  assert.ok(Math.abs(tank.speed) > initialSpeed * 0.9 && tank.pos.distanceTo(start) > 0.3,
+    'the hull carries momentum just after the controls are released');
+  physics.advance(0.9);
+  assert.ok(Math.abs(tank.speed) > 0.5 && Math.abs(tank.speed) < initialSpeed - 2,
+    'the brake slows the hull before it comes to rest');
+  physics.advance(2.4);
+  const distance = tank.pos.distanceTo(start), stopped = tank.pos.clone();
+  assert.ok(Math.abs(tank.speed) < 0.05 && distance > 1 && distance < 18, { grade, speed, distance, finalSpeed: tank.speed });
+  physics.advance(1.5);
+  assert.ok(tank.pos.distanceTo(stopped) < 0.08, 'the stopped tank holds its position');
+
+  tank.input.driveHeld = true;
+  tank.input.throttle = 1;
+  physics.advance(0.35);
+  assert.equal(tank.vehicle.autoBrake, 0);
+  assert.ok(tank.speed > 0.8, 'new drive input releases the automatic brake');
+  physics.free();
+}
+
 for (const roll of [Math.PI / 2, Math.PI]) {
   const { physics, spawn } = makeWorld((_, z) => -Math.max(0, Math.min(1.4, (8 - Math.abs(z)) * 0.48)));
   const tank = spawn(0, 0);
@@ -102,7 +132,7 @@ for (const roll of [Math.PI / 2, Math.PI]) {
   physics.free();
 }
 
-{
+for (const releaseInAir of [false, true]) {
   const { physics, spawn } = makeWorld((_, z) => -Math.max(0, z * 0.5));
   const tank = spawn(-14, 16);
   tank.input.throttle = 1;
@@ -114,8 +144,8 @@ for (const roll of [Math.PI / 2, Math.PI]) {
       airborneSteps++;
       if (!begin) {
         begin = { speed: tank.vel.z, vy: tank.vel.y, x: tank.pos.x };
-        tank.input.throttle = -1;
-        tank.input.steer = 1;
+        tank.input.throttle = releaseInAir ? 0 : -1;
+        tank.input.steer = releaseInAir ? 0 : 1;
       }
       end = { speed: tank.vel.z, vy: tank.vel.y, x: tank.pos.x };
     } else if (wasAirborne) {
@@ -159,6 +189,7 @@ for (const roll of [Math.PI / 2, Math.PI]) {
   const { physics, spawn, groundHeight } = makeWorld(() => -2, [], [deck],
     (x, z) => Math.abs(x) <= 3 && Math.abs(z) <= 10 ? deckY((z + 10) / 20) : -Infinity);
   const tank = spawn(-4, 6);
+  tank.input.throttle = 1;
   for (let i = 0; i < 130; i++) {
     physics.advance(PHYSICS_STEP);
     assert.ok(!tank.airborne && tank.vehicle.contact > 0);
@@ -216,4 +247,4 @@ for (const brokenSide of [-1, 1]) {
   physics.free();
 }
 
-console.log('Rapier downhill, ditch recovery, airborne, collision, bridge, damaged-track steering, and amphibious crossing checks passed.');
+console.log('Rapier automatic braking, downhill, ditch recovery, airborne, collision, bridge, damaged-track steering, and amphibious crossing checks passed.');
