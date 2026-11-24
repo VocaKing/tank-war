@@ -33,7 +33,12 @@ export class Ballistics {
       }
       const speed = s.vel.length(); const steps = Math.max(1, Math.ceil((speed * dt) / 30)); const h = dt / steps; let done = false;
       for (let k = 0; k < steps && !done; k++) {
-        _a.copy(s.pos); s.vel.y -= GRAVITY * h; _b.copy(s.pos).addScaledVector(s.vel, h);
+        _a.copy(s.pos);
+        if (s.spec.guided && s.target) {
+          const speed = s.vel.length(), desired = s.target.clone().sub(s.pos).normalize().multiplyScalar(speed);
+          s.vel.lerp(desired, clamp(h * 1.6, 0, 1));
+        } else s.vel.y -= GRAVITY * h;
+        _b.copy(s.pos).addScaledVector(s.vel, h);
         // Hard-kill APS intercepts eligible incoming threats before armour collision.
         for (const t of g.tanks) {
           if (!t.alive || t.team === s.owner?.team || !t.spec.aps) continue;
@@ -79,7 +84,7 @@ export class Ballistics {
   heBlast(s, p) {
     const g = this.game; const R = s.spec.blastRadius || s.spec.caliber / 22;
     for (const t of g.tanks) { if (!t.alive) continue; const d = t.pos.distanceTo(p) - t.spec.dims.W * 0.5; if (d > R) continue;
-      const top = t.spec.armor.hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
+      const top = (t.armorProfile || t.spec.armor).hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
       if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (t.spec.openTop) t.suppressedFor = Math.max(t.suppressedFor || 0, 1.4); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
       if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) {
         const x = _blastLocal.copy(p).applyMatrix4(t.inv).x;
@@ -118,10 +123,10 @@ export class Ballistics {
     }
     // tank impact
     const ev = this.evaluate(tank, hit, s.spec, s.dist);
-    tank.consumeERA?.(hit, s.spec, s.type);
     if (s.wet && s.waterDist > 0) { ev.waterF = waterPenFactor(s.type, s.waterDist); ev.pen *= ev.waterF; ev.ratio = ev.pen / ev.eff; }
     const shooter = s.owner; const toPlayer = tank.isPlayer, fromPlayer = shooter && shooter.isPlayer;
     if (s.noDamage) { g.effects.sparks(p, 12); return true; }
+    tank.consumeERA?.(hit, s.spec, s.type);
     if (shooter && tank.alive && shooter.team !== tank.team) shooter.stats.hits++;
     if (tank.alive && ev.ricochet && s.ricochets < 1) {
       const n = ev.normalW; const v = s.vel; v.addScaledVector(n, -2 * v.dot(n)).multiplyScalar(0.55); s.pos.copy(p).addScaledVector(n, 0.08); s.ricochets++; s.noDamage = true; s.life = Math.max(s.life, 6.5);
