@@ -287,7 +287,8 @@ export class Tank {
       fireShell = { ...sh, pen: Math.round(sh.pen * mult) };
     }
     const origin = this.shotOrigin(muzzle);
-    g.ballistics.spawn(this, fireShell, origin, vel);
+    const projectile = g.ballistics.spawn(this, fireShell, origin, vel);
+    if (sh.guided) projectile.target = this.input.aim.clone();
     this.lastFired = time; this.stats.shots++;
     if (secondary) {
       this.secondaryRounds--;
@@ -304,6 +305,12 @@ export class Tank {
     }
     g.physics?.recoil(this, this.gunMount.getWorldPosition(_v), dir, sh.caliber);
     g.effects.muzzle(origin, dir, sh.caliber); g.audio.gun(origin, sh.caliber, this.isPlayer);
+    if (!secondary && this.spec.artillery?.autoDeploy) {
+      this.autoArtilleryShots++;
+      if (this.autoArtilleryShots >= this.spec.artillery.fireMissionRounds) {
+        this.autoArtilleryState = 'packing'; this.autoArtilleryTimer = this.spec.artillery.packSeconds || 1; this.pendingFire = false;
+      }
+    }
     return true;
   }
   setSpade(deploy) {
@@ -415,7 +422,8 @@ export class Tank {
       const mult = this.abilities.consumeOverpen();
       fireShell = { ...fireShell, pen: Math.round(fireShell.pen * mult) };
     }
-    this.game.ballistics.spawn(this, fireShell, muzzle, velocity);
+    const projectile = this.game.ballistics.spawn(this, fireShell, muzzle, velocity);
+    if (shell.guided) projectile.target = this.input.aim.clone();
     return { muzzle, dir, caliber: shell.caliber };
   }
   fireBurstRound(time) {
