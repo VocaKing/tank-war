@@ -2,12 +2,15 @@ import * as THREE from 'three';
 import { hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
 import { makeTrackBelt } from './trackBelt.js';
 
-const fleetIds = new Set([
+const detailedExteriorIds = new Set([
   '2s38', 'archer', 'bmpt', 'centauro2', 'fv4005s1', 'm50ontos', 'sprutsd', 'strv103', 't14', 'xm8ags',
+]);
+const exteriorRevision = '2026-11-exterior-detail';
+const fleetIds = new Set([
+  ...detailedExteriorIds,
   'aegis140', 'bastion125', 'cerberus135', 'harrier105', 'lancer120', 'leviathan160', 'raptor90',
   'tempest155', 'thunderclad155', 'warden130',
 ]);
-// Only these three URLs change so existing browser caches fetch the revised geometry.
 const referenceImages = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
 const templates = new Map();
 const requests = new Map();
@@ -37,11 +40,14 @@ export function loadFleetModel(spec) {
     import('three/addons/libs/meshopt_decoder.module.js'),
   ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
     const referenceImage = referenceImages.get(id);
-    const revision = referenceImage ? '?v=2026-11-reference-2-8-10' : '';
-    const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb${revision}`;
+    const revision = detailedExteriorIds.has(id) ? exteriorRevision : null;
+    const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb${revision ? `?v=${revision}` : ''}`;
     const { scene } = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
     const root = required(scene, id);
     if (root.userData.fleetModelId !== id) throw new Error(`Incorrect vehicle in ${url}`);
+    if (revision && root.userData.fleetModelRevision !== revision) {
+      throw new Error(`Incorrect detail revision in ${url}`);
+    }
     if (referenceImage && root.userData.referenceImage !== referenceImage) {
       throw new Error(`Incorrect reference geometry in ${url}`);
     }

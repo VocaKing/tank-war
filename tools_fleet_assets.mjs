@@ -9,6 +9,9 @@ const files = (await readdir(root)).filter(file => file.endsWith('.glb'));
 assert.equal(files.length, 20, 'Expected each specialist and concept vehicle to ship its own GLB');
 const fingerprints = new Set();
 const ids = [];
+const expectedExterior = new Set([
+  '2s38', 'archer', 'bmpt', 'centauro2', 'fv4005s1', 'm50ontos', 'sprutsd', 'strv103', 't14', 'xm8ags',
+]);
 const wheelCounts = { archer: 8, centauro2: 8 };
 const expectedReferences = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
 
@@ -21,6 +24,10 @@ for (const file of files) {
   const model = nodes[scenes[0].nodes[0]];
   assert.equal(model.name, id);
   assert.equal(model.extras.fleetModelId, id);
+  if (expectedExterior.has(id)) {
+    assert.equal(model.extras.fleetModelRevision, '2026-11-exterior-detail', id + ' is missing the revised model');
+    assert.ok(model.extras.exteriorDetailParts > 16, id + ' is missing layered exterior fittings');
+  }
   if (expectedReferences.has(id)) {
     assert.equal(model.extras.referenceImage, expectedReferences.get(id), id + ' has the wrong reference image');
   }
