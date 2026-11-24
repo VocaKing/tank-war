@@ -168,7 +168,8 @@ function sprocketGeometry(paintHex, id = '') {
   }
   add(cylX(0.9, 1.0, 20, 0, 0, 0)); add(cylX(0.4, 1.3, 10, 0, 0, 0)); add(cylX(0.62, 1.1, 18, 0, 0, 0));
   for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; add(cylX(0.05, 1.36, 6, 0, Math.cos(a) * 0.28, Math.sin(a) * 0.28)); }
-  const teeth=({aegis140:14,bastion125:13,harrier105:12,warden130:14,lancer120:13,leviathan160:15,thunderclad155:14,tempest155:13,cerberus135:14,raptor90:11})[id]||13;\n  for (let i = 0; i < teeth; i++) { const a = (i / teeth) * Math.PI * 2; add(T(new THREE.BoxGeometry(0.9, 0.22, 0.2), 0, Math.cos(a) * 0.95, Math.sin(a) * 0.95, a, 0, 0)); }
+  const teeth=({aegis140:14,bastion125:13,harrier105:12,warden130:14,lancer120:13,leviathan160:15,thunderclad155:14,tempest155:13,cerberus135:14,raptor90:11})[id]||13;
+  for (let i = 0; i < teeth; i++) { const a = (i / teeth) * Math.PI * 2; add(T(new THREE.BoxGeometry(0.9, 0.22, 0.2), 0, Math.cos(a) * 0.95, Math.sin(a) * 0.95, a, 0, 0)); }
   return mergeGeometries(parts);
 }
 function convexHull(pts) {
