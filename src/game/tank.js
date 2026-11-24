@@ -6,7 +6,7 @@ import { armorZone, zoneLowerSideY } from './tankData.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
-import { advanceDispersion, impactDrop, incidence } from './combatMath.js';
+import { advanceDispersion, impactDrop, incidence, sampleDispersionRadius } from './combatMath.js';
 
 import { GRAVITY } from './physics.js';
 
@@ -233,14 +233,17 @@ export class Tank {
     const g = this.game; const sh = this.shell;
     const muzzle = this.muzzleNode.getWorldPosition(new THREE.Vector3());
     const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.gunMount.getWorldQuaternion(_q)).normalize();
-    // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
-    const disp = this.dispersion(); const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    const a = new THREE.Vector3().crossVectors(dir, up).normalize(), b = new THREE.Vector3().crossVectors(dir, a).normalize();
-    let gx = g.rng.gauss() / 2.2, gy = g.rng.gauss() / 2.2; const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
-    // Sample a disk on the tangent plane: its boundary is exactly tan(disp).
-    const radius = Math.tan(disp);
-    dir.addScaledVector(a, gx * radius).addScaledVector(b, gy * radius).normalize();
-    this.lastDeviation = Math.atan(Math.hypot(gx, gy) * radius);
+    // The disk on the gun's tangent plane projects to the HUD's angular spread.
+    const radius = Math.tan(this.dispersion());
+    const offset = radius > 0 ? radius * sampleDispersionRadius(g.rng) : 0;
+    if (offset > 0) {
+      const angle = g.rng.range(0, 2 * Math.PI);
+      const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+      const tangent = new THREE.Vector3().crossVectors(dir, up).normalize();
+      const bitangent = new THREE.Vector3().crossVectors(dir, tangent).normalize();
+      dir.addScaledVector(tangent, offset * Math.cos(angle)).addScaledVector(bitangent, offset * Math.sin(angle)).normalize();
+    }
+    this.lastDeviation = Math.atan(offset);
     const vel = dir.clone().multiplyScalar(sh.velocity).add(this.vel);
     let fireShell = sh;
     if (this.abilities && this.abilities.overpenLeft > 0) {

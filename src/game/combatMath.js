@@ -4,6 +4,8 @@ import { approach } from '../util.js';
 export const BASE_FOV = 60;
 export const DEG = Math.PI / 180;
 export const MIN_INCIDENCE_COS = 1e-6;
+// Keep the edge-to-centre density ratio close to the previous spread setting.
+const DISPERSION_FALLOFF = 2.4;
 export function advanceDispersion(current, speed, dt, aimTime) {
   return approach(current, speed === 0 ? 0 : 1, Math.max(0, dt) / aimTime);
 }
@@ -12,6 +14,16 @@ export function zoomFov(zoom, baseFov = BASE_FOV) {
 }
 export function dispersionPixels(cone, projectionY, viewportHeight) {
   return Math.tan(cone) * projectionY * viewportHeight / 2;
+}
+// Density per unit area on the aiming disk is proportional to exp(-k * r).
+// A ring's area contributes the factor r, so its radius is sampled from
+// Gamma(2, k) and conditioned on staying inside the unit disk.
+export function sampleDispersionRadius(rng) {
+  let radius;
+  do {
+    radius = -Math.log((1 - rng.next()) * (1 - rng.next())) / DISPERSION_FALLOFF;
+  } while (radius >= 1);
+  return radius;
 }
 // Geometric line-of-sight thickness, with no shell-dependent angular normalization.
 export function incidence(cosine, nominal) {

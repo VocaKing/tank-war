@@ -19,7 +19,7 @@ See CREDITS.md for licenses.
 
 ## v4 changes
 - **Gun dispersion.** Each tank has editable minimum and maximum cone radii, measured in metres at 100 m. The radius grows linearly toward the maximum while speed is nonzero and shrinks toward the minimum at rest. Aim time controls the full transition. The Abrams stabilizer doubles the time to reach maximum while moving. Players and NPCs use the same rules.
-- **Reticle.** The dot marks the predicted impact, and the ring scales with the current cone angle and optical magnification. Shell deviation is sampled from a centre-weighted 2D Gaussian within the cone.
+- **Reticle.** The dot marks the predicted impact, and the ring shows the current dispersion limit at the selected optical magnification. All random deviations are inside the aiming disk, with probability density per unit area decreasing exponentially with distance from the centre.
 - **Tanks.** Weathering (rain streaks, paint chipping), plus tail-light clusters, rubber mud flaps, fender brackets, track tensioners, tow shackles, a tow pintle and a rear infantry phone on modern tanks.
 - **Maps.** Building colour variation for walls, shutters/doors and roofs. Four boulder shapes with bedding strata and tint variety. Per-instance tree and bush tint. Field patchwork on the terrain.
 

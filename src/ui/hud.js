@@ -174,6 +174,7 @@ export class HUD {
   }
   setReticle(sx, sy, radius, state, text) {
     const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; r.style.visibility = sx === -100 && sy === -100 ? 'hidden' : ''; const ring = r.firstChild; const R = Math.max(0, Number.isFinite(radius) ? radius : 0);
+    ring.hidden = R === 0;
     ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; ring.style.boxSizing = 'border-box'; r.className = 'reticle ' + state + (this.g.player && this.g.player.dispersionProgress < 0.025 ? ' aimed' : ''); const pen = this.$('h-pen'); pen.textContent = text; pen.style.top = Math.max(22, Math.min(R + 8, 80)) + 'px';
   }
   scoreboard(show) {
