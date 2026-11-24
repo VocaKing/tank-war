@@ -227,7 +227,18 @@ export class Tank {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
     m.body.position.y = this.suspensionOffset || 0;
     m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
-    if (m.spade) m.spade.rotation.x = (1 - this.spadeProgress) * Math.PI / 2;
+    let support = this.spadeProgress;
+    if (this.spec.artillery?.autoDeploy) {
+      const state = this.autoArtilleryState;
+      const timer = this.autoArtilleryTimer;
+      if (state === 'deployed') support = 1;
+      else if (state === 'deploying') support = 1 - timer / this.spec.artillery.deploySeconds;
+      else if (state === 'packing') support = timer / this.spec.artillery.packSeconds;
+    }
+    const supportAngle = (1 - clamp(support, 0, 1)) * Math.PI / 2;
+    if (m.spade) m.spade.rotation.x = supportAngle;
+    if (m.stabilizers) for (const leg of m.stabilizers) leg.rotation.x = supportAngle;
+    m.steerWheels?.(clamp(this.turnRate * .34, -.46, .46));
     if (m.secondaryGun) m.secondaryGun.rotation.x = -this.gunPitch;
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
@@ -401,9 +412,11 @@ export class Tank {
     if (this.isPlayer) this.game.hud.message('ACTIVE PROTECTION · THREAT INTERCEPTED · ' + this.apsCharges + ' CHARGES', '#7edcff');
     return true;
   }
-  spawnRound(shellIndex, offset = null) {
+  spawnRound(shellIndex, offset = null, muzzleIndex = 0) {
     const shell = this.spec.shells[shellIndex], model = this.model;
-    const muzzle = offset ? model.gun.localToWorld(new THREE.Vector3(...offset)) : model.muzzle.getWorldPosition(new THREE.Vector3());
+    const markers = model.muzzles;
+    const muzzle = markers ? markers[muzzleIndex % markers.length].getWorldPosition(new THREE.Vector3())
+      : offset ? model.gun.localToWorld(new THREE.Vector3(...offset)) : model.muzzle.getWorldPosition(new THREE.Vector3());
     const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(model.gun.getWorldQuaternion(_q)).normalize();
     const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const tangent = new THREE.Vector3().crossVectors(dir, up).normalize();
@@ -430,7 +443,7 @@ export class Tank {
     const cfg = this.spec.burst, index = this.burstShellIdx;
     if (!cfg || this.ammo[index] <= 0 || this.burstLeft <= 0) { this.burstLeft = 0; return; }
     const offsets = cfg.offsets || [];
-    const shot = this.spawnRound(index, offsets.length ? offsets[this.burstOffsetIndex % offsets.length] : null);
+    const shot = this.spawnRound(index, offsets.length ? offsets[this.burstOffsetIndex % offsets.length] : null, this.burstOffsetIndex);
     this.burstOffsetIndex++; this.ammo[index]--; this.stats.shots++; this.lastFired = time; this.recoil = 0.35;
     this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber); this.game.audio.gun(shot.muzzle, shot.caliber, this.isPlayer);
     this.game.physics?.recoil(this, shot.muzzle, shot.dir, shot.caliber);
@@ -450,7 +463,7 @@ export class Tank {
     const offsets = this.spec.multiTube?.offsets || [];
     let first = null;
     for (let i = 0; i < count; i++) {
-      const shot = this.spawnRound(index, offsets.length ? offsets[i % offsets.length] : null);
+      const shot = this.spawnRound(index, offsets.length ? offsets[i % offsets.length] : null, i);
       if (!first) first = shot;
       this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber);
       this.game.physics?.recoil(this, shot.muzzle, shot.dir, shot.caliber);
@@ -460,7 +473,7 @@ export class Tank {
     if (first) this.game.audio.gun(first.muzzle, first.caliber, this.isPlayer);
     if (this.spec.burst && this.spec.burst.shellIndices.includes(index)) {
       this.burstLeft = Math.max(0, this.spec.burst.count - 1); this.burstShellIdx = index;
-      this.burstTimer = this.spec.burst.interval; this.burstOffsetIndex = 0;
+      this.burstTimer = this.spec.burst.interval; this.burstOffsetIndex = this.model.muzzles ? 1 : 0;
       if (this.burstLeft > 0) this.reloadLeft = this.spec.burst.interval;
     }
     if (this.spec.artillery?.autoDeploy) {

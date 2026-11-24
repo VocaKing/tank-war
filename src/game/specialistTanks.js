@@ -90,11 +90,11 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 't14', tier: 4, cls: 'Heavy', name: 'T-14 Armata', short: 'T-14', nation: 'Russia', era: 'Modern', year: 2015,
-    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, unmannedTurret: true, crewCapsule: true, modelBaseId: 't90m',
+    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, unmannedTurret: true, crewCapsule: true,
     mass: 55, power: 1500, maxSpeed: 75, reverseSpeed: 30, hullTraverse: 38, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 7, gunElevation: 20, hp: 1550, viewRange: 540, reload: 7.0, aimTime: 1.8, dispersion: 1.05, stabilizer: 1,
     aps: { charges: 4, radius: 6.5, cooldown: 2.5 },
-    dims: { L: 8.7, W: 3.5, hullH: 1.72, clearance: 0.48, trackW: 0.62, turretZ: 0.0, turretL: 3.6, turretW: 2.8, turretH: 0.88, gunLen: 5.85 },
+    dims: { L: 8.35, W: 3.5, hullH: 1.72, clearance: 0.48, trackW: 0.62, turretZ: 0.1, turretL: 3.72, turretW: 3.13, turretH: 0.81, gunLen: 5.85 },
     armor: {
       hull: { front: [120, 62], side: [80, 0], rear: [45, 0], top: [30, 0], bottom: [20, 0] },
       turret: { front: [85, 35], side: [65, 0], rear: [45, 0], top: [25, 0] },
@@ -112,11 +112,11 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'strv103', tier: 3, cls: 'Tank Destroyer', name: 'Stridsvagn 103C', short: 'Strv 103C', nation: 'Sweden', era: 'Cold War', year: 1986,
-    crew: ['Commander', 'Driver', 'Radio operator'], autoloader: true, fixedGun: true, casemate: { hullAimRate: 42, hydroRate: 8.5 }, modelBaseId: 'leo1',
+    crew: ['Commander', 'Driver', 'Radio operator'], autoloader: true, fixedGun: true, casemate: { hullAimRate: 42, hydroRate: 8.5 },
     mass: 39.7, power: 730, maxSpeed: 50, reverseSpeed: 15, hullTraverse: 42, turretTraverse: 0, gunSpeed: 8,
     gunDepression: 10, gunElevation: 12, hp: 1120, viewRange: 440, reload: 4.2, aimTime: 2.0, dispersion: 1.35, stabilizer: 0.25,
     hydroSuspension: { lowOffset: -0.10, highOffset: 0.10 },
-    dims: { L: 7.0, W: 3.6, hullH: 1.65, clearance: 0.42, trackW: 0.62, turretZ: 0, turretL: 0.1, turretW: 0.1, turretH: 0.08, gunLen: 5.45 },
+    dims: { L: 7.0, W: 3.6, hullH: 1.65, clearance: 0.42, trackW: 0.62, turretZ: 0, turretL: 0.1, turretW: 0.1, turretH: 0.08, gunLen: 2.65 },
     armor: {
       hull: { front: [80, 70], side: [50, 0], rear: [30, 0], top: [20, 0], bottom: [15, 0] },
       turret: { front: [10, 0], side: [10, 0], rear: [10, 0], top: [8, 0] },
@@ -134,11 +134,11 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'fv4005s1', tier: 3, cls: 'Tank Destroyer', name: 'FV4005 Stage I', short: 'FV4005 S1', nation: 'UK', era: 'Cold War', year: 1955,
-    crew: ['Commander', 'Gunner', 'Loader', 'Loader', 'Driver'], autoloader: false, openTop: true, fireArc: 38, modelBaseId: 'centurion',
+    crew: ['Commander', 'Gunner', 'Loader', 'Loader', 'Driver'], autoloader: false, openTop: true, fireArc: 38,
     mass: 50.8, power: 650, maxSpeed: 32, reverseSpeed: 8, hullTraverse: 18, turretTraverse: 12, gunSpeed: 2.8,
     gunDepression: 5, gunElevation: 10, hp: 1250, viewRange: 430, reload: 30, aimTime: 6.5, dispersion: 3.5, stabilizer: 0,
     recoilBrace: { spadeDeploySeconds: 2.8, spadeRetractSeconds: 2.0, recoilDistance: 1.2, recoilRecovery: 3.2 },
-    dims: { L: 7.5, W: 3.4, hullH: 1.85, clearance: 0.42, trackW: 0.62, turretZ: 0.05, turretL: 3.2, turretW: 3.0, turretH: 1.45, gunLen: 5.4 },
+    dims: { L: 7.5, W: 3.4, hullH: 1.85, clearance: 0.42, trackW: 0.62, turretZ: 0.05, turretL: 3.4, turretW: 2.99, turretH: 1.82, gunLen: 5.4 },
     armor: {
       hull: { front: [76, 55], side: [50, 0], rear: [38, 0], top: [18, 0], bottom: [15, 0] },
       turret: { front: [14, 0], side: [14, 0], rear: [14, 0], top: [8, 0] },
@@ -149,12 +149,12 @@ export const SPECIALIST_TANKS = [
       { name: '183 mm L4A1 HESH', type: 'HESH', caliber: 183, pen: 190, velocity: 762, damage: 1180, count: 12, blastRadius: 9.5 },
     ],
     paint: { base: '#59624c', camo: ['#333c2e', '#777c62'], accent: '#414a38' },
-    systemTag: '183 mm HESH · OPEN MOUNT',
-    desc: 'Experimental open gun mounting for the 183 mm L4A1. Extreme HESH impact and recoil, tiny ammunition supply, exposed crew and a restricted safe firing arc.',
+    systemTag: '183 mm HESH · RECOIL BRACE',
+    desc: 'Experimental 183 mm L4A1 mounting with a tall shield. Extreme HESH impact and recoil, limited ammunition and a restricted firing arc.',
   },
   {
     id: 'm50ontos', tier: 2, cls: 'Tank Destroyer', name: 'M50 Ontos', short: 'M50 Ontos', nation: 'USA', era: 'Cold War', year: 1956,
-    crew: ['Commander', 'Gunner', 'Driver', 'Loader'], autoloader: false, openTop: true, fixedGun: true, casemate: { hullAimRate: 58, hydroRate: 0 }, modelBaseId: 'sherman',
+    crew: ['Commander', 'Gunner', 'Driver', 'Loader'], autoloader: false, openTop: true, fixedGun: true, casemate: { hullAimRate: 58, hydroRate: 0 },
     mass: 9.0, power: 361, maxSpeed: 48, reverseSpeed: 12, hullTraverse: 65, turretTraverse: 0, gunSpeed: 5,
     gunDepression: 10, gunElevation: 20, hp: 570, viewRange: 390, reload: 5.5, aimTime: 2.3, dispersion: 2.4, stabilizer: 0,
     multiTube: {
@@ -177,11 +177,11 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'centauro2', tier: 4, cls: 'Tank Destroyer', name: 'Centauro II', short: 'Centauro II', nation: 'Italy', era: 'Modern', year: 2018,
-    crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false, runningGear: 'wheels', modelBaseId: 'leo1',
+    crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false, runningGear: 'wheels',
     mass: 30, power: 720, maxSpeed: 105, reverseSpeed: 30, hullTraverse: 58, turretTraverse: 32, gunSpeed: 8,
     gunDepression: 7, gunElevation: 16, hp: 1050, viewRange: 510, reload: 6.2, aimTime: 2.0, dispersion: 1.35, stabilizer: 0.9,
     roadSpeedMult: 1.18, offRoadSpeedMult: 0.72,
-    dims: { L: 8.26, W: 3.38, hullH: 1.85, clearance: 0.40, trackW: 0.35, turretZ: 0.05, turretL: 2.8, turretW: 2.8, turretH: 0.9, gunLen: 5.4 },
+    dims: { L: 7.55, W: 3.38, hullH: 2.10, clearance: 0.40, trackW: 0.35, turretZ: 0.05, turretL: 3.12, turretW: 2.91, turretH: 0.9, gunLen: 5.4 },
     armor: {
       hull: { front: [55, 55], side: [30, 0], rear: [20, 0], top: [15, 0], bottom: [15, 0] },
       turret: { front: [90, 25], side: [45, 0], rear: [30, 0], top: [15, 0] },
@@ -199,10 +199,10 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'sprutsd', tier: 4, cls: 'Light', name: '2S25 Sprut-SD', short: 'Sprut-SD', nation: 'Russia', era: 'Modern', year: 2005,
-    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, amphibious: { draft: 1.25, speed: 10 }, hydroSuspension: { lowOffset: -0.14, highOffset: 0.12 }, modelBaseId: 't72',
+    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, amphibious: { draft: 1.25, speed: 10 }, hydroSuspension: { lowOffset: -0.14, highOffset: 0.12 },
     mass: 18, power: 510, maxSpeed: 70, reverseSpeed: 20, hullTraverse: 55, turretTraverse: 30, gunSpeed: 8,
     gunDepression: 5, gunElevation: 15, hp: 780, viewRange: 450, reload: 6.5, aimTime: 1.9, dispersion: 1.5, stabilizer: 0.85,
-    dims: { L: 7.0, W: 3.15, hullH: 1.55, clearance: 0.42, trackW: 0.48, turretZ: 0.05, turretL: 2.7, turretW: 2.8, turretH: 0.8, gunLen: 4.9 },
+    dims: { L: 7.0, W: 3.15, hullH: 1.60, clearance: 0.42, trackW: 0.48, turretZ: -0.22, turretL: 2.7, turretW: 2.58, turretH: 0.8, gunLen: 4.9 },
     armor: {
       hull: { front: [35, 60], side: [20, 0], rear: [15, 0], top: [10, 0], bottom: [10, 0] },
       turret: { front: [25, 25], side: [20, 0], rear: [15, 0], top: [10, 0] },
@@ -220,32 +220,32 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'archer', tier: 4, cls: 'Artillery', name: 'Archer FH77BW L52', short: 'Archer', nation: 'Sweden', era: 'Modern', year: 2016,
-    crew: ['Commander', 'Driver', 'Gunner'], autoloader: true, runningGear: 'wheels', modelBaseId: 'pzh2000',
+    crew: ['Commander', 'Driver', 'Gunner'], autoloader: true, runningGear: 'wheels',
     mass: 30, power: 670, maxSpeed: 90, reverseSpeed: 28, hullTraverse: 42, turretTraverse: 12, gunSpeed: 8,
     gunDepression: 0, gunElevation: 70, hp: 900, viewRange: 600, reload: 6.7, aimTime: 4.5, dispersion: 1.1, stabilizer: 0,
     artillery: { highArc: true, autoDeploy: true, deploySeconds: 0.8, packSeconds: 0.7, fireMissionRounds: 3, maxFlightSeconds: 42, aiEngageRange: 1250, recoilDistance: 0.95, recoilRecovery: 2.5 },
     magazine: { size: 3, intraReload: 1.5, fullReload: 7.5 },
-    dims: { L: 14.3, W: 3.0, hullH: 2.0, clearance: 0.55, trackW: 0.25, turretZ: -1.2, turretL: 4.0, turretW: 3.2, turretH: 1.5, gunLen: 8.0 },
+    dims: { L: 9.0, W: 3.15, hullH: 2.62, clearance: 0.55, trackW: 0.46, turretZ: -2.3, turretL: 4.1, turretW: 2.84, turretH: 1.48, gunLen: 7.8 },
     armor: {
       hull: { front: [35, 30], side: [20, 0], rear: [15, 0], top: [12, 0], bottom: [15, 0] },
       turret: { front: [25, 15], side: [20, 0], rear: [15, 0], top: [12, 0] },
       lowerFront: [30, 25], lowerSide: [15, 0], mantlet: [30, 0], heatMult: 1.0,
     },
-    engineZone: 'front', ammoRack: { zMin: -5.5, zMax: -1.0, yMax: 1.5, chance: 0.035, turretBustle: true },
+    engineZone: 'front', ammoRack: { zMin: -4.2, zMax: -1.0, yMax: 1.5, chance: 0.035, turretBustle: true },
     shells: [
       { name: '155 mm HE / BONUS', type: 'HE', caliber: 155, pen: 55, velocity: 850, damage: 650, count: 21, blastRadius: 11.5 },
     ],
     paint: { base: '#667052', camo: ['#394333', '#8a866d'], accent: '#4b553c' },
     systemTag: '155 mm AUTO · SHOOT & SCOOT',
-    desc: 'Fully automated wheeled 155 mm artillery system. Protected crew cabin, rapid automatic firing-position deployment, three-round fire mission and automatic shoot-and-scoot packing cycle.',
+    desc: 'Fully automated 8×8 wheeled artillery system. Protected crew cabin, rapid automatic firing-position deployment, three-round fire mission and automatic shoot-and-scoot packing cycle.',
   },
   {
     id: 'bmpt', tier: 4, cls: 'Fire Support', name: 'BMPT Terminator', short: 'BMPT', nation: 'Russia', era: 'Modern', year: 2013,
-    crew: ['Commander', 'Gunner', 'Driver', 'Gunner', 'Grenadier'], autoloader: true, modelBaseId: 't72',
+    crew: ['Commander', 'Gunner', 'Driver', 'Gunner', 'Grenadier'], autoloader: true,
     mass: 48, power: 1000, maxSpeed: 65, reverseSpeed: 25, hullTraverse: 35, turretTraverse: 42, gunSpeed: 24,
     gunDepression: 5, gunElevation: 45, hp: 1450, viewRange: 500, reload: 4.5, aimTime: 1.8, dispersion: 2.0, stabilizer: 0.9,
     burst: { shellIndices: [0, 1], count: 4, interval: 0.11, offsets: [[-0.24,0,0],[0.24,0,0]] },
-    dims: { L: 7.2, W: 3.6, hullH: 1.75, clearance: 0.48, trackW: 0.62, turretZ: 0.0, turretL: 2.8, turretW: 3.0, turretH: 0.9, gunLen: 2.6 },
+    dims: { L: 7.2, W: 3.6, hullH: 1.75, clearance: 0.48, trackW: 0.62, turretZ: 0.0, turretL: 2.5, turretW: 3.0, turretH: 0.97, gunLen: 2.7 },
     armor: {
       hull: { front: [100, 60], side: [65, 0], rear: [35, 0], top: [25, 0], bottom: [18, 0] },
       turret: { front: [80, 25], side: [60, 0], rear: [35, 0], top: [20, 0] },
@@ -263,10 +263,10 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: '2s38', tier: 4, cls: 'Air Defence', name: '2S38 Derivatsiya-PVO', short: '2S38', nation: 'Russia', era: 'Modern', year: 2024,
-    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, scan: { cooldown: 20, maxTargets: 6, range: 900 }, burst: { shellIndices: [0, 1], count: 4, interval: 0.09, offsets: [[-0.18,0,0],[0.18,0,0]] }, modelBaseId: 't72',
+    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, scan: { cooldown: 20, maxTargets: 6, range: 900 }, burst: { shellIndices: [0, 1], count: 4, interval: 0.09, offsets: [[-0.18,0,0],[0.18,0,0]] },
     mass: 21.5, power: 500, maxSpeed: 70, reverseSpeed: 20, hullTraverse: 48, turretTraverse: 48, gunSpeed: 30,
     gunDepression: 5, gunElevation: 75, hp: 850, viewRange: 650, reload: 0.65, aimTime: 1.4, dispersion: 2.6, stabilizer: 0.85,
-    dims: { L: 7.2, W: 3.2, hullH: 1.65, clearance: 0.45, trackW: 0.48, turretZ: 0.0, turretL: 2.6, turretW: 2.8, turretH: 0.85, gunLen: 3.5 },
+    dims: { L: 7.2, W: 3.2, hullH: 1.65, clearance: 0.45, trackW: 0.48, turretZ: 0.0, turretL: 3.0, turretW: 2.85, turretH: 0.85, gunLen: 4.15 },
     armor: {
       hull: { front: [35, 60], side: [20, 0], rear: [15, 0], top: [12, 0], bottom: [10, 0] },
       turret: { front: [25, 20], side: [20, 0], rear: [15, 0], top: [10, 0] },
@@ -284,7 +284,7 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'xm8ags', tier: 3, cls: 'Light', name: 'XM8 Armored Gun System', short: 'XM8 AGS', nation: 'USA', era: 'Cold War', year: 1995,
-    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, modelBaseId: 'sherman',
+    crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 18.1, power: 550, maxSpeed: 72, reverseSpeed: 24, hullTraverse: 58, turretTraverse: 32, gunSpeed: 10,
     gunDepression: 10, gunElevation: 20, hp: 820, viewRange: 460, reload: 5.0, aimTime: 1.6, dispersion: 1.45, stabilizer: 0.9,
     armorPackages: [
@@ -292,7 +292,7 @@ export const SPECIALIST_TANKS = [
       { name: 'LEVEL II · SPACED', mass: 20.0, speedMult: 0.92, front: 18, side: 10, heatMult: 1.15 },
       { name: 'LEVEL III · HEAVY', mass: 23.1, speedMult: 0.82, front: 34, side: 18, heatMult: 1.32 },
     ],
-    dims: { L: 6.4, W: 2.7, hullH: 1.55, clearance: 0.42, trackW: 0.48, turretZ: 0.05, turretL: 2.3, turretW: 2.4, turretH: 0.75, gunLen: 4.2 },
+    dims: { L: 6.4, W: 2.7, hullH: 1.55, clearance: 0.42, trackW: 0.48, turretZ: 0.05, turretL: 3.23, turretW: 2.82, turretH: 0.85, gunLen: 4.17 },
     armor: {
       hull: { front: [38, 55], side: [25, 0], rear: [18, 0], top: [12, 0], bottom: [12, 0] },
       turret: { front: [45, 25], side: [25, 0], rear: [18, 0], top: [12, 0] },

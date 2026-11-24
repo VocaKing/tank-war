@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createTankModel, hasDetailedTankModel, loadDetailedTankModel } from '../models/tankModel.js';
+import { createFleetModel, hasFleetModel } from '../models/fleetModel.js';
 import { applyArmorPreview, clearArmorPreview } from './armorPreview.js';
 import { pbrTex } from '../world/textures.js';
 import { sharedMediaUrl } from '../media.js';
@@ -59,13 +60,29 @@ export class Garage {
     window.addEventListener('pointercancel', end);
   }
   show(spec) {
-    if (!this.models[spec.id]) this.models[spec.id] = createTankModel(spec, { links: true });
     if (this.current) this.turntable.remove(this.current.root);
-    this.current = this.models[spec.id]; this.turntable.add(this.current.root);
-    this.current.turret.rotation.y = 0.0; this.current.gun.rotation.x = -0.04;
+    this.current = null;
     this.spec = spec;
+    const id = spec.id;
+    const fleet = hasFleetModel(id);
+    if (fleet && !this.models[id]) {
+      const cached = createFleetModel(spec);
+      if (cached) this.models[id] = cached;
+      else {
+        loadDetailedTankModel(spec).then(() => {
+          this.models[id] ??= createTankModel(spec, { links: true });
+          if (this.spec === spec) this.show(spec);
+        });
+        return;
+      }
+    }
+    this.models[id] ??= createTankModel(spec, { links: true });
+    this.current = this.models[id];
+    this.turntable.add(this.current.root);
+    this.current.turret.rotation.y = 0;
+    this.current.gun.rotation.x = spec.id === 'archer' ? -0.21 : -0.04;
     if (this.armorMode) this.setArmorMode(true);
-    if (hasDetailedTankModel(spec.id) && this.current.links) {
+    if (!fleet && hasDetailedTankModel(id) && this.current.links) {
       const placeholder = this.current;
       loadDetailedTankModel(spec).then(loaded => {
         if (!loaded || this.models[spec.id] !== placeholder) return;

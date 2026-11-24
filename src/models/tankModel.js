@@ -11,6 +11,7 @@ import { buildSpecialist } from './specialistModels.js';
 import { createMausModel, loadMausModel } from './mausModel.js';
 import { buildExpansionFallback, expansionGunClearance, hasExpansionModel } from './expansionFallback.js';
 import { createExpansionModel, loadExpansionModel } from './expansionModel.js';
+import { createFleetModel, hasFleetModel, loadFleetModel } from './fleetModel.js';
 import * as K from './kit.js';
 import { gunMount, hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
 export { THREE };
@@ -607,13 +608,10 @@ function refineRoofDetails(P, spec) {
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
   const d = spec.dims;
-  // Vehicles awaiting bespoke modelling reuse a known in-game hull/turret as a temporary visual stand-in.
-  // Their gameplay specifications and dimensions remain independent of the placeholder model.
-  const visualSpec = spec.modelBaseId ? { ...spec, id: spec.modelBaseId } : spec;
-  const expansion = hasExpansionModel(visualSpec.id);
-  const specialist = !spec.modelBaseId && (spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious || spec.conceptFleet);
-  const builder = expansion ? buildExpansionFallback : specialist ? buildSpecialist : BUILDERS[visualSpec.id] || buildV2;
-  const b = builder(d, visualSpec);
+  const expansion = hasExpansionModel(spec.id);
+  const specialist = hasFleetModel(spec.id) || spec.conceptFleet || spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious;
+  const builder = expansion ? buildExpansionFallback : specialist ? buildSpecialist : BUILDERS[spec.id] || buildV2;
+  const b = builder(d, spec);
   if (!expansion) {
     if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b);
     finishDetails(b.P, d, b, spec);
@@ -621,7 +619,7 @@ function getTemplate(spec) {
   }
   b.muzzleInfo = K.hollowMuzzle(b.P);
   gunMount(b.P, b, spec, lathe);
-  const gunPitchFloor = expansion ? expansionGunClearance(visualSpec) : (yaw, min, max) => hullPitchFloor(b, yaw, min, max);
+  const gunPitchFloor = expansion ? expansionGunClearance(spec) : (yaw, min, max) => hullPitchFloor(b, yaw, min, max);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
@@ -659,14 +657,17 @@ function getTemplate(spec) {
 }
 
 export function hasDetailedTankModel(id) {
-  return id === 'mauseng' || hasExpansionModel(id);
+  return id === 'mauseng' || hasExpansionModel(id) || hasFleetModel(id);
 }
 
 export function loadDetailedTankModel(spec) {
+  if (hasFleetModel(spec.id)) return loadFleetModel(spec);
   return spec.id === 'mauseng' ? loadMausModel() : loadExpansionModel(spec);
 }
 
 export function createTankModel(spec, opts = {}) {
+  const fleet = createFleetModel(spec);
+  if (fleet) return fleet;
   if (spec.id === 'mauseng') {
     const imported = createMausModel(!!opts.links);
     if (imported) {
