@@ -41,6 +41,8 @@ jobs:
           done
           curl -fsS http://127.0.0.1:4173/tank-war/ >/dev/null || { cat /tmp/tank-war-preview.log; exit 1; }
           node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "t72,pzh2000,aegis140" "village,forest,desert"
+      - name: Remove QA-only path mapping
+        run: rm -f dist/tank-war
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
