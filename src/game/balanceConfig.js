@@ -64,7 +64,7 @@ export function fields(t){
  if (t.multiTube?.modes) for (let i=0;i<t.multiTube.modes.length;i++) for (const [k,label,unit,min,max,step] of [['count','齐射炮管数','管',1,12,1],['reloadMult','装填倍率','×',0.1,10,0.1]]) if (k in t.multiTube.modes[i]) out.push(def('multiTube.modes.'+i+'.'+k,t.multiTube.modes[i].name+' · '+label,unit,min,max,step,'多管武器'));
  if (t.burst) for (const [k,label,unit,min,max,step] of [['count','点射发数','发',1,30,1],['interval','点射间隔','s',0.02,5,0.01]]) if (k in t.burst) out.push(def('burst.'+k,label,unit,min,max,step,'连发系统'));
  if (t.eraLayout) for (let i=0;i<t.eraLayout.length;i++) for (const [k,label] of [['heat','HEAT 单块防护','mm'],['ke','动能单块防护','mm']]) if (k in t.eraLayout[i]) out.push(def('eraLayout.'+i+'.'+k,'ERA '+(i+1)+' · '+label,'mm',0,1000,1,'模块化反应装甲'));
- if (t.dozerAssist !== undefined) out.push(def('dozerAssist','推土铲爬坡辅助','×',0,1,0.01,'机动'));
+ if (t.dozerAssist !== undefined) out.push(def('dozerAssist','推土铲爬坡辅助','×',0,1,0.01,'推土铲辅助'));
  return out;
 }
 export const read=(obj,path)=>path.split('.').reduce((v,k)=>v[k],obj);
