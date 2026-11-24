@@ -10,6 +10,7 @@ assert.equal(files.length, 20, 'Expected each specialist and concept vehicle to 
 const fingerprints = new Set();
 const ids = [];
 const wheelCounts = { archer: 8, centauro2: 8 };
+const expectedReferences = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
 
 for (const file of files) {
   const id = file.slice(0, -4);
@@ -20,6 +21,9 @@ for (const file of files) {
   const model = nodes[scenes[0].nodes[0]];
   assert.equal(model.name, id);
   assert.equal(model.extras.fleetModelId, id);
+  if (expectedReferences.has(id)) {
+    assert.equal(model.extras.referenceImage, expectedReferences.get(id), id + ' has the wrong reference image');
+  }
   const child = (node, name) => node?.children?.map(i => nodes[i]).find(n => n.name === name);
   const body = child(model, 'body');
   const turret = child(body, 'turret');
@@ -50,7 +54,7 @@ if (process.argv[2]) {
     page.on('pageerror', error => errors.push(error.message));
     await page.addInitScript(() => {
       const raf = window.requestAnimationFrame.bind(window);
-      window.requestAnimationFrame = callback => callback.name === 'loop' ? 0 : raf(callback);
+      window.requestAnimationFrame = callback => callback.name === 'loop' || callback.toString().includes('toneMappingExposure') ? 0 : raf(callback);
     });
     await page.goto(process.argv[2]);
     await page.waitForFunction(() => window.__ready);

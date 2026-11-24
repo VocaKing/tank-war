@@ -7,6 +7,8 @@ const fleetIds = new Set([
   'aegis140', 'bastion125', 'cerberus135', 'harrier105', 'lancer120', 'leviathan160', 'raptor90',
   'tempest155', 'thunderclad155', 'warden130',
 ]);
+// Only these three URLs change so existing browser caches fetch the revised geometry.
+const referenceImages = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
 const templates = new Map();
 const requests = new Map();
 const beltMaterial = new THREE.MeshStandardMaterial({
@@ -34,10 +36,15 @@ export function loadFleetModel(spec) {
     import('three/addons/loaders/GLTFLoader.js'),
     import('three/addons/libs/meshopt_decoder.module.js'),
   ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
-    const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb`;
+    const referenceImage = referenceImages.get(id);
+    const revision = referenceImage ? '?v=2026-11-reference-2-8-10' : '';
+    const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb${revision}`;
     const { scene } = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
     const root = required(scene, id);
     if (root.userData.fleetModelId !== id) throw new Error(`Incorrect vehicle in ${url}`);
+    if (referenceImage && root.userData.referenceImage !== referenceImage) {
+      throw new Error(`Incorrect reference geometry in ${url}`);
+    }
     const body = required(root, 'body');
     const turret = required(body, 'turret');
     const gun = required(turret, 'gun');

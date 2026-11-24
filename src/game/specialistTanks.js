@@ -94,7 +94,7 @@ export const SPECIALIST_TANKS = [
     mass: 55, power: 1500, maxSpeed: 75, reverseSpeed: 30, hullTraverse: 38, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 7, gunElevation: 20, hp: 1550, viewRange: 540, reload: 7.0, aimTime: 1.8, dispersion: 1.05, stabilizer: 1,
     aps: { charges: 4, radius: 6.5, cooldown: 2.5 },
-    dims: { L: 8.35, W: 3.5, hullH: 1.72, clearance: 0.48, trackW: 0.62, turretZ: 0.1, turretL: 3.72, turretW: 3.13, turretH: 0.81, gunLen: 5.85 },
+    dims: { L: 8.35, W: 3.5, hullH: 1.72, clearance: 0.48, trackW: 0.62, turretZ: 0.1, turretL: 3.78, turretW: 3.18, turretH: 0.84, gunLen: 5.85 },
     armor: {
       hull: { front: [120, 62], side: [80, 0], rear: [45, 0], top: [30, 0], bottom: [20, 0] },
       turret: { front: [85, 35], side: [65, 0], rear: [45, 0], top: [25, 0] },
@@ -202,7 +202,7 @@ export const SPECIALIST_TANKS = [
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, amphibious: { draft: 1.25, speed: 10 }, hydroSuspension: { lowOffset: -0.14, highOffset: 0.12 },
     mass: 18, power: 510, maxSpeed: 70, reverseSpeed: 20, hullTraverse: 55, turretTraverse: 30, gunSpeed: 8,
     gunDepression: 5, gunElevation: 15, hp: 780, viewRange: 450, reload: 6.5, aimTime: 1.9, dispersion: 1.5, stabilizer: 0.85,
-    dims: { L: 7.0, W: 3.15, hullH: 1.60, clearance: 0.42, trackW: 0.48, turretZ: -0.22, turretL: 2.7, turretW: 2.58, turretH: 0.8, gunLen: 4.9 },
+    dims: { L: 7.0, W: 3.15, hullH: 1.43, clearance: 0.42, trackW: 0.48, turretZ: -0.28, turretL: 2.7, turretW: 2.76, turretH: 0.72, gunLen: 4.9 },
     armor: {
       hull: { front: [35, 60], side: [20, 0], rear: [15, 0], top: [10, 0], bottom: [10, 0] },
       turret: { front: [25, 25], side: [20, 0], rear: [15, 0], top: [10, 0] },
@@ -292,7 +292,7 @@ export const SPECIALIST_TANKS = [
       { name: 'LEVEL II · SPACED', mass: 20.0, speedMult: 0.92, front: 18, side: 10, heatMult: 1.15 },
       { name: 'LEVEL III · HEAVY', mass: 23.1, speedMult: 0.82, front: 34, side: 18, heatMult: 1.32 },
     ],
-    dims: { L: 6.4, W: 2.7, hullH: 1.55, clearance: 0.42, trackW: 0.48, turretZ: 0.05, turretL: 3.23, turretW: 2.82, turretH: 0.85, gunLen: 4.17 },
+    dims: { L: 6.4, W: 2.7, hullH: 1.59, clearance: 0.42, trackW: 0.48, turretZ: -0.05, turretL: 3.18, turretW: 2.92, turretH: 0.91, gunLen: 4.17 },
     armor: {
       hull: { front: [38, 55], side: [25, 0], rear: [18, 0], top: [12, 0], bottom: [12, 0] },
       turret: { front: [45, 25], side: [25, 0], rear: [18, 0], top: [12, 0] },
