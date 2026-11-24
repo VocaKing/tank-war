@@ -31,7 +31,7 @@ jobs:
       - run: npm run build
       - name: Smoke-test representative vehicles on all maps
         run: |
-          npm run preview -- --host 127.0.0.1 > /tmp/tank-war-preview.log 2>&1 &
+          npm run preview -- --base / --host 127.0.0.1 > /tmp/tank-war-preview.log 2>&1 &
           PREVIEW_PID=$!
           trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
           for i in $(seq 1 40); do
