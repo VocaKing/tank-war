@@ -16,6 +16,17 @@ class USceneComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
 
+namespace SteelFront
+{
+struct FPracticeRound
+{
+    FVector Position;
+    FVector Velocity;
+    TWeakObjectPtr<AActor> Tracer;
+    double Lifetime;
+};
+}
+
 UCLASS()
 class ASteelFrontTank : public APawn
 {
@@ -30,7 +41,10 @@ public:
     double SpeedKmh() const { return FMath::Abs(Speed) * 0.036; }
     double DispersionRadians() const { return FMath::Atan(FMath::Lerp(0.25, 2.4, Dispersion) / 100.0); }
     bool IsReloading() const { return Reload > 0.0; }
+    bool IsAutoBraking() const { return !bAirborne && AutoBrake > 0.0 && FMath::Abs(Speed) > 1.0; }
+    double ReloadProgress() const { return 1.0 - Reload / ReloadDuration; }
     double AimDistanceMetres() const { return AimDistance * 0.01; }
+    FVector GetAimImpact() const { return AimImpact; }
     void SetGunMount(const FVector& Mount);
     bool SetupRunningGear(const SteelFront::FRunningGear& Gear);
 
@@ -56,6 +70,7 @@ private:
     void Drive(double Step);
     void UpdateRunningGear(double Travel, double TurnArc);
     void UpdateAim(double Step);
+    void UpdateRounds(double Step);
     void Fire();
     void ToggleScope();
     void ReleaseMouse();
@@ -82,17 +97,21 @@ private:
 
     SteelFront::FRunningGear RunningGear;
     TArray<FTransform> GearTransforms;
+    TArray<SteelFront::FPracticeRound> Rounds;
     double TrackTravel[2] = {0.0, 0.0};
     FVector GunMount = FVector::ZeroVector;
+    FVector AimImpact = FVector::ZeroVector;
     float Throttle = 0;
     float Steer = 0;
     double Speed = 0;
+    double AutoBrake = 0;
     double VerticalSpeed = 0;
     double LastSupport = 0;
     double Pitch = 0;
     double Roll = 0;
     double Dispersion = 0;
     double AimDistance = 0;
+    static constexpr double ReloadDuration = 1.15;
     double Reload = 0;
     double Recoil = 0;
     bool bHasSupport = false;

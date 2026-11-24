@@ -1,6 +1,6 @@
-# Steel Front · Windows UE5 高画质原型 0.2
+# Steel Front · Windows UE5 高画质原型 0.3
 
-试玩内容是一块 **480 × 480 米的诺曼底靶场**，外部还有约 1.68 公里宽的地形背景。可以驾驶谢尔曼、在坡道上体验接地与短暂腾空、开镜瞄准并击倒靶板。打开后，主界面会显示 **Press ENTER to deploy**。
+试玩内容是一块 **480 × 480 米的诺曼底靶场**，外部还有约 1.68 公里宽的地形背景。可以驾驶谢尔曼、在坡道上体验接地与短暂腾空、开镜瞄准并击倒靶板。打开后，主界面会显示 **ENTER Deploy**。
 
 ## Windows 上启动
 
@@ -24,12 +24,19 @@ UE5.7 装在自定义位置时，追加 `-EngineRoot 'D:\Epic Games\UE_5.7'`。�
 | Enter | 出战或恢复鼠标捕获 |
 | W / S | 前进和倒车 |
 | A / D | 转动车体 |
-| Space | 刹车 |
+| 松开 WASD | 自动制动 |
+| Space | 立即施加制动力 |
 | 鼠标 | 转动视角并瞄准 |
 | 左键 | 射击 |
 | 右键 | 切换开镜 |
 | R | 重置全部靶板 |
 | Esc | 释放鼠标 |
+
+## 0.3 操控与靶场
+
+- 自动刹车接入谢尔曼的运动积分。制动力逐步建立，停车距离取决于松键时的速度。
+- 炮弹沿重力弹道飞行，曳光随弹移动，命中后在撞击位置闪光。散布采用圈内指数密度，准星跟随炮口预测着弹点。
+- 靶场界面显示车速、自动制动、装填进度和已击倒的目标。按 R 可以重置靶板。
 
 ## 画质与数据来源
 
@@ -41,4 +48,4 @@ UE5.7 装在自定义位置时，追加 `-EngineRoot 'D:\Epic Games\UE_5.7'`。�
 
 `Content/Prototype/Normandy.sfbin` 是自包含的压缩网格数据。`ArtSource/NormandyMaterials.json` 指定纹理和材质。从仓库根目录可以运行 `node native/windows/verify-slice.mjs` 校验两者。重新导出需要 `npm ci` 和 `npx playwright install chromium`，然后运行 `node native/windows/export-slice.mjs`。
 
-试玩包包含源码和资产，由 Windows 启动脚本在本机编译。已验证地图保真数据、独立地表着色器和启动脚本的顺序。实际 UE5 画面与 RTX 5060 Ti 的帧率仍需在 Windows 上实测。
+试玩包包含源码和资产，由 Windows 启动脚本在本机编译。地图与材质数据可用前面的校验命令验证。此版的 Windows 编译、实机画面与 RTX 5060 Ti 的帧率仍需在装有 UE5.7 的 Windows 上验证。

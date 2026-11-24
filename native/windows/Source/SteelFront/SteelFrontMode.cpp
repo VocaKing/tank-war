@@ -1,4 +1,5 @@
 #include "SteelFrontMode.h"
+#include "SteelFrontPracticeMath.h"
 #include "SteelFrontSlice.h"
 
 #include "Camera/CameraComponent.h"
@@ -181,38 +182,53 @@ void AddLighting(UWorld& World)
     }
 }
 
-void ShowTrace(UWorld& World, const FVector& Start, const FVector& End)
+void MoveTracer(AActor& Tracer, const FVector& Position, const FVector& Velocity, double Travel)
 {
-    const FVector Segment = End - Start;
-    if (Segment.IsNearlyZero()) return;
+    const double Length = FMath::Clamp(Travel, 1.0, 400.0);
+    const FVector Direction = Velocity.GetSafeNormal();
+    Tracer.SetActorLocationAndRotation(Position - Direction * (Length * 0.5), Direction.Rotation());
+    Tracer.SetActorScale3D(FVector(Length * 0.01, 0.025, 0.025));
+}
+
+AActor* SpawnTracer(UWorld& World, const FVector& Start, const FVector& Velocity)
+{
     static const auto TracerPath = TEXT("/Game/Prototype/Quality/Materials/M_Tracer.M_Tracer");
     auto* Material = LoadObject<UMaterialInterface>(nullptr, TracerPath, nullptr, LOAD_NoWarn);
     auto* Mesh = LoadObject<UStaticMesh>(nullptr, CubePath);
-    if (Material && Mesh)
-    {
-        if (auto* Trail = World.SpawnActor<AActor>())
-        {
-            UStaticMeshComponent* Shape = AddShape(*Trail, nullptr, Mesh, Material);
-            Shape->SetCastShadow(false);
-            const double Length = Segment.Size();
-            const double Visible = FMath::Min(Length, 750.0);
-            const FVector Direction = Segment / Length;
-            Shape->SetRelativeScale3D(FVector(Visible * 0.01, 0.025, 0.025));
-            Trail->SetActorLocationAndRotation(End - Direction * (Visible * 0.5), Direction.Rotation());
-            Trail->SetLifeSpan(0.075f);
-        }
-    }
+    if (!Material || !Mesh) return nullptr;
+    auto* Trail = World.SpawnActor<AActor>();
+    if (!Trail) return nullptr;
+    auto* Shape = AddShape(*Trail, nullptr, Mesh, Material);
+    Shape->SetMobility(EComponentMobility::Movable);
+    Shape->SetCastShadow(false);
+    MoveTracer(*Trail, Start, Velocity, 0.0);
+    Trail->SetLifeSpan(1.0f);
+    return Trail;
+}
+
+void ShowFlash(UWorld& World, const FVector& Position, float Intensity, float Radius)
+{
     FActorSpawnParameters Params;
-    if (auto* Flash = World.SpawnActor<APointLight>(Start, FRotator::ZeroRotator, Params))
+    if (auto* Flash = World.SpawnActor<APointLight>(Position, FRotator::ZeroRotator, Params))
     {
         auto* Light = Flash->FindComponentByClass<UPointLightComponent>();
         Light->SetMobility(EComponentMobility::Movable);
         Light->SetLightColor(FLinearColor(1.0f, 0.50f, 0.17f));
-        Light->SetIntensity(13000.f);
-        Light->SetAttenuationRadius(480.f);
+        Light->SetIntensity(Intensity);
+        Light->SetAttenuationRadius(Radius);
         Light->SetCastShadows(false);
         Flash->SetLifeSpan(0.065f);
     }
+}
+
+bool TraceRoundStep(UWorld& World, const FCollisionQueryParams& Query, FVector& Position,
+    FVector& Velocity, double Step, FHitResult& Hit)
+{
+    const FVector Next = Position + Velocity * Step - FVector(0, 0, Gravity * Step * Step * 0.5);
+    const bool bHit = World.LineTraceSingleByChannel(Hit, Position, Next, ECC_Visibility, Query);
+    Position = bHit ? Hit.ImpactPoint : Next;
+    Velocity.Z -= Gravity * Step * (bHit ? Hit.Time : 1.0);
+    return bHit;
 }
 }
 
@@ -285,12 +301,19 @@ void ASteelFrontTank::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     const auto* Player = Cast<APlayerController>(GetController());
-    if (!Player || Player->bShowMouseCursor || !bStarted || DeltaSeconds <= 0) return;
+    if (!Player || !bStarted || DeltaSeconds <= 0) return;
 
     const double Step = FMath::Min(double(DeltaSeconds), 0.05);
+    if (Player->bShowMouseCursor)
+    {
+        UpdateRounds(Step);
+        return;
+    }
     const FVector Start = GetActorLocation();
     const double Heading = GetActorRotation().Yaw;
-    Drive(Step);
+    const int32 Substeps = FMath::Max(1, FMath::CeilToInt(Step * 120.0));
+    for (int32 Index = 0; Index < Substeps; ++Index) Drive(Step / Substeps);
+    UpdateRounds(Step);
     const double Travel = FVector::DotProduct(GetActorLocation() - Start, GetActorForwardVector());
     const double TurnArc = FMath::DegreesToRadians(FMath::FindDeltaAngleDegrees(Heading, GetActorRotation().Yaw)) * RunningGear.HalfSpan;
     if (FMath::Abs(Travel) + FMath::Abs(TurnArc) > 0.001) UpdateRunningGear(Travel, TurnArc);
@@ -358,17 +381,29 @@ void ASteelFrontTank::UpdateRunningGear(double Travel, double TurnArc)
 void ASteelFrontTank::Drive(double Step)
 {
     const FVector Origin = GetActorLocation();
+    const bool bDriveReleased = FMath::IsNearlyZero(Throttle) && FMath::IsNearlyZero(Steer) && !bBraking;
+    AutoBrake = bDriveReleased ? FMath::Min(1.0, AutoBrake + Step / SteelFront::BrakeBuildup) : 0.0;
+    double Travel = Speed * Step;
     if (!bAirborne)
     {
-        const double Desired = bBraking ? 0.0 : (Throttle >= 0 ? 1160.0 : 390.0) * Throttle;
-        const double Rate = bBraking ? 920.0 : Desired == 0 ? 400.0 : 260.0;
-        Speed = FMath::FInterpConstantTo(Speed, Desired, Step, Rate);
+        if (bDriveReleased || bBraking)
+        {
+            const auto Motion = SteelFront::BrakeSherman(Speed, bBraking ? 1.0 : AutoBrake, Step);
+            Speed = Motion.Speed;
+            Travel = Motion.Travel;
+        }
+        else
+        {
+            const double Desired = (Throttle >= 0 ? 1160.0 : 390.0) * Throttle;
+            Speed = FMath::FInterpConstantTo(Speed, Desired, Step, Desired == 0 ? 400.0 : 260.0);
+            Travel = Speed * Step;
+        }
         const double Direction = Speed < -10 ? -1.0 : 1.0;
         AddActorWorldRotation(FRotator(0, Steer * Direction * 41.0 * Step, 0));
     }
     const FVector Forward = GetActorForwardVector();
     const FVector Right = GetActorRightVector();
-    FVector Destination = Origin + Forward * (Speed * Step);
+    FVector Destination = Origin + Forward * Travel;
     Destination.X = FMath::Clamp(Destination.X, -Boundary, Boundary);
     Destination.Y = FMath::Clamp(Destination.Y, -Boundary, Boundary);
     const double VerticalStep = (VerticalSpeed - Gravity * Step * 0.5) * Step;
@@ -461,22 +496,41 @@ void ASteelFrontTank::UpdateAim(double Step)
     FVector Eye;
     FRotator View;
     Player->GetPlayerViewPoint(Eye, View);
-    const FVector End = Eye + View.Vector() * 48000.0;
+    const FVector End = Eye + View.Vector() * SteelFront::ShotRange;
     const FCollisionQueryParams Query(SCENE_QUERY_STAT(SteelFrontAim), true, this);
     FHitResult Hit;
     GetWorld()->LineTraceSingleByChannel(Hit, Eye, End, ECC_Visibility, Query);
     const FVector Aim = Hit.bBlockingHit ? Hit.ImpactPoint : End;
-    AimDistance = FVector::Distance(Muzzle->GetComponentLocation(), Aim);
     const FVector Relative = Hull->GetComponentTransform().InverseTransformPosition(Aim) - Turret->GetRelativeLocation();
     const double DesiredYaw = FMath::RadiansToDegrees(FMath::Atan2(Relative.Y, Relative.X));
     const double Yaw = FMath::FixedTurn(Turret->GetRelativeRotation().Yaw, DesiredYaw, 76.0 * Step);
     Turret->SetRelativeRotation(FRotator(0, Yaw, 0));
     const FVector Ahead = Turret->GetComponentTransform().InverseTransformPosition(Aim) - GunMount;
-    const double AimPitch = FMath::RadiansToDegrees(FMath::Atan2(Ahead.Z, FMath::Max(260.0, Ahead.X)));
+    const double RangeAhead = FMath::Max(260.0, Ahead.X);
+    const double Flight = FMath::Max(0.0, RangeAhead - Muzzle->GetRelativeLocation().X) / SteelFront::ShellSpeed;
+    const double AimPitch = FMath::RadiansToDegrees(FMath::Atan2(Ahead.Z + Gravity * Flight * Flight * 0.5, RangeAhead));
     const double Current = Gun->GetRelativeRotation().Pitch;
     const double DesiredPitch = FMath::Clamp(AimPitch, -10.0, 24.0);
     Gun->SetRelativeRotation(FRotator(FMath::FixedTurn(Current, DesiredPitch, 48.0 * Step), 0, 0));
     Gun->SetRelativeLocation(GunMount - Gun->GetRelativeRotation().Vector() * Recoil);
+
+    const FVector Start = Muzzle->GetComponentLocation();
+    AimImpact = Start;
+    if (GetWorld()->LineTraceSingleByChannel(Hit, Gun->GetComponentLocation(), Start, ECC_Visibility, Query))
+    {
+        AimImpact = Hit.ImpactPoint;
+    }
+    else
+    {
+        FVector Velocity = Muzzle->GetForwardVector() * SteelFront::ShellSpeed;
+        constexpr int32 Steps = 12;
+        constexpr double TraceStep = SteelFront::ShotLifetime / Steps;
+        for (int32 Index = 0; Index < Steps; ++Index)
+        {
+            if (TraceRoundStep(*GetWorld(), Query, AimImpact, Velocity, TraceStep, Hit)) break;
+        }
+    }
+    AimDistance = FVector::Distance(Start, AimImpact);
 }
 
 void ASteelFrontTank::SetGunMount(const FVector& Mount)
@@ -491,22 +545,56 @@ void ASteelFrontTank::Fire()
     if (!Player) return;
     if (!bStarted || Player->bShowMouseCursor) { StartPractice(); return; }
     if (Reload > 0.0) return;
-    Reload = 1.15;
+    Reload = ReloadDuration;
     Recoil = 13.0;
 
     const FVector Start = Muzzle->GetComponentLocation();
-    const double Radius = FMath::Tan(DispersionRadians()) * FMath::Sqrt(FMath::FRand());
+    double UnitRadius;
+    do { UnitRadius = SteelFront::DispersionSample(FMath::FRand(), FMath::FRand()); } while (UnitRadius >= 1.0);
+    const double Radius = FMath::Tan(DispersionRadians()) * UnitRadius;
     const double Angle = FMath::FRand() * UE_DOUBLE_PI * 2.0;
     const FVector Direction = (Muzzle->GetForwardVector() + Radius *
         (Muzzle->GetRightVector() * FMath::Cos(Angle) + Muzzle->GetUpVector() * FMath::Sin(Angle))).GetSafeNormal();
     const FCollisionQueryParams Query(SCENE_QUERY_STAT(SteelFrontShot), true, this);
     FHitResult Hit;
-    const FVector End = Start + Direction * 48000.0;
-    GetWorld()->LineTraceSingleByChannel(Hit, Gun->GetComponentLocation(), Start, ECC_Visibility, Query);
-    if (!Hit.bBlockingHit) GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Query);
-    if (auto* Mode = GetWorld()->GetAuthGameMode<ASteelFrontMode>())
-        Mode->RegisterHit(Hit.GetComponent());
-    ShowTrace(*GetWorld(), Start, Hit.bBlockingHit ? Hit.ImpactPoint : End);
+    UWorld& World = *GetWorld();
+    if (World.LineTraceSingleByChannel(Hit, Gun->GetComponentLocation(), Start, ECC_Visibility, Query))
+    {
+        if (auto* Mode = World.GetAuthGameMode<ASteelFrontMode>()) Mode->RegisterHit(Hit.GetComponent());
+        ShowFlash(World, Hit.ImpactPoint + Hit.ImpactNormal * 5.0, 7400.f, 280.f);
+        return;
+    }
+    const FVector Velocity = Direction * SteelFront::ShellSpeed;
+    Rounds.Add(SteelFront::FPracticeRound{
+        Start, Velocity, TWeakObjectPtr<AActor>(SpawnTracer(World, Start, Velocity)), SteelFront::ShotLifetime});
+    ShowFlash(World, Start, 13000.f, 480.f);
+}
+
+void ASteelFrontTank::UpdateRounds(double Step)
+{
+    UWorld& World = *GetWorld();
+    const FCollisionQueryParams Query(SCENE_QUERY_STAT(SteelFrontShot), true, this);
+    for (int32 Index = Rounds.Num() - 1; Index >= 0; --Index)
+    {
+        auto& Round = Rounds[Index];
+        const double TravelStep = FMath::Min(Step, Round.Lifetime);
+        FHitResult Hit;
+        const bool bHit = TraceRoundStep(World, Query, Round.Position, Round.Velocity, TravelStep, Hit);
+        Round.Lifetime -= TravelStep * (bHit ? Hit.Time : 1.0);
+        if (bHit)
+        {
+            if (auto* Mode = World.GetAuthGameMode<ASteelFrontMode>()) Mode->RegisterHit(Hit.GetComponent());
+            ShowFlash(World, Hit.ImpactPoint + Hit.ImpactNormal * 5.0, 7400.f, 280.f);
+        }
+        const bool bFinished = bHit || Round.Lifetime <= 0.0;
+        if (auto* Tracer = Round.Tracer.Get())
+        {
+            const double Travel = (SteelFront::ShotLifetime - Round.Lifetime) * SteelFront::ShellSpeed;
+            MoveTracer(*Tracer, Round.Position, Round.Velocity, Travel);
+            if (bFinished) Tracer->SetLifeSpan(0.045f);
+        }
+        if (bFinished) Rounds.RemoveAtSwap(Index);
+    }
 }
 
 void ASteelFrontTank::ToggleScope()
@@ -544,6 +632,8 @@ void ASteelFrontTank::ReleaseMouse()
 
 void ASteelFrontTank::ResetTargets()
 {
+    for (const auto& Round : Rounds) if (auto* Tracer = Round.Tracer.Get()) Tracer->Destroy();
+    Rounds.Reset();
     if (auto* Mode = GetWorld()->GetAuthGameMode<ASteelFrontMode>()) Mode->ResetTargets();
 }
 
@@ -551,46 +641,71 @@ void ASteelFrontHud::DrawHUD()
 {
     Super::DrawHUD();
     if (!Canvas) return;
-    const FLinearColor Cream(0.96f, 0.91f, 0.80f);
-    const FLinearColor Panel(0.024f, 0.028f, 0.024f, 0.86f);
+    const FLinearColor Ink(0.031f, 0.048f, 0.058f, 0.92f);
+    const FLinearColor Text(0.93f, 0.94f, 0.91f);
+    const FLinearColor Muted(0.66f, 0.75f, 0.78f);
+    const FLinearColor Gold(0.88f, 0.63f, 0.29f);
+    const FLinearColor Ready(0.50f, 0.82f, 0.63f);
+    const float Scale = FMath::Clamp(FMath::Min(Canvas->SizeX / 1280.f, Canvas->SizeY / 720.f), 0.5f, 2.f);
+    const float Margin = 24.f * Scale;
+    const float CX = Canvas->SizeX * 0.5f, CY = Canvas->SizeY * 0.5f;
     const auto* Tank = Cast<ASteelFrontTank>(GetOwningPawn());
-    if (!Tank || !Tank->IsPracticing())
+    auto* Player = GetOwningPlayerController();
+    if (!Tank || !Tank->IsPracticing() || (Player && Player->bShowMouseCursor))
     {
-        const float Mid = Canvas->SizeY * 0.42f;
-        DrawRect(Panel, 0, Mid - 45.f, Canvas->SizeX, 201.f);
-        DrawText(TEXT("STEEL FRONT"), Cream, 55, Mid - 24.f, nullptr, 3.5f);
-        DrawText(TEXT("NORMANDY TRAINING RANGE"), Cream, 60, Mid + 39.f, nullptr, 1.35f);
-        DrawText(Tank ? TEXT("Press ENTER to deploy") : TEXT("Map data unavailable. Check the Steel Front log."),
-            Cream, 60, Mid + 96.f, nullptr, 1.2f);
+        const bool bResume = Tank && Tank->IsPracticing();
+        const float X = 2 * Margin;
+        const float Y = CY - 65.f * Scale;
+        DrawRect(Ink, X, Y, 410.f * Scale, 144.f * Scale);
+        DrawRect(Gold, X, Y, 3.f * Scale, 144.f * Scale);
+        DrawText(TEXT("STEEL FRONT"), Text, X + 20.f * Scale, Y + 20.f * Scale, nullptr, 2.35f * Scale);
+        DrawText(TEXT("Normandy training range"), Muted, X + 21.f * Scale, Y + 67.f * Scale, nullptr, 1.15f * Scale);
+        const TCHAR* Action = !Tank ? TEXT("Check Steel Front logs for map data.") :
+            bResume ? TEXT("ENTER   Resume") : TEXT("ENTER   Deploy");
+        DrawText(Action, Gold, X + 21.f * Scale, Y + 105.f * Scale, nullptr, 1.15f * Scale);
         return;
     }
 
     const auto* Mode = GetWorld()->GetAuthGameMode<ASteelFrontMode>();
-    DrawRect(Panel, 24, 22, 322, 70);
-    DrawText(FString::Printf(TEXT("%02d / %02d   TARGETS"), Mode ? Mode->Hits() : 0, Mode ? Mode->TotalTargets() : 0),
-        Cream, 41, 31, nullptr, 1.25f);
-    DrawText(FString::Printf(TEXT("%3.0f km/h     %s"), Tank->SpeedKmh(), Tank->IsReloading() ? TEXT("RELOADING") : TEXT("READY")),
-        Cream, 41, 58, nullptr, 1.12f);
-    DrawText(TEXT("WASD  Drive    SPACE  Brake    LMB  Fire    RMB  Scope    R  Reset targets    ESC  Cursor    ENTER  Resume"),
-        Cream, 28, Canvas->SizeY - 44.f);
+    const int32 Hits = Mode ? Mode->Hits() : 0;
+    const int32 Total = Mode ? Mode->TotalTargets() : 0;
+    const bool bCleared = Total > 0 && Hits == Total;
+    DrawRect(Ink, Margin, Margin, 263.f * Scale, 69.f * Scale);
+    DrawRect(Gold, Margin, Margin, 3.f * Scale, 69.f * Scale);
+    DrawText(TEXT("NORMANDY RANGE"), Muted, Margin + 14.f * Scale, Margin + 9.f * Scale, nullptr, 0.95f * Scale);
+    DrawText(bCleared ? FString(TEXT("Range clear   ·   R to reset")) : FString::Printf(TEXT("%02d / %02d   Targets"), Hits, Total),
+        bCleared ? Ready : Text, Margin + 14.f * Scale, Margin + 32.f * Scale, nullptr, 1.33f * Scale);
 
-    const float X = Canvas->SizeX * 0.5f, Y = Canvas->SizeY * 0.5f;
-    const auto* Player = GetOwningPlayerController();
-    const double Fov = Player && Player->PlayerCameraManager ? Player->PlayerCameraManager->GetFOVAngle() : 68.0;
-    const double Pixels = FMath::Tan(Tank->DispersionRadians()) * X / FMath::Tan(FMath::DegreesToRadians(Fov * 0.5));
-    const float Radius = FMath::Max(1.f, float(Pixels));
-    for (int32 Index = 0; Index < 32; ++Index)
+    const float StatusY = Canvas->SizeY - Margin - 98.f * Scale;
+    DrawRect(Ink, Margin, StatusY, 230.f * Scale, 72.f * Scale);
+    DrawText(FString::Printf(TEXT("%02.0f km/h"), Tank->SpeedKmh()), Text, Margin + 12.f * Scale,
+        StatusY + 6.f * Scale, nullptr, 1.54f * Scale);
+    if (Tank->IsAutoBraking())
+        DrawText(TEXT("BRAKING"), Gold, Margin + 126.f * Scale, StatusY + 12.f * Scale, nullptr, 0.95f * Scale);
+    const FLinearColor LoadColor = Tank->IsReloading() ? Gold : Ready;
+    DrawText(Tank->IsReloading() ? TEXT("Reloading") : TEXT("Gun ready"), LoadColor, Margin + 12.f * Scale,
+        StatusY + 36.f * Scale, nullptr, 1.0f * Scale);
+    DrawRect(FLinearColor(0.17f, 0.21f, 0.23f), Margin + 12.f * Scale, StatusY + 58.f * Scale, 206.f * Scale, 3.f * Scale);
+    DrawRect(LoadColor, Margin + 12.f * Scale, StatusY + 58.f * Scale, 206.f * Scale * Tank->ReloadProgress(), 3.f * Scale);
+    DrawText(TEXT("WASD  Drive    LMB  Fire    RMB  Scope    R  Reset    ESC  Cursor"),
+        Text, Margin, Canvas->SizeY - Margin - 9.f * Scale, nullptr, 0.97f * Scale);
+
+    DrawRect(Muted, CX - Scale, CY - Scale, 2.f * Scale, 2.f * Scale);
+    FVector2D Reticle;
+    if (!Player || !Player->ProjectWorldLocationToScreen(Tank->GetAimImpact(), Reticle, true)) return;
+    const double Fov = Player->PlayerCameraManager ? Player->PlayerCameraManager->GetFOVAngle() : 68.0;
+    const float Radius = float(FMath::Tan(Tank->DispersionRadians()) * CX / FMath::Tan(FMath::DegreesToRadians(Fov * 0.5)));
+    const float X = Reticle.X, Y = Reticle.Y;
+    const FLinearColor ReticleColor = Tank->IsReloading() ? Muted : Ready;
+    for (int32 Index = 0; Index < 40; ++Index)
     {
-        const double A = Index * UE_DOUBLE_PI / 16.0, B = (Index + 1) * UE_DOUBLE_PI / 16.0;
+        const double A = Index * UE_DOUBLE_PI / 20.0, B = (Index + 1) * UE_DOUBLE_PI / 20.0;
         DrawLine(X + Radius * FMath::Cos(A), Y + Radius * FMath::Sin(A), X + Radius * FMath::Cos(B),
-            Y + Radius * FMath::Sin(B), Cream, 1.2f);
+            Y + Radius * FMath::Sin(B), ReticleColor, 1.25f * Scale);
     }
-    const float Tick = FMath::Max(8.f, Radius + 4.f);
-    DrawLine(X - Tick - 7, Y, X - Tick, Y, Cream, 1.5f);
-    DrawLine(X + Tick, Y, X + Tick + 7, Y, Cream, 1.5f);
-    DrawLine(X, Y - Tick - 7, X, Y - Tick, Cream, 1.5f);
-    DrawLine(X, Y + Tick, X, Y + Tick + 7, Cream, 1.5f);
-    DrawText(FString::Printf(TEXT("%.0f m"), Tank->AimDistanceMetres()), Cream, X + Tick + 11, Y + Tick);
+    DrawRect(ReticleColor, X - Scale, Y - Scale, 2.f * Scale, 2.f * Scale);
+    DrawText(FString::Printf(TEXT("%.0f m"), Tank->AimDistanceMetres()), Text, X + Radius + 8.f * Scale,
+        Y + Radius + 4.f * Scale, nullptr, Scale);
 }
 
 ASteelFrontMode::ASteelFrontMode()
