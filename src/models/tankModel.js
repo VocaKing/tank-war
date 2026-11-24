@@ -620,7 +620,7 @@ function getTemplate(spec) {
   }
   b.muzzleInfo = K.hollowMuzzle(b.P);
   gunMount(b.P, b, spec, lathe);
-  const gunPitchFloor = expansion ? expansionGunClearance(spec) : (yaw, min, max) => hullPitchFloor(b, yaw, min, max);
+  const gunPitchFloor = expansion ? expansionGunClearance(visualSpec) : (yaw, min, max) => hullPitchFloor(b, yaw, min, max);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
