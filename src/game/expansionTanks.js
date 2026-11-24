@@ -103,6 +103,7 @@ export const EXPANSION_TANKS = [
   {
     id: 'pzh2000', tier: 4, cls: 'Artillery', name: 'PzH 2000-inspired Howitzer', short: 'PzH 2000 SPH', nation: 'Germany', era: 'Modern', year: 1998,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Assistant loader'], autoloader: true,
+    artillery: { highArc: true, spade: true, spadeDeploySeconds: 2.2, spadeRetractSeconds: 1.5, recoilDistance: 0.9, recoilRecovery: 2.2, maxFlightSeconds: 42 },
     mass: 55.3, power: 1000, maxSpeed: 54, reverseSpeed: 14, hullTraverse: 28, turretTraverse: 14, gunSpeed: 6,
     gunDepression: 3, gunElevation: 65, hp: 1320, viewRange: 425, reload: 15.5, aimTime: 4.2, dispersion: 2.45, stabilizer: 1,
     dims: { L: 7.88, W: 3.58, hullH: 1.71, clearance: 0.45, trackW: 0.58, trackGauge: 2.92,
