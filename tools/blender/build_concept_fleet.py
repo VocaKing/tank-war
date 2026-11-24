@@ -87,7 +87,7 @@ def cube(name,loc,size,mat,parent=None,rot=(0,0,0),bevel=0.0):
     if bevel:
         mod=ob.modifiers.new("Subtle machined edge","BEVEL")
         mod.width=bevel;mod.segments=2
-        mod.affect="EDGES" if hasattr(mod,"affect") else None
+        if hasattr(mod,"affect"): mod.affect="EDGES"
         ob.modifiers.new("Weighted normals","WEIGHTED_NORMAL")
     return ob
 
