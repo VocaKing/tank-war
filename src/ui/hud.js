@@ -137,7 +137,10 @@ export class HUD {
     } else if (s.artillery?.autoDeploy) {
       this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">AUTO GUN ${p.autoArtilleryState.toUpperCase()} · ${p.autoArtilleryShots}/${s.artillery.fireMissionRounds} ROUND FIRE MISSION · SHOOT & SCOOT</div>`);
     }
-    if (s.aps) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">HARD-KILL APS · ${p.apsCharges}/${s.aps.charges} INTERCEPTORS ${p.apsCooldown > 0 ? '· READY IN ' + p.apsCooldown.toFixed(1) + 's' : '· READY'}</div>`);
+    if (s.aps) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">HARD-KILL APS · ${p.apsCharges}/${s.aps.charges} INTERCEPTORS ${p.apsCooldown > 0 ? '· COOLING ' + p.apsCooldown.toFixed(1) + 's' : p.apsCharges < s.aps.charges ? '· RECHARGING' : '· READY'}</div>`);
+    if (s.eraLayout) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">ERA TILES · ${Math.max(0,(p.model.eraMeshes?.size||0)-p.eraSpent.size)}/${p.model.eraMeshes?.size||0} ACTIVE</div>`);
+    if (s.siegeMode || s.firstShot) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">${s.siegeMode?'SIEGE':'FIRST SHOT'} · ${p.stationarySeconds >= (s.siegeMode?.settleSeconds ?? s.firstShot?.settleSeconds) ? 'PRECISION READY' : 'SETTLING '+p.stationarySeconds.toFixed(1)+'s'}</div>`);
+    if (s.mrsi) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">MRSI · ${p.mrsiQueue ? 'SECOND ROUND IN '+Math.max(0,p.mrsiQueue.delay).toFixed(1)+'s' : 'TWO-ROUND MODE'}</div>`);
     if (s.armorPackages) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">ARMOUR KIT · ${s.armorPackages[p.armorPackageIndex].name} · PRESS N</div>`);
     if (s.hydroSuspension) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">HYDRO SUSPENSION · ${p.suspensionMode.toUpperCase()} · PRESS H</div>`);
     if (s.multiTube) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">RECOILLESS RIFLES · ${s.multiTube.modes[p.weaponModeIndex].name} · PRESS V</div>`);
