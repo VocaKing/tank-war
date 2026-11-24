@@ -285,6 +285,37 @@ def target(name, rgb, emission):
     finish(material)
 
 
+def impact_cloud():
+    material = new_material("ImpactCloud")
+    if material is None:
+        return
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    material.set_editor_property("two_sided", True)
+    uv = coordinates(material, -120)
+    vertex = expression(material, unreal.MaterialExpressionVertexColor, -1300, 140)
+    cloud = custom(material, """
+float2 p = UV * 2.0 - 1.0;
+float folds = sin(p.x * 9.7 + cos(p.y * 12.8)) * sin(p.y * 11.3 + cos(p.x * 7.7));
+float grain = sin(dot(p, float2(37.3, 29.1))) * cos(dot(p, float2(21.0, -32.9)));
+float shape = 1.0 - length(p) + folds * 0.13 + grain * 0.025;
+float opacity = smoothstep(0.04, 0.50, shape) * (0.86 + folds * 0.14);
+float light = 0.67 + (1.0 - UV.y) * 0.35 + folds * 0.20 + grain * 0.055;
+float heat = smoothstep(0.69, 0.96, Tint.r);
+float3 rgb = lerp(Tint * light, lerp(Tint * 1.6, float3(3.2, 1.15, 0.21),
+    smoothstep(0.28, 0.96, shape)), heat);
+return float4(rgb, opacity * Fade);
+""", [("UV", uv, ""), ("Tint", vertex, "RGB"), ("Fade", vertex, "A")],
+        unreal.CustomMaterialOutputType.CMOT_FLOAT4, x=-650, y=0)
+    rgb = expression(material, unreal.MaterialExpressionComponentMask, -260, -60, r=True, g=True, b=True)
+    alpha = expression(material, unreal.MaterialExpressionComponentMask, -260, 95, a=True)
+    connect(cloud, "", rgb, "")
+    connect(cloud, "", alpha, "")
+    plug(rgb, "", PROP.MP_EMISSIVE_COLOR)
+    plug(alpha, "", PROP.MP_OPACITY)
+    finish(material)
+
+
 catalog = json.loads((ART / "NormandyMaterials.json").read_text(encoding="utf-8"))
 for spec in catalog["materials"]:
     if "layers" in spec:
@@ -296,4 +327,5 @@ for spec in catalog["materials"]:
 target("Target", (0.82, 0.123, 0.022), 0.58)
 target("Stand", (0.09, 0.11, 0.13), 0.0)
 target("Tracer", (1.0, 0.25, 0.015), 18.0)
+impact_cloud()
 unreal.log("Steel Front high-quality materials are ready")

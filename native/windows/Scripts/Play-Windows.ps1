@@ -52,7 +52,7 @@ Invoke-Step 'Building Steel Front for Unreal Engine 5.7' $Build @(
 $Common = @($Project, '-unattended', '-nop4', '-nosplash', '-nullrhi', '-stdout', '-FullStdOutLogOutput')
 $MeshNames = 'Terrain','Buildings','Water','Hull','Turret','Gun','Foliage','Grass','Pebbles','Horizon','RoadWheel','Sprocket','TrackLink'
 $Manifest = Get-Content -Raw (Join-Path $Root 'ArtSource\NormandyMaterials.json') | ConvertFrom-Json
-$MaterialNames = @($Manifest.materials | ForEach-Object { $_.name }) + @('Target','Stand','Tracer')
+$MaterialNames = @($Manifest.materials | ForEach-Object { $_.name }) + @('Target','Stand','Tracer','ImpactCloud')
 
 function Test-Assets([string]$Folder, [string]$Prefix, [string[]]$Names) {
     foreach ($Name in $Names) {

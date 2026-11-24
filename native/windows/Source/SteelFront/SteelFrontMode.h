@@ -24,6 +24,7 @@ struct FPracticeRound
     FVector Velocity;
     TWeakObjectPtr<AActor> Tracer;
     double Lifetime;
+    bool bHighExplosive;
 };
 }
 
@@ -38,6 +39,7 @@ public:
     void SetupPlayerInputComponent(UInputComponent* Input) override;
     bool IsPracticing() const { return bStarted; }
     bool IsScoped() const { return bScoped; }
+    bool IsHighExplosiveSelected() const { return bHighExplosive; }
     double SpeedKmh() const { return FMath::Abs(Speed) * 0.036; }
     double DispersionRadians() const { return FMath::Atan(FMath::Lerp(0.25, 2.4, Dispersion) / 100.0); }
     bool IsReloading() const { return Reload > 0.0; }
@@ -71,7 +73,10 @@ private:
     void UpdateRunningGear(double Travel, double TurnArc);
     void UpdateAim(double Step);
     void UpdateRounds(double Step);
+    void ResolveImpact(const FHitResult& Hit, bool bExplosive);
     void Fire();
+    void SelectAP() { bHighExplosive = false; }
+    void SelectHE() { bHighExplosive = true; }
     void ToggleScope();
     void ReleaseMouse();
     void StartPractice();
@@ -98,6 +103,7 @@ private:
     SteelFront::FRunningGear RunningGear;
     TArray<FTransform> GearTransforms;
     TArray<SteelFront::FPracticeRound> Rounds;
+    TArray<TWeakObjectPtr<AActor>> ImpactEffects;
     double TrackTravel[2] = {0.0, 0.0};
     FVector GunMount = FVector::ZeroVector;
     FVector AimImpact = FVector::ZeroVector;
@@ -119,6 +125,7 @@ private:
     bool bBraking = false;
     bool bScoped = false;
     bool bStarted = false;
+    bool bHighExplosive = false;
 };
 
 UCLASS()

@@ -1,4 +1,5 @@
 #include "SteelFrontMode.h"
+#include "SteelFrontImpact.h"
 #include "SteelFrontPracticeMath.h"
 #include "SteelFrontSlice.h"
 
@@ -129,6 +130,63 @@ bool GroundAt(UWorld& World, const FVector& Point, const AActor* Ignore, double&
         Point - FVector(0, 0, 1700), GroundChannel, Query)) return false;
     Height = Hit.ImpactPoint.Z;
     return true;
+}
+
+void AddFiringLane(AActor& Environment, USceneComponent& Root, const FVector& Spawn, const FRotator& Heading)
+{
+    UWorld& World = *Environment.GetWorld();
+    auto* Cube = LoadObject<UStaticMesh>(nullptr, CubePath);
+    auto* Wood = LoadObject<UMaterialInterface>(nullptr,
+        TEXT("/Game/Prototype/Quality/Materials/M_Structure_wood.M_Structure_wood"));
+    auto* Paint = LoadObject<UMaterialInterface>(nullptr,
+        TEXT("/Game/Prototype/Quality/Materials/M_Structure_paintwhite.M_Structure_paintwhite"));
+    if (!Cube || !Wood || !Paint) return;
+    TArray<FTransform> Timbers, Caps;
+    const FVector Forward = Heading.Vector();
+    const FVector Right = FRotationMatrix(Heading).GetUnitAxis(EAxis::Y);
+    const FCollisionQueryParams Query(SCENE_QUERY_STAT(SteelFrontRangeFurniture), true);
+    const auto Place = [&](FVector Point, double Along, double Across, double Height,
+        double Base, TArray<FTransform>& Instances)
+    {
+        double Ground;
+        if (!GroundAt(World, Point, nullptr, Ground)) return;
+        Point.Z = Ground;
+        FHitResult Hit;
+        if (World.LineTraceSingleByChannel(Hit, Point + FVector(0, 0, 180),
+            Point + FVector(0, 0, 12), ECC_Visibility, Query)) return;
+        Point.Z += Base + Height * 0.5;
+        Instances.Emplace(Heading, Point, FVector(Along, Across, Height) / 100.0);
+    };
+    // Low posts define the firing lane without blocking the long sightline.
+    for (const double Side : {-1.0, 1.0})
+    {
+        for (int32 Index = 0; Index < 8; ++Index)
+        {
+            const FVector Point = Spawn + Forward * (550.0 + Index * 370.0) + Right * (720.0 * Side);
+            Place(Point, 12, 12, 62, 0, Timbers);
+            Place(Point, 15, 15, 17, 49, Caps);
+        }
+        const FVector Point = Spawn - Forward * 180.0 + Right * (550.0 * Side);
+        Place(Point, 200, 26, 6, 3, Caps);
+        Place(Point + Right * (95.0 * Side), 27, 90, 49, 0, Timbers);
+    }
+    const auto AddBatch = [&](UMaterialInterface* Material, const TArray<FTransform>& Instances)
+    {
+        if (Instances.IsEmpty()) return;
+        auto* Batch = NewObject<UInstancedStaticMeshComponent>(&Environment);
+        Environment.AddInstanceComponent(Batch);
+        Batch->SetupAttachment(&Root);
+        Batch->SetMobility(EComponentMobility::Static);
+        Batch->SetStaticMesh(Cube);
+        Batch->SetMaterial(0, Material);
+        Batch->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Batch->SetCanEverAffectNavigation(false);
+        Batch->SetCullDistances(9500, 13000);
+        Batch->RegisterComponent();
+        Batch->AddInstances(Instances, false);
+    };
+    AddBatch(Wood, Timbers);
+    AddBatch(Paint, Caps);
 }
 
 double Ease(double Rate, double Step)
@@ -271,6 +329,8 @@ void ASteelFrontTank::SetupPlayerInputComponent(UInputComponent* Input)
     Input->BindAxis(TEXT("LookYaw"), this, &ASteelFrontTank::LookYaw);
     Input->BindAxis(TEXT("LookPitch"), this, &ASteelFrontTank::LookPitch);
     Input->BindAction(TEXT("Fire"), IE_Pressed, this, &ASteelFrontTank::Fire);
+    Input->BindAction(TEXT("SelectAP"), IE_Pressed, this, &ASteelFrontTank::SelectAP);
+    Input->BindAction(TEXT("SelectHE"), IE_Pressed, this, &ASteelFrontTank::SelectHE);
     Input->BindAction(TEXT("Scope"), IE_Pressed, this, &ASteelFrontTank::ToggleScope);
     Input->BindAction(TEXT("ReleaseMouse"), IE_Pressed, this, &ASteelFrontTank::ReleaseMouse);
     Input->BindAction(TEXT("StartPractice"), IE_Pressed, this, &ASteelFrontTank::StartPractice);
@@ -560,13 +620,13 @@ void ASteelFrontTank::Fire()
     UWorld& World = *GetWorld();
     if (World.LineTraceSingleByChannel(Hit, Gun->GetComponentLocation(), Start, ECC_Visibility, Query))
     {
-        if (auto* Mode = World.GetAuthGameMode<ASteelFrontMode>()) Mode->RegisterHit(Hit.GetComponent());
-        ShowFlash(World, Hit.ImpactPoint + Hit.ImpactNormal * 5.0, 7400.f, 280.f);
+        ResolveImpact(Hit, bHighExplosive);
         return;
     }
     const FVector Velocity = Direction * SteelFront::ShellSpeed;
     Rounds.Add(SteelFront::FPracticeRound{
-        Start, Velocity, TWeakObjectPtr<AActor>(SpawnTracer(World, Start, Velocity)), SteelFront::ShotLifetime});
+        Start, Velocity, TWeakObjectPtr<AActor>(SpawnTracer(World, Start, Velocity)),
+        SteelFront::ShotLifetime, bHighExplosive});
     ShowFlash(World, Start, 13000.f, 480.f);
 }
 
@@ -581,11 +641,7 @@ void ASteelFrontTank::UpdateRounds(double Step)
         FHitResult Hit;
         const bool bHit = TraceRoundStep(World, Query, Round.Position, Round.Velocity, TravelStep, Hit);
         Round.Lifetime -= TravelStep * (bHit ? Hit.Time : 1.0);
-        if (bHit)
-        {
-            if (auto* Mode = World.GetAuthGameMode<ASteelFrontMode>()) Mode->RegisterHit(Hit.GetComponent());
-            ShowFlash(World, Hit.ImpactPoint + Hit.ImpactNormal * 5.0, 7400.f, 280.f);
-        }
+        if (bHit) ResolveImpact(Hit, Round.bHighExplosive);
         const bool bFinished = bHit || Round.Lifetime <= 0.0;
         if (auto* Tracer = Round.Tracer.Get())
         {
@@ -594,6 +650,28 @@ void ASteelFrontTank::UpdateRounds(double Step)
             if (bFinished) Tracer->SetLifeSpan(0.045f);
         }
         if (bFinished) Rounds.RemoveAtSwap(Index);
+    }
+}
+
+void ASteelFrontTank::ResolveImpact(const FHitResult& Hit, bool bExplosive)
+{
+    UWorld& World = *GetWorld();
+    if (auto* Mode = World.GetAuthGameMode<ASteelFrontMode>()) Mode->RegisterHit(Hit.GetComponent());
+    const FVector Normal = Hit.ImpactNormal.IsNearlyZero() ? FVector::UpVector : Hit.ImpactNormal;
+    const FVector Origin = Hit.ImpactPoint + Normal * 7.0;
+    ShowFlash(World, Origin, bExplosive ? 23500.f : 7400.f, bExplosive ? 1000.f : 280.f);
+    ImpactEffects.RemoveAll([](const TWeakObjectPtr<AActor>& Effect) { return !Effect.IsValid(); });
+    if (ImpactEffects.Num() >= 6)
+    {
+        if (auto* Oldest = ImpactEffects[0].Get()) Oldest->Destroy();
+        ImpactEffects.RemoveAt(0);
+    }
+    FActorSpawnParameters Params;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    if (auto* Effect = World.SpawnActor<ASteelFrontImpact>(Origin, FRotator::ZeroRotator, Params))
+    {
+        Effect->BeginBurst(Normal, bExplosive);
+        if (IsValid(Effect)) ImpactEffects.Emplace(Effect);
     }
 }
 
@@ -634,6 +712,8 @@ void ASteelFrontTank::ResetTargets()
 {
     for (const auto& Round : Rounds) if (auto* Tracer = Round.Tracer.Get()) Tracer->Destroy();
     Rounds.Reset();
+    for (const auto& Effect : ImpactEffects) if (auto* Actor = Effect.Get()) Actor->Destroy();
+    ImpactEffects.Reset();
     if (auto* Mode = GetWorld()->GetAuthGameMode<ASteelFrontMode>()) Mode->ResetTargets();
 }
 
@@ -685,9 +765,11 @@ void ASteelFrontHud::DrawHUD()
     const FLinearColor LoadColor = Tank->IsReloading() ? Gold : Ready;
     DrawText(Tank->IsReloading() ? TEXT("Reloading") : TEXT("Gun ready"), LoadColor, Margin + 12.f * Scale,
         StatusY + 36.f * Scale, nullptr, 1.0f * Scale);
+    DrawText(Tank->IsHighExplosiveSelected() ? TEXT("HE") : TEXT("AP"), Gold,
+        Margin + 170.f * Scale, StatusY + 36.f * Scale, nullptr, 1.15f * Scale);
     DrawRect(FLinearColor(0.17f, 0.21f, 0.23f), Margin + 12.f * Scale, StatusY + 58.f * Scale, 206.f * Scale, 3.f * Scale);
     DrawRect(LoadColor, Margin + 12.f * Scale, StatusY + 58.f * Scale, 206.f * Scale * Tank->ReloadProgress(), 3.f * Scale);
-    DrawText(TEXT("WASD  Drive    LMB  Fire    RMB  Scope    R  Reset    ESC  Cursor"),
+    DrawText(TEXT("WASD  Drive    LMB  Fire    RMB  Scope    1 / 2  AP / HE    R  Reset    ESC  Cursor"),
         Text, Margin, Canvas->SizeY - Margin - 9.f * Scale, nullptr, 0.97f * Scale);
 
     DrawRect(Muted, CX - Scale, CY - Scale, 2.f * Scale, 2.f * Scale);
@@ -745,6 +827,7 @@ void ASteelFrontMode::StartPlay()
     FActorSpawnParameters Spawn;
     Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     const FRotator Rotation(0, Slice.Heading, 0);
+    AddFiringLane(*Environment, *Root, Slice.Spawn, Rotation);
     auto* Tank = World->SpawnActor<ASteelFrontTank>(Slice.Spawn, Rotation, Spawn);
     if (!Tank) return;
     if (!AddSection(*Tank, Tank->Hull, Slice.Sections[SteelFront::Hull], SteelFront::Hull)
@@ -773,12 +856,14 @@ void ASteelFrontMode::CreateTargets(const FVector& Spawn, const FRotator& Rotati
     if (!Cube) return;
     const FVector Forward = Rotation.Vector(), Right = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
     const FCollisionQueryParams Query(SCENE_QUERY_STAT(SteelFrontTargetSites), true);
-    for (int32 Slot = 0; Slot < 6; ++Slot)
+    constexpr double Distances[] = {1850, 2610, 3370, 4130, 4890, 5650, 7700, 10400};
+    for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(Distances); ++Slot)
     {
-        for (int32 Attempt = 0; Attempt < 12; ++Attempt)
+        const double PreferredSide = (Slot % 2 == 0 ? -1.0 : 1.0) * (320.0 + (Slot / 2) * 440.0);
+        for (int32 Attempt = 0; Attempt < 22; ++Attempt)
         {
-            const double Distance = 1850.0 + Slot * 760.0 + Attempt * 115.0;
-            const double Side = (Slot % 2 == 0 ? -1.0 : 1.0) * (320.0 + (Slot / 2) * 440.0 + Attempt * 105.0);
+            const double Distance = Distances[Slot] + (Attempt % 3) * 115.0;
+            const double Side = PreferredSide + ((Attempt + 1) / 2) * (Attempt % 2 == 1 ? 420.0 : -420.0);
             FVector Point = Spawn + Forward * Distance + Right * Side;
             double Elevation;
             if (!GroundAt(*GetWorld(), Point + FVector(0, 0, 400), nullptr, Elevation)) continue;
