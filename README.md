@@ -1,11 +1,11 @@
 # Steel Front — 3D Tank War (v4)
-Browser 3D tank battle (Three.js r170 + Vite). 15 tanks in 4 tiers (WWII mediums → modern MBTs), 3 real-scale maps
+Browser 3D tank battle (Three.js r170 + Vite). 16 vehicles in 4 tiers (WWII mediums → modern MBTs), 3 real-scale maps
 (1.2 × 1.2 km playable, 1.4 km terrain), 7v7 team battle vs NPCs with base capture, bush concealment, tier matchmaking
 (mirrored lineups), graphics presets High/Medium/Low.
 - Dev: `npm install && npm run dev` · Build: `npm run build` (output in dist/) · Preview: `npm run preview`
 - Play the build: serve dist/ with any static server (see dist/README.txt).
   URL params: `?autostart=1&map=village|forest|desert&tank=<id>&q=low|medium|high`
-  Tank ids: sherman t34 tiger panther is2 pershing centurion t72 leo1 m1a2 chally2 leo2a6 merkava4 type99a t90m
+  Vehicle ids: sherman t34 tiger panther is2 pershing centurion t72 leo1 m1a2 chally2 leo2a6 merkava4 type99a t90m pzh2000
 - Aiming: Shift / right click = sniper; wheel = zoom ×2/4/8/16; X = armor-penetration view (sniper only, default on);
   E = lock gun on the target under the crosshair. Reticle = predicted ballistic impact; circle = current dispersion.
 - QA tools: tools_qa.mjs (every map × tank, armor view, matchmaking, console errors), tools_ballistic.mjs (reticle vs impact
@@ -24,3 +24,11 @@ Open `?balance=1` on the same game origin. Modify tank values, save, then reload
 
 ## Mobile touch mode
 Mobile browsers automatically use touch controls and a responsive garage. Use landscape for battle, left joystick to drive, drag the battlefield to aim, and hold Fire to shoot. Scope, zoom, armor, lock, special ability, ammo, equipment, scoreboard and pause are available as touch actions. Force mobile mode via `?mobile=1`. The garage includes fullscreen 3D inspection and the balance editor. Low graphics is the initial mobile preset. Desktop settings remain available.
+
+
+## PzH 2000 artillery vehicle
+- Added as a playable 16th vehicle: `pzh2000`.
+- Press **B** (or use the mobile **驻锄** control) to deploy/retract the rear stabilizer spade. Attempting to fire while stowed starts deployment and queues the shot.
+- The chassis remains stopped while the spade is deploying, deployed or retracting; movement input retracts it first.
+- Uses high-angle ballistic aiming, slow 5.5°/s turret traverse, 3.2°/s gun laying, a 21 s base reload and an enlarged 155 mm HE blast radius.
+- Artillery shells remain simulated under gravity for up to 42 s; the reticle prediction uses the same extended trajectory window.

@@ -96,6 +96,16 @@ export class Game {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
       if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
       if (e.code === 'KeyE') this.toggleLock();
+      if (!e.repeat && e.code === 'KeyB') {
+        if (p.usesSpade()) p.toggleSpade();
+        else if (p.spec.artillery?.autoDeploy) {
+          if (p.autoArtilleryState === 'stowed' && Math.abs(p.speed) < 0.3) { p.pendingFire = false; p.autoArtilleryState = 'deploying'; p.autoArtilleryTimer = p.spec.artillery.deploySeconds; this.hud.message('Automated firing position deploying', '#ffcf78'); }
+          else if (p.autoArtilleryState === 'deployed') { p.pendingFire = false; p.autoArtilleryState = 'packing'; p.autoArtilleryTimer = p.spec.artillery.packSeconds; }
+        }
+      }
+      if (!e.repeat && e.code === 'KeyV') p.cycleWeaponMode();
+      if (!e.repeat && e.code === 'KeyN') p.cycleArmorPackage();
+      if (!e.repeat && e.code === 'KeyH') p.toggleSuspension();
       if (e.code === 'KeyG') { if (p.tryAbility && p.tryAbility()) { /* ok */ } else if (p.abilities && p.abilities.kind) this.hud.message(p.abilities.kind + ' not ready', '#c8c8c8'); }
       const slot = { Digit4: 0, Digit5: 1, Digit6: 2, KeyR: p.equip.find('repair'), KeyF: p.equip.find('extinguisher') }[e.code];
       if (slot !== undefined && slot >= 0) this.useItem(slot);
@@ -301,10 +311,13 @@ export class Game {
   updateReticle() {
     // simulate actual gun trajectory to find where the shell would land
     const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    // High-arc artillery prediction is much longer; update it at 10 Hz rather than every render frame.
+    if (p.spec.artillery) { if (this.time - (this._lastArtilleryReticleAt ?? -1e9) < 0.1) return; this._lastArtilleryReticleAt = this.time; }
     const m = p.model; const pos = m.muzzle.getWorldPosition(new THREE.Vector3()); const q = m.gun.getWorldQuaternion(new THREE.Quaternion());
     const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity).add(p.vel); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
-    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02;
-    for (let i = 0; i < 200 && !hitP; i++) {
+    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = p.spec.artillery ? 0.04 : 0.02;
+    const maxSteps = p.spec.artillery ? Math.ceil((p.spec.artillery.maxFlightSeconds || 42) / h) : 200;
+    for (let i = 0; i < maxSteps && !hitP; i++) {
       a.copy(pos); v.y -= 9.81 * h; b.copy(pos).addScaledVector(v, h);
       let best = 2; const tt = W.terrain.segmentHit(a.x, a.y, a.z, b.x, b.y, b.z, 2); if (tt >= 0) best = tt;
       const ts = W.structureHit(a.x, a.y, a.z, b.x, b.y, b.z); if (ts >= 0 && ts < best) best = ts;
@@ -413,7 +426,7 @@ export class Game {
     const E = t.equip; const tryUse = (id) => { const i = E.find(id); if (i >= 0 && E.slots[i].charges > 0 && E.slots[i].cd <= 0) return this.useItem(i, t); return false; };
     t._itemT = (t._itemT || 0) - 1 / 30; if (t._itemT > 0) return; t._itemT = 0.8 + Math.random() * 0.8; // human-like reaction delay
     if (t.burning > 0 && tryUse('extinguisher')) return;
-    if ((t.modules.tracks < 1 || (t.modules.engine < 1 && t.modules.gun < 1) || (t.modules.gun < 1 && this.time - t.lastDamagedAt < 20)) && tryUse('repair')) return;
+    if ((t.modules[t.mobilityModule] < 1 || (t.modules.engine < 1 && t.modules.gun < 1) || (t.modules.gun < 1 && this.time - t.lastDamagedAt < 20)) && tryUse('repair')) return;
     if (t.crew.some((c) => !c.alive) && tryUse('medkit')) return;
     if (t.hp < t.maxHp * 0.35 && this.time - t.lastDamagedAt < 3 && tryUse('smoke')) return;
   }

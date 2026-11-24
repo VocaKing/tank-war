@@ -597,7 +597,7 @@ function refineRoofDetails(P, spec) {
 }
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
-  const d = spec.dims; const b = (BUILDERS[spec.id] || buildV2)(d, spec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec); b.muzzleInfo=K.hollowMuzzle(b.P); gunMount(b.P,b,spec,lathe);
+  const d = spec.dims; const builderSpec = spec.modelBaseId ? { ...spec, id: spec.modelBaseId } : spec; const b = (BUILDERS[builderSpec.id] || buildV2)(d, builderSpec); if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b); finishDetails(b.P, d, b, spec); refineRoofDetails(b.P, spec); b.muzzleInfo=K.hollowMuzzle(b.P); gunMount(b.P,b,spec,lathe);
   const mats = sharedMats();
   const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
@@ -634,6 +634,20 @@ export function createTankModel(spec, opts = {}) {
   for (const [k,g] of Object.entries(geo.barrel || {})) mk(g,k,barrel,tpl.paintG);
   const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, b.barrelLength); barrel.add(muzzle);
   const sight = new THREE.Object3D(); sight.position.set(0.35, 0.25, 0.2); gun.add(sight);
+  // Artillery-only rear stabilizer spade. The game animates this pivot between travel and firing positions.
+  let spade = null;
+  if (spec.artillery?.spade || spec.recoilBrace) {
+    spade = new THREE.Group(); spade.name = 'Stabilizer_Spade_Pivot';
+    spade.position.set(0, 0.64, -d.L / 2 + 0.16); spade.rotation.x = Math.PI / 2; body.add(spade);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(d.W * 0.76, 0.16, 0.82), mats.metal);
+    blade.name = 'Stabilizer_Spade_Blade'; blade.position.set(0, -0.22, -0.56); blade.castShadow = true; blade.receiveShadow = true; spade.add(blade); meshes.push(blade);
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 1.02), mats.metal);
+      arm.name = 'Stabilizer_Spade_Arm_' + side; arm.position.set(side * d.W * 0.28, -0.12, -0.40); arm.castShadow = true; spade.add(arm); meshes.push(arm);
+      const ram = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.82, 12), mats.steel);
+      ram.name = 'Stabilizer_Hydraulic_' + side; ram.position.set(side * d.W * 0.31, 0.02, -0.36); ram.rotation.x = Math.PI / 2; ram.castShadow = true; spade.add(ram); meshes.push(ram);
+    }
+  }
   // tracks: textured ribbon (LOD far) + individual instanced links (LOD near)
   const tracks = [], links = [], trackTex = [];
   for (const s of [-1, 1]) {
@@ -657,7 +671,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, barrel, muzzle, sight, gunClearance:b.gunClearance, gunMountNoCollar:!!b.gunMountNoCollar, roadWheelStationsPerSide:b.wheels.length, roadWheelDiscsPerSide:b.wheels.length * (b.wheelType === 'single' ? 1 : 2), roadWheelDiameter:b.roadWheelDiameter ?? (b.wheels[0]?.r ?? 0) * 2, frontIdlerDiameter:b.frontIdlerDiameter, driveSprocketTeethPerSide:b.driveSprocketTeeth, auxiliaryFuelTanks:b.auxiliaryFuelTanks, headlights:b.headlights, rearDTMountX:b.rearDTMountX, roadWheelStarIndentations:b.roadWheelStarIndentations, turretLeftWallAngleFromVertical:b.turretLeftWallAngleFromVertical, turretRightWallAngleFromVertical:b.turretRightWallAngleFromVertical, trackLinksPerSide:tpl.nLinks, glacisAngleFromVertical:b.glacisAngleFromVertical, idlersPerSide:b.idlers.length, returnRollersPerSide:b.rollers.length, driveSprocketsPerSide:b.sprockets.length, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, barrel, muzzle, sight, spade, gunClearance:b.gunClearance, gunMountNoCollar:!!b.gunMountNoCollar, roadWheelStationsPerSide:b.wheels.length, roadWheelDiscsPerSide:b.wheels.length * (b.wheelType === 'single' ? 1 : 2), roadWheelDiameter:b.roadWheelDiameter ?? (b.wheels[0]?.r ?? 0) * 2, frontIdlerDiameter:b.frontIdlerDiameter, driveSprocketTeethPerSide:b.driveSprocketTeeth, auxiliaryFuelTanks:b.auxiliaryFuelTanks, headlights:b.headlights, rearDTMountX:b.rearDTMountX, roadWheelStarIndentations:b.roadWheelStarIndentations, turretLeftWallAngleFromVertical:b.turretLeftWallAngleFromVertical, turretRightWallAngleFromVertical:b.turretRightWallAngleFromVertical, trackLinksPerSide:tpl.nLinks, glacisAngleFromVertical:b.glacisAngleFromVertical, idlersPerSide:b.idlers.length, returnRollersPerSide:b.rollers.length, driveSprocketsPerSide:b.sprockets.length, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:spec.artillery?.recoilDistance ?? spec.recoilBrace?.recoilDistance ?? MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;

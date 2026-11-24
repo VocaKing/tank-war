@@ -24,12 +24,12 @@ export class HUD {
       <div class="panel items" id="h-items"></div>
       <div class="panel ammo" id="h-ammo"></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
     this.$ = (id) => this.root.querySelector('#' + id);
-    this.mini = this.$('h-mini').getContext('2d'); this.markerPool = []; this.msgTimer = 0; this.feed = [];
+    this.mini = this.$('h-mini').getContext('2d'); this.markerPool = []; this.markerStates = new WeakMap(); this.msgTimer = 0; this.feed = [];
     this.$('h-resume').onclick = () => game.setPaused(false);
     const aa = this.$('h-aa'); const aaTxt = () => { aa.textContent = 'Aim assist: ' + (game.assist.enabled ? 'ON' : 'OFF'); }; aaTxt();
     aa.onclick = () => { game.assist.setEnabled(!game.assist.enabled); try { localStorage.setItem('tw_aa', game.assist.enabled ? '1' : '0'); } catch (e) { /* private mode */ } aaTxt(); }; this.$('h-quit').onclick = () => game.exit();
@@ -89,26 +89,104 @@ export class HUD {
     if (src) { this.dmgSrc = src.pos.clone(); this.dmgT = 2.5; }
     this.$('h-veh').classList.add('flash'); setTimeout(() => this.$('h-veh').classList.remove('flash'), 300);
   }
+  recordEnemyDamage(tank, amount, showNumber = true) {
+    if (!tank || !Number.isFinite(amount) || amount <= 0 || tank.team === this.g.player.team) return;
+    let state = this.markerStates.get(tank);
+    if (!state) {
+      // The hit has already reduced tank.hp, so reconstruct the pre-hit visual value.
+      state = { displayHp: Math.min(tank.maxHp, tank.hp + amount), pendingDamage: 0, tickElapsed: 0, damageTotal: 0, damageTimer: 0, flashTimer: 0 };
+      this.markerStates.set(tank, state);
+    }
+    if (state.pendingDamage <= 0) state.tickElapsed = 0;
+    state.pendingDamage += amount;
+    state.flashTimer = Math.max(state.flashTimer, 0.2);
+    if (showNumber) {
+      state.damageTotal = state.damageTimer > 0 ? state.damageTotal + amount : amount;
+      state.damageTimer = 2;
+    }
+  }
   kill(attacker, victim, cause) {
     const c = (t) => (t ? `<span class="${t.team === this.g.player.team ? 'a' : 'e'}">${t.name} <small>${t.spec.short}</small></span>` : '?');
     const f = el('div', 'kf', `${c(attacker)} <b>${cause === 'ammo' ? '💥' : '✖'}</b> ${c(victim)}`); this.$('h-feed').prepend(f); setTimeout(() => f.remove(), 12000);
     if (attacker && attacker.isPlayer) this.message('ENEMY DESTROYED', '#ffd34d', true);
     if (victim.isPlayer) this.message('YOU WERE DESTROYED — spectating allies (Esc for menu)', '#ff6050', true);
   }
-  updateMarkers(camera) {
+  updateMarkers(camera, dt = 0) {
     const G = this.g; const W = innerWidth, H = innerHeight; let n = 0; const v = new THREE.Vector3();
+
+    // Keep enemy marker damage state advancing even while a marker is temporarily off-screen.
+    for (const t of G.tanks) {
+      if (t.team === G.player.team) continue;
+      let state = this.markerStates.get(t);
+      if (!state) {
+        state = { displayHp: t.hp, pendingDamage: 0, tickElapsed: 0, damageTotal: 0, damageTimer: 0, flashTimer: 0 };
+        this.markerStates.set(t, state);
+      }
+      state.damageTimer = Math.max(0, state.damageTimer - dt);
+      if (state.damageTimer <= 0) state.damageTotal = 0;
+      state.flashTimer = Math.max(0, state.flashTimer - dt);
+      if (state.displayHp < t.hp) state.displayHp = t.hp;
+
+      if (state.pendingDamage > 0) {
+        state.tickElapsed += dt;
+        // Remove at most 200 HP every 0.1 seconds; the final step may be smaller.
+        while (state.tickElapsed + 1e-9 >= 0.1 && state.pendingDamage > 1e-6) {
+          const available = Math.max(0, state.displayHp - t.hp);
+          const step = Math.min(200, state.pendingDamage, available);
+          state.displayHp = Math.max(t.hp, state.displayHp - step);
+          state.pendingDamage = Math.max(0, state.pendingDamage - step);
+          state.tickElapsed -= 0.1;
+          if (step > 0) state.flashTimer = Math.max(state.flashTimer, 0.14);
+        }
+        if (state.pendingDamage <= 1e-6 || state.displayHp <= t.hp + 1e-6) {
+          state.displayHp = t.hp;
+          state.pendingDamage = 0;
+          state.tickElapsed = 0;
+        }
+      }
+    }
+
     for (const t of G.tanks) {
       if (t === G.player && t.alive) continue; if (!t.alive) continue;
       const ally = t.team === G.player.team; if (!ally && !t.spotted[G.player.team]) continue;
       v.copy(t.pos); v.y += t.spec.dims.hullH + t.spec.dims.turretH + 1.6; const d = camera.position.distanceTo(v); if (ally && d > 500) continue;
-      v.project(camera); if (v.z > 1 || v.z < -1) continue; const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * H; if (sx < -50 || sx > W + 50 || sy < -50 || sy > H + 50) continue;
-      let m = this.markerPool[n]; if (!m) { m = el('div', 'mk', '<div class="nm"></div><div class="rl"><i></i></div><div class="hp"><i></i></div><div class="ar">▼</div>'); this.$('h-markers').appendChild(m); this.markerPool.push(m); }
-      m.style.display = 'block'; m.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`; m.className = 'mk ' + (ally ? 'a' : 'e');
-      m.children[0].textContent = `${t.spec.short}${d < 700 ? ' · ' + Math.round(d) + 'm' : ''}`;
-      const rl = m.children[1];
-      if (ally && t.alive && t.reloadLeft > 0) { rl.style.display = 'block'; rl.firstChild.style.width = ((1 - t.reloadLeft / t.reloadTime()) * 100) + '%'; }
-      else rl.style.display = 'none';
-      m.children[2].firstChild.style.width = (t.hp / t.maxHp * 100) + '%'; n++;
+      v.project(camera); if (v.z > 1 || v.z < -1) continue; const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * H; if (sx < -70 || sx > W + 70 || sy < -50 || sy > H + 50) continue;
+      let m = this.markerPool[n];
+      if (!m) {
+        m = el('div', 'mk', '<div class="nm"></div><div class="hp-meta"></div><div class="hp-row"><div class="hp"><i></i></div><div class="damage"></div></div><div class="rl"><i></i></div><div class="ar">▼</div>');
+        m._parts = {
+          name: m.querySelector('.nm'),
+          hpMeta: m.querySelector('.hp-meta'),
+          hpRow: m.querySelector('.hp-row'),
+          hpFill: m.querySelector('.hp i'),
+          damage: m.querySelector('.damage'),
+          reload: m.querySelector('.rl'),
+          reloadFill: m.querySelector('.rl i')
+        };
+        this.$('h-markers').appendChild(m); this.markerPool.push(m);
+      }
+      const state = ally ? null : this.markerStates.get(t);
+      m.style.display = 'block';
+      m.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
+      m.className = 'mk ' + (ally ? 'a' : 'e') + (!ally && state.flashTimer > 0 ? ' hit' : '');
+      const parts = m._parts;
+      parts.name.textContent = `${t.spec.short}${d < 700 ? ' · ' + Math.round(d) + 'm' : ''}`;
+      if (ally) {
+        parts.hpMeta.style.display = 'none';
+        parts.damage.textContent = '';
+        parts.hpRow.style.width = '56px';
+        parts.hpFill.style.width = (t.hp / t.maxHp * 100) + '%';
+        if (t.reloadLeft > 0) { parts.reload.style.display = 'block'; parts.reloadFill.style.width = ((1 - t.reloadLeft / t.reloadTime()) * 100) + '%'; }
+        else parts.reload.style.display = 'none';
+      } else {
+        parts.hpMeta.style.display = 'block';
+        parts.hpMeta.textContent = `HP ${Math.ceil(t.hp).toLocaleString('en-US')} / ${Math.round(t.maxHp).toLocaleString('en-US')}`;
+        parts.hpRow.style.width = '132px';
+        parts.hpFill.style.width = (state.displayHp / t.maxHp * 100) + '%';
+        parts.damage.textContent = state.damageTimer > 0 ? '−' + Math.round(state.damageTotal).toLocaleString('en-US') : '';
+        parts.reload.style.display = 'none';
+      }
+      n++;
     }
     for (let i = n; i < this.markerPool.length; i++) this.markerPool[i].style.display = 'none';
   }
@@ -125,16 +203,30 @@ export class HUD {
     const s = p.spec; const mod = (k, label) => `<span class="mod ${p.modules[k] >= 1 ? 'ok' : p.modules[k] > 0 ? 'dmg' : 'dead'}">${label}</span>`;
     this.$('h-veh').innerHTML = `<div class="vn">${s.short} <small>${s.nation} · ${s.era}</small></div>
       <div class="hpwrap"><div class="hpbar"><i style="width:${p.hp / p.maxHp * 100}%"></i><span>${Math.ceil(p.hp)} / ${p.maxHp}</span></div>${(p.abilities && p.abilities.magazine) ? `<div class="magfan" title="magazine">${Array.from({length: p.abilities.magazine.size}, (_, i) => `<i class="${i < p.abilities.magLeft ? 'on' : ''}"></i>`).join('')}</div>` : ''}</div>
-      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod('tracks', p.trackRepair > 0 ? 'TRACKS ' + Math.ceil(p.trackRepair) + 's' : 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
+      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule, p.trackRepair > 0 ? p.mobilityLabel + ' ' + Math.ceil(p.trackRepair) + 's' : p.mobilityLabel)}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`;
+    if (s.artillery?.spade) {
+      const state = p.spadeState === 'deployed' ? 'DEPLOYED · READY' : p.spadeState.toUpperCase();
+      this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">SPADE ${state} · ${Math.round(p.spadeProgress * 100)}% · HIGH-ARC 155 mm</div>`);
+    } else if (s.recoilBrace) {
+      const state = p.spadeState === 'deployed' ? 'LOCKED · READY' : p.spadeState.toUpperCase();
+      this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">RECOIL BRACE ${state} · ${Math.round(p.spadeProgress * 100)}%</div>`);
+    } else if (s.artillery?.autoDeploy) {
+      this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">AUTO GUN ${p.autoArtilleryState.toUpperCase()} · ${p.autoArtilleryShots}/${s.artillery.fireMissionRounds} ROUND FIRE MISSION · SHOOT & SCOOT</div>`);
+    }
+    if (s.aps) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">HARD-KILL APS · ${p.apsCharges}/${s.aps.charges} INTERCEPTORS ${p.apsCooldown > 0 ? '· READY IN ' + p.apsCooldown.toFixed(1) + 's' : '· READY'}</div>`);
+    if (s.armorPackages) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">ARMOUR KIT · ${s.armorPackages[p.armorPackageIndex].name} · PRESS N</div>`);
+    if (s.hydroSuspension) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">HYDRO SUSPENSION · ${p.suspensionMode.toUpperCase()} · PRESS H</div>`);
+    if (s.multiTube) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">RECOILLESS RIFLES · ${s.multiTube.modes[p.weaponModeIndex].name} · PRESS V</div>`);
+    if (s.casemate) this.$('h-veh').insertAdjacentHTML('beforeend', `<div class="artillery-state">FIXED GUN · HULL AIM · HYDRAULIC ELEVATION</div>`);
     // equipment slots (keys 4/5/6)
     const E = p.equip; const lf = E.factor;
     this.$('h-items').innerHTML = E.slots.map((it, i) => { const ready = it.def.passive || (it.charges > 0 && it.cd <= 0); const st = it.def.passive ? 'PASSIVE' : it.active > 0 ? `ACTIVE ${Math.ceil(it.active)}s` : it.charges <= 0 ? 'EMPTY' : it.cd > 0 ? `${Math.ceil(it.cd)}s` : 'READY';
       return `<div class="item ${ready ? 'ok' : 'cd'} ${it.active > 0 ? 'on' : ''}"><b>${i + 4}</b><span class="ic">${it.def.icon}</span><div>${it.def.name}<small>${st}${it.def.passive ? '' : ' · ×' + it.charges}</small></div>${!it.def.passive && it.cd > 0 ? `<i style="width:${(1 - it.cd / it.def.cd) * 100}%"></i>` : ''}</div>`; }).join('') +
       `<div class="load">Load ${E.kg} kg · speed ×${lf.toFixed(3)}</div>`;
     // ammo
-    this.$('h-ammo').innerHTML = s.shells.map((sh, i) => `<div class="slot ${i === p.shellIdx ? 'sel' : ''} ${p.ammo[i] ? '' : 'empty'}"><b>${i + 1}</b><div>${sh.name}<small>${sh.type} · ${sh.pen} mm · ${sh.damage} dmg · ${sh.velocity} m/s</small></div><span>${p.ammo[i]}</span></div>`).join('') +
+    this.$('h-ammo').innerHTML = s.shells.map((sh, i) => `<div class="slot ${i === p.shellIdx ? 'sel' : ''} ${p.ammo[i] ? '' : 'empty'}"><b>${i + 1}</b><div>${sh.name}<small>${sh.type}${sh.guided ? ' · GUIDED' : ''}${sh.airburst ? ' · TIME-FUZE' : ''} · ${sh.pen} mm · ${sh.damage} dmg · ${sh.velocity} m/s</small></div><span>${p.ammo[i]}</span></div>`).join('') +
       `<div class="reload"><i style="width:${(1 - p.reloadLeft / p.reloadTime()) * 100}%"></i><span>${p.reloadLeft > 0 ? 'RELOADING ' + p.reloadLeft.toFixed(1) + 's' : 'READY'}</span></div>`;
     }
     // concealment
@@ -151,7 +243,7 @@ export class HUD {
     // damage direction
     const dd = this.$('h-dmgdir'); if (this.dmgT > 0 && this.dmgSrc) { this.dmgT -= dt; const ang = Math.atan2(this.dmgSrc.x - p.pos.x, this.dmgSrc.z - p.pos.z) - G.cam.yaw; dd.style.display = 'block'; dd.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`; dd.style.opacity = Math.min(1, this.dmgT); } else dd.style.display = 'none';
     this.miniT -= dt; if (this.miniT <= 0) { this.miniT = 0.15; this.drawMini(); }
-    this.updateMarkers(camera);
+    this.updateMarkers(camera, dt);
     this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; this.$('h-zoom').textContent = '×' + G.cam.zoom + '  ·  ' + G.camera.fov.toFixed(1) + '°';
     // aim-assist lock marker (just under the crosshair centre)
     const A = G.assist; const ah = this.$('h-assist'); let aTxt = '', aCls = 'assist';
