@@ -6,6 +6,8 @@ import { armorZone, zoneLowerSideY } from './tankData.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
+import { findEraTile } from './eraMechanics.js';
+import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
 import { advanceDispersion, impactDrop, incidence, sampleDispersionRadius } from './combatMath.js';
 
 import { GRAVITY } from './physics.js';
@@ -15,10 +17,11 @@ let NEXT_ID = 1;
 const TRACK_REPAIR_TIME = 9;
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
-export function ballisticAngle(v, R, dy) {
+export function ballisticAngle(v, R, dy, highArc = false) {
   const g = GRAVITY; const v2 = v * v; const disc = v2 * v2 - g * (g * R * R + 2 * dy * v2);
-  if (disc < 0 || R < 0.01) return Math.atan2(dy, Math.max(R, 0.01)) + 0.0;
-  return Math.atan((v2 - Math.sqrt(disc)) / (g * R));
+  if (disc < 0 || R < 0.01) return Math.atan2(dy, Math.max(R, 0.01));
+  const root = Math.sqrt(disc);
+  return Math.atan((v2 + (highArc ? root : -root)) / (g * R));
 }
 
 export class Tank {
@@ -34,7 +37,14 @@ export class Tank {
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
     this.turretYaw = 0; this.gunPitch = 0; this.dispersionProgress = 0; this.yawRate = 0; this.recoil = 0;
     this.reloadLeft = 1.5; this.shellIdx = 0; this.ammo = (loadout || spec.defaultLoadout).slice(); if (!this.ammo[0]) this.shellIdx = Math.max(0, this.ammo.findIndex((n) => n > 0));
-    this.modules = { engine: 1, tracks: 1, gun: 1, turret: 1 };
+    this.modules = { engine: 1, tracks: 1, wheels: 1, gun: 1, turret: 1 };
+    this.armorProfile = spec.armor; this.armorPackageIndex = 0; this.activeMass = spec.mass; this.activeMaxSpeed = spec.maxSpeed;
+    this.apsCharges = spec.aps?.charges || 0; this.apsCooldown = 0; this.apsRechargeTime = 0; this.eraSpent = new Set();
+    this.stationarySeconds = 0; this.suppressedFor = 0; this.mrsiQueue = null;
+    this.spadeProgress = 0; this.spadeState = 'stowed'; this.pendingFire = false;
+    this.autoArtilleryState = 'stowed'; this.autoArtilleryTimer = 0; this.autoArtilleryShots = 0;
+    this.weaponModeIndex = 0; this.burstLeft = 0; this.burstTimer = 0; this.burstShellIdx = 0; this.burstOffsetIndex = 0;
+    this.suspensionMode = 'normal'; this.suspensionOffset = 0;
     this.secondaryRounds = spec.secondary?.rounds ?? 0;
     this.secondaryReloadLeft = 0;
     this.trackRepairs = [0, 0]; this.burning = 0;
@@ -58,13 +68,16 @@ export class Tank {
     return this.abilities?.overpenLeft > 0 ? { ...sh, pen: Math.round(sh.pen * (this.abilities.overpen.mult || 1.35)) } : sh;
   }
   crewAlive(role) { const c = this.crew.find((m) => m.role === role); return c ? c.alive : true; }
+  get mobilityModule() { return this.spec.runningGear === 'wheels' ? 'wheels' : 'tracks'; }
+  get mobilityLabel() { return this.mobilityModule === 'wheels' ? 'WHEELS' : 'TRACKS'; }
+  usesSpade() { return !!(this.spec.artillery?.spade || this.spec.recoilBrace); }
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
-  aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
+  aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; if (this.suppressedFor > 0) a *= this.spec.openTop ? 1.9 : 1.28; if (this.spec.turretElectronicsWeakness && this.modules.turret < 1) a *= this.spec.turretElectronicsWeakness; return a; }
   // Balance values are cone radii in metres at 100 m.
   dispersion() {
     const radius = lerp(this.spec.dispersion, this.spec.maxDispersion, this.dispersionProgress);
-    return Math.atan(radius / 100);
+    return Math.atan(radius / 100) * precisionMultiplier(this) * (this.suppressedFor > 0 ? (this.spec.openTop ? 1.55 : 1.2) : 1);
   }
   updateDispersion(dt) {
     if (this.spec.dispersion === this.spec.maxDispersion) {
@@ -105,14 +118,16 @@ export class Tank {
   update(dt, time) {
     if (!this.alive) return;
     this.equip.update(dt);
+    if (this.apsCooldown > 0) this.apsCooldown = Math.max(0, this.apsCooldown - dt);
+    updateConceptTimers(this, dt);
     if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
     if (this.trackRepairs[0] > 0 || this.trackRepairs[1] > 0) {
-      const previous = this.modules.tracks;
+      const previous = this.modules[this.mobilityModule];
       this.trackRepairs[0] = Math.max(0, this.trackRepairs[0] - dt);
       this.trackRepairs[1] = Math.max(0, this.trackRepairs[1] - dt);
       this.updateTrackCondition();
-      if (this.isPlayer && this.modules.tracks > previous) {
-        this.game.hud.message(this.modules.tracks === 1 ? 'Tracks repaired' : 'One track repaired', '#9fd39f');
+      if (this.isPlayer && this.modules[this.mobilityModule] > previous) {
+        this.game.hud.message(this.mobilityLabel + ' repaired', '#9fd39f');
       }
     }
     if (this.burning > 0) {
@@ -130,7 +145,7 @@ export class Tank {
     }
     if (this.model.trim) this.model.trim.rotation.x = approach(this.model.trim.rotation.x, this.afloat ? -0.45 : 0.45, dt * 2);
     this.abilities.update(dt);
-    this.recoil = Math.max(0, this.recoil - dt * 1.2);
+    this.recoil = Math.max(0, this.recoil - dt * (this.spec.artillery?.recoilRecovery || this.spec.recoilBrace?.recoilRecovery || 1.2));
   }
 
   updateAfterMotion(dt) {
@@ -143,6 +158,10 @@ export class Tank {
       this.moved += Math.abs(this.speed) * dt;
       this.updateDispersion(dt);
       this.updateTurret(dt);
+      if (this.usesSpade()) this.updateSpade(dt, this.game.time);
+      if (this.spec.artillery?.autoDeploy) this.updateAutoArtillery(dt, this.game.time);
+      if (this.burstLeft > 0) { this.burstTimer -= dt; if (this.burstTimer <= 0 && this.reloadLeft <= 0) this.fireBurstRound(this.game.time); }
+      if (this.mrsiQueue) updateConceptMRSI(this, dt, this.game.time);
     }
     this.syncModel();
   }
@@ -188,10 +207,11 @@ export class Tank {
     _v2.set(sin * aimRange, rise, cos * aimRange).applyQuaternion(pose);
     const { x: dx, y: dy, z: dz } = _v2;
     const horizontal = Math.hypot(dx, dz);
-    const th = ballisticAngle(this.shell.velocity, horizontal, dy);
+    const th = ballisticAngle(this.shell.velocity, horizontal, dy, !!s.artillery?.highArc);
     _v2.set(dx / (horizontal || 1) * Math.cos(th), Math.sin(th), dz / (horizontal || 1) * Math.cos(th));
     _q.copy(pose).invert(); _v2.applyQuaternion(_q);
-    const yawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
+    const rawYawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
+    const yawT = s.fireArc ? clamp(wrapAngle(rawYawT), -s.fireArc * DEG, s.fireArc * DEG) : rawYawT;
     const prev = this.turretYaw;
     if (!s.fixedGun) {
       const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
@@ -201,11 +221,13 @@ export class Tank {
     const minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
     const desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
     this.gunPitch=clamp(approach(this.gunPitch,desiredPitch,s.gunSpeed*DEG*dt),minPitch,s.gunElevation*DEG);
-    this.aimError=Math.abs(wrapAngle(yawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
+    this.aimError=Math.abs(wrapAngle(rawYawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
+    m.body.position.y = this.suspensionOffset || 0;
     m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
+    if (m.spade) m.spade.rotation.x = (1 - this.spadeProgress) * Math.PI / 2;
     if (m.secondaryGun) m.secondaryGun.rotation.x = -this.gunPitch;
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
@@ -227,6 +249,20 @@ export class Tank {
     return first < 1 && reach > 0 ? pivot.lerp(muzzle, Math.max(0, first - 0.05 / reach)) : muzzle;
   }
   tryFire(time) {
+    if (!this.alive || this.afloat || this.fireReloadLeft > 0) return false;
+    if (!this.abilities.usingSecondary && this.usesSpade() && this.spadeState !== 'deployed') {
+      if (!this.setSpade(true)) return false;
+      this.pendingFire = true;
+      if (this.isPlayer) this.game.hud.message('Deploying firing brace · shot queued', '#ffcf78');
+      return false;
+    }
+    if (!this.abilities.usingSecondary && this.spec.artillery?.autoDeploy && this.autoArtilleryState !== 'deployed') {
+      this.pendingFire = true;
+      if (this.isPlayer && Math.abs(this.speed) > 0.3) this.game.hud.message('Stop to deploy the automated gun system', '#ffbd70');
+      return false;
+    }
+    if (!this.abilities.usingSecondary && this.spec.fireArc && Math.abs(this.turretYaw) > this.spec.fireArc * DEG + 0.01) return false;
+    if (!this.abilities.usingSecondary && (this.spec.mrsi || this.spec.multiTube || this.spec.burst)) return this.tryFireSpecial(time);
     const secondary = this.abilities.usingSecondary;
     const rounds = secondary ? this.secondaryRounds : this.ammo[this.shellIdx];
     if (!this.alive || this.afloat || this.fireReloadLeft > 0 || rounds <= 0) return false;
@@ -251,7 +287,8 @@ export class Tank {
       fireShell = { ...sh, pen: Math.round(sh.pen * mult) };
     }
     const origin = this.shotOrigin(muzzle);
-    g.ballistics.spawn(this, fireShell, origin, vel);
+    const projectile = g.ballistics.spawn(this, fireShell, origin, vel);
+    if (sh.guided) projectile.target = this.input.aim.clone();
     this.lastFired = time; this.stats.shots++;
     if (secondary) {
       this.secondaryRounds--;
@@ -268,6 +305,172 @@ export class Tank {
     }
     g.physics?.recoil(this, this.gunMount.getWorldPosition(_v), dir, sh.caliber);
     g.effects.muzzle(origin, dir, sh.caliber); g.audio.gun(origin, sh.caliber, this.isPlayer);
+    if (!secondary && this.spec.artillery?.autoDeploy) {
+      this.autoArtilleryShots++;
+      if (this.autoArtilleryShots >= this.spec.artillery.fireMissionRounds) {
+        this.autoArtilleryState = 'packing'; this.autoArtilleryTimer = this.spec.artillery.packSeconds || 1; this.pendingFire = false;
+      }
+    }
+    return true;
+  }
+  setSpade(deploy) {
+    if (!this.usesSpade()) return false;
+    if (deploy) {
+      if (Math.abs(this.speed) > 0.35 || Math.abs(this.turnRate) > 0.035) {
+        if (this.isPlayer) this.game.hud.message('Stop before deploying the firing brace', '#ffbd70');
+        return false;
+      }
+      if (this.spadeState === 'stowed' || this.spadeState === 'retracting') this.spadeState = 'deploying';
+    } else if (this.spadeState !== 'stowed') {
+      this.spadeState = 'retracting'; this.pendingFire = false;
+    }
+    return true;
+  }
+  toggleSpade() {
+    if (!this.usesSpade()) return false;
+    return this.setSpade(this.spadeState === 'stowed' || this.spadeState === 'retracting');
+  }
+  updateSpade(dt, time) {
+    const cfg = this.spec.artillery?.spade ? this.spec.artillery : this.spec.recoilBrace;
+    if (!cfg) return;
+    if (this.spadeState === 'deploying') {
+      this.spadeProgress = Math.min(1, this.spadeProgress + dt / Math.max(0.1, cfg.spadeDeploySeconds || 1));
+      if (this.spadeProgress >= 1) this.spadeState = 'deployed';
+    } else if (this.spadeState === 'retracting') {
+      this.spadeProgress = Math.max(0, this.spadeProgress - dt / Math.max(0.1, cfg.spadeRetractSeconds || 1));
+      if (this.spadeProgress <= 0) this.spadeState = 'stowed';
+    }
+    if (this.pendingFire && this.spadeState === 'deployed' && this.reloadLeft <= 0 &&
+        Math.abs(this.speed) < 0.3 && Math.abs(this.turnRate) < 0.025 && this.aimError < 0.05) {
+      this.pendingFire = false; this.tryFire(time);
+    }
+  }
+  updateAutoArtillery(dt, time) {
+    const cfg = this.spec.artillery;
+    if (this.autoArtilleryState === 'deploying' || this.autoArtilleryState === 'packing') {
+      this.autoArtilleryTimer -= dt;
+      if (this.autoArtilleryTimer <= 0) {
+        if (this.autoArtilleryState === 'deploying') this.autoArtilleryState = 'deployed';
+        else { this.autoArtilleryState = 'stowed'; this.autoArtilleryShots = 0; }
+      }
+    }
+    if (this.autoArtilleryState === 'stowed' && this.pendingFire &&
+        Math.abs(this.speed) < 0.3 && Math.abs(this.turnRate) < 0.025) {
+      this.autoArtilleryState = 'deploying'; this.autoArtilleryTimer = cfg.deploySeconds || 1;
+    }
+    if (this.autoArtilleryState === 'deployed' && this.pendingFire && this.reloadLeft <= 0 &&
+        Math.abs(this.speed) < 0.3 && Math.abs(this.turnRate) < 0.025 && this.aimError < 0.05) {
+      this.pendingFire = false; this.tryFire(time);
+    }
+  }
+  cycleWeaponMode() {
+    const modes = this.spec.multiTube?.modes;
+    if (!modes || modes.length < 2) return false;
+    this.weaponModeIndex = (this.weaponModeIndex + 1) % modes.length;
+    if (this.isPlayer) this.game.hud.message('WEAPON MODE · ' + modes[this.weaponModeIndex].name, '#9fd39f');
+    return true;
+  }
+  cycleArmorPackage() {
+    const packages = this.spec.armorPackages;
+    if (!packages || packages.length < 2) return false;
+    this.armorPackageIndex = (this.armorPackageIndex + 1) % packages.length;
+    const p = packages[this.armorPackageIndex], A = JSON.parse(JSON.stringify(this.spec.armor));
+    A.hull.front[0] += p.front; A.hull.side[0] += p.side;
+    A.turret.front[0] += p.front * 0.65; A.turret.side[0] += p.side * 0.65;
+    A.heatMult = p.heatMult;
+    this.armorProfile = A; this.activeMass = p.mass; this.activeMaxSpeed = this.spec.maxSpeed * p.speedMult;
+    if (this.isPlayer) this.game.hud.message('ARMOUR PACKAGE · ' + p.name, '#9fd39f');
+    return true;
+  }
+  toggleSuspension() {
+    const h = this.spec.hydroSuspension;
+    if (!h) return false;
+    const modes = ['normal', 'low', 'high'];
+    this.suspensionMode = modes[(modes.indexOf(this.suspensionMode) + 1) % modes.length];
+    this.suspensionOffset = this.suspensionMode === 'low' ? h.lowOffset : this.suspensionMode === 'high' ? h.highOffset : 0;
+    if (this.isPlayer) this.game.hud.message('HYDROPNEUMATIC SUSPENSION · ' + this.suspensionMode.toUpperCase(), '#9fd39f');
+    return true;
+  }
+  tryAPS(projectile, point) {
+    const cfg = this.spec.aps;
+    if (!cfg || this.apsCharges <= 0 || this.apsCooldown > 0 || !projectile || projectile.owner?.team === this.team) return false;
+    if (!(projectile.type?.heat || projectile.spec?.guided || projectile.spec?.apsThreat)) return false;
+    const centre = this.pos.clone(); centre.y += this.spec.dims.hullH * 0.62;
+    if (point.distanceTo(centre) > cfg.radius) return false;
+    this.apsCharges--; this.apsCooldown = cfg.cooldown; this.apsRechargeTime = 0;
+    if (this.isPlayer) this.game.hud.message('ACTIVE PROTECTION · THREAT INTERCEPTED · ' + this.apsCharges + ' CHARGES', '#7edcff');
+    return true;
+  }
+  spawnRound(shellIndex, offset = null) {
+    const shell = this.spec.shells[shellIndex], model = this.model;
+    const muzzle = offset ? model.gun.localToWorld(new THREE.Vector3(...offset)) : model.muzzle.getWorldPosition(new THREE.Vector3());
+    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(model.gun.getWorldQuaternion(_q)).normalize();
+    const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const tangent = new THREE.Vector3().crossVectors(dir, up).normalize();
+    const bitangent = new THREE.Vector3().crossVectors(dir, tangent).normalize();
+    const radius = Math.tan(this.dispersion());
+    let gx = this.game.rng.gauss() / 2.2, gy = this.game.rng.gauss() / 2.2;
+    const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
+    dir.addScaledVector(tangent, gx * radius).addScaledVector(bitangent, gy * radius).normalize();
+    let fireShell = shell;
+    if (shell.airburst) {
+      const range = muzzle.distanceTo(this.input.aim);
+      fireShell = { ...shell, fuseTime: Math.max(0.05, (range - (shell.fuseLeadDistance || 0)) / Math.max(1, shell.velocity)) };
+    }
+    const velocity = dir.clone().multiplyScalar(shell.velocity).add(this.vel);
+    if (this.abilities?.overpenLeft > 0) {
+      const mult = this.abilities.consumeOverpen();
+      fireShell = { ...fireShell, pen: Math.round(fireShell.pen * mult) };
+    }
+    const projectile = this.game.ballistics.spawn(this, fireShell, muzzle, velocity);
+    if (shell.guided) projectile.target = this.input.aim.clone();
+    return { muzzle, dir, caliber: shell.caliber };
+  }
+  fireBurstRound(time) {
+    const cfg = this.spec.burst, index = this.burstShellIdx;
+    if (!cfg || this.ammo[index] <= 0 || this.burstLeft <= 0) { this.burstLeft = 0; return; }
+    const offsets = cfg.offsets || [];
+    const shot = this.spawnRound(index, offsets.length ? offsets[this.burstOffsetIndex % offsets.length] : null);
+    this.burstOffsetIndex++; this.ammo[index]--; this.stats.shots++; this.lastFired = time; this.recoil = 0.35;
+    this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber); this.game.audio.gun(shot.muzzle, shot.caliber, this.isPlayer);
+    this.game.physics?.recoil(this, shot.muzzle, shot.dir, shot.caliber);
+    this.burstLeft--;
+    if (this.burstLeft > 0 && this.ammo[index] > 0) {
+      this.reloadLeft = cfg.interval; this.burstTimer = cfg.interval;
+    } else {
+      this.burstLeft = 0; this.reloadLeft = this.reloadTime();
+      if (this.ammo[index] <= 0) { const next = this.ammo.findIndex(n => n > 0); if (next >= 0) this.shellIdx = next; }
+    }
+  }
+  tryFireSpecial(time) {
+    const index = this.shellIdx, shell = this.spec.shells[index];
+    if (this.spec.mrsi && this.ammo[index] >= 2) return fireConceptMRSI(this, time);
+    const mode = this.spec.multiTube?.modes?.[this.weaponModeIndex] || { count: 1, reloadMult: 1 };
+    const count = Math.min(mode.count || 1, this.ammo[index]);
+    const offsets = this.spec.multiTube?.offsets || [];
+    let first = null;
+    for (let i = 0; i < count; i++) {
+      const shot = this.spawnRound(index, offsets.length ? offsets[i % offsets.length] : null);
+      if (!first) first = shot;
+      this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber);
+      this.game.physics?.recoil(this, shot.muzzle, shot.dir, shot.caliber);
+    }
+    this.ammo[index] -= count; this.reloadLeft = this.reloadTime() * (mode.reloadMult || 1);
+    this.lastFired = time; this.stats.shots += count; this.abilities?.onFire(); this.recoil = 1;
+    if (first) this.game.audio.gun(first.muzzle, first.caliber, this.isPlayer);
+    if (this.spec.burst && this.spec.burst.shellIndices.includes(index)) {
+      this.burstLeft = Math.max(0, this.spec.burst.count - 1); this.burstShellIdx = index;
+      this.burstTimer = this.spec.burst.interval; this.burstOffsetIndex = 0;
+      if (this.burstLeft > 0) this.reloadLeft = this.spec.burst.interval;
+    }
+    if (this.spec.artillery?.autoDeploy) {
+      this.autoArtilleryShots++;
+      if (this.autoArtilleryShots >= this.spec.artillery.fireMissionRounds) {
+        this.autoArtilleryState = 'packing'; this.autoArtilleryTimer = this.spec.artillery.packSeconds || 1;
+        this.pendingFire = false;
+      }
+    }
+    if (this.ammo[index] <= 0) { const next = this.ammo.findIndex(n => n > 0); if (next >= 0) this.shellIdx = next; }
     return true;
   }
   tryAbility() { return this.abilities ? this.abilities.tryActivate() : false; }
@@ -297,7 +500,8 @@ export class Tank {
   }
   // effective armour for a hit (from rayTest) and a shell; dist = shell travel
   armorAt(hit, shellSpec, typeInfo) {
-    const A = this.spec.armor; const [arm, zone] = armorZone(this.spec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
+    const armorSpec = this.armorProfile ? { ...this.spec, armor: this.armorProfile } : this.spec;
+    const A = armorSpec.armor; const [arm, zone] = armorZone(armorSpec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
     let n;
     if (hit.face === 'front') n = new THREE.Vector3(0, Math.sin(slope), Math.cos(slope));
     else if (hit.face === 'rear') n = new THREE.Vector3(0, Math.sin(slope), -Math.cos(slope));
@@ -310,8 +514,14 @@ export class Tank {
     if (cosA < 0) n.negate();
     let eff = los;
     const front = hit.face === 'front', hullSide = hit.part === 'hull' && hit.face === 'side';
-    if (typeInfo.heat) { eff *= A.heatMult || 1; if (A.era && front) eff += A.era; if (A.skirt && hullSide) eff += A.skirt; }
-    else if (!typeInfo.he && A.eraKE && front) eff += A.eraKE;
+    if (typeInfo.heat) { eff *= A.heatMult || 1; if (A.era && front) eff += A.era; if (A.eraSide && (hullSide || hit.part === 'turret' && hit.face === 'side')) eff += A.eraSide; if (A.skirt && hullSide) eff += A.skirt; }
+    else if (!typeInfo.he && A.eraKE && (front || hullSide || hit.part === 'turret' && hit.face === 'side')) eff += A.eraKE;
+    const tile = findEraTile(this.spec, hit);
+    if (tile && !this.eraSpent.has(tile.key)) {
+      if (typeInfo.heat) eff += tile.group.heat || 0;
+      else if (!typeInfo.he && !typeInfo.hesh) eff += tile.group.ke || 0;
+    }
+    if (typeInfo.heat && this.spec.slatArmor && hit.face === 'rear') eff += this.spec.slatArmor.rearHeatBonus || 0;
     let tracks = false;
     if (hullSide && hit.local.y < zoneLowerSideY(this.spec.dims)) { tracks = true; eff += 20; }
     const overmatch = shellSpec.caliber > tmm * 3;
@@ -321,6 +531,13 @@ export class Tank {
     return { eff, los, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
   }
   // ----- damage -----
+  consumeERA(hit, shellSpec, typeInfo) {
+    const tile = findEraTile(this.spec, hit);
+    if (!tile || this.eraSpent.has(tile.key)) return false;
+    if (!typeInfo.heat && (typeInfo.he || typeInfo.hesh || !(tile.group.ke > 0))) return false;
+    this.eraSpent.add(tile.key);
+    return true;
+  }
   damage(amount, attacker, cause) {
     if (!this.alive || amount <= 0) return;
     amount = Math.min(amount, this.hp); this.hp -= amount; this.stats.received += amount; this.lastDamagedAt = this.game.time;
@@ -360,25 +577,31 @@ export class Tank {
       if (!this.spec.casemate && (hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
       if (this.spec.ammoRack.turretBustle && hit.face === 'rear') { this.ammo = this.ammo.map((n) => Math.floor(n * 0.4)); msgs.push('Bustle ammo cooked off – blow-out panels vented'); }
     }
-    for (const c of this.crew) if (c.alive && r.next() < (shellSpec.type === 'APFSDS' ? 0.16 : shellSpec.type === 'HEAT' ? 0.22 : 0.2)) { c.alive = false; msgs.push(c.role + ' knocked out'); }
+    for (const c of this.crew) {
+      let crewChance = shellSpec.type === 'APFSDS' ? 0.16 : shellSpec.type === 'HEAT' ? 0.22 : 0.2;
+      if (this.spec.openTop) crewChance *= 1.65;
+      if (this.spec.unmannedTurret && hit.part === 'turret') crewChance = 0.015;
+      else if (this.spec.crewCapsule && hit.part === 'hull') crewChance *= 0.72;
+      if (c.alive && r.next() < crewChance) { c.alive = false; msgs.push(c.role + ' knocked out'); }
+    }
     if (this.crew.every((c) => !c.alive)) { this.damage(this.hp + 1, attacker, 'crew'); return msgs.concat(['Crew knocked out']); }
     this.damage(dmg, attacker, 'pen');
     return msgs;
   }
   get brokenTrackSide() {
-    if (this.modules.tracks !== 0.5) return 0;
+    if (this.modules[this.mobilityModule] !== 0.5) return 0;
     return this.trackRepairs[0] > 0 ? -1 : 1;
   }
   updateTrackCondition() {
-    this.modules.tracks = (Number(this.trackRepairs[0] === 0) + Number(this.trackRepairs[1] === 0)) / 2;
+    this.modules[this.mobilityModule] = (Number(this.trackRepairs[0] === 0) + Number(this.trackRepairs[1] === 0)) / 2;
   }
   breakTracks(side = 0) {
     if (side <= 0) this.trackRepairs[0] = TRACK_REPAIR_TIME;
     if (side >= 0) this.trackRepairs[1] = TRACK_REPAIR_TIME;
     this.updateTrackCondition();
-    if (side < 0) return 'Left track broken';
-    if (side > 0) return 'Right track broken';
-    return 'Both tracks broken';
+    if (side < 0) return 'Left ' + this.mobilityLabel.toLowerCase() + ' damaged';
+    if (side > 0) return 'Right ' + this.mobilityLabel.toLowerCase() + ' damaged';
+    return this.mobilityLabel + ' damaged';
   }
   repairTracks() {
     this.trackRepairs.fill(0);

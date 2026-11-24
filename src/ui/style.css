@@ -238,3 +238,16 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .magfan i:nth-child(3){transform:rotate(6deg);height:10px}
 .magfan i:nth-child(4){transform:rotate(18deg);height:7px}
 .magfan i.on{background:var(--acc)}
+
+/* Enemy HP readout and damage accumulation; allied markers retain the compact bar. */
+.mk .hp-meta{display:none}
+.mk .hp-row{display:flex;align-items:center;gap:5px;width:56px;margin:2px auto 0}
+.mk .damage{display:none}
+.mk.e .hp-meta{display:block;width:132px;margin:2px auto 0;color:#fff;font-size:10px;line-height:12px;font-weight:800;letter-spacing:.15px;text-align:center;text-shadow:0 1px 3px #000}
+.mk.e .hp-row{width:132px;gap:6px;margin:1px auto 0}
+.mk.e .hp{width:76px;height:6px;flex:0 0 76px;border:1px solid rgba(255,255,255,.22);box-shadow:0 0 3px rgba(0,0,0,.9)}
+.mk.e .hp i{background:linear-gradient(90deg,#b92520,#ff6557);transition:width .06s linear}
+.mk.e .damage{display:block;min-width:42px;text-align:left;color:#ffbd76;font-size:11px;font-weight:900;line-height:11px;text-shadow:0 0 5px rgba(255,70,35,.8),0 1px 2px #000}
+.mk.e .damage:empty{display:none}
+.mk.e.hit .hp{box-shadow:0 0 8px rgba(255,80,40,.95)}
+.mk.e.hit .hp i{filter:brightness(1.7)}

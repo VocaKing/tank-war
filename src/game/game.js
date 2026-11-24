@@ -117,6 +117,16 @@ export class Game {
       if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
       if (e.code === 'KeyE') this.toggleLock();
       if (e.code === 'KeyG' && !e.repeat) { if (p.tryAbility && p.tryAbility()) { /* ok */ } else if (p.abilities && p.abilities.kind) this.hud.message(p.abilities.kind + ' not ready', '#c8c8c8'); }
+      if (e.code === 'KeyB' && !e.repeat) {
+        if (p.usesSpade?.()) p.toggleSpade();
+        else if (p.spec.artillery?.autoDeploy) {
+          if (p.autoArtilleryState === 'stowed' && Math.abs(p.speed) < 0.3) { p.autoArtilleryState = 'deploying'; p.autoArtilleryTimer = p.spec.artillery.deploySeconds || 1; }
+          else if (p.autoArtilleryState === 'deployed') { p.autoArtilleryState = 'packing'; p.autoArtilleryTimer = p.spec.artillery.packSeconds || 1; p.pendingFire = false; }
+        }
+      }
+      if (e.code === 'KeyV' && !e.repeat) p.cycleWeaponMode?.();
+      if (e.code === 'KeyN' && !e.repeat) p.cycleArmorPackage?.();
+      if (e.code === 'KeyH' && !e.repeat) p.toggleSuspension?.();
       const slot = { Digit4: 0, Digit5: 1, Digit6: 2, KeyR: p.equip.find('repair'), KeyF: p.equip.find('extinguisher') }[e.code];
       if (slot !== undefined && slot >= 0) this.useItem(slot);
     });

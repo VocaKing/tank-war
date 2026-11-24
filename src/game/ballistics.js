@@ -26,9 +26,32 @@ export class Ballistics {
     const g = this.game, W = g.world;
     for (let i = this.shells.length - 1; i >= 0; i--) {
       const s = this.shells[i]; s.life += dt;
+      if (s.spec.fuseTime && s.life >= s.spec.fuseTime) {
+        this.heBlast(s, s.pos);
+        g.effects.explosion(s.pos, false); g.audio.impact(s.pos, 'explosion');
+        g.effects.removeTracer(s); this.shells.splice(i, 1); continue;
+      }
       const speed = s.vel.length(); const steps = Math.max(1, Math.ceil((speed * dt) / 30)); const h = dt / steps; let done = false;
       for (let k = 0; k < steps && !done; k++) {
-        _a.copy(s.pos); s.vel.y -= GRAVITY * h; _b.copy(s.pos).addScaledVector(s.vel, h);
+        _a.copy(s.pos);
+        if (s.spec.guided && s.target) {
+          const speed = s.vel.length(), desired = s.target.clone().sub(s.pos).normalize().multiplyScalar(speed);
+          s.vel.lerp(desired, clamp(h * 1.6, 0, 1));
+        } else s.vel.y -= GRAVITY * h;
+        _b.copy(s.pos).addScaledVector(s.vel, h);
+        // Hard-kill APS intercepts eligible incoming threats before armour collision.
+        for (const t of g.tanks) {
+          if (!t.alive || t.team === s.owner?.team || !t.spec.aps) continue;
+          const dx = _b.x - _a.x, dy = _b.y - _a.y, dz = _b.z - _a.z;
+          const l2 = dx*dx + dy*dy + dz*dz;
+          const u = l2 > 1e-9 ? clamp(((t.pos.x-_a.x)*dx + (t.pos.y+t.spec.dims.hullH*0.62-_a.y)*dy + (t.pos.z-_a.z)*dz) / l2, 0, 1) : 0;
+          const closest = _a.clone().addScaledVector(new THREE.Vector3(dx,dy,dz), u);
+          if (t.tryAPS(s, closest)) {
+            g.effects.explosion(closest, false); g.audio.impact(closest, 'explosion');
+            done = true; break;
+          }
+        }
+        if (done) break;
         let bestT = 2, kind = null, hitTank = null, hitInfo = null;
         const tt = W.terrain.segmentHit(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z, 1.5); if (tt >= 0 && tt < bestT) { bestT = tt; kind = 'ground'; }
         const ts = W.structureHit(_a.x, _a.y, _a.z, _b.x, _b.y, _b.z); if (ts >= 0 && ts < bestT) { bestT = ts; kind = 'structure'; }
@@ -52,16 +75,17 @@ export class Ballistics {
           if (!done) { s.pos.copy(p); if (kind === 'water') s.pos.y -= 0.02; }
         } else { s.dist += _a.distanceTo(_b); s.pos.copy(_b); }
       }
-      if (!done && (s.life > 8 || s.pos.y < -200 || Math.abs(s.pos.x) > 1500 || Math.abs(s.pos.z) > 1500)) done = true;
+      const maxFlight = s.owner?.spec?.artillery?.maxFlightSeconds || (s.owner?.spec?.cls === 'Artillery' ? 42 : 8);
+      if (!done && (s.life > maxFlight || s.pos.y < -200 || Math.abs(s.pos.x) > 1500 || Math.abs(s.pos.z) > 1500)) done = true;
       if (done) { g.effects.removeTracer(s); this.shells.splice(i, 1); }
       else if (s.tracer) { const v = s.vel; const len = Math.min(18, v.length() * 0.012); s.tracer.position.copy(s.pos).addScaledVector(v, -0.5 * len / v.length()); s.tracer.scale.set(1, 1, len); s.tracer.lookAt(_b.copy(s.pos).add(v)); }
     }
   }
   heBlast(s, p) {
-    const g = this.game; const R = s.spec.caliber / 22;
+    const g = this.game; const R = s.spec.blastRadius || s.spec.caliber / 22;
     for (const t of g.tanks) { if (!t.alive) continue; const d = t.pos.distanceTo(p) - t.spec.dims.W * 0.5; if (d > R) continue;
-      const top = t.spec.armor.hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
-      if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
+      const top = (t.armorProfile || t.spec.armor).hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
+      if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (t.spec.openTop) t.suppressedFor = Math.max(t.suppressedFor || 0, 1.4); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
       if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) {
         const x = _blastLocal.copy(p).applyMatrix4(t.inv).x;
         t.breakTracks(Math.abs(x) < t.spec.dims.trackW / 2 ? 0 : Math.sign(x));
@@ -102,6 +126,7 @@ export class Ballistics {
     if (s.wet && s.waterDist > 0) { ev.waterF = waterPenFactor(s.type, s.waterDist); ev.pen *= ev.waterF; ev.ratio = ev.pen / ev.eff; }
     const shooter = s.owner; const toPlayer = tank.isPlayer, fromPlayer = shooter && shooter.isPlayer;
     if (s.noDamage) { g.effects.sparks(p, 12); return true; }
+    tank.consumeERA?.(hit, s.spec, s.type);
     if (shooter && tank.alive && shooter.team !== tank.team) shooter.stats.hits++;
     if (tank.alive && ev.ricochet && s.ricochets < 1) {
       const n = ev.normalW; const v = s.vel; v.addScaledVector(n, -2 * v.dot(n)).multiplyScalar(0.55); s.pos.copy(p).addScaledVector(n, 0.08); s.ricochets++; s.noDamage = true; s.life = Math.max(s.life, 6.5);

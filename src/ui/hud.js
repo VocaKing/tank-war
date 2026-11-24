@@ -24,7 +24,7 @@ export class HUD {
       <div class="panel left" id="h-veh"></div>
       <div class="combat-deck"><div class="status" id="h-status"></div><div class="panel items" id="h-items"></div><div class="panel ammo" id="h-ammo"></div></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>G vehicle ability · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>G vehicle ability · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
@@ -181,7 +181,7 @@ export class HUD {
       } else {
         parts.hpMeta.style.display = 'block';
         parts.hpMeta.textContent = `HP ${Math.ceil(t.hp).toLocaleString('en-US')} / ${Math.round(t.maxHp).toLocaleString('en-US')}`;
-        parts.hpRow.style.width = '120px';
+        parts.hpRow.style.width = '132px';
         parts.hpFill.style.width = (state.displayHp / t.maxHp * 100) + '%';
         parts.damage.textContent = state.damageTimer > 0 ? '−' + Math.round(state.damageTotal).toLocaleString('en-US') : '';
         parts.reload.style.display = 'none';
@@ -206,11 +206,14 @@ export class HUD {
       ? `推土铲 · ${ability.dozerActive ? '施工 ' + Math.min(100, Math.floor(100 * ability.dozerTravel / s.dozer.travel)) + '%' :
         ability.dozerCooldown > 0 ? '冷却 ' + Math.ceil(ability.dozerCooldown) + 's' : '按 G 或点技能键'} · 剩 ${ability.dozerCharges} 次`
       : '';
-    const movementStatus = p.afloat ? '浮航 · 主炮锁定' : dozerStatus;
-    const trackStatus = p.trackRepairs.map((time, i) => time > 0 ? `${i === 0 ? 'L' : 'R'} ${Math.ceil(time)}s` : '').filter(Boolean).join(' · ');
+    const mobilityStatus = p.trackRepairs.map((time, i) => time > 0 ? `${i === 0 ? 'L' : 'R'} ${Math.ceil(time)}s` : '').filter(Boolean).join(' · ');
+    const specialStatus = p.usesSpade?.() ? `驻锄 · ${p.spadeState}` : s.artillery?.autoDeploy ? `自动部署 · ${p.autoArtilleryState}` : '';
+    const kitStatus = s.armorPackages ? `装甲套件 · ${s.armorPackages[p.armorPackageIndex]?.name || '基础'}` : '';
+    const movementStatus = p.afloat ? '浮航 · 主炮锁定' : [dozerStatus, specialStatus, kitStatus].filter(Boolean).join(' · ');
+    const trackStatus = mobilityStatus;
     this.$('h-veh').innerHTML = `<div class="vn">${s.short} <small>${s.nation} · ${s.era}</small></div>
       <div class="hpwrap"><div class="hpbar"><i style="width:${p.hp / p.maxHp * 100}%"></i><span>${Math.ceil(p.hp)} / ${p.maxHp}</span></div>${(p.abilities && p.abilities.magazine) ? `<div class="magfan" title="magazine">${Array.from({length: p.abilities.magazine.size}, (_, i) => `<i class="${i < p.abilities.magLeft ? 'on' : ''}"></i>`).join('')}</div>` : ''}</div>
-      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod('tracks', trackStatus || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
+      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       ${movementStatus ? `<div class="crew"><span>${movementStatus}</span></div>` : ''}
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`;

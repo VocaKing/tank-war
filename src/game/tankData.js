@@ -1,4 +1,5 @@
 import { SPECIALIST_TANKS } from './specialistTanks.js';
+import { CONCEPT_VEHICLES } from './conceptVehicles.js';
 import { EXPANSION_TANKS } from './expansionTanks.js';
 import publishedBalance from './balanceDefaults.json';
 import { clone, effective, legacyMaxDispersion, loadLocal } from './balanceConfig.js';
@@ -322,6 +323,7 @@ export const TANKS = [
   },
   ...SPECIALIST_TANKS,
   ...EXPANSION_TANKS,
+  ...CONCEPT_VEHICLES,
 ];
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // ---- v3 ammunition balance & loadouts ----
