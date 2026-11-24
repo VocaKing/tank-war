@@ -16,6 +16,7 @@ Browser 3D tank battle (Three.js r170 + Vite). 27 vehicles in 4 tiers, 3 real-sc
   E = lock gun on the target under the crosshair. Reticle = predicted ballistic impact; circle = current dispersion.
 - QA tools: tools_qa.mjs (every map × tank, armor view, matchmaking, console errors), tools_ballistic.mjs (reticle vs impact
   at 100/300/500 m), tools_sim.mjs (AI soak), tools_models.mjs (triangle counts), tools_shots_*.mjs (screenshots).
+Release pipeline: every deployment checks muzzle geometry, the balance-editor layout for the full roster, and representative gameplay on all three maps before publishing to GitHub Pages.
 See CREDITS.md for licenses.
 
 ## v4 changes
