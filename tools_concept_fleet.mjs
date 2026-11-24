@@ -2,6 +2,8 @@
 // Run with Vite at http://127.0.0.1:5173/ (npm run dev -- --host 127.0.0.1).
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
+import { CONCEPT_VEHICLES } from './src/game/conceptVehicles.js';
 
 const url=process.argv[2]||'http://127.0.0.1:5173/';
 const ids=['aegis140','bastion125','harrier105','warden130','lancer120',
@@ -12,14 +14,13 @@ const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftsh
 const page=await browser.newPage({viewport:{width:960,height:540}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const results=[];
-let roster=[];
+// Static roster verification avoids a second dynamically transformed Vite import.
+const baseSource=readFileSync('src/game/tankData.js','utf8');
+assert.ok(baseSource.includes('TANKS.push(...CONCEPT_VEHICLES)'), 'concept registration missing');
+const roster=[...new Set([...baseSource.matchAll(/id:\\s*'([^']+)'/g)].map(m=>m[1]), ...CONCEPT_VEHICLES.map(t=>t.id)])];
 for(const id of ids){
   await page.goto(`${url}?autostart=1&map=village&tank=${id}&q=low&seed=2026`);
   await page.waitForFunction(key=>window.__game?.player?.spec?.id===key,id,{timeout:180000});
-  if(!roster.length) roster=await page.evaluate(async()=>{
-    const {TANKS}=await import('/src/game/tankData.js');
-    return TANKS.map(t=>t.id);
-  });
   const r=await page.evaluate(key=>{
     const g=window.__game,p=g.player,d=p.spec.dims,T=p.pos.constructor;
     const result={id:key,model:!!p.model?.root,modelName:p.model?.root?.name,stats:p.spec.systemTag};
