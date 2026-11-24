@@ -12,6 +12,7 @@ const ANCHOR_HEIGHT = 0.55;
 const SPRING_FREQUENCY = 9;
 const SPRING_REST = ANCHOR_HEIGHT + GRAVITY / (SPRING_FREQUENCY ** 2);
 const REBOUND_TRAVEL = 0.105;
+const RECOVERY_DELAY = 0.4;
 // Five suspension stations per track, with the end stations close to its idlers.
 const STATIONS = [-0.42, -0.21, 0, 0.21, 0.42];
 const WHEEL_COUNT = STATIONS.length * 2;
@@ -21,6 +22,7 @@ const _side = new THREE.Vector3(), _normal = new THREE.Vector3(), _contactNormal
 const _arm = new THREE.Vector3(), _velocity = new THREE.Vector3(), _angular = new THREE.Vector3();
 const _impulse = new THREE.Vector3(), _forceSum = new THREE.Vector3(), _momentSum = new THREE.Vector3();
 const _tangent = new THREE.Vector3(), _scrub = new THREE.Vector3();
+const _hullNormal = new THREE.Vector3(), _rightingAxis = new THREE.Vector3();
 
 let rapierReady;
 export function initPhysics() {
@@ -108,14 +110,22 @@ export class BattlefieldPhysics {
     const body = this.world.createRigidBody(RigidBodyDesc.dynamic().setLinearDamping(0.014)
       .setAngularDamping(0.25).setCcdEnabled(true).setCanSleep(false));
     const filter = groups(VEHICLE, SURFACE | OBSTACLE | VEHICLE);
-    const base = 0.31, halfHeight = (d.hullH - base) / 2;
-    this.world.createCollider(ColliderDesc.cuboid(d.W / 2, halfHeight, d.L / 2)
-      .setTranslation(0, base + halfHeight, 0).setMass(mass)
+    const base = Math.min(d.clearance ?? 0.31, d.hullH * 0.46);
+    const halfWidth = d.W / 2, halfLength = d.L / 2;
+    const chamfer = Math.min(0.6, (d.hullH - base) * 0.5);
+    const hullPoints = [];
+    // Leave clearance under the leading and trailing edges for the tracks to climb a bank.
+    for (const [y, w, l] of [
+      [base, halfWidth - chamfer * 0.45, halfLength - chamfer],
+      [base + chamfer, halfWidth, halfLength],
+      [d.hullH, halfWidth, halfLength],
+    ]) for (const x of [-w, w]) for (const z of [-l, l]) hullPoints.push(x, y, z);
+    const hull = this.world.createCollider(ColliderDesc.convexHull(new Float32Array(hullPoints)).setMass(mass)
       .setFriction(0.6).setContactSkin(0.012).setCollisionGroups(filter), body);
     const turret = this.world.createCollider(ColliderDesc.cuboid(d.turretW * 0.46, d.turretH / 2, d.turretL * 0.45)
       .setTranslation(0, d.hullH + d.turretH / 2, (d.turretZ ?? 0) + (d.turretBoxZ ?? 0)).setMass(0)
       .setFriction(0.6).setCollisionGroups(filter), body);
-    const vehicle = { tank, body, turret, mass, contact: 0, unsupported: 0,
+    const vehicle = { tank, body, hull, turret, mass, contact: 0, unsupported: 0, recoveryTime: 0, righting: false,
       inertiaYaw: mass * (d.L * d.L + d.W * d.W) / 12 };
     this.vehicles.push(vehicle);
     tank.vehicle = vehicle;
@@ -132,6 +142,8 @@ export class BattlefieldPhysics {
     body.setAngvel(ZERO, true);
     vehicle.contact = 0;
     vehicle.unsupported = 0;
+    vehicle.recoveryTime = 0;
+    vehicle.righting = false;
     tank.vel.copy(_forward);
     tank.speed = speed;
   }
@@ -219,9 +231,11 @@ export class BattlefieldPhysics {
       _momentSum.add(_arm.cross(_impulse));
     }
 
-    vehicle.contact = support;
     if (tank.afloat && floatLoad > load) {
+      vehicle.contact = support;
       vehicle.unsupported = 0;
+      vehicle.recoveryTime = 0;
+      vehicle.righting = false;
       tank.airborne = false;
       _normal.set(0, 1, 0);
       body.applyImpulse(_forceSum, true);
@@ -229,19 +243,78 @@ export class BattlefieldPhysics {
       this.applyTraction(vehicle, floatLoad * 0.52, floatLoad * 0.26, waterDepth, true);
       return;
     }
-    if (!support) {
+
+    // The chassis can carry the tank on a bank even with every suspension ray unloaded.
+    const { throttle, steer, brake } = tank.input;
+    const recovering = vehicle.recoveryTime >= RECOVERY_DELAY;
+    const pushing = tank.alive && tank.modules.tracks === 1 && !brake &&
+      Math.max(Math.abs(throttle), Math.abs(steer)) > 0.1;
+    const stalled = pushing && tank.vel.lengthSq() < (recovering ? 6 : 0.36) &&
+      (recovering || _angular.lengthSq() < 0.25);
+    const weight = mass * GRAVITY * dt;
+    const hullLoad = !support || stalled ? this.hullGroundLoad(vehicle) : 0;
+    const onHull = hullLoad > weight * 0.12;
+    vehicle.recoveryTime = stalled && onHull ? vehicle.recoveryTime + dt : 0;
+    const canRecover = vehicle.recoveryTime >= RECOVERY_DELAY;
+    vehicle.contact = support || Number(onHull);
+    const bothTracksLoaded = Math.min(leftLoad, load - leftLoad) > weight * 0.16;
+    const rightingLimit = vehicle.righting && !bothTracksLoaded ? -0.74 : -0.55;
+    vehicle.righting = pushing && _down.y > rightingLimit &&
+      (vehicle.righting ? vehicle.contact > 0 : canRecover);
+    if (!vehicle.contact) {
       vehicle.unsupported += dt;
       tank.airborne = vehicle.unsupported >= 0.025;
       tank.hullAiming = false;
       return;
     }
+
+    const crawl = canRecover && !vehicle.righting;
+    const recoveryLoad = crawl ? Math.min(hullLoad, weight) : 0;
+    if (!support) _normal.copy(_hullNormal);
+    else if (crawl) _normal.addScaledVector(_hullNormal, recoveryLoad / hullLoad);
     _normal.normalize();
     if (tank.airborne) tank.landingSpeed = Math.max(tank.landingSpeed, -tank.vel.dot(_normal));
     vehicle.unsupported = 0;
     tank.airborne = false;
     body.applyImpulse(_forceSum, true);
     body.applyTorqueImpulse(_momentSum, true);
-    this.applyTraction(vehicle, load, leftLoad, waterDepth);
+    if (vehicle.righting) {
+      tank.hullAiming = false;
+      this.rightHull(vehicle);
+    } else if (support || crawl) {
+      this.applyTraction(vehicle, load + recoveryLoad, leftLoad, waterDepth, false, crawl);
+    } else tank.hullAiming = false;
+  }
+
+  hullGroundLoad({ hull, turret }) {
+    _hullNormal.set(0, 0, 0);
+    for (const part of [hull, turret]) {
+      if (!part.isEnabled()) continue;
+      this.world.contactPairsWith(part, surface => {
+        if (!(surface.collisionGroups() >>> 16 & SURFACE)) return;
+        this.world.contactPair(part, surface, (manifold, flipped) => {
+          // Orient the normal from the surface toward the hull regardless of pair order.
+          const sign = flipped ? 1 : -1;
+          const n = manifold.normal();
+          if (n.y * sign < 0.2) return;
+          let impulse = 0;
+          for (let i = 0; i < manifold.numContacts(); i++) impulse += manifold.contactImpulse(i);
+          _hullNormal.x += sign * n.x * impulse;
+          _hullNormal.y += sign * n.y * impulse;
+          _hullNormal.z += sign * n.z * impulse;
+        });
+      });
+    }
+    return _hullNormal.y;
+  }
+
+  rightHull({ tank, body, inertiaYaw }) {
+    // Roll or pitch toward the upright pose using torque through Rapier's contacts.
+    _rightingAxis.set(_down.z, 0, -_down.x);
+    if (_rightingAxis.lengthSq() < 0.002) _rightingAxis.set(Math.sin(tank.heading), 0, Math.cos(tank.heading));
+    _rightingAxis.normalize();
+    const acceleration = clamp((1.45 - _angular.dot(_rightingAxis)) * 9, 0, 15);
+    body.applyTorqueImpulse(_rightingAxis.multiplyScalar(acceleration * inertiaYaw * PHYSICS_STEP), true);
   }
 
   applyBuoyancy({ tank, body, mass, inertiaYaw }, depth) {
@@ -260,7 +333,7 @@ export class BattlefieldPhysics {
     return load;
   }
 
-  applyTraction(vehicle, load, leftLoad, waterDepth, floating = false) {
+  applyTraction(vehicle, load, leftLoad, waterDepth, floating = false, crawl = false) {
     const { tank, body, mass, inertiaYaw } = vehicle;
     const s = tank.spec, dt = PHYSICS_STEP, input = tank.input, T = this.battlefield.terrain;
     const mobile = tank.alive && tank.modules.tracks === 1;
@@ -282,8 +355,10 @@ export class BattlefieldPhysics {
       water * (0.78 + 0.22 * Math.min(1, road * 1.5)) * (overdrive ? 1.2 : 1) * (tank.abilities?.speedMult ?? 1);
     if (floating) speedLimit = s.amphibious.speed / 3.6 * engine * driver * (throttle < 0 ? 0.52 : 1);
     if (tank.abilities?.dozerActive) speedLimit = Math.min(speedLimit, s.dozer.speed / 3.6);
+    if (crawl) speedLimit = Math.min(speedLimit, 1.5);
     const lowGear = 4.3 * Math.max(0, 1 - Math.abs(tank.speed) / 9) ** 2;
-    const driveLimit = (lowGear + clamp(s.power / s.mass * 0.075, 0.6, 2.2) * (s.cls === 'Light' ? 2.4 : 1)) *
+    const driveAcceleration = lowGear + clamp(s.power / s.mass * 0.075, 0.6, 2.2) * (s.cls === 'Light' ? 2.4 : 1);
+    const driveLimit = (crawl ? Math.max(driveAcceleration, 9) : driveAcceleration) *
       engine * loadFactor * (overdrive ? 1.35 : 1);
     _forward.set(0, 0, 1).applyQuaternion(tank.quat);
     _tangent.copy(_forward).addScaledVector(_normal, -_forward.dot(_normal)).normalize();
@@ -318,7 +393,7 @@ export class BattlefieldPhysics {
 
     const angularSpeed = _angular.dot(_normal);
     const turnTraction = commanded && !mobile ? intactLoad * grip : maxTraction;
-    const torqueLimit = turnTraction * s.dims.W * (mobile ? 0.53 : 0.82);
+    const torqueLimit = turnTraction * s.dims.W * (mobile && !crawl ? 0.53 : 0.82);
     const response = tank.hullAiming ? 0.085 : steer ? 0.105 : 0.065;
     const torque = clamp((commanded - angularSpeed) * dt / response * inertiaYaw, -torqueLimit, torqueLimit);
     body.applyTorqueImpulse(_impulse.copy(_normal).multiplyScalar(torque), true);

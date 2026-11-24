@@ -60,6 +60,48 @@ for (const steer of [-0.6, 0.6]) {
   assert.deepEqual(path[0], path[2]);
 }
 
+for (const roll of [Math.PI / 2, Math.PI]) {
+  const { physics, spawn } = makeWorld((_, z) => -Math.max(0, Math.min(1.4, (8 - Math.abs(z)) * 0.48)));
+  const tank = spawn(0, 0);
+  tank.pos.y += tank.spec.dims.hullH + tank.spec.dims.turretH + 0.1;
+  tank.quat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll);
+  physics.place(tank);
+  const upright = () => new THREE.Vector3(0, 1, 0).applyQuaternion(tank.quat).y;
+  for (let i = 0; i < 240; i++) physics.advance(PHYSICS_STEP);
+  assert.ok(upright() < 0.2 && tank.vehicle.contact > 0 && !tank.airborne,
+    'an overturned hull lying in the ditch is grounded');
+
+  const rest = tank.pos.clone();
+  tank.modules.tracks = 0;
+  tank.input.throttle = -1;
+  for (let i = 0; i < 120; i++) physics.advance(PHYSICS_STEP);
+  assert.ok(upright() < 0.2 && tank.pos.distanceTo(rest) < 0.1, 'disabled tracks cannot recover the hull');
+
+  tank.modules.tracks = 1;
+  for (let i = 0; i < 540; i++) physics.advance(PHYSICS_STEP);
+  assert.ok(upright() > 0.8 && tank.vehicle.contact > 0, 'reverse input puts the tracks back on the ground');
+  assert.ok(tank.pos.z < rest.z - 1, 'the vehicle can reverse after righting');
+  tank.input.throttle = 0;
+  for (let i = 0; i < 120; i++) physics.advance(PHYSICS_STEP);
+  tank.input.steer = 1;
+  const heading = tank.heading;
+  for (let i = 0; i < 150; i++) physics.advance(PHYSICS_STEP);
+  assert.ok(Math.abs(Math.sin(tank.heading - heading)) > 0.25, 'steering responds after recovery');
+  physics.free();
+}
+
+{
+  const { physics, spawn } = makeWorld(x => Math.max(-0.95, 1.4 - Math.abs(x) * 1.2));
+  const tank = spawn(0, 0);
+  for (let i = 0; i < 120; i++) physics.advance(PHYSICS_STEP);
+  const start = tank.pos.clone();
+  assert.ok(tank.vehicle.contact > 0 && !tank.airborne && Math.abs(tank.speed) < 0.05);
+  tank.input.throttle = 1;
+  for (let i = 0; i < 360; i++) physics.advance(PHYSICS_STEP);
+  assert.ok(tank.pos.z > start.z + 1.5, 'a chassis grounded on a ridge can crawl off its belly');
+  physics.free();
+}
+
 {
   const { physics, spawn } = makeWorld((_, z) => -Math.max(0, z * 0.5));
   const tank = spawn(-14, 16);
@@ -174,4 +216,4 @@ for (const brokenSide of [-1, 1]) {
   physics.free();
 }
 
-console.log('Rapier downhill, airborne, collision, bridge, damaged-track steering, and amphibious crossing checks passed.');
+console.log('Rapier downhill, ditch recovery, airborne, collision, bridge, damaged-track steering, and amphibious crossing checks passed.');
