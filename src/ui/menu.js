@@ -13,6 +13,7 @@ function tankCard(t) {
     <b>${t.short}<em>${t.casemate ? 'TD' : t.cls}</em></b><small>${t.nation} · ${t.year}</small>
     ${abilities.length ? `<span class="tank-ability-labels" lang="zh-CN">${abilities.map(({ type, name }) =>
       `<span class="tank-ability-label">${typeBadge(type)} ${name}</span>`).join('')}</span>` : ''}
+    ${t.systemTag ? `<span class="tcard-system">${t.systemTag}</span>` : ''}
   </button>`;
 }
 
@@ -124,6 +125,7 @@ export class Menu {
     const stats = this.root.querySelector('#m-stats');
     stats.innerHTML = `<h2>${t.name}</h2><div class="tag">Tier ${['I', 'II', 'III', 'IV'][t.tier - 1]} ${t.cls} · ${t.nation} · ${t.era} · ${t.year} · crew ${t.crew.length}${t.autoloader ? ' (autoloader)' : ''}</div>
       ${!this.mobile && skills ? `<section class="vehicle-skills" lang="zh-CN" aria-label="车辆技能">${skills}</section>` : ''}
+      ${t.systemTag ? `<div class="tag">SYSTEM · ${t.systemTag}</div>` : ''}
       <p>${t.desc}</p>
       ${t.casemate ? `<p>Fixed gun. Release ${this.mobile ? 'the drive joystick' : 'WASD'} to aim with the hull.</p>` : ''}
       ${bar('Hit points', t.hp, 2000)}${bar('Damage (' + (sh.type === 'HE' ? 'HE' : 'AP') + ')', sh.damage, 450)}${bar('Penetration', sh.pen, 760, ' mm')}${bar('Hull front (LOS)', los(a.hull.front), 700, ' mm')}${bar(upperArmor + ' front (LOS)', los(a.turret.front), 950, ' mm')}
