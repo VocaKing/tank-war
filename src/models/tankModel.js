@@ -416,7 +416,8 @@ function buildT72(d) {
   P.add('turret', 'metal', box(0.3, 0.3, 0.3, 0.72, 0.45, 0.95)); P.add('turret', 'glass', cylZ(0.12, 0.02, 14, 0.72, 0.45, 1.11)); // Luna IR light
   for (const s of [-1, 1]) for (let i = 0; i < 4; i++) P.add('turret', 'metal', cylZ(0.045, 0.3, 8, s * (0.8 + i * 0.07), 0.42 + i * 0.03, 0.75 - i * 0.12, 0.045, -0.4));
   P.add('turret', 'metal', cylY(0.012, 2.0, 4, -0.7, 1.6, -0.8));
-  K.barrel(P, 'barrel', d.gunLen, { r0: 0.20, r1: 0.095, evac: { z: 3.6, r: 0.14, len: 0.55 } });
+  const evacZ = Math.min(3.6, d.gunLen * 0.72), evacLen = Math.min(0.55, d.gunLen * 0.16);
+  K.barrel(P, 'barrel', d.gunLen, { r0: 0.20, r1: 0.095, evac: { z: evacZ, r: 0.14, len: evacLen } });
   return {
     P, wheels: [-2.55, -1.62, -0.69, 0.24, 1.17, 2.1].map((z) => ({ z, y: 0.4, r: 0.375, w: 0.46 })),
     sprockets: [{ z: -3.15, y: 0.62, r: 0.33 }], idlers: [{ z: 2.95, y: 0.56, r: 0.31 }], rollers: [-1.6, 0.0, 1.5].map((z) => ({ z, y: 0.98, r: 0.075 })),
