@@ -52,7 +52,7 @@ export function createEraVisuals(spec, body, turret) {
       const bevel = Math.min(0.022, tileH * 0.12, tileW * 0.10, depth * 0.22);
       const geo = new RoundedBoxGeometry(front ? tileW * 0.91 : depth, tileH * 0.89, front ? depth : tileW * 0.91, 2, bevel);
       const palette = PALETTES[spec.id] || [0x59614c, 0x69735b, 0x48513f];
-      const mat = new THREE.MeshStandardMaterial({ color: palette[0], roughness: 0.79, metalness: 0.28 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.79, metalness: 0.28 });
       const mesh = new THREE.InstancedMesh(geo, mat, group.cols * group.rows);
       mesh.name = `ERA_${group.part}_${group.face}_${side}_${groupIndex}`;
       mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
