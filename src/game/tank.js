@@ -324,6 +324,7 @@ export class Tank {
   damage(amount, attacker, cause) {
     if (!this.alive || amount <= 0) return;
     amount = Math.min(amount, this.hp); this.hp -= amount; this.stats.received += amount; this.lastDamagedAt = this.game.time;
+    if (this.game.player && this.team !== this.game.player.team) this.game.hud?.recordEnemyDamage(this, amount, cause !== 'fire');
     if (attacker && attacker !== this && attacker.team !== this.team) { attacker.stats.damage += amount; this.lastAttacker = attacker; }
     if (this.hp <= 0.5) this.destroy(attacker, cause);
   }
