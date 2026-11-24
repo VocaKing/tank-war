@@ -31,15 +31,15 @@ jobs:
       - run: npm run build
       - name: Smoke-test representative vehicles on all maps
         run: |
-          npm run preview -- --base / --host 127.0.0.1 > /tmp/tank-war-preview.log 2>&1 &
+          npm run preview -- --host 127.0.0.1 > /tmp/tank-war-preview.log 2>&1 &
           PREVIEW_PID=$!
           trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
           for i in $(seq 1 40); do
-            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            if curl -fsS http://127.0.0.1:4173/tank-war/ >/dev/null; then break; fi
             sleep 1
           done
           curl -fsS http://127.0.0.1:4173/ >/dev/null || { cat /tmp/tank-war-preview.log; exit 1; }
-          node tools_qa.mjs http://127.0.0.1:4173/ "t72,pzh2000,aegis140" "village,forest,desert"
+          node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "t72,pzh2000,aegis140" "village,forest,desert"
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
