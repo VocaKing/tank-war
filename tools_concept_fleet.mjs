@@ -17,7 +17,7 @@ const results=[];
 // Static roster verification avoids a second dynamically transformed Vite import.
 const baseSource=readFileSync('src/game/tankData.js','utf8');
 assert.ok(baseSource.includes('TANKS.push(...CONCEPT_VEHICLES)'), 'concept registration missing');
-const roster=[...new Set([...baseSource.matchAll(/id:\\s*'([^']+)'/g)].map(m=>m[1]), ...CONCEPT_VEHICLES.map(t=>t.id)])];
+const roster=[...new Set([...baseSource.matchAll(/id:\s*'([^']+)'/g)].map(m=>m[1]), ...CONCEPT_VEHICLES.map(t=>t.id)])];
 for(const id of ids){
   await page.goto(`${url}?autostart=1&map=village&tank=${id}&q=low&seed=2026`);
   await page.waitForFunction(key=>window.__game?.player?.spec?.id===key,id,{timeout:180000});
