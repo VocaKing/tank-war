@@ -60,8 +60,24 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .killfeed{position:absolute;right:14px;top:12px;display:flex;flex-direction:column;gap:3px;align-items:flex-end}
 .kf{background:var(--panel);padding:3px 10px;border-radius:4px;font-size:12px}.kf .a{color:var(--ally)}.kf .e{color:var(--enemy)}
 .mk{position:absolute;left:0;top:0;text-align:center;font-size:11px;white-space:nowrap}
-.mk .nm{font-weight:600}.mk .hp{width:56px;height:4px;margin:2px auto;background:rgba(0,0,0,.6);border-radius:2px;overflow:hidden}.mk .hp i{display:block;height:100%}
-.mk.e .nm,.mk.e .ar{color:var(--enemy)}.mk.e .hp i{background:var(--enemy)}.mk.a .nm,.mk.a .ar{color:var(--ally)}.mk.a .hp i{background:var(--ally)}.mk .ar{font-size:10px;line-height:8px}
+.mk .nm{font-weight:600}
+.mk .hp-meta{display:none}
+.mk .hp-row{display:flex;align-items:center;gap:5px;width:56px;margin:2px auto 0}
+.mk .hp{width:56px;height:4px;flex:0 0 56px;margin:0;background:rgba(0,0,0,.72);border-radius:3px;overflow:hidden}
+.mk .hp i{display:block;height:100%;background:var(--ally);transition:width .06s linear}
+.mk .damage{display:none}
+.mk.e .nm,.mk.e .ar{color:var(--enemy)}
+.mk.e .hp-meta{display:block;width:132px;margin:2px auto 0;color:#fff;font-size:10px;line-height:12px;font-weight:800;letter-spacing:.15px;text-align:center;text-shadow:0 1px 3px #000}
+.mk.e .hp-row{width:132px;gap:6px;margin:1px auto 0}
+.mk.e .hp{width:88px;height:7px;flex:0 0 88px;border:1px solid rgba(255,255,255,.22);box-shadow:0 0 3px rgba(0,0,0,.9)}
+.mk.e .hp i{background:linear-gradient(90deg,#b92520,#ff6557);transition:width .06s linear}
+.mk.e .damage{display:block;min-width:38px;text-align:left;color:#ffbd76;font-size:11px;font-weight:900;line-height:11px;text-shadow:0 0 5px rgba(255,70,35,.8),0 1px 2px #000}
+.mk.e .damage:empty{display:none}
+.mk.e.hit .hp{box-shadow:0 0 8px rgba(255,80,40,.95)}
+.mk.e.hit .hp i{filter:brightness(1.7)}
+.mk.a .nm,.mk.a .ar{color:var(--ally)}
+.mk.a .hp i{background:var(--ally)}
+.mk .ar{font-size:10px;line-height:8px}
 .cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 2px #000}
 .reticle{position:absolute;left:0;top:0;will-change:transform}
 .reticle .ring{position:absolute;border:2px solid rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.8)}
