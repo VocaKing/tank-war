@@ -33,7 +33,7 @@ export function fields(t){
   const group=name;
   out.push(def('armor.'+key+'.0','厚度','mm',0.1,3000,0.1,group),def('armor.'+key+'.1','倾角','°',0,89,0.1,group));
  }
- for(const [key,name,max] of [['era','HEAT 反应装甲附加量',3000],['eraKE','动能弹反应装甲附加量',3000],['skirt','侧裙附加防护',3000],['heatMult','HEAT 防护倍率',10]])if(key in t.armor)out.push(def('armor.'+key,name,key==='heatMult'?'×':'mm',key==='heatMult'?0.1:0,max,key==='heatMult'?0.01:1,'附加防护'));
+ for(const [key,name,max] of [['era','正面 HEAT 反应装甲附加量',3000],['eraSide','侧面 HEAT 反应装甲附加量',3000],['eraKE','动能弹反应装甲附加量',3000],['skirt','侧裙附加防护',3000],['heatMult','HEAT 防护倍率',10]])if(key in t.armor)out.push(def('armor.'+key,name,key==='heatMult'?'×':'mm',key==='heatMult'?0.1:0,max,key==='heatMult'?0.01:1,'附加防护'));
  for(let i=0;i<t.shells.length;i++){
   const sh=t.shells[i],group='弹药 '+(i+1)+' · '+sh.name;
   for(const [key,label,unit,min,max,step] of [['pen','百米穿深','mm',1,3000,1],['damage','单发伤害','HP',1,10000,1],['velocity','初速','m/s',100,2500,1],['count','默认携带量','发',0,500,1]])out.push(def('shells.'+i+'.'+key,label,unit,min,max,step,group));
@@ -57,6 +57,14 @@ export function fields(t){
    def('secondary.shell.damage','副炮伤害','HP',1,10000,1,'副炮'),
    def('secondary.shell.velocity','副炮初速','m/s',100,2500,1,'副炮'));
  }
+ if (t.aps) for (const [k,label,unit,min,max,step] of [['charges','拦截弹数量','发',0,20,1],['radius','拦截半径','m',1,30,0.1],['cooldown','拦截冷却','s',0.1,60,0.1],['rechargeSeconds','重新充能时间','s',0.1,180,0.1]]) if (k in t.aps) out.push(def('aps.'+k,label,unit,min,max,step,'主动防护'));
+ if (t.artillery) for (const [k,label,unit,min,max,step] of [['spadeDeploySeconds','驻锄部署时间','s',0.1,20,0.1],['spadeRetractSeconds','驻锄收起时间','s',0.1,20,0.1],['maxFlightSeconds','最大弹道飞行时间','s',1,120,1],['aiEngageRange','AI交战距离','m',100,2000,1],['deploySeconds','自动部署时间','s',0.1,20,0.1],['packSeconds','自动收起时间','s',0.1,20,0.1],['fireMissionRounds','单次任务弹数','发',1,20,1],['recoilRecovery','后坐恢复时间','s',0.1,20,0.1]]) if (k in t.artillery) out.push(def('artillery.'+k,label,unit,min,max,step,'自行火炮'));
+ if (t.recoilBrace) for (const [k,label] of [['spadeDeploySeconds','驻锄部署时间'],['spadeRetractSeconds','驻锄收起时间'],['recoilRecovery','后坐恢复时间']]) if (k in t.recoilBrace) out.push(def('recoilBrace.'+k,label,'s',0.1,20,0.1,'驻锄系统'));
+ if (t.armorPackages) for (let i=0;i<t.armorPackages.length;i++) for (const [k,label,unit,min,max,step] of [['front','正面附加装甲','mm',0,1000,1],['side','侧面附加装甲','mm',0,1000,1],['mass','套件后重量','t',1,200,0.1],['speedMult','速度倍率','×',0.2,2,0.01],['heatMult','HEAT 防护倍率','×',0.1,5,0.01]]) if (k in t.armorPackages[i]) out.push(def('armorPackages.'+i+'.'+k,'套件 '+(i+1)+' · '+label,unit,min,max,step,'可换装甲'));
+ if (t.multiTube?.modes) for (let i=0;i<t.multiTube.modes.length;i++) for (const [k,label,unit,min,max,step] of [['count','齐射炮管数','管',1,12,1],['reloadMult','装填倍率','×',0.1,10,0.1]]) if (k in t.multiTube.modes[i]) out.push(def('multiTube.modes.'+i+'.'+k,t.multiTube.modes[i].name+' · '+label,unit,min,max,step,'多管武器'));
+ if (t.burst) for (const [k,label,unit,min,max,step] of [['count','点射发数','发',1,30,1],['interval','点射间隔','s',0.02,5,0.01]]) if (k in t.burst) out.push(def('burst.'+k,label,unit,min,max,step,'连发系统'));
+ if (t.eraLayout) for (let i=0;i<t.eraLayout.length;i++) for (const [k,label] of [['heat','HEAT 单块防护','mm'],['ke','动能单块防护','mm']]) if (k in t.eraLayout[i]) out.push(def('eraLayout.'+i+'.'+k,'ERA '+(i+1)+' · '+label,'mm',0,1000,1,'模块化反应装甲'));
+ if (t.dozerAssist !== undefined) out.push(def('dozerAssist','推土铲爬坡辅助','×',0,1,0.01,'机动'));
  return out;
 }
 export const read=(obj,path)=>path.split('.').reduce((v,k)=>v[k],obj);
