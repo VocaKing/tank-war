@@ -129,7 +129,7 @@ function wheelGeometry(paintHex, type = 'disc', id = '') {
   }
   if(type!=='spoked') paintC(lx([[0,0.06],[0.86,0.06]]),hub);
   paintC(cylX(0.17, 0.08, 10, s * 0.52, 0, 0), hub); // hub cap
-  const nuts=({sherman:8,tiger:8,panther:8,t34:6,is2:6,pershing:8,centurion:8,leo1:8,leo2a6:8,t72:8,t90m:8,m1a2:8,chally2:8,merkava4:8,type99a:8})[id]||6;
+  const nuts=({sherman:8,tiger:8,panther:8,t34:6,is2:6,pershing:8,centurion:8,leo1:8,leo2a6:8,t72:8,t90m:8,m1a2:8,chally2:8,merkava4:8,type99a:8,aegis140:10,bastion125:10,harrier105:6,warden130:8,lancer120:8,leviathan160:10,thunderclad155:8,tempest155:8,cerberus135:10,raptor90:6})[id]||6;
   for(let i=0;i<nuts;i++){const a=i/nuts*Math.PI*2;paintC(cylX(0.03,0.045,6,0.48,Math.cos(a)*0.27,Math.sin(a)*0.27),metal);} // wheel nuts
   if (type === 'modern') for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + 0.3; paintC(cylX(0.09, 0.03, 8, s * 0.43, Math.cos(a) * 0.55, Math.sin(a) * 0.55), dark); }
   if(type==='spoked') for(let i=0;i<6;i++){const a=i/6*Math.PI*2;paintC(T(new THREE.BoxGeometry(0.20,0.52,0.13),0.35,Math.cos(a)*0.48,Math.sin(a)*0.48,a,0,0),col);}
@@ -168,7 +168,7 @@ function sprocketGeometry(paintHex, id = '') {
   }
   add(cylX(0.9, 1.0, 20, 0, 0, 0)); add(cylX(0.4, 1.3, 10, 0, 0, 0)); add(cylX(0.62, 1.1, 18, 0, 0, 0));
   for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; add(cylX(0.05, 1.36, 6, 0, Math.cos(a) * 0.28, Math.sin(a) * 0.28)); }
-  for (let i = 0; i < 13; i++) { const a = (i / 13) * Math.PI * 2; add(T(new THREE.BoxGeometry(0.9, 0.22, 0.2), 0, Math.cos(a) * 0.95, Math.sin(a) * 0.95, a, 0, 0)); }
+  const teeth=({aegis140:14,bastion125:13,harrier105:12,warden130:14,lancer120:13,leviathan160:15,thunderclad155:14,tempest155:13,cerberus135:14,raptor90:11})[id]||13;\n  for (let i = 0; i < teeth; i++) { const a = (i / teeth) * Math.PI * 2; add(T(new THREE.BoxGeometry(0.9, 0.22, 0.2), 0, Math.cos(a) * 0.95, Math.sin(a) * 0.95, a, 0, 0)); }
   return mergeGeometries(parts);
 }
 function convexHull(pts) {
@@ -509,8 +509,8 @@ const EXTRAS = {
 const templates = {};
 // one track link (shoe + grouser + guide horns + pins + optional rubber pad); outer side is -y (see placement)
 function linkGeometry(w, pitch, th, id) {
-  const rubberPad=['sherman','pershing','centurion','leo1','leo2a6','m1a2','chally2','merkava4','type99a'].includes(id);
-  const eastern=['t34','is2','t72','t90m'].includes(id);
+  const rubberPad=['sherman','pershing','centurion','leo1','leo2a6','m1a2','chally2','merkava4','type99a','aegis140','bastion125','harrier105','lancer120','cerberus135','raptor90'].includes(id);
+  const eastern=['t34','is2','t72','t90m','warden130','leviathan160','thunderclad155','tempest155'].includes(id);
   const parts = [];
   const add = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   const steel = new THREE.Color(0x5b5750), dark = new THREE.Color(0x2c2a27), rub = new THREE.Color(0x151514), shiny = new THREE.Color(0x8a857c);
