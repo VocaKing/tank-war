@@ -6,6 +6,7 @@ import { DEG, makeNoise2D, tileField, sampleField } from '../util.js';
 
 import { V3, T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, flipWinding, taper, lathe, superEllipse, castLoft, clean, Parts } from './geom.js';
 import { buildV2 } from './tanksV2.js';
+import { createEraVisuals } from './conceptERA.js';
 import * as K from './kit.js';
 import { gunMount, hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
 export { THREE };
@@ -628,6 +629,8 @@ export function createTankModel(spec, opts = {}) {
   for (const [k, g] of Object.entries(geo.hull)) mk(g, k, body, tpl.paint);
   const turret = new THREE.Group(); turret.position.set(...b.turretPos); body.add(turret);
   for (const [k, g] of Object.entries(geo.turret)) mk(g, k, turret, tpl.paintT);
+  const eraMeshes = createEraVisuals(spec, body, turret);
+  for (const mesh of new Set([...eraMeshes.values()].map(item => item.mesh))) meshes.push(mesh);
   const gun = new THREE.Group(); gun.position.set(...b.gunPos); turret.add(gun);
   for (const [k, g] of Object.entries(geo.gun || {})) mk(g, k, gun, tpl.paintG);
   const barrel = new THREE.Group(); barrel.name='recoiling-barrel'; gun.add(barrel);
@@ -671,7 +674,7 @@ export function createTankModel(spec, opts = {}) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(dc.s, dc.s), new THREE.MeshStandardMaterial({ map: decalTexture(dc.kind, dc.text), transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false }));
     m.position.set(...dc.pos); m.rotation.y = dc.ry; (dc.part === 'hull' ? body : turret).add(m); m.userData.decal = true; meshes.push(m);
   }
-  const model = { root, body, turret, gun, barrel, muzzle, sight, spade, gunClearance:b.gunClearance, gunMountNoCollar:!!b.gunMountNoCollar, roadWheelStationsPerSide:b.wheels.length, roadWheelDiscsPerSide:b.wheels.length * (b.wheelType === 'single' ? 1 : 2), roadWheelDiameter:b.roadWheelDiameter ?? (b.wheels[0]?.r ?? 0) * 2, frontIdlerDiameter:b.frontIdlerDiameter, driveSprocketTeethPerSide:b.driveSprocketTeeth, auxiliaryFuelTanks:b.auxiliaryFuelTanks, headlights:b.headlights, rearDTMountX:b.rearDTMountX, roadWheelStarIndentations:b.roadWheelStarIndentations, turretLeftWallAngleFromVertical:b.turretLeftWallAngleFromVertical, turretRightWallAngleFromVertical:b.turretRightWallAngleFromVertical, trackLinksPerSide:tpl.nLinks, glacisAngleFromVertical:b.glacisAngleFromVertical, idlersPerSide:b.idlers.length, returnRollersPerSide:b.rollers.length, driveSprocketsPerSide:b.sprockets.length, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:spec.artillery?.recoilDistance ?? spec.recoilBrace?.recoilDistance ?? MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
+  const model = { root, body, turret, gun, barrel, muzzle, sight, spade, eraMeshes, gunClearance:b.gunClearance, gunMountNoCollar:!!b.gunMountNoCollar, roadWheelStationsPerSide:b.wheels.length, roadWheelDiscsPerSide:b.wheels.length * (b.wheelType === 'single' ? 1 : 2), roadWheelDiameter:b.roadWheelDiameter ?? (b.wheels[0]?.r ?? 0) * 2, frontIdlerDiameter:b.frontIdlerDiameter, driveSprocketTeethPerSide:b.driveSprocketTeeth, auxiliaryFuelTanks:b.auxiliaryFuelTanks, headlights:b.headlights, rearDTMountX:b.rearDTMountX, roadWheelStarIndentations:b.roadWheelStarIndentations, turretLeftWallAngleFromVertical:b.turretLeftWallAngleFromVertical, turretRightWallAngleFromVertical:b.turretRightWallAngleFromVertical, trackLinksPerSide:tpl.nLinks, glacisAngleFromVertical:b.glacisAngleFromVertical, idlersPerSide:b.idlers.length, returnRollersPerSide:b.rollers.length, driveSprocketsPerSide:b.sprockets.length, muzzleInfo:b.muzzleInfo, gunPitchFloor:(yaw,min,max)=>hullPitchFloor(b,yaw,min,max), maxRecoil:spec.artillery?.recoilDistance ?? spec.recoilBrace?.recoilDistance ?? MAX_RECOIL, tracks, trackTex, links, linksOn: false, loop: tpl.track.loop, loopLen: tpl.track.length, nLinks: tpl.nLinks, pitch: tpl.pitch, wheelGeo: tpl.wheelGeo, wheelGeoLo: tpl.wheelGeoLo, wheels, sprockets, wheelList: wl, sprocketList: sl, meshes, trackLength: tpl.track.length, spin: 0, trackOffset: [0, 0] };
   updateRunningGear(model, 0, 0);
   if (opts.links) setTrackLOD(model, true);
   return model;
