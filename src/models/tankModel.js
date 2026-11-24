@@ -606,10 +606,13 @@ function refineRoofDetails(P, spec) {
 function getTemplate(spec) {
   if (templates[spec.id]) return templates[spec.id];
   const d = spec.dims;
-  const expansion = hasExpansionModel(spec.id);
-  const specialist = spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious;
-  const builder = expansion ? buildExpansionFallback : specialist ? buildSpecialist : BUILDERS[spec.id] || buildV2;
-  const b = builder(d, spec);
+  // Vehicles awaiting bespoke modelling reuse a known in-game hull/turret as a temporary visual stand-in.
+  // Their gameplay specifications and dimensions remain independent of the placeholder model.
+  const visualSpec = spec.modelBaseId ? { ...spec, id: spec.modelBaseId } : spec;
+  const expansion = hasExpansionModel(visualSpec.id);
+  const specialist = !spec.modelBaseId && (spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious);
+  const builder = expansion ? buildExpansionFallback : specialist ? buildSpecialist : BUILDERS[visualSpec.id] || buildV2;
+  const b = builder(d, visualSpec);
   if (!expansion) {
     if (EXTRAS[spec.id]) EXTRAS[spec.id](b.P, d, b);
     finishDetails(b.P, d, b, spec);
