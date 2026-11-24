@@ -11,7 +11,7 @@ Browser 3D tank battle (Three.js r170 + Vite). 27 vehicles in 4 tiers, 3 real-sc
 - Armour Expansion vehicle IDs are `jagdpanther`, `su100`, `isu122`, `jagdtiger`, `amxfoch`, `atlas`, `basilisk`, and `pzh2000`.
   The five tank destroyers use hull aim. The howitzer uses direct fire. The garage and battle load the detailed assets from `public/models/armour-expansion/` when needed.
 - Vehicle physics: Rapier 3D steps the rigid bodies at 120 Hz. Suspension contacts supply track traction and steering. Vehicle inertia, terrain, buildings, rocks, bridges, and hull collisions use the same simulation. Regression checks: `node tools_ground_physics.mjs`.
-- Release WASD or the touch joystick to brake automatically. Braking force builds as the vehicle slows, up to the grip available at the tracks.
+- Release WASD or the touch joystick to brake automatically. Ground braking builds over a short interval and scales with vehicle mass, with a cap for super-heavy vehicles. The current speed, slope and track contact determine how far the vehicle travels before stopping.
 - Aiming: Shift / right click = sniper; wheel = zoom ×2/4/8/16; X = armor-penetration view (sniper only, default on);
   E = lock gun on the target under the crosshair. Reticle = predicted ballistic impact; circle = current dispersion.
 - QA tools: tools_qa.mjs (every map × tank, armor view, matchmaking, console errors), tools_ballistic.mjs (reticle vs impact

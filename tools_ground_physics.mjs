@@ -19,11 +19,11 @@ function makeWorld(height, colliders = [], decks = [], deckHeight = () => -Infin
   const groundHeight = (x, z) => Math.max(terrain.height(x, z), deckHeight(x, z));
   const physics = new BattlefieldPhysics(engine, { terrain, playHalf: 100, colliders, decks,
     veg: { rocks: [] }, groundHeight });
-  function spawn(z, speed, x = 0) {
+  function spawn(z, speed, x = 0, mass = spec.mass) {
     const pitch = -Math.atan((groundHeight(x, z + 1) - groundHeight(x, z - 1)) / 2);
     const roll = Math.atan((groundHeight(x + 1, z) - groundHeight(x - 1, z)) / 2);
     const tank = {
-      spec, pos: new THREE.Vector3(x, groundHeight(x, z) + 0.01, z),
+      spec: { ...spec, mass }, pos: new THREE.Vector3(x, groundHeight(x, z) + 0.01, z),
       quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, 0, roll, 'YXZ')),
       vel: new THREE.Vector3(), input: { throttle: 0, steer: 0 }, alive: true,
       modules: { engine: 1, tracks: 1 }, equip: { active: () => false, factor: 1 }, crewAlive: () => true,
@@ -60,25 +60,30 @@ for (const steer of [-0.6, 0.6]) {
   assert.deepEqual(path[0], path[2]);
 }
 
-for (const [grade, speed] of [[0, 10], [0, -6], [0.34, 10]]) {
+function brakeFrom(grade, speed, mass = 33.7) {
   const { physics, spawn } = makeWorld((_, z) => -grade * z);
-  const tank = spawn(-22, speed);
+  const tank = spawn(-22, speed, 0, mass);
   tank.input.driveHeld = true;
   physics.advance(0.1);
   assert.equal(tank.vehicle.autoBrake, 0, 'a held direction control does not engage the automatic brake');
 
   const start = tank.pos.clone(), initialSpeed = Math.abs(tank.speed);
   tank.input.driveHeld = false;
-  physics.advance(0.1);
+  physics.advance(1 / 30);
   assert.ok(tank.vehicle.autoBrake > 0 && tank.vehicle.autoBrake < 1);
-  assert.ok(Math.abs(tank.speed) > initialSpeed * 0.9 && tank.pos.distanceTo(start) > 0.3,
+  assert.ok(Math.abs(tank.speed) > initialSpeed * 0.9 && tank.pos.distanceTo(start) > 0.1,
     'the hull carries momentum just after the controls are released');
-  physics.advance(0.9);
-  assert.ok(Math.abs(tank.speed) > 0.5 && Math.abs(tank.speed) < initialSpeed - 2,
+  physics.advance(0.075 - 1 / 30);
+  const engagedSpeed = Math.abs(tank.speed);
+  const interval = 0.075;
+  physics.advance(interval);
+  const remainingSpeed = Math.abs(tank.speed);
+  assert.ok(remainingSpeed > 0.5 && remainingSpeed < engagedSpeed,
     'the brake slows the hull before it comes to rest');
-  physics.advance(2.4);
+  physics.advance(1.5);
   const distance = tank.pos.distanceTo(start), stopped = tank.pos.clone();
-  assert.ok(Math.abs(tank.speed) < 0.05 && distance > 1 && distance < 18, { grade, speed, distance, finalSpeed: tank.speed });
+  assert.ok(Math.abs(tank.speed) < 0.05 && distance > 0.3, { grade, speed, distance, finalSpeed: tank.speed });
+  assert.equal(Math.sign(tank.pos.z - start.z), Math.sign(speed));
   physics.advance(1.5);
   assert.ok(tank.pos.distanceTo(stopped) < 0.08, 'the stopped tank holds its position');
 
@@ -88,6 +93,18 @@ for (const [grade, speed] of [[0, 10], [0, -6], [0.34, 10]]) {
   assert.equal(tank.vehicle.autoBrake, 0);
   assert.ok(tank.speed > 0.8, 'new drive input releases the automatic brake');
   physics.free();
+  return { distance, deceleration: (engagedSpeed - remainingSpeed) / interval };
+}
+
+const shermanBrake = brakeFrom(0, 10.7);
+assert.ok(shermanBrake.distance >= 2 && shermanBrake.distance <= 3, shermanBrake.distance);
+assert.ok(brakeFrom(0, 5.5).distance < shermanBrake.distance / 2);
+assert.ok(brakeFrom(0, 15.5).distance > shermanBrake.distance * 1.8);
+assert.ok(brakeFrom(0, -6).distance < 1.2);
+assert.ok(brakeFrom(0.34, 10.7).distance < 3.5);
+for (const [mass, factor] of [[18, 18 / 33.7], [66, 66 / 33.7], [188, 2.5]]) {
+  const sample = brakeFrom(0, 10.7, mass);
+  assert.ok(Math.abs(sample.deceleration / shermanBrake.deceleration - factor) < 0.04, { mass, sample });
 }
 
 for (const roll of [Math.PI / 2, Math.PI]) {

@@ -13,8 +13,10 @@ const SPRING_FREQUENCY = 9;
 const SPRING_REST = ANCHOR_HEIGHT + GRAVITY / (SPRING_FREQUENCY ** 2);
 const REBOUND_TRAVEL = 0.105;
 const RECOVERY_DELAY = 0.4;
-const AUTO_BRAKE_BUILDUP = 0.28;
-const AUTO_BRAKE_DECELERATION = 4.4;
+const OFF_ROAD_GRIP = 0.82;
+const AUTO_BRAKE_BUILDUP = 0.075;
+const AUTO_BRAKE_REFERENCE_MASS = 33700; // Standard Sherman's mass in kg.
+const AUTO_BRAKE_DECELERATION = 25;
 // Five suspension stations per track, with the end stations close to its idlers.
 const STATIONS = [-0.42, -0.21, 0, 0.21, 0.42];
 const WHEEL_COUNT = STATIONS.length * 2;
@@ -352,7 +354,7 @@ export class BattlefieldPhysics {
     const fullSpeed = s.maxSpeed / 3.6, water = clamp(1 - Math.max(0, waterDepth) * 0.38, 0.2, 1);
     const i = T.x2i(tank.pos.x), j = T.x2i(tank.pos.z);
     const road = T.inside(i, j) ? T.road[T.idx(i, j)] : 0;
-    const grip = 0.82 + road * 0.21;
+    const grip = OFF_ROAD_GRIP + road * 0.21;
     const overdrive = tank.equip.active('overdrive'), loadFactor = tank.equip.factor;
     const engine = tank.modules.engine < 1 ? 0.5 : 1;
     const reverse = rearDriving ? s.rearDriver.maxSpeed : s.reverseSpeed;
@@ -385,8 +387,10 @@ export class BattlefieldPhysics {
     const coastBrake = holding ? 6 : 0.75 + Math.abs(longitudinal) * 0.07;
     // Counter downhill acceleration as the brakes engage, subject to the contact patch's grip.
     const downhillAcceleration = Math.max(0, Math.sign(longitudinal) * gradeAcceleration);
-    const autoBrakeLimit = Math.max(coastBrake, AUTO_BRAKE_DECELERATION + downhillAcceleration);
-    const neutralBrake = floating ? coastBrake : lerp(coastBrake, autoBrakeLimit, vehicle.autoBrake);
+    const massScale = clamp(mass / AUTO_BRAKE_REFERENCE_MASS, 0.33, 2.5);
+    const autoBrake = mobile && !floating ? vehicle.autoBrake : 0;
+    const autoBrakeLimit = Math.max(coastBrake, AUTO_BRAKE_DECELERATION * massScale + downhillAcceleration);
+    const neutralBrake = lerp(coastBrake, autoBrakeLimit, autoBrake);
     const driveBrake = throttle * longitudinal < 0 ? 5 : 3.2;
     const brake = input.brake || !mobile ? 7 : (throttle ? driveBrake : neutralBrake);
     const speedError = throttle * speedLimit + pivotSpeed - longitudinal;
@@ -396,8 +400,11 @@ export class BattlefieldPhysics {
     const drive = clamp(speedError / dt + parkAssist, -acceleration, acceleration) * mass * dt;
     const lateral = (-sideways / 0.075 + GRAVITY * _side.y) * mass * dt;
     const maxTraction = load * grip;
-    _scrub.copy(_tangent).multiplyScalar(drive).addScaledVector(_side, lateral);
-    _scrub.clampLength(0, maxTraction);
+    // The tuned brake can use extra track grip along the hull's travel axis.
+    const brakeGrip = autoBrake > 0 ? Math.max(1, neutralBrake / (GRAVITY * OFF_ROAD_GRIP)) : 1;
+    const demand = Math.hypot(drive / brakeGrip, lateral);
+    const gripScale = demand > maxTraction ? maxTraction / demand : 1;
+    _scrub.copy(_tangent).multiplyScalar(drive * gripScale).addScaledVector(_side, lateral * gripScale);
     body.applyImpulse(_scrub, true);
 
     const angularSpeed = _angular.dot(_normal);
