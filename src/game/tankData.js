@@ -1,3 +1,4 @@
+import { CONCEPT_VEHICLES } from './conceptVehicles.js';
 import publishedBalance from './balanceDefaults.json';
 import { clone, effective, loadLocal, EMPTY } from './balanceConfig.js';
 // Tank specifications. Figures are grounded in published real-world data
@@ -555,7 +556,9 @@ export const TANKS = [
     systemTag: 'THREE ARMOUR KITS · AIR-MOBILE',
     desc: 'Air-transportable light tank with three removable armour packages. Select the light airborne fit or trade mobility for stronger add-on protection.',
   }
-];
+]; 
+// Preserve all existing real-world and specialist entries; append the separate fictional roster.
+TANKS.push(...CONCEPT_VEHICLES);
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // ---- v3 ammunition balance & loadouts ----
 // Each tank carries a fixed number of rounds (its real stowage capacity = sum of the historical default load).
