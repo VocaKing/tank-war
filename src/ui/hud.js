@@ -24,12 +24,12 @@ export class HUD {
       <div class="panel items" id="h-items"></div>
       <div class="panel ammo" id="h-ammo"></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>G vehicle ability · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>G vehicle ability · 4/5/6 equipment (R repair · F extinguisher) · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · G scan/ability · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
     this.$ = (id) => this.root.querySelector('#' + id);
-    this.mini = this.$('h-mini').getContext('2d'); this.markerPool = []; this.msgTimer = 0; this.feed = [];
+    this.mini = this.$('h-mini').getContext('2d'); this.markerPool = []; this.markerStates = new WeakMap(); this.msgTimer = 0; this.feed = [];
     this.$('h-resume').onclick = () => game.setPaused(false);
     const aa = this.$('h-aa'); const aaTxt = () => { aa.textContent = 'Aim assist: ' + (game.assist.enabled ? 'ON' : 'OFF'); }; aaTxt();
     aa.onclick = () => { game.assist.setEnabled(!game.assist.enabled); try { localStorage.setItem('tw_aa', game.assist.enabled ? '1' : '0'); } catch (e) { /* private mode */ } aaTxt(); }; this.$('h-quit').onclick = () => game.exit();
@@ -89,26 +89,77 @@ export class HUD {
     if (src) { this.dmgSrc = src.pos.clone(); this.dmgT = 2.5; }
     this.$('h-veh').classList.add('flash'); setTimeout(() => this.$('h-veh').classList.remove('flash'), 300);
   }
+  recordEnemyDamage(tank, amount, showNumber = true) {
+    if (!tank || !Number.isFinite(amount) || amount <= 0 || tank.team === this.g.player.team) return;
+    let state = this.markerStates.get(tank);
+    if (!state) {
+      state = { displayHp: Math.min(tank.maxHp, tank.hp + amount), pendingDamage: 0, tickElapsed: 0, damageTotal: 0, damageTimer: 0, flashTimer: 0 };
+      this.markerStates.set(tank, state);
+    }
+    if (state.pendingDamage <= 0) state.tickElapsed = 0;
+    state.pendingDamage += amount; state.flashTimer = Math.max(state.flashTimer, 0.2);
+    if (showNumber) { state.damageTotal = state.damageTimer > 0 ? state.damageTotal + amount : amount; state.damageTimer = 2; }
+  }
   kill(attacker, victim, cause) {
     const c = (t) => (t ? `<span class="${t.team === this.g.player.team ? 'a' : 'e'}">${t.name} <small>${t.spec.short}</small></span>` : '?');
     const f = el('div', 'kf', `${c(attacker)} <b>${cause === 'ammo' ? '💥' : '✖'}</b> ${c(victim)}`); this.$('h-feed').prepend(f); setTimeout(() => f.remove(), 12000);
     if (attacker && attacker.isPlayer) this.message('ENEMY DESTROYED', '#ffd34d', true);
     if (victim.isPlayer) this.message('YOU WERE DESTROYED — spectating allies (Esc for menu)', '#ff6050', true);
   }
-  updateMarkers(camera) {
+  updateMarkers(camera, dt = 0) {
     const G = this.g; const W = innerWidth, H = innerHeight; let n = 0; const v = new THREE.Vector3();
+    // Animate enemy HP independently of marker visibility: no more than 200 HP per 0.1 s.
+    for (const t of G.tanks) {
+      if (t.team === G.player.team) continue;
+      let state = this.markerStates.get(t);
+      if (!state) { state = { displayHp: t.hp, pendingDamage: 0, tickElapsed: 0, damageTotal: 0, damageTimer: 0, flashTimer: 0 }; this.markerStates.set(t, state); }
+      state.damageTimer = Math.max(0, state.damageTimer - dt);
+      if (state.damageTimer <= 0) state.damageTotal = 0;
+      state.flashTimer = Math.max(0, state.flashTimer - dt);
+      if (state.displayHp < t.hp) state.displayHp = t.hp;
+      if (state.pendingDamage > 0) {
+        state.tickElapsed += dt;
+        while (state.tickElapsed + 1e-9 >= 0.1 && state.pendingDamage > 1e-6) {
+          const available = Math.max(0, state.displayHp - t.hp);
+          const step = Math.min(200, state.pendingDamage, available);
+          state.displayHp = Math.max(t.hp, state.displayHp - step);
+          state.pendingDamage = Math.max(0, state.pendingDamage - step);
+          state.tickElapsed -= 0.1;
+          if (step > 0) state.flashTimer = Math.max(state.flashTimer, 0.14);
+        }
+        if (state.pendingDamage <= 1e-6 || state.displayHp <= t.hp + 1e-6) {
+          state.displayHp = t.hp; state.pendingDamage = 0; state.tickElapsed = 0;
+        }
+      }
+    }
     for (const t of G.tanks) {
       if (t === G.player && t.alive) continue; if (!t.alive) continue;
       const ally = t.team === G.player.team; if (!ally && !t.spotted[G.player.team]) continue;
       v.copy(t.pos); v.y += t.spec.dims.hullH + t.spec.dims.turretH + 1.6; const d = camera.position.distanceTo(v); if (ally && d > 500) continue;
-      v.project(camera); if (v.z > 1 || v.z < -1) continue; const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * H; if (sx < -50 || sx > W + 50 || sy < -50 || sy > H + 50) continue;
-      let m = this.markerPool[n]; if (!m) { m = el('div', 'mk', '<div class="nm"></div><div class="rl"><i></i></div><div class="hp"><i></i></div><div class="ar">▼</div>'); this.$('h-markers').appendChild(m); this.markerPool.push(m); }
-      m.style.display = 'block'; m.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`; m.className = 'mk ' + (ally ? 'a' : 'e');
-      m.children[0].textContent = `${t.spec.short}${d < 700 ? ' · ' + Math.round(d) + 'm' : ''}`;
-      const rl = m.children[1];
-      if (ally && t.alive && t.reloadLeft > 0) { rl.style.display = 'block'; rl.firstChild.style.width = ((1 - t.reloadLeft / t.reloadTime()) * 100) + '%'; }
-      else rl.style.display = 'none';
-      m.children[2].firstChild.style.width = (t.hp / t.maxHp * 100) + '%'; n++;
+      v.project(camera); if (v.z > 1 || v.z < -1) continue; const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * H; if (sx < -70 || sx > W + 70 || sy < -50 || sy > H + 50) continue;
+      let m = this.markerPool[n];
+      if (!m) {
+        m = el('div', 'mk', '<div class="nm"></div><div class="hp-meta"></div><div class="hp-row"><div class="hp"><i></i></div><div class="damage"></div></div><div class="rl"><i></i></div><div class="ar">▼</div>');
+        m._parts = { name:m.querySelector('.nm'), hpMeta:m.querySelector('.hp-meta'), hpRow:m.querySelector('.hp-row'),
+          hpFill:m.querySelector('.hp i'), damage:m.querySelector('.damage'), reload:m.querySelector('.rl'), reloadFill:m.querySelector('.rl i') };
+        this.$('h-markers').appendChild(m); this.markerPool.push(m);
+      }
+      const state = ally ? null : this.markerStates.get(t);
+      m.style.display = 'block'; m.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
+      m.className = 'mk ' + (ally ? 'a' : 'e') + (!ally && state.flashTimer > 0 ? ' hit' : '');
+      const p = m._parts; p.name.textContent = `${t.spec.short}${d < 700 ? ' · ' + Math.round(d) + 'm' : ''}`;
+      if (ally) {
+        p.hpMeta.style.display = 'none'; p.damage.textContent = ''; p.hpRow.style.width = '56px';
+        p.hpFill.style.width = (t.hp / t.maxHp * 100) + '%';
+        if (t.reloadLeft > 0) { p.reload.style.display = 'block'; p.reloadFill.style.width = ((1 - t.reloadLeft / t.reloadTime()) * 100) + '%'; }
+        else p.reload.style.display = 'none';
+      } else {
+        p.hpMeta.style.display = 'block'; p.hpMeta.textContent = `HP ${Math.ceil(t.hp).toLocaleString('en-US')} / ${Math.round(t.maxHp).toLocaleString('en-US')}`;
+        p.hpRow.style.width = '132px'; p.hpFill.style.width = (state.displayHp / t.maxHp * 100) + '%';
+        p.damage.textContent = state.damageTimer > 0 ? '−' + Math.round(state.damageTotal).toLocaleString('en-US') : '';
+        p.reload.style.display = 'none';
+      }
+      n++;
     }
     for (let i = n; i < this.markerPool.length; i++) this.markerPool[i].style.display = 'none';
   }
@@ -128,11 +179,14 @@ export class HUD {
       ? `推土铲 · ${ability.dozerActive ? '施工 ' + Math.min(100, Math.floor(100 * ability.dozerTravel / s.dozer.travel)) + '%' :
         ability.dozerCooldown > 0 ? '冷却 ' + Math.ceil(ability.dozerCooldown) + 's' : '按 G 或点技能键'} · 剩 ${ability.dozerCharges} 次`
       : '';
-    const movementStatus = p.afloat ? '浮航 · 主炮锁定' : dozerStatus;
-    const trackStatus = p.trackRepairs.map((time, i) => time > 0 ? `${i === 0 ? 'L' : 'R'} ${Math.ceil(time)}s` : '').filter(Boolean).join(' · ');
+    const mobilityStatus = p.trackRepairs.map((time, i) => time > 0 ? `${i === 0 ? 'L' : 'R'} ${Math.ceil(time)}s` : '').filter(Boolean).join(' · ');
+    const specialStatus = p.usesSpade?.() ? `驻锄 · ${p.spadeState}` : s.artillery?.autoDeploy ? `自动部署 · ${p.autoArtilleryState}` : '';
+    const kitStatus = s.armorPackages ? `装甲套件 · ${s.armorPackages[p.armorPackageIndex]?.name || '基础'}` : '';
+    const movementStatus = p.afloat ? '浮航 · 主炮锁定' : [dozerStatus, specialStatus, kitStatus].filter(Boolean).join(' · ');
+    const trackStatus = mobilityStatus;
     this.$('h-veh').innerHTML = `<div class="vn">${s.short} <small>${s.nation} · ${s.era}</small></div>
       <div class="hpwrap"><div class="hpbar"><i style="width:${p.hp / p.maxHp * 100}%"></i><span>${Math.ceil(p.hp)} / ${p.maxHp}</span></div>${(p.abilities && p.abilities.magazine) ? `<div class="magfan" title="magazine">${Array.from({length: p.abilities.magazine.size}, (_, i) => `<i class="${i < p.abilities.magLeft ? 'on' : ''}"></i>`).join('')}</div>` : ''}</div>
-      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod('tracks', trackStatus || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
+      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       ${movementStatus ? `<div class="crew"><span>${movementStatus}</span></div>` : ''}
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`;
@@ -160,7 +214,7 @@ export class HUD {
     // damage direction
     const dd = this.$('h-dmgdir'); if (this.dmgT > 0 && this.dmgSrc) { this.dmgT -= dt; const ang = Math.atan2(this.dmgSrc.x - p.pos.x, this.dmgSrc.z - p.pos.z) - G.cam.yaw; dd.style.display = 'block'; dd.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`; dd.style.opacity = Math.min(1, this.dmgT); } else dd.style.display = 'none';
     this.miniT -= dt; if (this.miniT <= 0) { this.miniT = 0.15; this.drawMini(); }
-    this.updateMarkers(camera);
+    this.updateMarkers(camera, dt);
     this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; this.$('h-zoom').textContent = '×' + G.cam.zoom + '  ·  ' + G.camera.fov.toFixed(1) + '°';
     // aim-assist lock marker (just under the crosshair centre)
     const A = G.assist; const ah = this.$('h-assist'); let aTxt = '', aCls = 'assist';
