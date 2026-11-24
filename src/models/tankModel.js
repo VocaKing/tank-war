@@ -610,7 +610,7 @@ function getTemplate(spec) {
   // Their gameplay specifications and dimensions remain independent of the placeholder model.
   const visualSpec = spec.modelBaseId ? { ...spec, id: spec.modelBaseId } : spec;
   const expansion = hasExpansionModel(visualSpec.id);
-  const specialist = !spec.modelBaseId && (spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious);
+  const specialist = !spec.modelBaseId && (spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious || spec.conceptFleet);
   const builder = expansion ? buildExpansionFallback : specialist ? buildSpecialist : BUILDERS[visualSpec.id] || buildV2;
   const b = builder(d, visualSpec);
   if (!expansion) {
