@@ -6,6 +6,7 @@ import { GRAVITY } from './tank.js';
 import { clamp } from '../util.js';
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _blastLocal = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
 // Water never makes a tank immune: a shell that enters water keeps flying and loses penetration per metre of water
 // it travels through (kinetic rounds −12 %/m, HEAT jets −30 %/m), down to a floor of 35 % / 25 %.
 export function waterPenFactor(type, metres) { return type.heat ? Math.max(0.25, 1 - 0.3 * metres) : Math.max(0.35, 1 - 0.12 * metres); }
@@ -67,13 +68,32 @@ export class Ballistics {
       }
     }
   }
+  artilleryImpact(s, p, surface, normal) {
+    const g = this.game;
+    if (surface === 'ground') normal = g.world.terrain.normal(p.x, p.z);
+    else if (surface === 'water') normal = UP;
+    else if (!normal) normal = s.vel.clone().normalize().negate();
+    g.effects.artilleryImpact(p, normal, surface);
+    g.audio.impact(p, 'explosion');
+  }
   // returns true if the shell is consumed
   onImpact(s, kind, p, tank, hit) {
     const g = this.game; const he = !!s.type.he; g.lastImpact = { kind, p: p.clone(), owner: s.owner, tank: tank || null };
-    if (kind === 'ground') { g.effects.impactGround(p, s.spec.caliber, he); g.audio.impact(p, he ? 'explosion' : 'ground'); if (he && !s.noDamage) this.heBlast(s, p); return true; }
-    if (kind === 'structure') { g.effects.impactStructure(p); g.audio.impact(p, he ? 'explosion' : 'ground'); if (he && !s.noDamage) this.heBlast(s, p); return true; }
+    const artillery = s.owner?.spec?.cls === 'Artillery' && !s.noDamage;
+    if (kind === 'ground' || kind === 'structure') {
+      if (artillery) this.artilleryImpact(s, p, kind);
+      else {
+        if (kind === 'ground') g.effects.impactGround(p, s.spec.caliber, he);
+        else g.effects.impactStructure(p);
+        g.audio.impact(p, he ? 'explosion' : 'ground');
+      }
+      if (he && !s.noDamage) this.heBlast(s, p);
+      return true;
+    }
     if (kind === 'water') {
-      g.effects.impactWater(p); g.audio.impact(p, 'ground');
+      g.effects.impactWater(p);
+      if (artillery && he) this.artilleryImpact(s, p, kind);
+      else g.audio.impact(p, 'ground');
       if (he) { if (!s.noDamage) this.heBlast(s, p); return true; } // HE bursts on the surface (still splashes a tank in the water)
       s.wet = true; s.waterDist = 0; s.wl = p.y; s.vel.multiplyScalar(0.8); s.pos.copy(p); s.pos.y -= 0.02; return false;
     }
@@ -83,19 +103,22 @@ export class Ballistics {
     const shooter = s.owner; const toPlayer = tank.isPlayer, fromPlayer = shooter && shooter.isPlayer;
     if (s.noDamage) { g.effects.sparks(p, 12); return true; }
     if (shooter && tank.alive && shooter.team !== tank.team) shooter.stats.hits++;
-    const dirN = s.vel.clone().normalize();
-    if (!tank.alive) { g.effects.sparks(p, 20); g.audio.impact(p, 'metal'); return true; }
-    if (ev.ricochet && s.ricochets < 1) {
+    if (tank.alive && ev.ricochet && s.ricochets < 1) {
       const n = ev.normalW; const v = s.vel; v.addScaledVector(n, -2 * v.dot(n)).multiplyScalar(0.55); s.pos.copy(p).addScaledVector(n, 0.08); s.ricochets++; s.noDamage = true; s.life = Math.max(s.life, 6.5);
       g.effects.sparks(p, 30, [1, 0.85, 0.5], v.clone().normalize()); g.audio.impact(p, 'ricochet');
       if (fromPlayer) g.hud.hitMarker('ricochet'); if (toPlayer) g.hud.damageFrom(shooter, 0, 'Ricochet');
       return false;
     }
+    if (artillery) this.artilleryImpact(s, p, kind, ev.normalW);
+    if (!tank.alive) {
+      if (!artillery) { g.effects.sparks(p, 20); g.audio.impact(p, 'metal'); }
+      return true;
+    }
     const roll = ev.pen * g.rng.range(1 - PEN_RNG, 1 + PEN_RNG);
     g.lastTankHit = { pen: ev.pen, eff: ev.eff, waterF: ev.waterF || 1, waterDist: s.waterDist || 0, penetrated: roll >= ev.eff, tank };
     if (roll >= ev.eff) {
       const mult = s.type.he ? 1.0 : 1.0; const dmg = s.spec.damage * mult * g.rng.range(0.85, 1.15);
-      g.effects.penetration(p); g.audio.impact(p, 'metal');
+      if (!artillery) { g.effects.penetration(p); g.audio.impact(p, 'metal'); }
       const msgs = tank.applyPenetration(hit, s.spec, shooter, dmg, ev.tracks);
       if (shooter && shooter.team !== tank.team) shooter.stats.pens++;
       if (fromPlayer) g.hud.hitMarker('pen', Math.round(dmg), msgs, tank); if (toPlayer) g.hud.damageFrom(shooter, Math.round(dmg), msgs.join(', '));
@@ -103,9 +126,10 @@ export class Ballistics {
       return true;
     }
     // non-penetration
-    g.effects.sparks(p, 22); g.audio.impact(p, 'metal');
+    if (!artillery) { g.effects.sparks(p, 22); g.audio.impact(p, 'metal'); }
     let dmg = 0;
-    if (he) { dmg = s.spec.damage * 0.45 * clamp(1 - ev.eff / (s.spec.caliber * 1.2), 0, 1); if (dmg > 1) tank.damage(dmg, shooter, 'he'); g.effects.impactGround(p, s.spec.caliber, true);
+    if (he) { dmg = s.spec.damage * 0.45 * clamp(1 - ev.eff / (s.spec.caliber * 1.2), 0, 1); if (dmg > 1) tank.damage(dmg, shooter, 'he');
+      if (!artillery) g.effects.impactGround(p, s.spec.caliber, true);
       // HE/HESH blast wrecks external modules even without penetrating
       if (tank.alive && g.rng.next() < 0.4) { const m = ['gun', 'turret', 'engine'][Math.floor(g.rng.next() * 3)]; if (tank.modules[m] === 1) { tank.modules[m] = 0.5; if (toPlayer) g.hud.message(m[0].toUpperCase() + m.slice(1) + ' damaged by HE blast', '#ffb060'); } } }
     if (tank.alive && ev.tracks && g.rng.next() < 0.45) {

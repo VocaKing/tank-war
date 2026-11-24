@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { softSprite } from '../world/textures.js';
 
+const UP = new THREE.Vector3(0, 1, 0);
 const VS = `
 attribute float aSize; attribute vec4 aColor; attribute float aRot;
 varying vec4 vColor; varying float vRot; uniform float uScale;
@@ -93,6 +94,58 @@ export class Effects {
   }
   impactWater(pos) { for (let i = 0; i < 40; i++) this.smoke.emit({ x: pos.x + (Math.random() - 0.5), y: pos.y, z: pos.z + (Math.random() - 0.5), vx: (Math.random() - 0.5) * 3, vy: 6 + Math.random() * 10, vz: (Math.random() - 0.5) * 3, life: 1.5, s0: 0.6, s1: 2.5, r: 0.9, g: 0.94, b: 0.97, a: 0.8, drag: 0.6, grav: 9 }); }
   impactStructure(pos) { this.impactGround(pos, 80); for (let i = 0; i < 20; i++) this.smoke.emit({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 8, vy: Math.random() * 6, vz: (Math.random() - 0.5) * 8, life: 3, s0: 1.5, s1: 5, r: 0.75, g: 0.72, b: 0.66, a: 0.5, drag: 0.3 }); }
+  artilleryImpact(pos, normal, surface) {
+    const water = surface === 'water';
+    const spread = new THREE.Quaternion().setFromUnitVectors(UP, normal);
+    const origin = pos.clone().addScaledVector(normal, 0.65);
+    const { x, y, z } = origin;
+    const v = new THREE.Vector3();
+
+    this.flash(origin, 480, 0.2, 0xffad64);
+    this.fire.emit({ x, y, z, life: 0.18, s0: 3.4, s1: 6.8, r: 1, g: 0.9, b: 0.63, a: 1, fadeIn: 0 });
+    for (let i = 0; i < (water ? 12 : 24); i++) {
+      v.set(Math.random() - 0.5, 0.16 + Math.random() * 0.64, Math.random() - 0.5)
+        .normalize().multiplyScalar(5 + Math.random() * 9).applyQuaternion(spread);
+      this.fire.emit({
+        x, y, z, vx: v.x, vy: v.y + 1.1, vz: v.z, life: 0.26 + Math.random() * 0.27,
+        s0: 1.5 + Math.random(), s1: 4 + Math.random() * 2.5,
+        r: 1, g: 0.52 + Math.random() * 0.22, b: 0.19, r1: 0.65, g1: 0.16, b1: 0.03,
+        a: 0.64, drag: 0.15, fadeIn: 0.02,
+      });
+    }
+
+    if (surface === 'ground' || surface === 'structure') {
+      const [r, g, b] = surface === 'ground' ? this.dust : [0.66, 0.62, 0.56];
+      for (let i = 0; i < 22; i++) {
+        const angle = Math.PI * 2 * (i + Math.random()) / 22;
+        const speed = 5 + Math.random() * 8;
+        v.set(Math.cos(angle) * speed, 1.5 + Math.random() * 4, Math.sin(angle) * speed).applyQuaternion(spread);
+        this.smoke.emit({
+          x, y, z, vx: v.x, vy: v.y, vz: v.z, life: 1.6 + Math.random() * 1.1,
+          s0: 1.3, s1: 6.2, r, g, b, a: 0.54, drag: 0.12, fadeIn: 0.13,
+        });
+      }
+    }
+
+    const [r, g, b] = water ? [0.73, 0.79, 0.83] : [0.15, 0.13, 0.12];
+    for (let i = 0; i < 20; i++) {
+      v.set((Math.random() - 0.5) * 9, Math.random() * 6, (Math.random() - 0.5) * 9).applyQuaternion(spread);
+      this.smoke.emit({
+        x, y, z, vx: v.x, vy: v.y + 2.8, vz: v.z, life: (water ? 1.3 : 2.5) + Math.random() * 1.4,
+        s0: 1, s1: 5 + Math.random() * 3, r, g, b, a: 0.64, drag: 0.33, grav: -0.35, fadeIn: 0.16,
+      });
+    }
+    if (!water) {
+      for (let i = 0; i < 16; i++) {
+        v.set(Math.random() - 0.5, 0.1 + Math.random() * 0.55, Math.random() - 0.5)
+          .normalize().multiplyScalar(10 + Math.random() * 21).applyQuaternion(spread);
+        this.fire.emit({
+          x, y, z, vx: v.x, vy: v.y, vz: v.z, life: 0.23 + Math.random() * 0.4,
+          s0: 0.24, s1: 0.1, r: 1, g: 0.68, b: 0.27, a: 1, drag: 0.38, grav: 10,
+        });
+      }
+    }
+  }
   sparks(pos, n = 30, color = [1, 0.8, 0.4], dir) {
     for (let i = 0; i < n; i++) { const v = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.3, Math.random() - 0.5).normalize().multiplyScalar(8 + Math.random() * 18); if (dir) v.addScaledVector(dir, 12);
       this.fire.emit({ x: pos.x, y: pos.y, z: pos.z, vx: v.x, vy: v.y, vz: v.z, life: 0.25 + Math.random() * 0.35, s0: 0.25, s1: 0.1, r: color[0], g: color[1], b: color[2], a: 1, drag: 0.3, grav: 9.8 }); }

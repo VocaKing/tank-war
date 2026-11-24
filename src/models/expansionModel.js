@@ -128,7 +128,8 @@ export function loadExpansionModel(spec) {
       import('three/addons/loaders/GLTFLoader.js'),
       import('three/addons/libs/meshopt_decoder.module.js'),
     ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
-      const url = import.meta.env.BASE_URL + `models/armour-expansion/${id}.glb`;
+      const base = import.meta.env.VITE_EXPANSION_MODELS_BASE || import.meta.env.BASE_URL;
+      const url = base + `models/armour-expansion/${id}.glb`;
       const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
       templates.set(id, prepare(gltf.scene, spec));
       return true;
