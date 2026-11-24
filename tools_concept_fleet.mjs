@@ -12,9 +12,14 @@ const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftsh
 const page=await browser.newPage({viewport:{width:960,height:540}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const results=[];
+let roster=[];
 for(const id of ids){
   await page.goto(`${url}?autostart=1&map=village&tank=${id}&q=low&seed=2026`);
   await page.waitForFunction(key=>window.__game?.player?.spec?.id===key,id,{timeout:180000});
+  if(!roster.length) roster=await page.evaluate(async()=>{
+    const {TANKS}=await import('/src/game/tankData.js');
+    return TANKS.map(t=>t.id);
+  });
   const r=await page.evaluate(key=>{
     const g=window.__game,p=g.player,d=p.spec.dims,T=p.pos.constructor;
     const result={id:key,model:!!p.model?.root,modelName:p.model?.root?.name,stats:p.spec.systemTag};
@@ -71,10 +76,6 @@ for(const id of ids){
   },id);
   results.push(r);
 }
-const roster=await page.evaluate(async()=>{
- const {TANKS}=await import('/src/game/tankData.js');
- return TANKS.map(t=>t.id);
-});
 await browser.close();
 console.log(JSON.stringify({results,errors,rosterCount:roster.length},null,2));
 for(const id of ids)assert.ok(roster.includes(id),'missing concept '+id);
