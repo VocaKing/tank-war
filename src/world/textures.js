@@ -149,6 +149,7 @@ export function camoTexture(paint, seed = 1) {
   g.fillStyle = paint.base; g.fillRect(0, 0, S, S);
   const img = g.getImageData(0, 0, S, S); const d = img.data;
   const camo = (paint.camo || []).map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  const grimeAmount = paint.grime ?? 1;
   const dig = paint.pattern === 'digital'; const N = 128;
   const f1 = tileField(noise, N, dig ? 5 : 3.2, 4, 0, 0), f2 = tileField(noise, N, dig ? 5 : 3.2, 4, 31.7, 17.3), fg = tileField(noise, N, 9, 3, 71, 5);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
@@ -159,12 +160,12 @@ export function camoTexture(paint, seed = 1) {
       else if (camo[1] && n2 > 0.16) { d[i] = camo[1][0]; d[i + 1] = camo[1][1]; d[i + 2] = camo[1][2]; }
       else if (camo[2] && n2 < -0.2) { d[i] = camo[2][0]; d[i + 1] = camo[2][1]; d[i + 2] = camo[2][2]; }
     }
-    const grime = sampleField(fg, N, x / S, y / S) * 22 + (r.next() - 0.5) * 6;
+    const grime = (sampleField(fg, N, x / S, y / S) * 22 + (r.next() - 0.5) * 6) * grimeAmount;
     d[i] = Math.max(0, Math.min(255, d[i] + grime - 4)); d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + grime - 4)); d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + grime * 0.8 - 4));
   }
   g.putImageData(img, 0, 0);
   // chipped paint / mud spots
-  for (let k = 0; k < 350; k++) {
+  for (let k = 0; k < 350 * grimeAmount; k++) {
     g.fillStyle = r.next() < 0.6 ? `rgba(60,48,32,${r.range(0.08, 0.3)})` : `rgba(30,28,25,${r.range(0.1, 0.35)})`;
     g.beginPath(); g.arc(r.range(0, S), r.range(0, S), r.range(1, 5), 0, Math.PI * 2); g.fill();
   }

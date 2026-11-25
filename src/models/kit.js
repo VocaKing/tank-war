@@ -118,8 +118,8 @@ export function stowageBox(P, part, x, y, z, w, h, d, ry = 0) {
   }
   const [lx, lz] = rot(0, d / 2 + 0.01, ry); P.add(part, 'metal', box(0.06, 0.08, 0.02, x + lx, y + h / 2 - 0.08, z + lz, 0, ry)); // latch
 }
-export function headlight(P, part, x, y, z, guard = true) {
-  P.add(part, 'metal', cylZ(0.085, 0.12, 12, x, y, z)); P.add(part,'glass',cylZ(0.07,0.015,24,x,y,z+0.065));
+export function headlight(P, part, x, y, z, guard = true, lens = 'glass') {
+  P.add(part, 'metal', cylZ(0.085, 0.12, 12, x, y, z)); P.add(part,lens,cylZ(0.07,0.015,24,x,y,z+0.065));
   P.add(part,'metal',T(new THREE.TorusGeometry(0.074,0.009,6,24),x,y,z+0.07,0,0,0));
   if (guard) for (const a of [-0.6, 0, 0.6]) P.add(part, 'metal', T(new THREE.TorusGeometry(0.11, 0.01, 4, 10, Math.PI), x, y, z + 0.02, 0, 0, a * 0.2));
   P.add(part, 'metal', box(0.04, 0.12, 0.04, x, y - 0.1, z - 0.04));
