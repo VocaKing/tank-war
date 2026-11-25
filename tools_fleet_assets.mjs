@@ -14,12 +14,26 @@ const expectedExterior = new Set([
 ]);
 const wheelCounts = { archer: 8, centauro2: 8 };
 const expectedReferences = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
+const rearTurretRevision = '2026-11-rear-turrets';
+
+function checkRearTurret({ nodes, meshes, accessors }, pivot, id) {
+  assert.equal(pivot?.extras?.turretExteriorRevision, rearTurretRevision, id);
+  const exterior = pivot.children.map(index => nodes[index]).find(node => node.extras?.turretExterior === id);
+  assert.ok(exterior?.extras?.turretDetailParts > 30, id + ' is missing its tailored turret');
+  for (const { attributes, indices } of meshes[exterior.mesh].primitives) {
+    const { count } = accessors[attributes.POSITION];
+    assert.ok(Number.isInteger(count) && count > 0, id);
+    for (const index of Object.values(attributes)) assert.equal(accessors[index].count, count, id);
+    assert.equal(accessors[indices].count % 3, 0, id);
+  }
+}
 
 for (const file of files) {
   const id = file.slice(0, -4);
   const asset = await readFile(new URL(file, root));
   const size = asset.readUInt32LE(12);
-  const { nodes, scenes, materials } = JSON.parse(asset.subarray(20, 20 + size));
+  const gltf = JSON.parse(asset.subarray(20, 20 + size));
+  const { nodes, scenes, materials } = gltf;
   assert.ok(hasFleetModel(id), id + ' is missing its game binding');
   const model = nodes[scenes[0].nodes[0]];
   assert.equal(model.name, id);
@@ -28,7 +42,8 @@ for (const file of files) {
     assert.equal(model.extras.fleetModelRevision, '2026-11-exterior-detail', id + ' is missing the revised model');
     assert.ok(model.extras.exteriorDetailParts > 16, id + ' is missing layered exterior fittings');
   } else {
-    assert.equal(model.extras.fleetModelRevision, '2026-11-concept-detail-v3', id + ' is missing the revised concept model');
+    const revision = id === 'aegis140' ? rearTurretRevision : '2026-11-concept-detail-v3';
+    assert.equal(model.extras.fleetModelRevision, revision, id + ' is missing the revised concept model');
     assert.ok(model.extras.exteriorDetailParts > 22, id + ' is missing its new hull and turret fittings');
     for (const suffix of ['track', 'rubber']) {
       assert.ok(materials.some(m => m.name.toLowerCase().endsWith('_' + suffix) && m.normalTexture),
@@ -41,6 +56,7 @@ for (const file of files) {
   const child = (node, name) => node?.children?.map(i => nodes[i]).find(n => n.name === name);
   const body = child(model, 'body');
   const turret = child(body, 'turret');
+  if (id === 'aegis140') checkRearTurret(gltf, turret, id);
   const gun = child(turret, 'gun');
   const barrel = child(gun, 'recoiling-barrel');
   const muzzle = child(barrel, 'muzzle');
@@ -55,6 +71,12 @@ for (const file of files) {
   assert.ok(!fingerprints.has(fingerprint), id + ' ships geometry already bound to another vehicle');
   fingerprints.add(fingerprint);
   ids.push(id);
+}
+
+for (const id of ['atlas', 'basilisk']) {
+  const asset = await readFile(new URL(`../armour-expansion/${id}.glb`, root));
+  const gltf = JSON.parse(asset.subarray(20, 20 + asset.readUInt32LE(12)));
+  checkRearTurret(gltf, gltf.nodes.find(node => node.name === 'TURRET_PIVOT'), id);
 }
 
 if (process.argv[2]) {

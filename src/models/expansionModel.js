@@ -12,6 +12,7 @@ const materialMaps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap
 const sharedMaterialName = /^(Abraded rubber|Burnished contact|Oxidized track|Forged and soot)/;
 const rollingAxis = new THREE.Vector3(1, 0, 0);
 const sides = ['R', 'L']; // Blender's right track is the negative-x track in game coordinates.
+const revisedTurrets = new Set(['atlas', 'basilisk']);
 const beltMaterial = new THREE.MeshStandardMaterial({ color: 0x39342c, roughness: 0.81, metalness: 0.36, side: THREE.DoubleSide });
 const originalName = node => node.userData.name || node.name;
 
@@ -131,7 +132,8 @@ export function loadExpansionModel(spec) {
       import('three/addons/libs/meshopt_decoder.module.js'),
     ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
       const base = import.meta.env.VITE_EXPANSION_MODELS_BASE || import.meta.env.BASE_URL;
-      const url = base + `models/armour-expansion/${id}.glb`;
+      const revision = revisedTurrets.has(id) ? '?v=2026-11-rear-turrets' : '';
+      const url = base + `models/armour-expansion/${id}.glb${revision}`;
       const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
       templates.set(id, prepare(gltf.scene, spec));
       return true;
