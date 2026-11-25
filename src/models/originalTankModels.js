@@ -439,8 +439,10 @@ function buildT72(d) {
   turretRing(P, H, d.turretZ, 0.94);
   K.eraGrid(P, 'hull', bow.point(-1.035, 0.274, 0.016), [1, 0, 0], [0, ...bow.up], 7, 3, 0.296, 0.339, 0.060, 0.024);
   P.add('hull', 'paint', bow.place(box(2.16, 0.065, 0.095), 0, 0.151, 0.057));
-  K.hatchRect(P, 'hull', 0, H + 0.008, 1.691, 0.55, 0.34);
-  K.periscope(P, 'hull', 0, H + 0.008, 1.893, 0, 0.86);
+  P.add('hull', 'dark', box(0.562, 0.015, 0.354, 0, H + 0.008, 1.690));
+  P.add('hull', 'paint', box(0.535, 0.021, 0.328, 0, H + 0.019, 1.690));
+  P.add('hull', 'paintDetail', box(0.169, 0.039, 0.083, 0, H + 0.018, 1.892));
+  P.add('hull', 'glass', box(0.130, 0.024, 0.015, 0, H + 0.018, 1.935));
 
   for (const side of sides) {
     const x = side * (d.W / 2 - 0.31);

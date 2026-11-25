@@ -130,7 +130,11 @@ export function grabRail(P, part, a, b, h = 0.07, r = 0.012) {
   P.add(part, 'metal', T(new THREE.CylinderGeometry(r, r, L, 5).rotateX(Math.PI / 2), (a[0] + b[0]) / 2, a[1] + h, (a[2] + b[2]) / 2, 0, yaw, 0));
   for (const p of [a, b]) P.add(part, 'metal', cylY(r, h, 5, p[0], p[1] + h / 2, p[2]));
 }
-export function antenna(P, part, x, y, z, h = 2.2) { P.add(part, 'dark', cylY(0.05, 0.12, 8, x, y + 0.06, z)); P.add(part, 'metal', cylY(0.006, h, 4, x, y + h / 2, z, 0.012)); }
+export function antenna(P, part, x, y, z, h = 2.2) {
+  P.add(part, 'dark', cylY(0.05, 0.12, 8, x, y + 0.06, z));
+  const whip = P.add(part, 'metal', cylY(0.006, h, 4, x, y + h / 2, z, 0.012));
+  whip.userData.flexible = true;
+}
 export function jerrycans(P, part, x, y, z, n = 2, ry = 0) {
   for (let i = 0; i < n; i++) { const [ox, oz] = rot((i - (n - 1) / 2) * 0.19, 0, ry); P.add(part,'paint',box(0.17,0.42,0.34,x+ox,y+0.21,z+oz,0,ry));
     const [cx,cz]=rot(0,0.108,ry);

@@ -77,6 +77,7 @@ export function gunMount(P,b,spec,lathe){
  const pivotY=b.turretPos[1]+b.gunPos[1];
  const minY=pivotY-b.barrelLength*Math.sin(Math.min(45,spec.gunDepression)*Math.PI/180)-0.25;
  for(const [key,parts] of Object.entries(P.b))if(key.startsWith('hull|'))for(const g of parts){
+  if(g.userData.flexible)continue;
   g.computeBoundingBox();const q=g.boundingBox;
   if(q&&q.max.y>minY)b.gunHullBoxes.push([q.min.x,q.max.x,q.min.z,q.max.z,q.max.y]);
  }

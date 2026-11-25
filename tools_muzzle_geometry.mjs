@@ -23,11 +23,18 @@ try {
   for(const spec of TANKS){
    const model=createTankModel(spec,{links:false});
    const boreMeshes=model.barrel.children.filter(x=>x.isMesh&&x.userData.matKey==='bore');
+   let forcedElevation;
+   if(spec.id==='tiger'||spec.id==='t72'){
+    const rad=Math.PI/180;
+    const min=-spec.gunDepression*rad, max=spec.gunElevation*rad;
+    forcedElevation=-Infinity;
+    for(let yaw=0;yaw<360;yaw++) forcedElevation=Math.max(forcedElevation,model.gunPitchFloor(yaw*rad,min,max));
+   }
    out.push({
     id:spec.id, removed:model.muzzleInfo?.removed||0, bore:model.muzzleInfo?.bore||0,
     outer:model.muzzleInfo?.outer||0, boreMeshes:boreMeshes.length, muzzleZ:model.muzzle.position.z,
     drawnLength:model.muzzle.getWorldPosition(new THREE.Vector3()).z + spec.dims.L / 2,
-    referenceLength:spec.dims.gunForwardL, gunLen:spec.dims.gunLen,
+    referenceLength:spec.dims.gunForwardL, gunLen:spec.dims.gunLen, forcedElevation,
    });
   }
   const t72=createTankModel(TANKS.find(x=>x.id==='t72'),{links:false});
@@ -54,6 +61,8 @@ try {
   assert.ok(x.muzzleZ>minimumMuzzleReach, x.id+' has an invalid muzzle position');
   if(x.referenceLength!==undefined)
    assert.ok(Math.abs(x.drawnLength-x.referenceLength)<0.005, x.id+' gun-forward length differs from the chassis datum');
+  if(x.forcedElevation!==undefined)
+   assert.ok(x.forcedElevation<=0, x.id+' hull fittings obstruct the gun while aiming horizontally');
  }
  assert.ok(Math.abs(result.t72.pivotZ-1.05)<1e-6,'T-72B trunnion must stay at the front mantlet position');
  assert.ok(Math.abs(result.t72.clearancePivot-1.05)<1e-6,'T-72B geometry mount override was not applied');

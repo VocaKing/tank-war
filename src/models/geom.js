@@ -94,7 +94,11 @@ export function clean(g) {
 }
 export class Parts {
   constructor() { this.b = {}; }
-  add(part, mat, g) { (this.b[part + '|' + mat] ||= []).push(clean(g)); }
+  add(part, mat, g) {
+    const piece = clean(g);
+    (this.b[part + '|' + mat] ||= []).push(piece);
+    return piece;
+  }
   merged() { const out = {}; for (const [k, list] of Object.entries(this.b)) { const [part, mat] = k.split('|'); (out[part] ||= {})[mat] = mergeGeometries(list); } return out; }
 }
 
