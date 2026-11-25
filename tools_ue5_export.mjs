@@ -5,7 +5,7 @@ import { mkdir, writeFile, appendFile, rename, rm, readdir } from 'node:fs/promi
 import path from 'node:path';
 const out=path.resolve(process.argv[2]||'WebFleet');
 await mkdir(out,{recursive:true});
-for(const file of await readdir(out)){if(file==='catalog.json'||/^[a-z0-9_]+\\.(sfveh|sfmap)$/.test(file))await rm(path.join(out,file),{force:true});}
+for(const file of await readdir(out)){if(file==='catalog.json'||/^[a-z0-9_]+\.(sfveh|sfmap)$/.test(file))await rm(path.join(out,file),{force:true});}
 const host='http://127.0.0.1:5191', revision='00fe26fad97af5653892a407c01594e2f3c40fc5';
 const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5191','--strictPort'],{stdio:'inherit'});
 let browser;
