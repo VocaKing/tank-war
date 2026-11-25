@@ -316,6 +316,23 @@ export const TANKS = [
     desc: 'Crew survivability first: front-mounted engine, modular wedge armor with a long sloped turret, rear hatch and ball-and-chain curtains under the bustle.',
   },
 ];
+// Playable self-propelled howitzer. The game uses an articulated artillery control profile:
+ // deployment lock, high-arc ballistic solution, slow traverse and long reload.
+const _spgBase = TANKS.find((t) => t.id === 'leo2a6');
+TANKS.push({
+  ..._spgBase, id:'pzh2000', tier:4, cls:'Artillery', name:'PzH 2000 Self-Propelled Howitzer', short:'PzH 2000',
+  artillery:{reloadMultiplier:2.1,traverseMultiplier:0.24,highArc:true},
+  mass:55.8,power:735,maxSpeed:38,reverseSpeed:12,hullTraverse:26,turretTraverse:14,gunSpeed:3,
+  gunDepression:2,gunElevation:65,hp:1450,viewRange:460,reload:7.2,aimTime:4.2,dispersion:4.4,
+  dims:{..._spgBase.dims,L:7.90,W:3.55,hullH:1.78,clearance:0.48,trackW:0.64,turretZ:-0.15,turretL:4.2,turretW:3.25,turretH:0.95,gunLen:5.6},
+  shells:[
+    {name:'155 mm HE',type:'HE',caliber:155,pen:48,velocity:720,damage:780,count:24},
+    {name:'155 mm HE-VT',type:'HE',caliber:155,pen:38,velocity:720,damage:690,count:12},
+    {name:'155 mm Smoke',type:'HE',caliber:155,pen:1,velocity:720,damage:1,count:8}
+  ],
+  paint:{base:'#626b55',camo:['#343c32','#827d61'],accent:'#424b3b'},
+  desc:'Self-propelled howitzer. Must deploy rear stabilizers before firing; slow turret traverse, high-angle ballistic fire and long reload.'
+});
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // ---- v3 ammunition balance & loadouts ----
 // Each tank carries a fixed number of rounds (its real stowage capacity = sum of the historical default load).

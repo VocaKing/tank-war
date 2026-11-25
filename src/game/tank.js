@@ -17,6 +17,12 @@ export function ballisticAngle(v, R, dy) {
   return Math.atan((v2 - Math.sqrt(disc)) / (g * R));
 }
 
+export function ballisticAngleHigh(v, R, dy) {
+  const v2=v*v, disc=v2*v2-GRAVITY*(GRAVITY*R*R+2*dy*v2);
+  if (disc < 0 || R < 0.01) return Math.atan2(dy,Math.max(R,0.01));
+  return Math.atan((v2+Math.sqrt(disc))/(GRAVITY*R));
+}
+
 export class Tank {
   static MAX_BLOOM = MAX_BLOOM;
   constructor(game, spec, team, name, isPlayer = false, loadout = null, items = null) {
@@ -25,6 +31,23 @@ export class Tank {
     this.abilities.resetForBattle();
     if (this.abilities.magazine) this.reloadLeft = 0;
     this.model = createTankModel(spec); game.scene.add(this.model.root);
+    this.isArtillery = !!spec.artillery;
+    this.spadeDeployment = 0; this.spadeTarget = 0; this.spadeState = 'STOWED';
+    this.spadeParts = [];
+    if (this.isArtillery) {
+      for (const side of [-1, 1]) {
+        const arm = new THREE.Group(); arm.position.set(side * spec.dims.W * 0.38, 0.48, -spec.dims.L * 0.46); this.model.root.add(arm);
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, 0.22), new THREE.MeshStandardMaterial({color:0x45443e, roughness:0.82, metalness:0.55}));
+        blade.position.set(side * 0.24, -0.34, -0.22); blade.rotation.x = -0.28; blade.castShadow = true; arm.add(blade);
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.10, 0.48), blade.material); shoe.position.set(side*0.24,-0.70,-0.28); shoe.castShadow=true; arm.add(shoe);
+        const ram = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.66,12), new THREE.MeshStandardMaterial({color:0x77766f,metalness:0.75,roughness:0.38}));
+        ram.position.set(side*0.12,-0.18,-0.10); ram.rotation.x=Math.PI/2; arm.add(ram);
+        this.spadeParts.push({arm,side});
+      }
+      this.spadeCenter = new THREE.Group(); this.model.root.add(this.spadeCenter);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(spec.dims.W*0.62,0.72,0.14), new THREE.MeshStandardMaterial({color:0x41413b,roughness:0.86,metalness:0.5}));
+      plate.position.set(0,-0.35,-spec.dims.L*0.48); plate.castShadow=true; this.spadeCenter.add(plate);
+    }
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0; this.rock = 0; this.rockV = 0;
     this.hp = spec.hp; this.maxHp = spec.hp; this.alive = true;
@@ -48,7 +71,7 @@ export class Tank {
   }
   crewAlive(role) { const c = this.crew.find((m) => m.role === role); return c ? c.alive : true; }
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
-  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
+  reloadTime() { const s = this.spec; let r = s.reload; if (this.isArtillery) r *= (s.artillery.reloadMultiplier || 2.1); if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
   aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
   // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
   baseDispersion() { let d = Math.atan(Math.max(MIN_DISPERSION_100M,this.spec.dispersion) / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
@@ -104,7 +127,20 @@ export class Tank {
     this.updateTurret(dt);
     if (this.reloadLeft > 0) this.reloadLeft = Math.max(0, this.reloadLeft - dt);
     if (this.abilities) this.abilities.update(dt);
-    this.recoil = Math.max(0, this.recoil - dt * 1.2);
+    this.recoil = Math.max(0, this.recoil - dt * (this.isArtillery ? 0.48 : 1.2));
+    if (this.isArtillery && !this.isPlayer) {
+      const rangeToAim = Math.hypot(this.input.aim.x-this.pos.x,this.input.aim.z-this.pos.z);
+      this.spadeTarget = Math.abs(this.speed) < 0.25 && rangeToAim < 850 ? 1 : 0;
+    }
+    if (this.isArtillery) {
+      const rate = this.spadeTarget > this.spadeDeployment ? 0.72 : 0.95;
+      this.spadeDeployment += Math.sign(this.spadeTarget-this.spadeDeployment) * Math.min(Math.abs(this.spadeTarget-this.spadeDeployment), rate*dt);
+      this.spadeDeployment = clamp(this.spadeDeployment,0,1);
+      this.spadeState = this.spadeDeployment > 0.96 ? 'DEPLOYED' : this.spadeDeployment > 0.03 ? 'DEPLOYING' : 'STOWED';
+      for (const p of this.spadeParts) { p.arm.rotation.x = -0.95*this.spadeDeployment; p.arm.rotation.z = p.side*0.12*this.spadeDeployment; }
+      if (this.spadeCenter) this.spadeCenter.rotation.x = -0.72*this.spadeDeployment;
+      if (this.spadeDeployment > 0.05) { this.speed *= Math.pow(0.04,dt); this.turnRate *= Math.pow(0.04,dt); }
+    }
     // hull rocking spring (firing / braking)
     const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
     this.rockV += (-this.rock * 60 - this.rockV * 7 + decel * 0.004) * dt; this.rock += this.rockV * dt;
@@ -113,11 +149,11 @@ export class Tank {
     const s = this.spec; const aim = this.input.aim; const gunW = this.model.gun.getWorldPosition(_v);
     const dx = aim.x - gunW.x, dy = aim.y - gunW.y, dz = aim.z - gunW.z; const R = Math.hypot(dx, dz);
     if (!Number.isFinite(dx + dy + dz)) return; // ignore an invalid aim point instead of poisoning the turret state
-    const th = ballisticAngle(this.shell.velocity, R, dy);
+    const th = this.isArtillery ? ballisticAngleHigh(this.shell.velocity, R, dy) : ballisticAngle(this.shell.velocity, R, dy);
     _v2.set((dx / (R || 1)) * Math.cos(th), Math.sin(th), (dz / (R || 1)) * Math.cos(th));
     _q.copy(this.quat).invert(); _v2.applyQuaternion(_q);
     const yawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
-    const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
+    const rate = s.turretTraverse * DEG * (this.isArtillery ? (s.artillery.traverseMultiplier || 0.24) : 1) * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
     const prev = this.turretYaw; this.turretYaw = wrapAngle(approachAngle(this.turretYaw, yawT, rate * dt));
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
     const minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
@@ -145,11 +181,15 @@ export class Tank {
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
-    m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
+    m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil * (this.isArtillery ? 1.7 : 1);
     m.root.updateMatrixWorld(true); this.inv.copy(m.root.matrixWorld).invert();
   }
   tryFire(time) {
     if (!this.alive || this.reloadLeft > 0 || this.ammo[this.shellIdx] <= 0) return false;
+    if (this.isArtillery && this.spadeDeployment < 0.96) {
+      if (this.isPlayer) this.game.hud.message('Deploy rear stabilizers before firing [B]', '#ffb45b');
+      return false;
+    }
     const g = this.game; const sh = this.shell; const m = this.model;
     const muzzle = m.muzzle.getWorldPosition(new THREE.Vector3()); const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(m.gun.getWorldQuaternion(_q)).normalize();
     // dispersion: 2D gaussian (sigma = R/2.2, centre-weighted) clamped to the dispersion circle of radius R
@@ -170,8 +210,9 @@ export class Tank {
     this.ammo[this.shellIdx]--; this.reloadLeft = this.reloadTime(); this.lastFired = time; this.stats.shots++;
     if (this.abilities) this.abilities.onFire();
     // Firing retains visual recoil, but does not inject a jump into the linear dispersion curve.
-    this.recoil = 1;
-    this.rockV -= (sh.caliber / 100) * 1.4 * (40 / this.spec.mass) * Math.cos(this.turretYaw);
+    this.recoil = this.isArtillery ? 1.65 : 1;
+    this.rockV -= (sh.caliber / 100) * (this.isArtillery ? 2.3 : 1.4) * (40 / this.spec.mass) * Math.cos(this.turretYaw);
+    if (this.isArtillery) { this._recoilImpulse = 1; this._barrelRecoil = 0.9; }
     g.effects.muzzle(muzzle, dir, sh.caliber); g.audio.gun(muzzle, sh.caliber, this.isPlayer);
     if (this.ammo[this.shellIdx] <= 0) { const nxt = this.ammo.findIndex((n) => n > 0); if (nxt >= 0) this.shellIdx = nxt; }
     return true;
