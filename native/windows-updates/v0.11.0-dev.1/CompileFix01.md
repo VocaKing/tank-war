@@ -1,0 +1,1 @@
+Apply CompileFix01.patch to the separately distributed v0.11.0-dev.1 project, not the incomplete source subset on this branch. Fixes IWYU matching header order, explicit TObjectPtr::Get() for the camera manager, and HUD Owner shadowing. All six matching-header translation units checked. Overlay and full archives verified offline; UE5.8.4 compile and gameplay remain unverified.

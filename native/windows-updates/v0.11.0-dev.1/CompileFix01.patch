@@ -1,0 +1,27 @@
+--- a/Source/SteelFront/SteelFrontMode.cpp
++++ b/Source/SteelFront/SteelFrontMode.cpp
+@@ -451,3 +451,3 @@
+         const auto* PC=GetWorld()->GetFirstPlayerController();
+-        const auto* View=PC?PC->PlayerCameraManager:nullptr;
++        const APlayerCameraManager* View=PC?PC->PlayerCameraManager.Get():nullptr;
+         const bool bNear=!View||FVector::DistSquared(View->GetCameraLocation(),GetActorLocation())<FMath::Square(18000.0);
+@@ -1265,4 +1265,4 @@
+         DrawRect(Red,X+W-W*.5f*float(Mode->TeamScore(1)/100.0),Y,W*.5f*float(Mode->TeamScore(1)/100.0),5.f*Scale);
+-        const int32 Owner=Mode->ObjectiveOwner();
+-        const TCHAR* State=Owner==0?TEXT("BLUE CONTROL"):Owner==1?TEXT("RED CONTROL"):Owner==-2?TEXT("CONTESTED"):TEXT("CAPTURE A");
++        const int32 ObjectiveControlTeam=Mode->ObjectiveOwner();
++        const TCHAR* State=ObjectiveControlTeam==0?TEXT("BLUE CONTROL"):ObjectiveControlTeam==1?TEXT("RED CONTROL"):ObjectiveControlTeam==-2?TEXT("CONTESTED"):TEXT("CAPTURE A");
+         DrawText(FString::Printf(TEXT("%02.0f    %s    %02.0f"),Mode->TeamScore(0),State,Mode->TeamScore(1)),Text,X+12*Scale,Y+13*Scale,nullptr,1.05f*Scale);
+@@ -1272,3 +1272,3 @@
+             const float R=14*Scale;
+-            const FLinearColor C=Owner==0?Blue:Owner==1?Red:Gold;
++            const FLinearColor C=ObjectiveControlTeam==0?Blue:ObjectiveControlTeam==1?Red:Gold;
+             DrawLine(Point.X-R,Point.Y,Point.X,Point.Y-R,C,2*Scale);DrawLine(Point.X,Point.Y-R,Point.X+R,Point.Y,C,2*Scale);
+--- a/Source/SteelFront/SteelFrontWeb.cpp
++++ b/Source/SteelFront/SteelFrontWeb.cpp
+@@ -1,4 +1,4 @@
++#include "SteelFrontWeb.h"
+ #include "Components/StaticMeshComponent.h"
+ #include "Engine/StaticMesh.h"
+-#include "SteelFrontWeb.h"
+ #include "Components/SceneComponent.h"
