@@ -2,7 +2,7 @@
 export const EXPANSION_TANKS = [
   {
     id: 'su100', tier: 2, cls: 'Tank Destroyer', name: 'SU-100', short: 'SU-100', nation: 'USSR', era: 'WWII', year: 1944,
-    fixedGun: true, casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
+    casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 31.6, power: 500, maxSpeed: 48, reverseSpeed: 8, hullTraverse: 36, turretTraverse: 0, gunSpeed: 7,
     gunDepression: 3, gunElevation: 20, hp: 1050, viewRange: 370, reload: 8.2, aimTime: 2.5, dispersion: 1.65, stabilizer: 1,
     dims: { L: 5.92, W: 3, hullH: 1.46, clearance: 0.40, trackW: 0.50, trackGauge: 2.45,
@@ -22,7 +22,7 @@ export const EXPANSION_TANKS = [
   },
   {
     id: 'jagdpanther', tier: 2, cls: 'Tank Destroyer', name: 'Jagdpanther G1', short: 'Jagdpanther', nation: 'Germany', era: 'WWII', year: 1944,
-    fixedGun: true, casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
+    casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
     mass: 45.5, power: 700, maxSpeed: 46, reverseSpeed: 8, hullTraverse: 33, turretTraverse: 0, gunSpeed: 7,
     gunDepression: 7, gunElevation: 15, hp: 1320, viewRange: 410, reload: 8.6, aimTime: 2.7, dispersion: 1.35, stabilizer: 1,
     dims: { L: 6.87, W: 3.42, hullH: 1.67, clearance: 0.55, trackW: 0.66, trackGauge: 2.61,
@@ -42,7 +42,7 @@ export const EXPANSION_TANKS = [
   },
   {
     id: 'isu122', tier: 2, cls: 'Tank Destroyer', name: 'ISU-122', short: 'ISU-122', nation: 'USSR', era: 'WWII', year: 1944,
-    fixedGun: true, casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Assistant loader'], autoloader: false,
+    casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Assistant loader'], autoloader: false,
     mass: 46, power: 520, maxSpeed: 37, reverseSpeed: 10, hullTraverse: 26, turretTraverse: 0, gunSpeed: 5,
     gunDepression: 3, gunElevation: 22, hp: 1450, viewRange: 380, reload: 11.4, aimTime: 3.2, dispersion: 1.90, stabilizer: 1,
     dims: { L: 6.77, W: 3.07, hullH: 1.47, clearance: 0.42, trackW: 0.65, trackGauge: 2.38,
@@ -62,7 +62,7 @@ export const EXPANSION_TANKS = [
   },
   {
     id: 'jagdtiger', tier: 3, cls: 'Tank Destroyer', name: 'Jagdtiger (Henschel)', short: 'Jagdtiger', nation: 'Germany', era: 'WWII', year: 1944,
-    fixedGun: true, casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator', 'Assistant loader'], autoloader: false,
+    casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator', 'Assistant loader'], autoloader: false,
     mass: 71.7, power: 700, maxSpeed: 34, reverseSpeed: 9, hullTraverse: 22, turretTraverse: 0, gunSpeed: 5,
     gunDepression: 7, gunElevation: 15, hp: 1850, viewRange: 410, reload: 12.6, aimTime: 3.0, dispersion: 1.48, stabilizer: 1,
     dims: { L: 7.79, W: 3.63, hullH: 1.77, clearance: 0.50, trackW: 0.80, trackGauge: 2.75,
@@ -82,7 +82,7 @@ export const EXPANSION_TANKS = [
   },
   {
     id: 'amxfoch', tier: 3, cls: 'Tank Destroyer', name: 'AMX 50 Foch (120 mm)', short: 'AMX 50 Foch', nation: 'France', era: 'Cold War', year: 1950,
-    fixedGun: true, casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
+    casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 50, power: 850, maxSpeed: 50, reverseSpeed: 16, hullTraverse: 33, turretTraverse: 0, gunSpeed: 7,
     gunDepression: 6, gunElevation: 18, hp: 1560, viewRange: 435, reload: 9.9, aimTime: 2.6, dispersion: 1.55, stabilizer: 1,
     dims: { L: 7.15, W: 3.40, hullH: 1.60, clearance: 0.46, trackW: 0.65, trackGauge: 2.65,

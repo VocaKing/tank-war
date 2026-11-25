@@ -112,7 +112,7 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'strv103', tier: 3, cls: 'Tank Destroyer', name: 'Stridsvagn 103C', short: 'Strv 103C', nation: 'Sweden', era: 'Cold War', year: 1986,
-    crew: ['Commander', 'Driver', 'Radio operator'], autoloader: true, fixedGun: true, casemate: { hullAimRate: 42, hydroRate: 8.5 },
+    crew: ['Commander', 'Driver', 'Radio operator'], autoloader: true, casemate: { hullAimRate: 42, hydroRate: 8.5 },
     mass: 39.7, power: 730, maxSpeed: 50, reverseSpeed: 15, hullTraverse: 42, turretTraverse: 0, gunSpeed: 8,
     gunDepression: 10, gunElevation: 12, hp: 1120, viewRange: 440, reload: 4.2, aimTime: 2.0, dispersion: 1.35, stabilizer: 0.25,
     hydroSuspension: { lowOffset: -0.10, highOffset: 0.10 },
@@ -154,7 +154,7 @@ export const SPECIALIST_TANKS = [
   },
   {
     id: 'm50ontos', tier: 2, cls: 'Tank Destroyer', name: 'M50 Ontos', short: 'M50 Ontos', nation: 'USA', era: 'Cold War', year: 1956,
-    crew: ['Commander', 'Gunner', 'Driver', 'Loader'], autoloader: false, openTop: true, fixedGun: true, casemate: { hullAimRate: 58, hydroRate: 0 },
+    crew: ['Commander', 'Gunner', 'Driver', 'Loader'], autoloader: false, openTop: true, casemate: { hullAimRate: 58, hydroRate: 0 },
     mass: 9.0, power: 361, maxSpeed: 48, reverseSpeed: 12, hullTraverse: 65, turretTraverse: 0, gunSpeed: 5,
     gunDepression: 10, gunElevation: 20, hp: 570, viewRange: 390, reload: 5.5, aimTime: 2.3, dispersion: 2.4, stabilizer: 0,
     multiTube: {

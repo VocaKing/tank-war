@@ -13,13 +13,13 @@ try {
   const result = await page.evaluate(async (base) => {
     const load = (file) => import(new URL('src/' + file, base).href);
     const { Tank } = await load('game/tank.js');
-    const { TANK_BY_ID } = await load('game/tankData.js');
+    const { TANKS, TANK_BY_ID } = await load('game/tankData.js');
     const { Game } = await load('game/game.js');
     const { BattlefieldPhysics, initPhysics } = await load('game/physics.js');
     const engine = await initPhysics();
     const { Terrain } = await load('world/terrain.js');
     const { TouchControls } = await load('ui/touchControls.js');
-    const { THREE } = await load('models/tankModel.js');
+    const { THREE, loadDetailedTankModel } = await load('models/tankModel.js');
 
     const terrain = new Terrain(200, 2);
     const world = { terrain, playHalf: 200, colliders: [], decks: [], groundHeight: () => 0, veg: { knock: () => false, rocks: [] } };
@@ -31,6 +31,9 @@ try {
     const spec = TANK_BY_ID.sherman;
     const fixed = new Tank(game, { ...spec, fixedGun: true }, 0, 'Fixed gun', true);
     const normal = new Tank(game, spec, 0, 'Turret', true);
+    const wardenSpec = TANK_BY_ID.warden130;
+    await loadDetailedTankModel(wardenSpec);
+    const warden = new Tank(game, wardenSpec, 0, 'Warden', true);
     const dt = 1 / 60;
     const step = (n = 1) => {
       const tank = game.player;
@@ -44,7 +47,7 @@ try {
     };
     function start(tank, heading = 0, speed = 0) {
       game.physics?.free();
-      for (const vehicle of [fixed, normal]) vehicle.vehicle = null;
+      tank.vehicle = null;
       for (let z = 0; z < terrain.n; z++) for (let x = 0; x < terrain.n; x++) {
         terrain.h[terrain.idx(x, z)] = world.groundHeight(terrain.i2x(x), terrain.i2x(z));
       }
@@ -140,9 +143,19 @@ try {
 
     start(normal);
     step(120);
+    start(warden);
+    game.keys.KeyW = true;
+    step(55);
+    const wardenDriving = { heading: warden.heading, speed: warden.speed, aiming: warden.hullAiming };
+    game.keys.KeyW = false;
+    step(290);
+    const wardenAimed = { heading: warden.heading, error: warden.fixedGunHeadingError(), yaw: warden.turretYaw };
     game.physics.free();
+    const fixedGunIds = TANKS.filter(tank => tank.fixedGun).map(tank => tank.id).sort();
+    const missingFixedGuns = TANKS.filter(tank => tank.turretTraverse === 0 && !tank.fixedGun).map(tank => tank.id);
     return { afterAim, driving, afterRelease, settled, keysCancel, brake, right, touchCentered, touchReleased,
-      shortest, broken, airborne, grounded, reversing, slope, occluded, normal: { heading: normal.heading, yaw: normal.turretYaw } };
+      shortest, broken, airborne, grounded, reversing, slope, occluded, normal: { heading: normal.heading, yaw: normal.turretYaw },
+      fixedGunIds, missingFixedGuns, wardenDriving, wardenAimed, detailedWarden: warden.model.root.userData.fleetModelId };
   }, base);
 
   assert.ok(result.afterAim > 0.05);
@@ -170,6 +183,11 @@ try {
   assert.ok(Math.abs(result.occluded - Math.PI / 2) < 0.02);
   assert.ok(Math.abs(result.normal.heading) < 1e-4);
   assert.ok(result.normal.yaw > 0.5);
+  assert.deepEqual(result.fixedGunIds, ['amxfoch', 'isu122', 'jagdpanther', 'jagdtiger', 'm50ontos', 'strv103', 'su100', 'warden130']);
+  assert.deepEqual(result.missingFixedGuns, []);
+  assert.equal(result.detailedWarden, 'warden130');
+  assert.ok(!result.wardenDriving.aiming && Math.abs(result.wardenDriving.heading) < 0.02 && result.wardenDriving.speed > 0.5);
+  assert.ok(result.wardenAimed.heading > 1 && Math.abs(result.wardenAimed.error) < 0.01 && result.wardenAimed.yaw === 0);
   console.log('Fixed gun aim, drive priority, joystick release, ground constraints and normal turret checks passed.');
 } finally {
   await browser.close();

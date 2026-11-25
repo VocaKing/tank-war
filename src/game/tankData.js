@@ -332,6 +332,8 @@ TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // less damage per hit (and APCR/APDS also lose penetration faster with range); HE/HESH have little penetration
 // but the highest damage, splash and module/crew damage. HEAT is countered by ERA, composite and spaced armour.
 for (const t of TANKS) {
+  // The casemate classification also enables hull aiming for this vehicle.
+  t.fixedGun = Boolean(t.casemate);
   t.maxDispersion = legacyMaxDispersion(t.dispersion);
   const s0 = t.shells[0]; const D0 = s0.baseDamage ?? s0.damage;
   t.ammoCap = t.shells.reduce((a, s) => a + s.count, 0); t.defaultLoadout = t.shells.map((s) => s.count);
@@ -393,13 +395,28 @@ export function armorZone(spec, part, face, local, mantlet = false) {
 export const zoneLowerFrontY = (d) => d.clearance + (d.hullH - d.clearance) * 0.42;
 export const zoneLowerSideY = (d) => d.clearance + 0.6;
 
-// Apply overrides AFTER automatic stock ammunition balancing, before any game/menu constructor.
+// Apply overrides after automatic stock ammunition balancing.
 export const STOCK_TANKS = clone(TANKS);
 let published = STOCK_TANKS, publishedError = '';
 try { published = effective(STOCK_TANKS, publishedBalance); }
 catch(e) { publishedError = String(e.message||e); console.error('Published balance rejected',e); }
 export const PUBLISHED_TANKS = clone(published);
-const local = loadLocal(STOCK_TANKS);
-export const BALANCE_STATUS = { source: local.config ? 'local' : 'published', error: [publishedError,local.error].filter(Boolean).join('; ') };
-const active = local.config ? effective(STOCK_TANKS,local.config) : clone(PUBLISHED_TANKS);
-for(let i=0;i<TANKS.length;i++) Object.assign(TANKS[i],active[i]);
+export const BALANCE_STATUS = { source: 'published', error: '' };
+let appliedLocalConfig;
+
+export function refreshLocalBalance() {
+  const { config, error } = loadLocal(STOCK_TANKS);
+  BALANCE_STATUS.source = config ? 'local' : 'published';
+  BALANCE_STATUS.error = [publishedError, error].filter(Boolean).join('; ');
+  const serialized = JSON.stringify(config);
+  if (serialized === appliedLocalConfig) return false;
+
+  const active = config ? effective(STOCK_TANKS, config) : clone(PUBLISHED_TANKS);
+  for (const [i, spec] of active.entries()) {
+    TANKS[i] = spec;
+    TANK_BY_ID[spec.id] = spec;
+  }
+  appliedLocalConfig = serialized;
+  return true;
+}
+refreshLocalBalance();

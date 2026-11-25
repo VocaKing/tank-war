@@ -6,7 +6,7 @@ Browser 3D tank battle (Three.js r170 + Vite). 27 vehicles in 4 tiers, 3 real-sc
 - Play the build: serve dist/ with any static server (see dist/README.txt).
   URL params: `?autostart=1&map=village|forest|desert&tank=<id>&q=low|medium|high`
 - `?fixedGunTest=1` applies fixed-gun aiming to the player's selected vehicle for that match.
-  Vehicle specs opt into this mechanism with `fixedGun: true`. Release WASD or the touch joystick to aim with the hull.
+  Vehicles with a `casemate` use hull aiming. Release WASD or the touch joystick to aim with the hull.
   Tank ids: sherman t34 tiger panther is2 pershing centurion t72 leo1 m1a2 chally2 leo2a6 merkava4 type99a t90m
 - Armour Expansion vehicle IDs are `jagdpanther`, `su100`, `isu122`, `jagdtiger`, `amxfoch`, `atlas`, `basilisk`, and `pzh2000`.
   The five tank destroyers use hull aim. The howitzer uses direct fire. The garage and battle load the detailed assets from `public/models/armour-expansion/` when needed.
@@ -26,7 +26,7 @@ See CREDITS.md for licenses.
 - **Maps.** Building colour variation for walls, shutters/doors and roofs. Four boulder shapes with bedding strata and tint variety. Per-instance tree and bush tint. Field patchwork on the terrain.
 
 ## Balance editor
-Open `?balance=1` on the same game origin. Modify tank values, save, then reload the game. The local profile applies to both player and NPC tanks. Export `balanceDefaults.json` to back up or publish; to change defaults for all players, replace `src/game/balanceDefaults.json` in the repository and rebuild/deploy. Existing local profiles can be reset to the published defaults. No tokens or server access are required for local editing. Run `node tools_balance.mjs` to check data initialization and refresh behavior.
+Open the balance editor from the garage. Saved changes update the garage preview and apply to player and NPC tanks in the next battle. Export `balanceDefaults.json` to back up or publish custom settings. To change defaults for all players, replace `src/game/balanceDefaults.json` in the repository and rebuild and deploy. Existing local profiles can be reset to the published defaults. Run `node tools_balance.mjs` to check data initialization and refresh behavior.
 
 ## Mobile touch mode
 Mobile browsers automatically use touch controls and a responsive garage. Use landscape for battle, left joystick to drive, drag the battlefield to aim, and hold Fire to shoot. Scope, zoom, armor, lock, special ability, ammo, equipment, scoreboard and pause are available as touch actions. Force mobile mode via `?mobile=1`. The garage includes fullscreen 3D inspection and the balance editor. Low graphics is the initial mobile preset. Desktop settings remain available.

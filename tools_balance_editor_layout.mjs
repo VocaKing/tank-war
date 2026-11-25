@@ -13,7 +13,8 @@ try {
  }
  assert.ok(ready,'Vite server did not start');
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- const page=await browser.newPage({viewport:{width:1440,height:1000}});
+ const context=await browser.newContext({viewport:{width:1440,height:1000}});
+ const page=await context.newPage();
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:5173/balance.html');
  await page.waitForSelector('#form .field-group');
@@ -80,8 +81,41 @@ try {
   await page.locator('#save').click();
   assert.match(await page.locator('#status').textContent(),/已保存/);
  }
+ await page.setViewportSize({ width: 1280, height: 720 });
+ await page.goto('http://127.0.0.1:5173/balance.html');
+ await page.getByRole('button', { name: /Tiger I/ }).click();
+ const garage = await context.newPage();
+ garage.on('pageerror', e => errors.push(e.message));
+ await garage.addInitScript(() => {
+  const raf = requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = callback =>
+   callback.name === 'loop' || callback.toString().includes('toneMappingExposure') ? 0 : raf(callback);
+ });
+ await garage.goto('http://127.0.0.1:5173/?tank=tiger');
+ await garage.locator('#m-armor').click();
+ await garage.locator('#av-shell').selectOption('1');
+ const rear = page.locator('.field-group').filter({ has: page.getByRole('heading', { name: '后面装甲', exact: true }) });
+ await rear.getByRole('spinbutton', { name: '车体厚度 mm' }).fill('3000');
+ await rear.getByRole('spinbutton', { name: '炮塔厚度 mm' }).fill('3000');
+ const ammo = page.locator('.field-group').filter({ has: page.getByRole('heading', { name: /^弹药 2 ·/ }) });
+ await ammo.getByRole('spinbutton', { name: '百米穿深 mm' }).fill('400');
+ assert.notEqual(await garage.evaluate(() => window.__menu.garage.spec.armor.hull.rear[0]), 3000);
+ await page.locator('#save').click();
+ await garage.waitForFunction(() => window.__menu.garage.spec.armor.hull.rear[0] === 3000);
+ const preview = await garage.evaluate(() => {
+  const { garage: scene } = window.__menu;
+  let overlay;
+  scene.current.root.traverse(node => { if (node.userData.avOverlay) overlay = node.material.uniforms; });
+  return {
+   open: scene.armorMode, hullRear: overlay.avArm.value[2], turretRear: overlay.avArm.value[9],
+   pen: overlay.avShell.value.x, shell: document.querySelector('#av-shell').value,
+  };
+ });
+ assert.deepEqual(preview, { open: true, hullRear: 3000, turretRear: 3000, pen: 400, shell: '1' });
+ assert.equal(await garage.locator('.tcard[data-id="warden130"] em').textContent(), '无炮塔');
+ await garage.close();
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({desktop,mobile},null,2));
+ console.log(JSON.stringify({desktop,mobile,preview},null,2));
 } finally {
  if(browser)await browser.close();
  server.kill('SIGTERM');

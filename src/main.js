@@ -3,7 +3,8 @@ import { Garage } from './ui/garage.js';
 import { Menu } from './ui/menu.js';
 import { initPhysics } from './game/physics.js';
 import { Game } from './game/game.js';
-import { TANK_BY_ID } from './game/tankData.js';
+import { TANK_BY_ID, refreshLocalBalance } from './game/tankData.js';
+import { STORAGE_KEY } from './game/balanceConfig.js';
 import { loadDetailedTankModel } from './models/tankModel.js';
 import { RNG } from './util.js';
 import { Audio } from './game/audio.js';
@@ -36,6 +37,15 @@ const garage = new Garage(renderer); garage.resize(innerWidth, innerHeight);
 let game = null; let mode = 'menu';
 const loading = document.createElement('div'); loading.className = 'loading'; loading.innerHTML = '<div><h2>Generating battlefield…</h2><p>Sculpting 1.4 km of terrain, planting forests, building villages</p><div class="spin"></div></div>'; ui.appendChild(loading);
 const menu = new Menu(ui, garage, start, openBalance);
+function syncGarageBalance() {
+  if (mode !== 'menu' || !refreshLocalBalance()) return;
+  menu.select(menu.tank);
+  if (menu.armorOn) menu.refreshArmor();
+}
+addEventListener('storage', (event) => {
+  if (event.storageArea === localStorage && (event.key === STORAGE_KEY || event.key === null)) syncGarageBalance();
+});
+addEventListener('pageshow', syncGarageBalance);
 const requestedTank = params.get('tank');
 const tankId = Object.prototype.hasOwnProperty.call(TANK_BY_ID, requestedTank) ? requestedTank : null;
 if (tankId && !params.has('autostart')) menu.select(tankId);
@@ -52,6 +62,7 @@ async function openBalance() {
   catch(e) { console.error(e); mode = 'menu'; alert('Unable to open balance editor. Please reload and retry.'); }
 }
 function start(opts, gesture = true) {
+  syncGarageBalance();
   if (gesture) { audio.init(); audio.resume(); }
   menu.show(false); loading.style.display = 'flex'; mode = 'loading';
   setTimeout(async () => {
@@ -63,7 +74,10 @@ function start(opts, gesture = true) {
         initPhysics(), ...Array.from(lineup, id => loadDetailedTankModel(TANK_BY_ID[id])),
       ]);
       resizeRenderer(opts.quality);
-      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, onExit: () => { game = null; window.__game = null; mode = 'menu'; resizeRenderer('menu'); menu.show(true); garage.resize(innerWidth, innerHeight); } });
+      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, onExit: () => {
+        game = null; window.__game = null; mode = 'menu';
+        resizeRenderer('menu'); syncGarageBalance(); menu.show(true); garage.resize(innerWidth, innerHeight);
+      } });
       window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';

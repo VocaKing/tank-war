@@ -10,7 +10,7 @@ const typeBadge = (type) => `<span class="ability-badge ${type}">${type === 'act
 function tankCard(t) {
   const abilities = describeTankAbilities(t);
   return `<button class="tcard" data-id="${t.id}" aria-pressed="false">
-    <b>${t.short}<em>${t.casemate ? 'TD' : t.cls}</em></b><small>${t.nation} · ${t.year}</small>
+    <b>${t.short}<em>${t.casemate ? '无炮塔' : t.cls}</em></b><small>${t.nation} · ${t.year}</small>
     ${abilities.length ? `<span class="tank-ability-labels" lang="zh-CN">${abilities.map(({ type, name }) =>
       `<span class="tank-ability-label">${typeBadge(type)} ${name}</span>`).join('')}</span>` : ''}
     ${t.systemTag ? `<span class="tcard-system">${t.systemTag}</span>` : ''}
@@ -128,7 +128,7 @@ export class Menu {
       ${!this.mobile && skills ? `<section class="vehicle-skills" lang="zh-CN" aria-label="车辆技能">${skills}</section>` : ''}
       ${t.systemTag ? `<div class="tag">SYSTEM · ${t.systemTag}</div>` : ''}
       <p>${t.desc}</p>
-      ${t.casemate ? `<p>Fixed gun. Release ${this.mobile ? 'the drive joystick' : 'WASD'} to aim with the hull.</p>` : ''}
+      ${t.casemate ? `<p lang="zh-CN">无炮塔。松开${this.mobile ? '移动摇杆' : ' WASD'}后，车体会随准星转向。</p>` : ''}
       ${bar('Hit points', t.hp, 2000)}${bar('Damage (' + (sh.type === 'HE' ? 'HE' : 'AP') + ')', sh.damage, 450)}${bar('Penetration', sh.pen, 760, ' mm')}${bar('Hull front thickness', a.hull.front[0], 700, ' mm')}${bar(upperArmor + ' front thickness', a.turret.front[0], 950, ' mm')}
       ${bar('Top speed', t.maxSpeed, 72, ' km/h')}${bar('Reload', t.reload, 19, ' s', true)}${t.casemate ? bar('Hull traverse', t.hullTraverse, 45, '°/s') : bar('Turret traverse', t.turretTraverse, 45, '°/s')}${bar('View range', t.viewRange, 520, ' m')}
       <table class="armor"><tr><th></th><th>Front</th><th>Side</th><th>Rear</th><th>Top</th></tr>

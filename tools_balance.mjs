@@ -11,7 +11,7 @@ const strip=s=>s.replace(/^import .*$/gm,'').replace(/^export /gm,'');
 const store=new Map(),env={localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)}};
 const api=new Function('globalThis',strip(config)+'\nreturn {STORAGE_KEY,EMPTY,clone,effective,legacyMaxDispersion,loadLocal,saveLocal,diff};')(env);
 function load(published=api.EMPTY()){
- return new Function('publishedBalance','clone','effective','legacyMaxDispersion','loadLocal','EMPTY','SPECIALIST_TANKS','EXPANSION_TANKS','CONCEPT_VEHICLES',strip(source)+'\nreturn {TANKS,TANK_BY_ID,STOCK_TANKS,armorZone,penAtRange,sanitizeLoadout,BALANCE_STATUS};')(published,api.clone,api.effective,api.legacyMaxDispersion,api.loadLocal,api.EMPTY,SPECIALIST_TANKS,EXPANSION_TANKS,CONCEPT_VEHICLES);
+ return new Function('publishedBalance','clone','effective','legacyMaxDispersion','loadLocal','EMPTY','SPECIALIST_TANKS','EXPANSION_TANKS','CONCEPT_VEHICLES',strip(source)+'\nreturn {TANKS,TANK_BY_ID,STOCK_TANKS,armorZone,penAtRange,sanitizeLoadout,BALANCE_STATUS,refreshLocalBalance};')(published,api.clone,api.effective,api.legacyMaxDispersion,api.loadLocal,api.EMPTY,SPECIALIST_TANKS,EXPANSION_TANKS,CONCEPT_VEHICLES);
 }
 const stock=load().STOCK_TANKS,cfg=api.EMPTY();
 const stockTiger=stock.find(t=>t.id==='tiger');
@@ -35,6 +35,18 @@ assert.throws(()=>api.saveLocal({version:1,tanks:{tiger:{dispersion:0.35,maxDisp
 assert.equal(load().TANK_BY_ID.tiger.hp,2222);
 env.localStorage.removeItem(api.STORAGE_KEY);
 assert.equal(load().TANK_BY_ID.tiger.hp,stock.find(t=>t.id==='tiger').hp);
+assert.equal(game.refreshLocalBalance(), true);
+assert.equal(game.BALANCE_STATUS.source, 'published');
+assert.equal(game.TANK_BY_ID.tiger.hp, stockTiger.hp);
+assert.equal(game.refreshLocalBalance(), false);
+assert.equal(t.hp, 2222, 'Refreshing the roster must preserve a battle’s existing spec');
+api.saveLocal({ version: 1, tanks: { tiger: { 'armor.hull.rear.0': 3000, 'shells.0.pen': 400 } } }, stock);
+assert.equal(game.refreshLocalBalance(), true);
+assert.equal(game.BALANCE_STATUS.source, 'local');
+assert.equal(game.TANK_BY_ID.tiger.armor.hull.rear[0], 3000);
+assert.equal(game.TANK_BY_ID.tiger.shells[0].pen, 400);
+assert.equal(game.TANKS.find(x => x.id === 'tiger'), game.TANK_BY_ID.tiger);
+env.localStorage.removeItem(api.STORAGE_KEY);
 assert.equal(load(cfg).TANK_BY_ID.tiger.hp,2222);
 assert.equal(load(cfg).TANK_BY_ID.tiger.dispersion,0.35);
 assert.equal(load(cfg).TANK_BY_ID.tiger.maxDispersion,stockTiger.maxDispersion);

@@ -63,7 +63,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Rapid flanking tank with exposed crew compartment, a tall open shield and quick loading.',
   }),
   vehicle('warden130','Warden-130 Heavy Tank Destroyer','Warden-130','Tank Destroyer',{
-    casemate:{hullAimRate:26,hydroRate:4.8},fireArc:8,
+    casemate:{hullAimRate:26,hydroRate:4.8},
     siegeMode:{settleSeconds:2.0,dispersionMult:0.48,recoilMult:0.58},
     mass:69,power:920,maxSpeed:29,reverseSpeed:11,hullTraverse:22,turretTraverse:0,gunSpeed:3.5,
     gunDepression:6,gunElevation:15,hp:2100,viewRange:460,reload:13.4,aimTime:2.4,dispersion:1.32,
