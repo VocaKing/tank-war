@@ -150,13 +150,14 @@ export function createArmorOverlay(model, spec, garage = false) {
       materials.set(key, new THREE.ShaderMaterial({
         side, uniforms: { ...uniforms, avKind: { value: kind } },
         defines: { ERA_GROUPS: spec.eraLayout?.length || 0, ERA_TILES: keys.length },
-        transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
+        // Use a constant depth bias. A slope-based offset pulls grazing panels in front of nearer armor.
+        transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetUnits: -1,
         vertexShader: /* glsl */`
           varying vec3 vArmorWorld;
           void main() {
             vec4 world = modelMatrix * vec4(position, 1.0);
             vArmorWorld = world.xyz;
-            gl_Position = projectionMatrix * viewMatrix * world;
+            gl_Position = projectionMatrix * (modelViewMatrix * vec4(position, 1.0));
           }
         `,
         fragmentShader: FRAGMENT,

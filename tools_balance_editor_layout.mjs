@@ -85,6 +85,7 @@ try {
  await page.goto('http://127.0.0.1:5173/balance.html');
  await page.getByRole('button', { name: /Tiger I/ }).click();
  const garage = await context.newPage();
+ await garage.setViewportSize({ width: 1280, height: 720 });
  garage.on('pageerror', e => errors.push(e.message));
  await garage.addInitScript(() => {
   const raf = requestAnimationFrame.bind(window);
@@ -112,10 +113,44 @@ try {
   };
  });
  assert.deepEqual(preview, { open: true, hullRear: 3000, turretRear: 3000, pen: 400, shell: '1' });
+ const rearPixels = await garage.evaluate(async () => {
+  const { THREE } = await import('/src/models/tankModel.js');
+  const { intersectArmor } = await import('/src/game/armorGeometry.js');
+  const { garage: scene } = window.__menu;
+  const { renderer, camera, current, spec } = scene;
+  scene.drag = { x: 0 };
+  scene.angle = Math.PI + 0.9;
+  scene.hMul = 0.4;
+  scene.render(0);
+  const width = 640, height = 360;
+  const target = new THREE.WebGLRenderTarget(width, height);
+  const pixels = new Uint8Array(width * height * 4);
+  renderer.setRenderTarget(target);
+  renderer.render(scene.scene, camera);
+  renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+  renderer.setRenderTarget(null);
+  target.dispose();
+
+  const raycaster = new THREE.Raycaster(), end = new THREE.Vector3();
+  let blocked = 0, penetrable = 0;
+  for (let y = 140; y < 220; y += 5) for (let x = 190; x < 390; x += 5) {
+   raycaster.setFromCamera({ x: (x + 0.5) / width * 2 - 1, y: (y + 0.5) / height * 2 - 1 }, camera);
+   const ray = raycaster.ray;
+   const hit = intersectArmor(current, spec, ray.origin, ray.at(300, end));
+   if (hit?.face !== 'rear' || hit.part !== 'hull' || hit.local.z > -0.42 * spec.dims.L) continue;
+   const pixel = (y * width + x) * 4;
+   const [red, green] = pixels.subarray(pixel, pixel + 2);
+   if (red > green * 1.4) blocked++;
+   if (green > red * 1.4) penetrable++;
+  }
+  return { blocked, penetrable };
+ });
+ assert.ok(rearPixels.blocked > 10, JSON.stringify(rearPixels));
+ assert.equal(rearPixels.penetrable, 0, 'Grazing adjacent plates must not color the 3000 mm rear hull green');
  assert.equal(await garage.locator('.tcard[data-id="warden130"] em').textContent(), '无炮塔');
  await garage.close();
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({desktop,mobile,preview},null,2));
+ console.log(JSON.stringify({desktop,mobile,preview,rearPixels},null,2));
 } finally {
  if(browser)await browser.close();
  server.kill('SIGTERM');
