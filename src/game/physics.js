@@ -13,7 +13,8 @@ const SPRING_FREQUENCY = 9;
 const SPRING_REST = ANCHOR_HEIGHT + GRAVITY / (SPRING_FREQUENCY ** 2);
 const REBOUND_TRAVEL = 0.105;
 const RECOVERY_DELAY = 0.4;
-const OFF_ROAD_GRIP = 0.82;
+const OFF_ROAD_GRIP = 0.92;
+const PARK_SPEED = 0.28;
 const AUTO_BRAKE_BUILDUP = 0.075;
 const AUTO_BRAKE_REFERENCE_MASS = 33700; // Standard Sherman's mass in kg.
 const AUTO_BRAKE_DECELERATION = 25;
@@ -130,6 +131,7 @@ export class BattlefieldPhysics {
       .setTranslation(0, d.hullH + d.turretH / 2, (d.turretZ ?? 0) + (d.turretBoxZ ?? 0)).setMass(0)
       .setFriction(0.6).setCollisionGroups(filter), body);
     const vehicle = { tank, body, hull, turret, mass, contact: 0, unsupported: 0, recoveryTime: 0, righting: false, autoBrake: 0,
+      parked: false, parkAnchor: new THREE.Vector3(),
       inertiaYaw: mass * (d.L * d.L + d.W * d.W) / 12 };
     this.vehicles.push(vehicle);
     tank.vehicle = vehicle;
@@ -149,6 +151,7 @@ export class BattlefieldPhysics {
     vehicle.recoveryTime = 0;
     vehicle.righting = false;
     vehicle.autoBrake = 0;
+    vehicle.parked = false;
     tank.vel.copy(_forward);
     tank.speed = speed;
   }
@@ -269,6 +272,7 @@ export class BattlefieldPhysics {
     vehicle.righting = pushing && _down.y > rightingLimit &&
       (vehicle.righting ? vehicle.contact > 0 : canRecover);
     if (!vehicle.contact) {
+      vehicle.parked = false;
       vehicle.unsupported += dt;
       tank.airborne = vehicle.unsupported >= 0.025;
       tank.hullAiming = false;
@@ -286,11 +290,15 @@ export class BattlefieldPhysics {
     body.applyImpulse(_forceSum, true);
     body.applyTorqueImpulse(_momentSum, true);
     if (vehicle.righting) {
+      vehicle.parked = false;
       tank.hullAiming = false;
       this.rightHull(vehicle);
     } else if (support || crawl) {
       this.applyTraction(vehicle, load + recoveryLoad, leftLoad, waterDepth, false, crawl);
-    } else tank.hullAiming = false;
+    } else {
+      vehicle.parked = false;
+      tank.hullAiming = false;
+    }
   }
 
   hullGroundLoad({ hull, turret }) {
@@ -405,17 +413,32 @@ export class BattlefieldPhysics {
     const neutralBrake = lerp(coastBrake, autoBrakeLimit, autoBrake);
     const driveBrake = throttle * longitudinal < 0 ? 5 : 3.2;
     const brake = input.brake || !mobile ? 7 : (throttle ? driveBrake : neutralBrake);
-    const speedError = throttle * speedLimit + pivotSpeed - longitudinal;
+    // Hold the low-speed contact patch on uneven ground. Position feedback
+    // only changes the bounded friction impulse; the rigid body remains free
+    // to move when hit, when driving or when the surface runs out of grip.
+    const park = !floating && !crawl && !throttle && !steer && Math.abs(commanded) < 0.05
+      && longitudinal * longitudinal + sideways * sideways < PARK_SPEED * PARK_SPEED;
+    if (park && !vehicle.parked) vehicle.parkAnchor.copy(tank.pos);
+    vehicle.parked = park;
+    let parkForward = 0, parkSide = 0;
+    if (park) {
+      _scrub.subVectors(vehicle.parkAnchor, tank.pos);
+      _scrub.y = 0;
+      parkForward = clamp(_scrub.dot(_tangent) * 8, -0.24, 0.24);
+      parkSide = clamp(_scrub.dot(_side) * 8, -0.24, 0.24);
+    }
+    const speedError = throttle * speedLimit + pivotSpeed + parkForward - longitudinal;
     const acceleration = pivotSpeed ? intactLoad * grip * 0.35 / (mass * dt) :
       throttle && Math.sign(speedError) === Math.sign(throttle) ? driveLimit : brake;
     const parkAssist = holding ? -gradeAcceleration : 0;
     const drive = clamp(speedError / dt + parkAssist, -acceleration, acceleration) * mass * dt;
-    const lateral = (-sideways / 0.075 + GRAVITY * _side.y) * mass * dt;
-    const maxTraction = load * grip;
+    const lateral = ((parkSide - sideways) / (park ? dt : 0.075) + GRAVITY * _side.y) * mass * dt;
+    const maxTraction = load * grip * (park ? 1.12 : 1);
     // The tuned brake can use extra track grip along the hull's travel axis.
-    const brakeGrip = autoBrake > 0 ? Math.max(1, neutralBrake / (GRAVITY * OFF_ROAD_GRIP)) : 1;
+    const brakeGrip = !park && autoBrake > 0 ? Math.max(1, neutralBrake / (GRAVITY * OFF_ROAD_GRIP)) : 1;
     const demand = Math.hypot(drive / brakeGrip, lateral);
     const gripScale = demand > maxTraction ? maxTraction / demand : 1;
+    if (gripScale < 1) vehicle.parked = false;
     _scrub.copy(_tangent).multiplyScalar(drive * gripScale).addScaledVector(_side, lateral * gripScale);
     body.applyImpulse(_scrub, true);
 

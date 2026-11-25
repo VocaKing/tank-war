@@ -13,7 +13,9 @@ export class HUD {
     this.g = game; this.root = el('div', 'hud'); root.appendChild(this.root);
     this.root.innerHTML = `
       <div class="top"><div class="teams"><div class="tcount ally" id="h-ally"></div><div class="timer" id="h-timer">15:00</div><div class="tcount enemy" id="h-enemy"></div></div>
-        <div class="caps"><div class="cap ally"><span>Allied base</span><div class="bar"><i id="h-cap0"></i></div></div><div class="cap enemy"><span>Enemy base</span><div class="bar"><i id="h-cap1"></i></div></div></div></div>
+        <div class="caps"><div class="cap ally"><span>Allied base</span><div class="bar"><i id="h-cap0"></i></div></div><div class="cap enemy"><span>Enemy base</span><div class="bar"><i id="h-cap1"></i></div></div></div>
+        <div class="control-status" id="h-control"><span id="h-control-text"></span><div class="bar"><i id="h-control-progress"></i></div></div></div>
+      <div class="control-marker" id="h-control-marker" aria-hidden="true" hidden>C</div>
       <div class="killfeed" id="h-feed"></div>
       <div class="markers" id="h-markers"></div>
       <div class="scope" id="h-scope"><div class="scope-ring"></div><div class="mil"></div><div class="ticks"></div><div class="zoom" id="h-zoom">x4</div><div class="avhint" id="h-av"></div></div>
@@ -47,6 +49,8 @@ export class HUD {
       return { count, pips, aliveClass: team === 0 ? 'a' : 'e' };
     });
     this.markerPosition = new THREE.Vector3();
+    const point = game.world.controlPoint;
+    this.controlPosition = new THREE.Vector3(point.x, game.world.groundHeight(point.x, point.z) + 14, point.z);
     this.mini = this.$('h-mini').getContext('2d'); this.markerPool = []; this.markerStates = new WeakMap(); this.msgTimer = 0; this.feed = [];
     this.$('h-resume').onclick = () => game.setPaused(false);
     const aa = this.$('h-aa'); const aaTxt = () => { aa.textContent = 'Aim assist: ' + (game.assist.enabled ? 'ON' : 'OFF'); }; aaTxt();
@@ -85,6 +89,16 @@ export class HUD {
     // view range circle & camera direction
     g.strokeStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.arc(px, py, p.viewRange / half * S / 2, 0, 6.3); g.stroke();
     const cy = G.cam.yaw; g.fillStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.moveTo(px, py); g.arc(px, py, 40, Math.PI / 2 - cy - 0.4, Math.PI / 2 - cy + 0.4, false); g.closePath(); g.fill();
+    const point = G.world.controlPoint;
+    const [cx, cyPoint] = this.toM(point.x, point.z), radius = point.r / half * S / 2;
+    const control = G.control;
+    const color = control.contested || control.team === null ? '#f6cb69' : control.team === 0 ? '#6fe37f' : '#ff7769';
+    g.save();
+    g.beginPath(); g.arc(cx, cyPoint, radius, 0, Math.PI * 2);
+    g.fillStyle = '#18222c'; g.fill();
+    g.strokeStyle = color; g.lineWidth = 2; g.stroke();
+    g.fillStyle = color; g.font = 'bold 12px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('C', cx, cyPoint);
+    g.restore();
     for (const t of G.tanks) {
       if (t === p && t.alive) continue;
       const ally = t.team === p.team; const vis = ally || t.spotted[p.team] || !t.alive;
@@ -97,6 +111,26 @@ export class HUD {
       if (!t.alive) { g.strokeStyle = '#222'; g.beginPath(); g.moveTo(mx - 3, my - 3); g.lineTo(mx + 3, my + 3); g.moveTo(mx + 3, my - 3); g.lineTo(mx - 3, my + 3); g.stroke(); }
     }
     if (p.alive) { g.save(); g.translate(px, py); g.rotate(-p.heading + Math.PI); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(0, -8); g.lineTo(5.5, 6); g.lineTo(0, 3); g.lineTo(-5.5, 6); g.closePath(); g.fill(); g.stroke(); g.restore(); }
+  }
+  updateControl(camera) {
+    const G = this.g, control = G.control;
+    const follow = G.cam.follow.pos, point = this.controlPosition;
+    const distance = Math.round(Math.hypot(follow.x - point.x, follow.z - point.z));
+    const side = control.team === null ? '' : control.team === G.player.team ? 'ally' : 'enemy';
+    const status = control.contested ? '双方争夺' : control.team === null ? '中立' : control.occupied ? (side === 'ally' ? '我方占领中' : '敌方占领中') : '进度回落';
+    const label = this.$('h-control');
+    const style = 'control-status' + (side ? ' ' + side : '');
+    if (label.className !== style) label.className = style;
+    setText(this.$('h-control-text'), `据点 C · ${status} · ${Math.floor(control.points)}% · ${distance} m`);
+    this.$('h-control-progress').style.width = control.points + '%';
+    const v = this.markerPosition.copy(point).project(camera);
+    const marker = this.$('h-control-marker');
+    marker.hidden = v.z < -1 || v.z > 1 || Math.abs(v.x) > 0.94 || Math.abs(v.y) > 0.9;
+    if (!marker.hidden) {
+      const cls = 'control-marker' + (control.contested || !side ? '' : ' ' + side);
+      if (marker.className !== cls) marker.className = cls;
+      marker.style.transform = `translate(${(v.x * 0.5 + 0.5) * innerWidth}px, ${(-v.y * 0.5 + 0.5) * innerHeight}px) translate(-50%, -50%)`;
+    }
   }
   message(text, color = '#fff', big = false) {
     const m = el('div', 'msg' + (big ? ' big' : ''), text); m.style.color = color; this.$('h-msgs').appendChild(m); setTimeout(() => m.remove(), big ? 3500 : 2600);
@@ -232,6 +266,7 @@ export class HUD {
     }
     const tl = Math.max(0, G.timeLimit - G.time); setText(this.$('h-timer'), `${Math.floor(tl / 60)}:${String(Math.floor(tl % 60)).padStart(2, '0')}`);
     this.$('h-cap0').style.width = G.capture[0].points + '%'; this.$('h-cap1').style.width = G.capture[1].points + '%';
+    this.updateControl(camera);
     this.panelT = (this.panelT || 0) - dt; const doPanel = this.panelT <= 0; if (doPanel) this.panelT = 0.1;
     // vehicle panel
     if (doPanel) {

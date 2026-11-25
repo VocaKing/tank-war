@@ -26,7 +26,7 @@ function makeWorld(height, colliders = [], decks = [], deckHeight = () => -Infin
       spec: { ...spec, mass }, pos: new THREE.Vector3(x, groundHeight(x, z) + 0.01, z),
       quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, 0, roll, 'YXZ')),
       vel: new THREE.Vector3(), input: { throttle: 0, steer: 0 }, alive: true,
-      modules: { engine: 1, tracks: 1 }, equip: { active: () => false, factor: 1 }, crewAlive: () => true,
+      mobilityModule: 'tracks', modules: { engine: 1, tracks: 1 }, equip: { active: () => false, factor: 1 }, crewAlive: () => true,
     };
     physics.place(tank, speed);
     return tank;
@@ -105,6 +105,21 @@ assert.ok(brakeFrom(0.34, 10.7).distance < 3.5);
 for (const [mass, factor] of [[18, 18 / 33.7], [66, 66 / 33.7], [188, 2.5]]) {
   const sample = brakeFrom(0, 10.7, mass);
   assert.ok(Math.abs(sample.deceleration / shermanBrake.deceleration - factor) < 0.04, { mass, sample });
+}
+
+for (const grade of [0.08, 0.25]) for (const direction of [0.4, Math.PI / 2]) {
+  const { physics, spawn } = makeWorld((x, z) => grade * (Math.sin(direction) * x + Math.cos(direction) * z)
+    + 0.12 * Math.sin(x * 0.53 + z * 0.36) * Math.cos(x * 0.25 - z * 0.3));
+  const tank = spawn(0, 0);
+  physics.advance(1);
+  const parked = tank.pos.clone();
+  for (let i = 0; i < 360; i++) physics.advance(1 / 30);
+  const drift = Math.hypot(tank.pos.x - parked.x, tank.pos.z - parked.z);
+  assert.ok(drift < 0.01, { grade, direction, drift });
+  tank.input.throttle = 1;
+  physics.advance(0.35);
+  assert.ok(tank.speed > 0.8, 'resuming drive releases stationary grip');
+  physics.free();
 }
 
 for (const roll of [Math.PI / 2, Math.PI]) {

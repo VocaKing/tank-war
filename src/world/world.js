@@ -502,17 +502,33 @@ export class World {
     this.grass = new Grass(scene, mb, quality, windUniform);
     this.groundDetails = new GroundDetails(scene, mb, quality);
     this.bases = mb.bases; this.lanes = mb.lanes; this.playHalf = mb.play;
+    this.controlPoint = def.controlPoint;
     this.stats = { trees: mb.trees.length, bushes: mb.bushes.length, buildings: mb.buildings.length, rocks: mb.rocks.length, walls: mb.walls.length, bridges: mb.bridges.length };
     // base flags
     this.baseMarkers = [];
-    for (let i = 0; i < this.bases.length; i++) {
-      const b = this.bases[i]; const y = this.terrain.height(b.x, b.z);
-      const ring = new THREE.Mesh(new THREE.RingGeometry(b.r - 1.2, b.r, 96), new THREE.MeshBasicMaterial({ color: i === 0 ? 0x3fa34d : 0xc0392b, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
-      ring.rotation.x = -Math.PI / 2; ring.position.set(b.x, y + 0.4, b.z); ring.renderOrder = 2; scene.add(ring);
+    for (const [i, b] of [...this.bases, this.controlPoint].entries()) {
+      const central = b === this.controlPoint;
+      const y = this.groundHeight(b.x, b.z), color = central ? 0xe0b458 : i === 0 ? 0x3fa34d : 0xc0392b;
+      const geometry = new THREE.RingGeometry(b.r - (central ? 1.7 : 1.2), b.r, 96);
+      geometry.rotateX(-Math.PI / 2);
+      if (central) {
+        const p = geometry.attributes.position;
+        for (let v = 0; v < p.count; v++) {
+          p.setY(v, this.groundHeight(b.x + p.getX(v), b.z + p.getZ(v)) - y);
+        }
+      }
+      const ring = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: central ? 0.76 : 0.55, depthWrite: false, side: THREE.DoubleSide }));
+      ring.position.set(b.x, y + 0.4, b.z); ring.renderOrder = 2; scene.add(ring);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 12, 8), new THREE.MeshStandardMaterial({ color: 0x777777, metalness: 0.7, roughness: 0.4 })); pole.position.set(b.x, y + 6, b.z); pole.castShadow = true; scene.add(pole);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6, 8, 4), new THREE.MeshStandardMaterial({ color: i === 0 ? 0x3fa34d : 0xc0392b, side: THREE.DoubleSide, roughness: 0.9 })); flag.position.set(b.x + 1.3, y + 11, b.z); scene.add(flag);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6, 8, 4), new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.9 })); flag.position.set(b.x + 1.3, y + 11, b.z); scene.add(flag);
       this.baseMarkers.push({ ring, pole, flag });
+      if (central) this.controlMarker = { ring, flag };
     }
+  }
+  setControlTeam(team) {
+    const color = team === 0 ? 0x3fa34d : team === 1 ? 0xc0392b : 0xe0b458;
+    this.controlMarker.ring.material.color.setHex(color);
+    this.controlMarker.flag.material.color.setHex(color);
   }
   _loadHdri(renderer, H, quality) {
     const res = quality === 'low' ? '1k' : '2k';

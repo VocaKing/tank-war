@@ -8,6 +8,7 @@ const houseStyle = (r) => ({ style: 'stone', floors: r.next() < 0.45 ? 2 : 1, ro
 export const MAPS = [
   {
     id: 'village', name: 'Normandy Countryside', subtitle: 'Saint-Aubin-sur-Orne',
+    controlPoint: { x: 85, z: -132, r: 38 },
     desc: 'Rolling bocage farmland cut by a river, with a stone village and church at its heart. Dense hedgerows give superb concealment; three bridges and a ford are the key crossings.',
     seed: 1944, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 48, azimuth: 205 }, turbidity: 3.5, rayleigh: 1.4, fog: { color: 0xbcc8d2, density: 0.0011 }, exposure: 0.62,
@@ -69,6 +70,7 @@ export const MAPS = [
   },
   {
     id: 'forest', name: 'Carpathian Forest', subtitle: 'Valley of the Prut',
+    controlPoint: { x: -36, z: -96, r: 38 },
     desc: 'Steep wooded hills and a mountain stream. Spruce forests and clearings, a sawmill hamlet in the valley and a ruined watchtower on the ridge. Long sightlines are rare; ambushes are common.',
     seed: 3121, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 21, azimuth: 120 }, turbidity: 6, rayleigh: 2.0, fog: { color: 0xc7c3b4, density: 0.0019 }, exposure: 0.6,
@@ -117,6 +119,7 @@ export const MAPS = [
   },
   {
     id: 'desert', name: 'Al-Qasr Desert Town', subtitle: 'Wadi Rasheed',
+    controlPoint: { x: -45, z: 0, r: 46 },
     desc: 'A sun-baked town of flat-roofed sandstone houses, a mosque and a market, partly ruined by fighting. Dunes and a rocky mesa surround it; a dry wadi with an oasis cuts the south.',
     seed: 1991, playHalf: 600, terrainHalf: 700,
     sun: { elevation: 34, azimuth: 250 }, turbidity: 8, rayleigh: 1.1, fog: { color: 0xd8c6a6, density: 0.00095 }, exposure: 0.56,

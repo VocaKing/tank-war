@@ -76,6 +76,13 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .timer{font-size:20px;font-weight:700;min-width:64px}
 .caps{display:flex;gap:10px;margin-top:6px;justify-content:center}.cap{font-size:11px;width:180px}.cap .bar{display:block;height:5px;background:rgba(255,255,255,.12);border-radius:3px;margin-top:2px;overflow:hidden}
 .cap.ally i{display:block;height:100%;background:var(--enemy)}.cap.enemy i{display:block;height:100%;background:var(--ally)}
+.control-status,.control-marker{--point-color:#f6cb69;color:var(--point-color);background:rgba(14,22,31,.86);border:1px solid var(--point-color);border-radius:5px;font-weight:650}
+.control-status.ally,.control-marker.ally{--point-color:var(--ally)}
+.control-status.enemy,.control-marker.enemy{--point-color:var(--enemy)}
+.control-status{width:max-content;max-width:calc(100vw - 48px);margin:6px auto 0;padding:3px 8px;font-size:11px;white-space:nowrap}
+.control-status .bar{height:3px;margin:3px 0 1px;border-radius:2px;background:#fff2;overflow:hidden}
+.control-status .bar i{display:block;height:100%;background:var(--point-color)}
+.control-marker{position:absolute;left:0;top:0;padding:2px 6px;font-size:13px;pointer-events:none}
 .killfeed{position:absolute;right:14px;top:12px;display:flex;flex-direction:column;gap:3px;align-items:flex-end}
 .kf{background:var(--panel);padding:3px 10px;border-radius:4px;font-size:12px}.kf .a{color:var(--ally)}.kf .e{color:var(--enemy)}
 .mk{position:absolute;left:0;top:0;text-align:center;font-size:11px;white-space:nowrap}

@@ -15,6 +15,9 @@ export class AIController {
     this.retreatUntil = 0; this.sniperIdle = 0; this.lastHp = tank.hp; this.reserved = null; this.idleScan = Math.random() * 6;
     this.angleOff = (tank.spec.id === 'tiger' || tank.spec.id === 'sherman') ? (Math.random() < 0.5 ? 1 : -1) * 25 * DEG : 0;
     this.enemyBase = game.world.bases[1 - tank.team]; this.ownBase = game.world.bases[tank.team];
+    this.lastContact = 0;
+    this.controlDelay = 30 + game.ai.length * 0.75;
+    this.controlAngle = game.ai.length * 2.4;
     if (role === 'sniper' || role === 'defender') this.pickHold();
   }
   // --- helpers ---
@@ -49,6 +52,21 @@ export class AIController {
       return;
     } else if (this.state === 'defendBase') { this.state = 'advance'; if (this.hold) this.setGoal(this.hold); }
     if (this.state === 'retreat') { if (g.time > this.retreatUntil) { this.state = 'advance'; this.path = []; } return; }
+    const point = g.world.controlPoint;
+    if (this.state !== 'controlPoint' && !this.target && g.time - this.lastContact >= this.controlDelay) {
+      const radius = point.r * 0.52;
+      const cell = g.nav.nearestWalkable(...g.nav.toCell(
+        point.x + Math.cos(this.controlAngle) * radius,
+        point.z + Math.sin(this.controlAngle) * radius,
+      ));
+      const goal = g.nav.center(...cell);
+      this.hold = null;
+      this.claim(null);
+      this.state = 'controlPoint';
+      this.setGoal(Math.hypot(goal[0] - point.x, goal[1] - point.z) < point.r - 5 ? goal : [point.x, point.z]);
+      return;
+    }
+    if (this.state === 'controlPoint') return;
     if (this.hold) {
       if (this.role === 'sniper' && this.sniperIdle > 75) { this.hold = null; this.claim(null); this.role = 'assault'; this.path = []; }
       else return;
@@ -142,7 +160,9 @@ export class AIController {
         else if (k === 'selfDestruct' && this.t.hp < this.t.maxHp * 0.25 && this.target && this.t.pos.distanceTo(this.target.pos) < 25) this.t.tryAbility();
       }
       this.think = 0.25 + Math.random() * 0.1;
-      this.chooseTarget(); this.strategicGoal();
+      this.chooseTarget();
+      if (this.target) this.lastContact = g.time;
+      this.strategicGoal();
       if (this.target) this.planShot();
       if (this.hold && !this.target) this.sniperIdle += 0.3; else this.sniperIdle = 0;
       if (this.state !== 'retreat' && t.hp < t.maxHp * 0.3 && this.target && t.pos.distanceTo(this.target.pos) < 450 && !t.inBush) {
