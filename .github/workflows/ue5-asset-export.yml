@@ -43,17 +43,65 @@ jobs:
         run: |
           cp ../tools/tools_ue5_export.mjs ./tools_ue5_export.mjs
           node tools_ue5_export.mjs ue5-export
+      - name: Split exports into downloadable artifact groups
+        if: always()
+        working-directory: source
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const root='ue5-export';
+          const manifest=path.join(root,'catalog.json');
+          if(!fs.existsSync(manifest)) process.exit(0);
+          const catalog=JSON.parse(fs.readFileSync(manifest,'utf8'));
+          const files=catalog.vehicles.filter(x=>x.ok).map(x=>({name:x.id+'.sfveh',size:fs.statSync(path.join(root,x.id+'.sfveh')).size}));
+          const groups=[[],[]],sizes=[0,0];
+          for(const file of files.sort((a,b)=>b.size-a.size)){
+            const i=sizes[0]<=sizes[1]?0:1;
+            groups[i].push(file);sizes[i]+=file.size;
+          }
+          for(let i=0;i<2;i++){
+            const dir='ue5-export-vehicles-'+String.fromCharCode(97+i);
+            fs.mkdirSync(dir,{recursive:true});
+            for(const f of groups[i])fs.copyFileSync(path.join(root,f.name),path.join(dir,f.name));
+            fs.copyFileSync(manifest,path.join(dir,'catalog.json'));
+            console.log(dir,groups[i].length,'vehicles',sizes[i],'bytes');
+          }
+          const mapDir='ue5-export-maps';
+          fs.mkdirSync(mapDir,{recursive:true});
+          for(const m of catalog.exportedMaps.filter(x=>x.ok))fs.copyFileSync(path.join(root,m.id+'.sfmap'),path.join(mapDir,m.id+'.sfmap'));
+          fs.copyFileSync(manifest,path.join(mapDir,'catalog.json'));
+          console.log(mapDir,catalog.exportedMaps.filter(x=>x.ok).length,'maps');
+          NODE
       - name: Validate exported geometry manifest
         if: always()
         working-directory: source
         run: |
-          node -e "const fs=require('fs');const p='ue5-export/catalog.json';if(!fs.existsSync(p)){console.error('No export catalog produced');process.exit(1)}const c=JSON.parse(fs.readFileSync(p));const ok=c.vehicles.filter(x=>x.ok).length;const maps=c.exportedMaps.filter(x=>x.ok).length;console.log({vehicles:ok,totalVehicles:c.tanks.length,maps,totalMaps:c.maps.length});if(ok!==c.tanks.length||maps!==c.maps.length)process.exit(1)"
-      - name: Upload UE5 asset export
+          node -e "const fs=require('fs');const p='ue5-export/catalog.json';if(!fs.existsSync(p)){console.error('No export catalog produced');process.exit(1)}const c=JSON.parse(fs.readFileSync(p));const ok=c.vehicles.filter(x=>x.ok).length;const maps=c.exportedMaps.filter(x=>x.ok).length;console.log({vehicles:ok,totalVehicles:c.tanks.length,maps,totalMaps:c.maps.length});if(ok===0||maps!==c.maps.length)process.exit(1)"
+      - name: Upload vehicle geometry A
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: steel-front-ue5-asset-export
-          path: source/ue5-export/
+          name: steel-front-ue5-vehicles-a
+          path: source/ue5-export-vehicles-a/
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
+      - name: Upload vehicle geometry B
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: steel-front-ue5-vehicles-b
+          path: source/ue5-export-vehicles-b/
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
+      - name: Upload map geometry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: steel-front-ue5-maps
+          path: source/ue5-export-maps/
           if-no-files-found: warn
           compression-level: 0
           retention-days: 7
