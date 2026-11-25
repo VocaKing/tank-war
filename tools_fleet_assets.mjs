@@ -28,7 +28,7 @@ for (const file of files) {
     assert.equal(model.extras.fleetModelRevision, '2026-11-exterior-detail', id + ' is missing the revised model');
     assert.ok(model.extras.exteriorDetailParts > 16, id + ' is missing layered exterior fittings');
   } else {
-    assert.equal(model.extras.fleetModelRevision, '2026-11-concept-detail', id + ' is missing the revised concept model');
+    assert.equal(model.extras.fleetModelRevision, '2026-11-concept-detail-v2', id + ' is missing the revised concept model');
     assert.ok(model.extras.exteriorDetailParts > 22, id + ' is missing its new hull and turret fittings');
     for (const suffix of ['track', 'rubber']) {
       assert.ok(materials.some(m => m.name.toLowerCase().endsWith('_' + suffix) && m.normalTexture),
@@ -75,7 +75,7 @@ if (process.argv[2]) {
     for (const id of ids) {
       await page.evaluate(id => window.__menu.select(id), id);
       await page.waitForFunction(id => window.__menu.garage.current?.root.userData.fleetModelId === id, id);
-      const actual = await page.evaluate(() => {
+      const actual = await page.evaluate(id => {
         const { current } = window.__menu.garage;
         const model = current.root;
         const wheels = [];
@@ -83,12 +83,23 @@ if (process.argv[2]) {
         const track = current.meshes.find(node => node.isInstancedMesh);
         const previous = track?.instanceMatrix.array[14];
         current.moveRunningGear(.21, .21);
+        const rubber = current.meshes.find(({ material }) => material.name === id + '_Rubber');
+        let rubberBrightness;
+        if (rubber) {
+          const sample = document.createElement('canvas');
+          sample.width = sample.height = 8;
+          const context = sample.getContext('2d');
+          context.drawImage(rubber.material.map.image, 0, 0, 8, 8);
+          const values = context.getImageData(0, 0, 8, 8).data;
+          rubberBrightness = values.reduce((sum, value, i) => sum + (i % 4 === 3 ? 0 : value), 0) / (8 * 8 * 3);
+        }
         return {
           id: model.name, meshes: current.meshes.length, wheels: wheels.length,
           muzzles: current.muzzles.length, movedTrack: track?.instanceMatrix.array[14] !== previous,
           pitchFloor: current.gunPitchFloor(0, -.08, .3),
+          rubberBrightness,
         };
-      });
+      }, id);
       assert.equal(actual.id, id);
       assert.ok(actual.meshes > 8, id);
       assert.equal(actual.wheels, wheelCounts[id] || 0, id);
@@ -96,6 +107,10 @@ if (process.argv[2]) {
       if (!wheelCounts[id]) assert.ok(actual.movedTrack, id + ' has frozen track shoes');
       if (id === 'strv103') assert.ok(actual.pitchFloor <= 0, id + ' forces its barrel above level');
       if (wheelCounts[id]) assert.ok(!actual.movedTrack, id + ' unexpectedly renders track shoes');
+      if (!expectedExterior.has(id)) {
+        assert.ok(actual.rubberBrightness > 20 && actual.rubberBrightness < 100,
+          id + ' has an incorrect rubber albedo');
+      }
     }
     assert.deepEqual(errors, []);
   } finally {

@@ -7,9 +7,9 @@ import { foliageShading } from './vegetation.js';
 import { RNG } from '../util.js';
 
 const PRESETS = {
-  village: { layer: 0, dens: 1.0, col: [0.62, 0.68, 0.42], col2: [0.8, 0.74, 0.46], h: 0.55 },
-  forest: { layer: 1, dens: 0.85, col: [0.56, 0.64, 0.38], col2: [0.7, 0.66, 0.4], h: 0.6 },
-  desert: { layer: 1, dens: 0.16, col: [1.15, 0.95, 0.62], col2: [0.95, 0.8, 0.5], h: 0.45 },
+  village: { layer: 0, dens: 1.0, col: [0.62, 0.68, 0.42], col2: [0.8, 0.74, 0.46], h: 0.46 },
+  forest: { layer: 1, dens: 0.85, col: [0.56, 0.64, 0.38], col2: [0.7, 0.66, 0.4], h: 0.52 },
+  desert: { layer: 1, dens: 0.16, col: [1.15, 0.95, 0.62], col2: [0.95, 0.8, 0.5], h: 0.38 },
 };
 function bladeTexture(biome) {
   const size = 256;
@@ -24,7 +24,7 @@ function bladeTexture(biome) {
     const base = size - random.range(0, 15);
     const height = size * random.range(0.30, 0.88);
     const lean = (x - size / 2) * 0.20 + random.range(-31, 31);
-    const width = random.range(1.35, 3.85);
+    const width = random.range(1.12, 2.92);
     const hue = dry ? random.range(33, 51) : random.range(65, 99);
     const sat = dry ? random.range(23, 37) : random.range(32, 53);
     const value = random.range(30, 52);
@@ -99,8 +99,12 @@ export class Grass {
       const w = mb.splat[k * 4 + p.layer] * p.dens; if (h1 > w * 1.15 - 0.1) continue;
       if (t.occ[k] === OCC.ROAD || t.occ[k] === OCC.BUILDING || t.occ[k] === OCC.WATER) continue;
       const y = t.height(x, z); if (t.water[k] > -1e8 && y < t.water[k] + 0.1) continue;
-      const hs = p.h * (0.6 + hash(i * 3, j * 7) * 0.9) * (0.7 + w * 0.5);
-      e.set(0, h1 * 6.28, 0); q.setFromEuler(e); m.compose(v.set(x, y - 0.05, z), q, sc.set(hs * 1.6, hs, hs * 1.6)); this.mesh.setMatrixAt(n, m);
+      const growth = hash(i * 3, j * 7);
+      const hs = p.h * (0.57 + growth * growth * 0.94) * (0.74 + w * 0.47);
+      const spread = p.h * (0.95 + hash(j + 3, i - 9) * 0.81);
+      e.set(0, h1 * 6.28, 0); q.setFromEuler(e);
+      m.compose(v.set(x, y - 0.031, z), q, sc.set(spread, hs, spread));
+      this.mesh.setMatrixAt(n, m);
       const f = hash(i + 11, j + 13); this.colors.setXYZ(n, (c1[0] + (c2[0] - c1[0]) * f) / p.col[0], (c1[1] + (c2[1] - c1[1]) * f) / p.col[1], (c1[2] + (c2[2] - c1[2]) * f) / p.col[2]);
       if (++n >= max) break;
     }

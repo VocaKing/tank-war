@@ -6,7 +6,7 @@ const detailedExteriorIds = new Set([
   '2s38', 'archer', 'bmpt', 'centauro2', 'fv4005s1', 'm50ontos', 'sprutsd', 'strv103', 't14', 'xm8ags',
 ]);
 const exteriorRevision = '2026-11-exterior-detail';
-const conceptRevision = '2026-11-concept-detail';
+const conceptRevision = '2026-11-concept-detail-v2';
 const fleetIds = new Set([
   ...detailedExteriorIds,
   'aegis140', 'bastion125', 'cerberus135', 'harrier105', 'lancer120', 'leviathan160', 'raptor90',
