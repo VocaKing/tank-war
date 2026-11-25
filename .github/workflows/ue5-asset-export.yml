@@ -77,7 +77,7 @@ jobs:
         if: always()
         working-directory: source
         run: |
-          node -e "const fs=require('fs');const p='ue5-export/catalog.json';if(!fs.existsSync(p)){console.error('No export catalog produced');process.exit(1)}const c=JSON.parse(fs.readFileSync(p));const ok=c.vehicles.filter(x=>x.ok).length;const maps=c.exportedMaps.filter(x=>x.ok).length;console.log({vehicles:ok,totalVehicles:c.tanks.length,maps,totalMaps:c.maps.length});if(ok===0||maps!==c.maps.length)process.exit(1)"
+          node -e "const fs=require('fs');const p='ue5-export/catalog.json';if(!fs.existsSync(p)){console.error('No export catalog produced');process.exit(1)}const c=JSON.parse(fs.readFileSync(p));const ok=c.vehicles.filter(x=>x.ok).length;const maps=c.exportedMaps.filter(x=>x.ok).length;console.log({vehicles:ok,totalVehicles:c.tanks.length,maps,totalMaps:c.maps.length});if(ok!==c.tanks.length||maps!==c.maps.length)process.exit(1)"
       - name: Upload vehicle geometry A
         if: always()
         uses: actions/upload-artifact@v4
