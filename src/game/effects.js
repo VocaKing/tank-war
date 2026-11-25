@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { softSprite } from '../world/textures.js';
 import { ArtilleryVfx } from './artilleryVfx.js';
+import { TankWreckVfx } from './tankWreckVfx.js';
 
 const VS = `
 attribute float aSize; attribute vec4 aColor; attribute float aRot;
@@ -60,6 +61,7 @@ export class Effects {
   constructor(scene, renderer, dustColor = [0.55, 0.5, 0.42], quality = 'high') {
     this.scene = scene; this.smoke = new Particles(scene, 5000, false); this.fire = new Particles(scene, 2500, true);
     this.artillery = new ArtilleryVfx(scene, quality, dustColor);
+    this.wrecks = new TankWreckVfx(scene, quality, dustColor);
     this.dust = dustColor; this.lights = []; this.burners = []; this.tracers = []; this.debris = [];
     const flashes = quality === 'high' ? 4 : quality === 'medium' ? 2 : 1;
     for (let i = 0; i < flashes; i++) { const l = new THREE.PointLight(0xffaa55, 0, 60, 1.6); scene.add(l); this.lights.push({ l, t: 0, max: 0.1, i0: 0 }); }
@@ -70,7 +72,7 @@ export class Effects {
   }
   setScale(h, fovDeg) { const s = h * this.renderer.getPixelRatio() / (2 * Math.tan((fovDeg * Math.PI) / 360)); this.smoke.mat.uniforms.uScale.value = s; this.fire.mat.uniforms.uScale.value = s; }
   dispose() {
-    this.smoke.dispose(); this.fire.dispose(); this.artillery.dispose();
+    this.smoke.dispose(); this.fire.dispose(); this.artillery.dispose(); this.wrecks.dispose();
     this.tracerGeo.dispose(); this.tracerMat.dispose();
     this.debrisGeo.dispose(); this.debrisMat.dispose();
   }
@@ -118,6 +120,14 @@ export class Effects {
     this.flash(pos, 25, 0.05, 0xffe0a0);
   }
   penetration(pos) { this.sparks(pos, 40, [1, 0.65, 0.25]); for (let i = 0; i < 10; i++) this.smoke.emit({ x: pos.x, y: pos.y, z: pos.z, vx: (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 2, vz: (Math.random() - 0.5) * 3, life: 2.5, s0: 0.8, s1: 3, r: 0.2, g: 0.19, b: 0.18, a: 0.7, drag: 0.5 }); }
+  wreckBlast(pos, surfaceY, water, width, ammo) {
+    const scale = THREE.MathUtils.clamp(Math.sqrt(width / 3.2), 0.82, 1.18) * (ammo ? 1.24 : 1);
+    const { sparks, debris } = this.wrecks.budget;
+    this.wrecks.burst(pos, surfaceY, water, scale);
+    this.sparks(pos, sparks, [1, 0.72, 0.32]);
+    this.flash(pos, 1320 * scale, 0.28, 0xffa45c);
+    this.scatterDebris(pos, debris, scale);
+  }
   explosion(pos, big = true) {
     this.flash(pos, big ? 900 : 300, 0.5, 0xff8a3a);
     for (let i = 0; i < (big ? 70 : 30); i++) { const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.9, Math.random() - 0.5).normalize().multiplyScalar(4 + Math.random() * (big ? 16 : 8));
@@ -125,8 +135,20 @@ export class Effects {
     for (let i = 0; i < (big ? 60 : 25); i++) { const v = new THREE.Vector3(Math.random() - 0.5, Math.random(), Math.random() - 0.5).normalize().multiplyScalar(2 + Math.random() * 9);
       this.smoke.emit({ x: pos.x, y: pos.y + 1.5, z: pos.z, vx: v.x, vy: v.y + 2, vz: v.z, life: 4 + Math.random() * 4, s0: 3, s1: 14, r: 0.12, g: 0.11, b: 0.1, a: 0.85, drag: 0.4, grav: -0.6 }); }
     this.sparks(pos.clone().add(new THREE.Vector3(0, 1.5, 0)), 60, [1, 0.7, 0.3]);
-    for (let i = 0; i < (big ? 14 : 5); i++) { const m = new THREE.Mesh(this.debrisGeo, this.debrisMat); const s = 0.15 + Math.random() * 0.45; m.scale.set(s, s * 0.5, s * 1.4); m.position.copy(pos).y += 1.5; m.castShadow = true; this.scene.add(m);
-      this.debris.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 18, 6 + Math.random() * 14, (Math.random() - 0.5) * 18), w: new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8), t: 0 }); }
+    this.scatterDebris(pos.clone().add(new THREE.Vector3(0, 1.5, 0)), big ? 14 : 5);
+  }
+  scatterDebris(pos, count, scale = 1) {
+    for (let i = 0; i < count && this.debris.length < 140; i++) {
+      const m = new THREE.Mesh(this.debrisGeo, this.debrisMat);
+      const size = (0.15 + Math.random() * 0.45) * scale;
+      m.scale.set(size, size * 0.5, size * 1.4);
+      m.position.copy(pos);
+      m.castShadow = true;
+      this.scene.add(m);
+      const v = new THREE.Vector3((Math.random() - 0.5) * 18, 6 + Math.random() * 14, (Math.random() - 0.5) * 18);
+      const w = new THREE.Vector3(Math.random() * 8, Math.random() * 8, Math.random() * 8);
+      this.debris.push({ m, v: v.multiplyScalar(scale), w, t: 0 });
+    }
   }
   addBurner(obj, offset, dur = 40, intensity = 1) { this.burners.push({ obj, offset, t: 0, dur, k: intensity, acc: 0 }); }
   trackDust(pos, speed, inWater, dt) {
@@ -167,6 +189,6 @@ export class Effects {
     for (let i = this.debris.length - 1; i >= 0; i--) { const d = this.debris[i]; d.t += dt; d.v.y -= 9.81 * dt; d.m.position.addScaledVector(d.v, dt); d.m.rotation.x += d.w.x * dt; d.m.rotation.y += d.w.y * dt;
       const gy = ground(d.m.position.x, d.m.position.z); if (d.m.position.y < gy + 0.1) { d.m.position.y = gy + 0.1; d.v.multiplyScalar(0.3); d.v.y = Math.abs(d.v.y) * 0.3; d.w.multiplyScalar(0.5); }
       if (d.t > 25) { this.scene.remove(d.m); this.debris.splice(i, 1); } }
-    this.smoke.update(dt); this.fire.update(dt); this.artillery.update(dt, camera);
+    this.smoke.update(dt); this.fire.update(dt); this.artillery.update(dt, camera); this.wrecks.update(dt, camera);
   }
 }

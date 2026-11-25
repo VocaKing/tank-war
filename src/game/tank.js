@@ -537,8 +537,14 @@ export class Tank {
     if (!this.alive) return;
     this.alive = false; this.hp = 0; this.burning = 0;
     const g = this.game; burnModel(this.model);
-    const p = this.pos.clone(); p.y += this.spec.dims.hullH;
-    g.effects.explosion(p, true); g.audio.impact(p, 'explosion');
+    const d = this.spec.dims;
+    const p = this.model.body.localToWorld(new THREE.Vector3(0, d.hullH, 0));
+    const groundY = g.world.groundHeight(p.x, p.z);
+    const waterY = g.world.terrain.waterLevel(p.x, p.z);
+    const water = waterY > groundY + 0.02;
+    if (water) p.y = Math.max(p.y, waterY + 0.25);
+    g.effects.wreckBlast(p, Math.max(groundY, waterY), water, d.W, cause === 'ammo');
+    g.audio.impact(p, 'wreck');
     g.effects.addBurner(this.model.root, new THREE.Vector3(0, this.spec.dims.hullH + 0.3, -this.spec.dims.L * 0.25), 45, 1);
     if (cause === 'ammo' && !this.spec.casemate) {
       // turret blown off
