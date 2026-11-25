@@ -17,23 +17,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Checkout exporter branch
+        uses: actions/checkout@v4
+        with:
+          path: tools
       - name: Checkout pinned web source
         uses: actions/checkout@v4
         with:
           ref: 00fe26fad97af5653892a407c01594e2f3c40fc5
+          path: source
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: source/package-lock.json
       - name: Install web dependencies
+        working-directory: source
         run: npm ci
       - name: Install Chromium
+        working-directory: source
         run: npx playwright install --with-deps chromium
       - name: Export all vehicle and map geometry for UE5
-        run: node tools_ue5_export.mjs ue5-export
+        working-directory: source
+        run: |
+          cp ../tools/tools_ue5_export.mjs ./tools_ue5_export.mjs
+          node tools_ue5_export.mjs ue5-export
       - name: Validate exported geometry manifest
         if: always()
+        working-directory: source
         run: |
           node -e "const fs=require('fs');const p='ue5-export/catalog.json';if(!fs.existsSync(p)){console.error('No export catalog produced');process.exit(1)}const c=JSON.parse(fs.readFileSync(p));const ok=c.vehicles.filter(x=>x.ok).length;const maps=c.exportedMaps.filter(x=>x.ok).length;console.log({vehicles:ok,totalVehicles:c.tanks.length,maps,totalMaps:c.maps.length});if(ok!==c.tanks.length||maps!==c.maps.length)process.exit(1)"
       - name: Upload UE5 asset export
@@ -41,7 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: steel-front-ue5-asset-export
-          path: ue5-export/
+          path: source/ue5-export/
           if-no-files-found: warn
           compression-level: 0
           retention-days: 7
