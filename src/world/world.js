@@ -479,7 +479,10 @@ export class World {
     this.shadowInterval = quality === 'high' ? 1 / 30 : 1 / 24;
     this.shadowUpdatedAt = -Infinity;
     this.shadowFocus = new THREE.Vector3();
+    this.shadowVehiclePoses = new WeakMap();
     const S = quality === 'high' ? 88 : 102; this.shadowS = S; this.shadowTexel = (2 * S) / sm;
+    // Limit cached vehicle shadow drift to one texel, with a tighter bound on coarse maps.
+    this.shadowMotionLimit = Math.min(0.12, this.shadowTexel);
     Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 10, far: 800 });
     sun.shadow.bias = -0.00025; sun.shadow.normalBias = this.shadowTexel * 1.6; if (H && H.overcast) sun.shadow.radius = 6; else sun.shadow.radius = 2;
     scene.add(sun); scene.add(sun.target); this.sun = sun;
@@ -567,15 +570,43 @@ export class World {
     return best;
   }
   updateTerrainLOD(camera) { updateTerrainLOD(this.terrainGroup.userData.lodTiles, camera, this.terrainDetailDistance); }
-  updateShadowCenter(target, time = 0) {
-    // Shadow maps need fewer updates than the visible pose. Refresh at once
-    // after a teleport or camera handoff so a stale map never follows it.
-    if (time - this.shadowUpdatedAt < this.shadowInterval
-      && this.shadowFocus.distanceToSquared(target) < 12 * 12) return;
+  vehicleShadowsMoved(tanks) {
+    const center = this.sun.target.position;
+    const lightX = center.dot(this._lr), lightY = center.dot(this._lu);
+    const limit = this.shadowMotionLimit;
+    const onMap = (point, extent) => Math.abs(point.dot(this._lr) - lightX) <= extent
+      && Math.abs(point.dot(this._lu) - lightY) <= extent;
+    for (const tank of tanks) {
+      const { root } = tank.model;
+      const previous = this.shadowVehiclePoses.get(root);
+      if (!root.visible && !previous?.visible) continue;
+      const radius = Math.hypot(tank.spec.dims.L, tank.spec.dims.W) / 2;
+      const extent = this.shadowS + radius + tank.spec.dims.gunLen;
+      if (!onMap(root.position, extent) && !(previous && onMap(previous.position, extent))) continue;
+      if (!previous || previous.visible !== root.visible
+        || root.position.distanceToSquared(previous.position) >= limit * limit
+        || root.quaternion.angleTo(previous.quaternion) * radius >= limit) return true;
+    }
+    return false;
+  }
+  updateShadowCenter(target, time = 0, tanks = []) {
+    const s = this.sun;
+    // Reuse the map while the visible casters are still aligned with it.
+    if (!s.shadow.needsUpdate && time - this.shadowUpdatedAt < this.shadowInterval
+      && this.shadowFocus.distanceToSquared(target) < 12 * 12 && !this.vehicleShadowsMoved(tanks)) return;
     this.shadowUpdatedAt = time;
     this.shadowFocus.copy(target);
+    for (const { model: { root } } of tanks) {
+      const pose = this.shadowVehiclePoses.get(root) ?? {
+        position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), visible: false,
+      };
+      pose.position.copy(root.position);
+      pose.quaternion.copy(root.quaternion);
+      pose.visible = root.visible;
+      this.shadowVehiclePoses.set(root, pose);
+    }
     // stable shadows: snap the shadow centre to whole shadow-map texels in light space (no shimmering when moving)
-    const s = this.sun; const L = this.sunDir; const ty0 = this.terrain.height(target.x, target.z);
+    const L = this.sunDir; const ty0 = this.terrain.height(target.x, target.z);
     if (!this._lr) { this._lr = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), L).normalize(); this._lu = new THREE.Vector3().crossVectors(L, this._lr).normalize(); }
     const P = new THREE.Vector3(target.x, ty0, target.z); const tx_ = this.shadowTexel;
     const a = Math.round(P.dot(this._lr) / tx_) * tx_, b = Math.round(P.dot(this._lu) / tx_) * tx_, c = P.dot(L);

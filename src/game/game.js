@@ -36,6 +36,10 @@ function withinPathXZ(p, origin, dx, dz, radius) {
 const ALLY_NAMES = ['Sgt. Miller', 'Cpl. Novak', 'Lt. Hayes', 'Sgt. Dubois', 'Pvt. Kowalski', 'Cpt. Reyes', 'Sgt. Okafor', 'Lt. Varga'];
 const ENEMY_NAMES = ['Lt. Weber', 'Sgt. Volkov', 'Cpt. Brandt', 'Sgt. Petrov', 'Uffz. Krüger', 'Lt. Orlov', 'Sgt. Haas', 'Cpl. Zaitsev'];
 
+const SOLO_CONTROL_CAPTURE_SECONDS = 150;
+const CONTROL_CONTRIBUTION_STEP = 20;
+const MIN_CONTROL_CONTRIBUTION = 20;
+
 export class Game {
   static ZOOMS = [2, 4, 8, 16];
   constructor(renderer, uiRoot, audio, opts) {
@@ -51,7 +55,6 @@ export class Game {
     this.tanks = []; this.ai = [];
     this.spawnTeams(opts.tankId);
     this.player = this.tanks[0];
-    this.world.updateShadowCenter(this.player.pos, 0);
     this.contactShadows = new ContactShadows(this.world, this.tanks);
     this.trackMarks = new TrackMarks(this.world, this.tanks, this.quality);
     this.cam = { yaw: this.player.heading, pitch: -0.12, dist: 14, sniper: false, zoom: 4, fov: 60, follow: this.player };
@@ -314,8 +317,13 @@ export class Game {
     const previousTeam = control.team;
     if (control.occupied) {
       const signed = control.team === 1 ? -control.points : control.points;
+      let totalContribution = 0;
+      for (let i = 0; i < allies + enemies; i++) {
+        totalContribution += Math.max(MIN_CONTROL_CONTRIBUTION, 100 - CONTROL_CONTRIBUTION_STEP * i);
+      }
       // Unopposed vehicles first reverse enemy progress, then secure the point.
-      const next = clamp(signed + (allies - enemies > 0 ? 1 : -1) * Math.min(3, allies + enemies) * (100 / 60) * dt, -100, 100);
+      const direction = allies > 0 ? 1 : -1;
+      const next = clamp(signed + direction * totalContribution * dt / SOLO_CONTROL_CAPTURE_SECONDS, -100, 100);
       control.points = Math.abs(next);
       control.team = next > 0 ? 0 : next < 0 ? 1 : null;
     } else {
@@ -483,7 +491,7 @@ export class Game {
     this.armorView.update();
     // player bush ghosting
     const pb = this.player.alive ? this.player.inBush : null; this.world.veg.setPlayerBush(pb && !this.cam.sniper ? pb : pb);
-    this.world.updateShadowCenter(this.cam.follow.pos, this.time); this.world.update(dt, this.time, this.camera.position);
+    this.world.update(dt, this.time, this.camera.position);
     this.effects.update(dt, (x, z) => this.world.terrain.height(x, z), this.camera);
     this.audio.setListener(this.camera.position);
     if (this.player.alive && !this.ended) this.audio.engine(Math.abs(this.player.input.throttle), this.player.speed); else this.audio.stopEngine();
@@ -491,6 +499,7 @@ export class Game {
   }
   render() {
     this.frameRequested = false;
+    this.world.updateShadowCenter(this.cam.follow.pos, this.time, this.tanks);
     if (this.post) this.post.render(); else this.renderer.render(this.scene, this.camera);
     if (this.outline && !this.camOverride) this.outline.render(this.assist.outlineTarget(), this.camera);
   }
