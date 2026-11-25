@@ -90,20 +90,46 @@ function cloudAtlas() {
   return tex;
 }
 
+function cloudSilhouette(texture) {
+  const { data, width } = texture.image;
+  const tile = width / 2;
+  let diagonal = 0.5;
+  for (let y = 0; y < width; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!data[(y * width + x) * 4 + 3]) continue;
+      const u = (x % tile + 0.5) / tile - 0.5;
+      const v = (y % tile + 0.5) / tile - 0.5;
+      diagonal = Math.max(diagonal, Math.abs(u) + Math.abs(v));
+    }
+  }
+  // Keep the fully transparent atlas corners outside the geometry. One texel
+  // of bilinear filtering support per axis preserves all visible edge samples.
+  const edge = Math.min(0.5, diagonal + 2 / tile - 0.5);
+  const rim = [[0.5, edge], [edge, 0.5], [-edge, 0.5], [-0.5, edge],
+    [-0.5, -edge], [-edge, -0.5], [edge, -0.5], [0.5, -edge]];
+  const position = [], uv = [], indices = [];
+  for (let i = 0; i < rim.length; i++) {
+    const [x, y] = rim[i];
+    position.push(x, y, 0);
+    uv.push(x + 0.5, y + 0.5);
+    if (i >= 2) indices.push(0, i - 1, i);
+  }
+  return { position, uv, indices };
+}
+
 export class CloudVfx {
   constructor(scene, capacity) {
     this.puffs = [];
     this.draw = [];
     this.capacity = capacity;
-    this.forward = new THREE.Vector3();
     atlas ??= cloudAtlas();
     atlasUsers++;
 
     const geometry = new THREE.InstancedBufferGeometry();
-    const quad = new THREE.PlaneGeometry();
-    geometry.index = quad.index;
-    geometry.setAttribute('position', quad.getAttribute('position'));
-    geometry.setAttribute('uv', quad.getAttribute('uv'));
+    const silhouette = cloudSilhouette(atlas);
+    geometry.setIndex(silhouette.indices);
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(silhouette.position, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(silhouette.uv, 2));
     const attribute = (name, size) => {
       const buffer = new THREE.InstancedBufferAttribute(new Float32Array(capacity * size), size);
       geometry.setAttribute(name, buffer.setUsage(THREE.DynamicDrawUsage));
@@ -143,9 +169,8 @@ export class CloudVfx {
     if (!this.puffs.length) return;
     const draw = this.draw;
     draw.length = 0;
-    const eye = camera?.position;
-    if (eye) camera.getWorldDirection(this.forward);
-    const view = this.forward;
+    const view = camera?.matrixWorldInverse.elements;
+    const projection = camera?.isPerspectiveCamera ? camera.projectionMatrix.elements : null;
     let kept = 0;
     for (const puff of this.puffs) {
       const age = puff.age + dt;
@@ -168,8 +193,19 @@ export class CloudVfx {
         puff.cy += (Math.sin(angle) - 0.60 * (1 - Math.cos(angle))) * puff.roll * 0.76;
       }
       puff.diameter = mix(puff.initial, puff.size, elapsed ** 0.56);
-      puff.viewDepth = eye ? (puff.cx - eye.x) * view.x + (puff.cy - eye.y) * view.y + (puff.cz - eye.z) * view.z : age;
-      const nearFade = eye ? saturate((puff.viewDepth - puff.diameter * 0.14) / (puff.diameter * 0.23)) : 1;
+      puff.viewDepth = view ? -(view[2] * puff.cx + view[6] * puff.cy + view[10] * puff.cz + view[14]) : age;
+      if (projection) {
+        const depth = puff.viewDepth;
+        if (depth < camera.near || depth > camera.far) continue;
+        const x = view[0] * puff.cx + view[4] * puff.cy + view[8] * puff.cz + view[12];
+        const y = view[1] * puff.cx + view[5] * puff.cy + view[9] * puff.cz + view[13];
+        // A rolled billboard stays inside the half-diagonal of its square.
+        // Leave a small float margin and keep simulating puffs outside the view.
+        const radius = puff.diameter * Math.SQRT1_2 + 0.002;
+        if (Math.abs(x * projection[0] - depth * projection[8]) > depth + radius * projection[0]
+          || Math.abs(y * projection[5] - depth * projection[9]) > depth + radius * projection[5]) continue;
+      }
+      const nearFade = view ? saturate((puff.viewDepth - puff.diameter * 0.14) / (puff.diameter * 0.23)) : 1;
       const fade = Math.min(1, age / puff.fadeIn) * (1 - elapsed) ** (puff.heat ? 0.92 : 0.76);
       puff.opacity = puff.alpha * fade * nearFade;
       if (puff.opacity >= 0.012) draw.push(puff);

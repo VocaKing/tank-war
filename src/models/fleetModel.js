@@ -15,6 +15,7 @@ const fleetIds = new Set([
 const referenceImages = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
 const templates = new Map();
 const requests = new Map();
+const battleGlass = new WeakMap();
 const beltMaterial = new THREE.MeshStandardMaterial({
   color: 0x484137, roughness: .81, metalness: .36, side: THREE.DoubleSide,
 });
@@ -143,7 +144,7 @@ function moveTrack(track, distance) {
   }
 }
 
-export function createFleetModel(spec) {
+export function createFleetModel(spec, { battle = false } = {}) {
   const template = templates.get(spec.id);
   if (!template) return null;
   const root = template.root.clone(true);
@@ -164,7 +165,20 @@ export function createFleetModel(spec) {
   const tracks = template.tracks.map((layout, side) => trackInstance(root, side, layout));
   const meshes = [];
   root.traverse(node => {
-    if (node.isMesh) meshes.push(node);
+    if (node.isMesh) {
+      meshes.push(node);
+      const original = node.material;
+      // The small lenses can use environment reflections in battle. A single
+      // transmissive mesh would make Three.js draw the opaque world again.
+      if (battle && original.transmission > 0 && /Glass$/i.test(original.name)) {
+        if (!battleGlass.has(original)) {
+          const material = original.clone();
+          material.transmission = 0;
+          battleGlass.set(original, material);
+        }
+        node.material = battleGlass.get(original);
+      }
+    }
     if (node.name.startsWith('wheel_') && node.userData.radius > 0) {
       const steer = node.parent;
       wheels.push({ node, radius: node.userData.radius, side: steer.position.x < 0 ? 0 : 1 });

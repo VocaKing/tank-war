@@ -31,7 +31,7 @@ export class Tank {
     this.abilities = new Abilities(this);
     this.abilities.resetForBattle();
     if (this.abilities.magazine) this.reloadLeft = 0;
-    this.model = createTankModel(spec); game.scene.add(this.model.root);
+    this.model = createTankModel(spec, { battle: true }); game.scene.add(this.model.root);
     this.pos = new THREE.Vector3(); this.heading = 0; this.speed = 0; this.turnRate = 0; this.vel = new THREE.Vector3();
     this.airborne = false; this.afloat = false; this.landingSpeed = 0;
     this.quat = new THREE.Quaternion(); this.pitch = 0; this.roll = 0;

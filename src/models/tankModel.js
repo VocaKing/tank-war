@@ -696,7 +696,7 @@ export function loadDetailedTankModel(spec) {
 }
 
 export function createTankModel(spec, opts = {}) {
-  const fleet = createFleetModel(spec);
+  const fleet = createFleetModel(spec, opts);
   if (fleet) return fleet;
   if (spec.id === 'mauseng') {
     const imported = createMausModel(!!opts.links);

@@ -236,9 +236,11 @@ export class Game {
   setPaused(v) { if (this.ended) return; this.touch?.clear(); this.paused = v; this.hud.setPaused(v); if (v && document.pointerLockElement) document.exitPointerLock(); }
   exit() { this.dispose(); this.opts.onExit && this.opts.onExit(); }
   resize() {
-    this.camera.aspect = innerWidth / innerHeight;
+    this.viewportWidth = innerWidth;
+    this.viewportHeight = innerHeight;
+    this.camera.aspect = this.viewportWidth / this.viewportHeight;
     this.camera.updateProjectionMatrix();
-    if (this.post) this.post.resize(innerWidth, innerHeight);
+    if (this.post) this.post.resize(this.viewportWidth, this.viewportHeight);
     if (this.outline) this.outline.resize();
     this.frameRequested = true;
   }
@@ -334,12 +336,12 @@ export class Game {
     if (!hitP) hitP = pos;
     // Project the impact for the center. Size the ring from the gun's cone
     // and the camera's magnification, independent of the impact distance.
-    const cv = this.renderer.domElement.getBoundingClientRect();
-    const depth = -hitP.clone().applyMatrix4(this.camera.matrixWorldInverse).z;
-    const sp = hitP.clone().project(this.camera);
-    const sx = (sp.x * 0.5 + 0.5) * cv.width, sy = (-sp.y * 0.5 + 0.5) * cv.height;
+    const sp = hitP.clone().applyMatrix4(this.camera.matrixWorldInverse);
+    const depth = -sp.z;
+    sp.applyMatrix4(this.camera.projectionMatrix);
+    const sx = (sp.x * 0.5 + 0.5) * this.viewportWidth, sy = (-sp.y * 0.5 + 0.5) * this.viewportHeight;
     const cone = p.dispersion();
-    const radPx = dispersionPixels(cone, this.camera.projectionMatrix.elements[5], cv.height);
+    const radPx = dispersionPixels(cone, this.camera.projectionMatrix.elements[5], this.viewportHeight);
     this.reticleRadiusWorld = Math.tan(cone) * dist;
     this.reticleWorld = hitP.clone(); this.reticleDist = dist;
     if (depth <= this.camera.near || !Number.isFinite(sx+sy+radPx)) { hud.setReticle(-100, -100, 0, '', ''); return; }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ArtilleryVfx } from './src/game/artilleryVfx.js';
+import { CloudVfx } from './src/game/cloudVfx.js';
 import { TankWreckVfx } from './src/game/tankWreckVfx.js';
 import { RNG } from './src/util.js';
 
@@ -50,5 +51,23 @@ for (const quality of ['low', 'medium', 'high']) {
   artillery.dispose();
   assert.equal(atlasReleased, true);
 }
+
+const clouds = new CloudVfx(scene, 4);
+const billboard = { life: 8, initial: 4, size: 4, tint, fadeIn: 0.1 };
+const stationary = new THREE.Vector3();
+clouds.emit(new THREE.Vector3(0, 0, -20), stationary, billboard);
+clouds.emit(new THREE.Vector3(11, 0, -20), stationary, billboard);
+clouds.emit(new THREE.Vector3(30, 0, -20), stationary, billboard);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.updateMatrixWorld();
+clouds.update(0.2, camera);
+assert.deepEqual(clouds.draw.map(puff => puff.x), [0, 11], 'retain puffs overlapping the screen edge');
+assert.equal(clouds.puffs.length, 3, 'keep simulating puffs outside the frustum');
+camera.lookAt(30, 0, -20);
+camera.updateMatrixWorld();
+clouds.update(0.2, camera);
+assert.ok(clouds.draw.some(puff => puff.x === 30 && puff.age === 0.4), 'puffs return at their current age');
+clouds.dispose();
+
 assert.equal(scene.children.length, 0);
-console.log('Verified tank wreck shape, concurrent bursts, atlas lifetime and artillery on all graphics tiers.');
+console.log('Verified tank wreck shape, concurrent bursts, screen culling, atlas lifetime and artillery on all graphics tiers.');

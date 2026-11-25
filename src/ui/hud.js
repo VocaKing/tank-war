@@ -5,6 +5,8 @@ import { TANKS } from '../game/tankData.js';
 import { equipmentIcon, equipmentStatus } from './equipment.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const formatHp = new Intl.NumberFormat('en-US').format;
+const setText = (node, value) => { if (node.textContent !== value) node.textContent = value; };
 
 export class HUD {
   constructor(root, game) {
@@ -28,13 +30,34 @@ export class HUD {
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
-    this.$ = (id) => this.root.querySelector('#' + id);
+    const nodes = new Map(Array.from(this.root.querySelectorAll('[id]'), node => [node.id, node]));
+    this.$ = (id) => nodes.get(id);
+    this.panelHtml = new Map();
+    this.teams = ['ally', 'enemy'].map((side, team) => {
+      const container = this.$('h-' + side);
+      const count = el('b');
+      const pips = game.tanks.filter(tank => tank.team === team).map(tank => {
+        const pip = el('i');
+        pip.title = tank.name;
+        container.appendChild(pip);
+        return { tank, pip };
+      });
+      if (team === 0) container.prepend(count);
+      else container.appendChild(count);
+      return { count, pips, aliveClass: team === 0 ? 'a' : 'e' };
+    });
+    this.markerPosition = new THREE.Vector3();
     this.mini = this.$('h-mini').getContext('2d'); this.markerPool = []; this.markerStates = new WeakMap(); this.msgTimer = 0; this.feed = [];
     this.$('h-resume').onclick = () => game.setPaused(false);
     const aa = this.$('h-aa'); const aaTxt = () => { aa.textContent = 'Aim assist: ' + (game.assist.enabled ? 'ON' : 'OFF'); }; aaTxt();
     aa.onclick = () => { game.assist.setEnabled(!game.assist.enabled); try { localStorage.setItem('tw_aa', game.assist.enabled ? '1' : '0'); } catch (e) { /* private mode */ } aaTxt(); }; this.$('h-quit').onclick = () => game.exit();
     setTimeout(() => this.$('h-help').classList.add('fade'), 14000);
     this.buildMiniBase(); this.miniT = 0;
+  }
+  setPanelHtml(id, html) {
+    if (this.panelHtml.get(id) === html) return;
+    this.panelHtml.set(id, html);
+    this.$(id).innerHTML = html;
   }
   buildMiniBase() {
     const W = this.g.world; const T = W.terrain; const S = 260; const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
@@ -112,7 +135,7 @@ export class HUD {
     if (victim.isPlayer) this.message('YOU WERE DESTROYED — spectating allies (Esc for menu)', '#ff6050', true);
   }
   updateMarkers(camera, dt = 0) {
-    const G = this.g; const W = innerWidth, H = innerHeight; let n = 0; const v = new THREE.Vector3();
+    const G = this.g; const W = innerWidth, H = innerHeight; let n = 0; const v = this.markerPosition;
 
     // Advance damage animations even while an enemy marker is temporarily off-screen.
     for (const t of G.tanks) {
@@ -168,22 +191,28 @@ export class HUD {
       const state = ally ? null : this.markerStates.get(t);
       m.style.display = 'block';
       m.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
-      m.className = 'mk ' + (ally ? 'a' : 'e') + (!ally && state.flashTimer > 0 ? ' hit' : '');
+      const cls = 'mk ' + (ally ? 'a' : 'e') + (!ally && state.flashTimer > 0 ? ' hit' : '');
+      if (m.className !== cls) m.className = cls;
       const parts = m._parts;
-      parts.name.textContent = `${t.spec.short}${d < 700 ? ' · ' + Math.round(d) + 'm' : ''}`;
+      setText(parts.name, `${t.spec.short}${d < 700 ? ' · ' + Math.round(d) + 'm' : ''}`);
       if (ally) {
         parts.hpMeta.style.display = 'none';
-        parts.damage.textContent = '';
+        setText(parts.damage, '');
         parts.hpRow.style.width = '56px';
         parts.hpFill.style.width = (t.hp / t.maxHp * 100) + '%';
         if (t.reloadLeft > 0) { parts.reload.style.display = 'block'; parts.reloadFill.style.width = ((1 - t.reloadLeft / t.reloadTime()) * 100) + '%'; }
         else parts.reload.style.display = 'none';
       } else {
         parts.hpMeta.style.display = 'block';
-        parts.hpMeta.textContent = `HP ${Math.ceil(t.hp).toLocaleString('en-US')} / ${Math.round(t.maxHp).toLocaleString('en-US')}`;
+        const hp = Math.ceil(t.hp), maxHp = Math.round(t.maxHp);
+        if (parts.hp !== hp || parts.maxHp !== maxHp) {
+          parts.hpMeta.textContent = `HP ${formatHp(hp)} / ${formatHp(maxHp)}`;
+          parts.hp = hp;
+          parts.maxHp = maxHp;
+        }
         parts.hpRow.style.width = '132px';
         parts.hpFill.style.width = (state.displayHp / t.maxHp * 100) + '%';
-        parts.damage.textContent = state.damageTimer > 0 ? '−' + Math.round(state.damageTotal).toLocaleString('en-US') : '';
+        setText(parts.damage, state.damageTimer > 0 ? '−' + formatHp(Math.round(state.damageTotal)) : '');
         parts.reload.style.display = 'none';
       }
       n++;
@@ -192,10 +221,16 @@ export class HUD {
   }
   update(dt, camera) {
     const G = this.g, p = G.player;
-    const alive = (team) => G.tanks.filter((t) => t.team === team && t.alive).length; const tot = (team) => G.tanks.filter((t) => t.team === team).length;
-    const pips = (team, cls) => G.tanks.filter((t) => t.team === team).map((t) => `<i class="${t.alive ? cls : 'dead'}" title="${t.name}"></i>`).join('');
-    this.$('h-ally').innerHTML = `<b>${alive(0)}</b>${pips(0, 'a')}`; this.$('h-enemy').innerHTML = `${pips(1, 'e')}<b>${alive(1)}</b>`; void tot;
-    const tl = Math.max(0, G.timeLimit - G.time); this.$('h-timer').textContent = `${Math.floor(tl / 60)}:${String(Math.floor(tl % 60)).padStart(2, '0')}`;
+    for (const { count, pips, aliveClass } of this.teams) {
+      let alive = 0;
+      for (const { tank, pip } of pips) {
+        const cls = tank.alive ? aliveClass : 'dead';
+        if (pip.className !== cls) pip.className = cls;
+        if (tank.alive) alive++;
+      }
+      setText(count, String(alive));
+    }
+    const tl = Math.max(0, G.timeLimit - G.time); setText(this.$('h-timer'), `${Math.floor(tl / 60)}:${String(Math.floor(tl % 60)).padStart(2, '0')}`);
     this.$('h-cap0').style.width = G.capture[0].points + '%'; this.$('h-cap1').style.width = G.capture[1].points + '%';
     this.panelT = (this.panelT || 0) - dt; const doPanel = this.panelT <= 0; if (doPanel) this.panelT = 0.1;
     // vehicle panel
@@ -211,42 +246,43 @@ export class HUD {
     const kitStatus = s.armorPackages ? `装甲套件 · ${s.armorPackages[p.armorPackageIndex]?.name || '基础'}` : '';
     const movementStatus = p.afloat ? '浮航 · 主炮锁定' : [dozerStatus, specialStatus, kitStatus].filter(Boolean).join(' · ');
     const trackStatus = mobilityStatus;
-    this.$('h-veh').innerHTML = `<div class="vn">${s.short} <small>${s.nation} · ${s.era}</small></div>
+    this.setPanelHtml('h-veh', `<div class="vn">${s.short} <small>${s.nation} · ${s.era}</small></div>
       <div class="hpwrap"><div class="hpbar"><i style="width:${p.hp / p.maxHp * 100}%"></i><span>${Math.ceil(p.hp)} / ${p.maxHp}</span></div>${(p.abilities && p.abilities.magazine) ? `<div class="magfan" title="magazine">${Array.from({length: p.abilities.magazine.size}, (_, i) => `<i class="${i < p.abilities.magLeft ? 'on' : ''}"></i>`).join('')}</div>` : ''}</div>
       <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       ${movementStatus ? `<div class="crew"><span>${movementStatus}</span></div>` : ''}
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
-      ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`;
+      ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`);
     // equipment slots (keys 4/5/6)
     const E = p.equip; const lf = E.factor;
-    this.$('h-items').innerHTML = Array.from({ length: ITEM_SLOTS }, (_, i) => {
+    this.setPanelHtml('h-items', Array.from({ length: ITEM_SLOTS }, (_, i) => {
       const slot = E.slots[i];
       const { state, label, count } = equipmentStatus(slot);
       const name = slot?.def.name ?? 'Empty slot';
       const cooldown = state === 'cooldown' ? `<i style="width:${(1 - slot.cd / slot.def.cd) * 100}%"></i>` : '';
       return `<div class="item equipment-state-${state}" title="${name}"><kbd>${i + 4}</kbd>${equipmentIcon(slot?.id)}<div class="item-info"><span class="item-name">${name}</span>${slot ? `<small>${label}${count ? ` · ${count}` : ''}</small>` : ''}</div>${cooldown}</div>`;
-    }).join('') + `<div class="load">Load ${E.kg} kg · speed ×${lf.toFixed(3)}</div>`;
+    }).join('') + `<div class="load">Load ${E.kg} kg · speed ×${lf.toFixed(3)}</div>`);
     // ammo
-    this.$('h-ammo').innerHTML = s.shells.map((sh, i) => `<div class="slot ${!ability.usingSecondary && i === p.shellIdx ? 'sel' : ''} ${p.ammo[i] ? '' : 'empty'}"><b>${i + 1}</b><div>${sh.name}<small>${sh.type} · ${sh.pen} mm · ${sh.damage} dmg · ${sh.velocity} m/s</small></div><span>${p.ammo[i]}</span></div>`).join('') +
+    this.setPanelHtml('h-ammo', s.shells.map((sh, i) => `<div class="slot ${!ability.usingSecondary && i === p.shellIdx ? 'sel' : ''} ${p.ammo[i] ? '' : 'empty'}"><b>${i + 1}</b><div>${sh.name}<small>${sh.type} · ${sh.pen} mm · ${sh.damage} dmg · ${sh.velocity} m/s</small></div><span>${p.ammo[i]}</span></div>`).join('') +
       (s.secondary ? `<div class="slot ${ability.usingSecondary ? 'sel' : ''} ${p.secondaryRounds ? '' : 'empty'}"><b>G</b><div>${s.secondary.shell.name}<small>副炮 · ${p.secondaryReloadLeft > 0 ? p.secondaryReloadLeft.toFixed(1) + 's' : '就绪'}</small></div><span>${p.secondaryRounds}</span></div>` : '') +
-      `<div class="reload"><i style="width:${Math.max(0, 1 - p.fireReloadLeft / (ability.usingSecondary ? s.secondary.reload : p.reloadTime())) * 100}%"></i><span>${p.afloat ? '浮航中' : p.fireReloadLeft > 0 ? 'RELOADING ' + p.fireReloadLeft.toFixed(1) + 's' : 'READY'}</span></div>`;
+      `<div class="reload"><i style="width:${Math.max(0, 1 - p.fireReloadLeft / (ability.usingSecondary ? s.secondary.reload : p.reloadTime())) * 100}%"></i><span>${p.afloat ? '浮航中' : p.fireReloadLeft > 0 ? 'RELOADING ' + p.fireReloadLeft.toFixed(1) + 's' : 'READY'}</span></div>`);
     }
     // concealment
     const st = this.$('h-status'); const sinceFire = G.time - p.lastFired;
-    if (!p.alive) { st.textContent = ''; st.className = 'status'; }
-    else {
+    let statusText = '', statusClass = 'status';
+    if (p.alive) {
       const cam = Math.round((p.camo || 0) * 100); const vr = Math.round(Math.max(50, 400 * (1 - (p.camo || 0))));
       const why = `${p.inBush ? '🌿 IN BUSH' : 'IN THE OPEN'}${Math.abs(p.speed) > 1 ? ' · moving' : ''}${p.equip.has('camonet') && G.time - (p.lastMoving ?? G.time) > 3 ? ' · net' : ''}`;
-      if (sinceFire < 5) { st.textContent = `${why} — CAMO ${cam}% (firing: revealed ${(5 - sinceFire).toFixed(1)}s) · seen within ~${vr} m`; st.className = 'status revealed'; }
-      else if (p.inBush || cam >= 30) { st.textContent = `${why} — CAMO ${cam}% · seen within ~${vr} m (always within 50 m)`; st.className = 'status hidden'; }
-      else { st.textContent = ''; st.className = 'status'; }
+      if (sinceFire < 5) { statusText = `${why} — CAMO ${cam}% (firing: revealed ${(5 - sinceFire).toFixed(1)}s) · seen within ~${vr} m`; statusClass += ' revealed'; }
+      else if (p.inBush || cam >= 30) { statusText = `${why} — CAMO ${cam}% · seen within ~${vr} m (always within 50 m)`; statusClass += ' hidden'; }
     }
+    setText(st, statusText);
+    if (st.className !== statusClass) st.className = statusClass;
     this.$('h-spotted').style.display = p.alive && p.spotted[1] ? 'block' : 'none';
     // damage direction
     const dd = this.$('h-dmgdir'); if (this.dmgT > 0 && this.dmgSrc) { this.dmgT -= dt; const ang = Math.atan2(this.dmgSrc.x - p.pos.x, this.dmgSrc.z - p.pos.z) - G.cam.yaw; dd.style.display = 'block'; dd.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`; dd.style.opacity = Math.min(1, this.dmgT); } else dd.style.display = 'none';
     this.miniT -= dt; if (this.miniT <= 0) { this.miniT = 0.15; this.drawMini(); }
     this.updateMarkers(camera, dt);
-    this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; this.$('h-zoom').textContent = '×' + G.cam.zoom + '  ·  ' + G.camera.fov.toFixed(1) + '°';
+    this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; setText(this.$('h-zoom'), '×' + G.cam.zoom + '  ·  ' + G.camera.fov.toFixed(1) + '°');
     // aim-assist lock marker (just under the crosshair centre)
     const A = G.assist; const ah = this.$('h-assist'); let aTxt = '', aCls = 'assist';
     if (p.alive && G.lock) { aTxt = 'GUN LOCK · ' + G.lock.spec.short; aCls += ' gun'; }
@@ -260,7 +296,10 @@ export class HUD {
   setReticle(sx, sy, radius, state, text) {
     const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; r.style.visibility = sx === -100 && sy === -100 ? 'hidden' : ''; const ring = r.firstChild; const R = Math.max(0, Number.isFinite(radius) ? radius : 0);
     ring.hidden = R === 0;
-    ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; ring.style.boxSizing = 'border-box'; r.className = 'reticle ' + state + (this.g.player && this.g.player.dispersionProgress < 0.025 ? ' aimed' : ''); const pen = this.$('h-pen'); pen.textContent = text; pen.style.top = Math.max(22, Math.min(R + 8, 80)) + 'px';
+    ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; ring.style.boxSizing = 'border-box';
+    const cls = 'reticle ' + state + (this.g.player && this.g.player.dispersionProgress < 0.025 ? ' aimed' : '');
+    if (r.className !== cls) r.className = cls;
+    const pen = this.$('h-pen'); setText(pen, text); pen.style.top = Math.max(22, Math.min(R + 8, 80)) + 'px';
   }
   scoreboard(show) {
     const b = this.$('h-board'); if (!show) { b.style.display = 'none'; return; }
