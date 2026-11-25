@@ -111,6 +111,25 @@ function terrainMaterial(def, quality) {
         float wetRut = compacted * fineSediment * (terrainDetail == 2 ? 0.55 : terrainDetail == 0 ? 0.18 : 0.0);
         col *= mix(vec3(1.0), vec3(0.52, 0.48, 0.45), wetRut);
         tRough = mix(tRough, 0.47, wetRut);
+        #ifndef TERRAIN_LOW
+          // Follow the road centreline through bends and soften the shoulders with sand drift.
+          float paved = asphalt * roadFade;
+          float warp = disturbed * 0.8 + br * 0.55;
+          float longitudinal = vRoad.x * 1.22 + warp;
+          float transverse = vRoad.y * 0.29 + sin(longitudinal * 4.6) * 0.14 + warp;
+          vec2 jointWidth = fwidth(vec2(longitudinal, transverse));
+          if (paved > 0.015) {
+            vec2 joint = abs(fract(vec2(longitudinal, transverse)) - 0.5);
+            float fractures = 1.0 - min(smoothstep(0.010, 0.023 + jointWidth.x, joint.x),
+                                        smoothstep(0.007, 0.019 + jointWidth.y, joint.y));
+            float worn = paved * fine * smoothstep(0.36, 0.71, disturbed);
+            col *= 1.0 - worn * fractures * 0.44;
+            float drift = paved * smoothstep(1.25, 3.1, shoulder + disturbed * 1.35);
+            drift *= smoothstep(0.34, 0.65, br + 0.16 * disturbed);
+            col = mix(col, cA * vec3(0.88, 0.85, 0.80), drift * 0.51);
+            tRough = mix(tRough, 0.97, drift);
+          }
+        #endif
         float ripple = 0.0, furrowRelief = 0.0;
         vec2 furrowDir = vec2(0.0);
         float naturalDetail = fine * (1.0 - steep) * (1.0 - w.w);
@@ -149,9 +168,10 @@ function terrainMaterial(def, quality) {
             tRough = clamp(tRough + grain * 0.19, 0.35, 1.0);
           }
         #endif
-        float bankWet = vTerrainLight.y * mix(0.65, 1.0, smoothstep(0.15, 0.52, br));
-        col *= mix(vec3(1.0), vec3(0.67, 0.70, 0.59), bankWet);
-        tRough = mix(tRough, 0.52, bankWet * 0.85);
+        float bankWet = vTerrainLight.y * mix(0.45, 1.0, smoothstep(0.15, 0.65, br * 0.8 + br2 * 0.3));
+        vec3 wetTint = terrainDetail == 1 ? vec3(0.88, 0.75, 0.64) : vec3(0.59, 0.65, 0.52);
+        col *= mix(vec3(1.0), wetTint, bankWet);
+        tRough = mix(tRough, terrainDetail == 1 ? 0.89 : 0.55, bankWet * 0.85);
         diffuseColor.rgb *= col;`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = mix(tRough, 0.95, far * 0.5);')
       .replace('#include <aomap_fragment>', 'reflectedLight.indirectDiffuse *= tAO; reflectedLight.indirectSpecular *= tAO * tAO; reflectedLight.directDiffuse *= mix(1.0, tAO, 0.5) * vTerrainLight.x; reflectedLight.directSpecular *= vTerrainLight.x;')
@@ -172,7 +192,7 @@ function terrainMaterial(def, quality) {
           normal = normalize(T * nm.x + Bt * nm.y + normal * nm.z);
         }`);
   };
-  m.customProgramCacheKey = () => 'terrain8-' + def.id + '-' + quality;
+  m.customProgramCacheKey = () => 'terrain9-' + def.id + '-' + quality;
   return m;
 }
 

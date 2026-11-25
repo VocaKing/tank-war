@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RNG, smoothstep } from '../util.js';
 import { OCC } from './mapgen.js';
 
@@ -60,7 +61,38 @@ function vesselGeometry() {
   return new THREE.LatheGeometry(shape.map(([r, y]) => new THREE.Vector2(r, y)), 10);
 }
 
-const DETAIL_SHAPES = { curb: curbGeometry, stump: stumpGeometry, vessel: vesselGeometry };
+function branchGeometry() {
+  const pieces = [];
+  const add = (a, b, base, tip) => {
+    const start = new THREE.Vector3(...a), end = new THREE.Vector3(...b);
+    const axis = end.clone().sub(start);
+    const piece = new THREE.CylinderGeometry(tip, base, axis.length(), 6);
+    const bark = new THREE.Color(0x69523a), brokenWood = new THREE.Color(0xbb9665);
+    const color = new Float32Array(piece.attributes.position.count * 3);
+    const barkFaces = piece.groups[0].count;
+    const tips = new Set(piece.index.array.slice(barkFaces));
+    for (let i = 0; i < piece.attributes.position.count; i++) {
+      (tips.has(i) ? brokenWood : bark).toArray(color, i * 3);
+    }
+    piece.setAttribute('color', new THREE.BufferAttribute(color, 3));
+    const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
+    const center = start.add(end).multiplyScalar(0.5);
+    piece.applyQuaternion(rotation).translate(center.x, center.y, center.z);
+    pieces.push(piece);
+  };
+  add([0, 0, -0.5], [0.02, 0.02, 0.18], 0.092, 0.059);
+  add([0.02, 0.02, 0.18], [-0.10, -0.02, 0.51], 0.059, 0.022);
+  add([0.01, 0.03, -0.02], [0.24, 0.13, 0.29], 0.048, 0.020);
+  add([0.12, 0.10, 0.15], [0.33, 0.14, 0.21], 0.024, 0.010);
+  const result = mergeGeometries(pieces);
+  pieces.forEach(piece => piece.dispose());
+  return result;
+}
+
+const DETAIL_SHAPES = {
+  curb: curbGeometry, stump: stumpGeometry, vessel: vesselGeometry,
+  deadwood: branchGeometry, rubble: pebbleGeometry, scree: pebbleGeometry,
+};
 
 function roadEdges(map, quality, add) {
   if (map.def.id === 'forest') return;
@@ -129,6 +161,73 @@ function yardDetails(map, quality, add) {
       if (map.slope(x, z) > 0.26 || t.waterLevel(x, z) > y - 0.06) continue;
       add(forest ? 'stump' : 'vessel', x, y + height * 0.39, z, angle, size, height, size, rng.pick(palette));
       placements.push({ x, z });
+    }
+  }
+}
+
+function landscapeDebris(map, quality, add) {
+  const t = map.t, biome = map.def.id;
+  const rng = new RNG(map.def.seed + 27191);
+  const normal = new THREE.Vector3();
+  const wood = [0xe1d2bc, 0xb2b2a5, 0xaaa191].map(c => new THREE.Color(c));
+  const masonry = [0xa79a83, 0xbeaf98, 0x8a7f70, 0x986654].map(c => new THREE.Color(c));
+  const shale = [0x956f50, 0xb6906c, 0xd4ad82, 0x8f6a48].map(c => new THREE.Color(c));
+  const heightAt = (x, z) => {
+    const type = t.occAt(x, z);
+    if (type !== OCC.FREE && type !== OCC.TREE) return null;
+    const y = t.height(x, z);
+    return t.waterLevel(x, z) < y - 0.08 ? y : null;
+  };
+  if (biome === 'forest') {
+    // Occasional deadfall around trees and glades, approximately following the ground.
+    const chance = quality === 'high' ? 0.22 : 0.13;
+    for (const tree of map.trees) {
+      if (rng.next() >= chance || Math.max(Math.abs(tree.x), Math.abs(tree.z)) > map.play) continue;
+      const yaw = rng.range(0, Math.PI * 2), reach = rng.range(2, 5);
+      const x = tree.x + Math.sin(yaw) * reach, z = tree.z + Math.cos(yaw) * reach;
+      const y = heightAt(x, z), len = rng.range(0.9, 2.6);
+      const dx = Math.sin(yaw) * len / 2, dz = Math.cos(yaw) * len / 2;
+      const a = heightAt(x - dx, z - dz), b = heightAt(x + dx, z + dz);
+      if (y === null || a === null || b === null || Math.abs(a - b) > len * 0.45) continue;
+      if (Math.abs((a + b) / 2 - y) > 0.12) continue;
+      const thickness = rng.range(0.70, 1.25);
+      add('deadwood', x, (a + b + 2 * y) / 4 + 0.075 * thickness, z, yaw,
+        thickness, thickness, len, rng.pick(wood), -Math.atan2(b - a, len));
+    }
+    return;
+  }
+  if (biome === 'village') {
+    for (const b of map.buildings) {
+      if (!b.ruined) continue;
+      const cos = Math.cos(b.rot), sin = Math.sin(b.rot);
+      for (let i = 0, count = quality === 'high' ? 27 : 16; i < count; i++) {
+        const side = rng.next() < 0.5 ? -1 : 1;
+        const bx = side * (b.w / 2 + rng.range(1.7, 3.5)), bz = rng.range(-b.d * 0.51, b.d * 0.51);
+        const x = b.x + bx * cos + bz * sin, z = b.z - bx * sin + bz * cos;
+        const y = heightAt(x, z);
+        if (y === null) continue;
+        const size = rng.range(0.12, 0.37);
+        add('rubble', x, y + size * 0.14, z, rng.range(0, Math.PI * 2),
+          size, size * 0.55, size * 0.73, rng.pick(masonry), rng.range(-0.4, 0.4));
+      }
+    }
+    return;
+  }
+  // Flat debris at the foot of larger outcrops, elongated down the slope.
+  for (const rock of map.rocks) {
+    if (rock.s < 1.4 || rng.next() < 0.35) continue;
+    t.normal(rock.x, rock.z, normal);
+    const downhill = Math.atan2(normal.x, normal.z);
+    for (let i = 0, count = quality === 'high' ? 9 : 5; i < count; i++) {
+      const a = downhill + rng.range(-1.4, 1.4), d = rock.s * rng.range(1.3, 4);
+      const x = rock.x + Math.sin(a) * d, z = rock.z + Math.cos(a) * d;
+      const y = heightAt(x, z);
+      if (y === null) continue;
+      const size = rng.range(0.14, 0.40) * (1 - 0.43 * (d / (4 * rock.s)));
+      t.normal(x, z, normal);
+      if (normal.y < 0.7) continue;
+      const pitch = Math.atan2(normal.x * Math.sin(a) + normal.z * Math.cos(a), normal.y);
+      add('scree', x, y + size * 0.12, z, a, size * 0.69, size * 0.31, size * 1.17, rng.pick(shale), pitch);
     }
   }
 }
@@ -205,6 +304,7 @@ export class GroundDetails {
     };
     roadEdges(map, quality, add);
     if (map.def.id !== 'village') yardDetails(map, quality, add);
+    landscapeDebris(map, quality, add);
     const transform = new THREE.Object3D();
     transform.rotation.order = 'YXZ';
     for (const [kind, tiles] of shapes) {

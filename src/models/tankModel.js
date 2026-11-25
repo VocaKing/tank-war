@@ -23,7 +23,9 @@ function noiseTexture() {
   const S = 256; const d = new Uint8Array(S * S * 4); const n = makeNoise2D(77); const n2 = makeNoise2D(91);
   const N = 128; const f1 = tileField(n, N, 4, 5), f2 = tileField(n2, N, 12, 3);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    const v1 = Math.min(1, Math.max(0, sampleField(f1, N, x / S, y / S) * 1.2 + 0.5)); const v2 = Math.min(1, Math.max(0, sampleField(f2, N, x / S, y / S) * 1.2 + 0.5)); const v3 = Math.random();
+    const v1 = Math.min(1, Math.max(0, sampleField(f1, N, x / S, y / S) * 1.2 + 0.5)); const v2 = Math.min(1, Math.max(0, sampleField(f2, N, x / S, y / S) * 1.2 + 0.5));
+    const hash = Math.imul((x + y * S) ^ 0x13941, 0x45d9f3b);
+    const v3 = ((hash ^ (hash >>> 16)) & 255) / 255;
     const i = (y * S + x) * 4; d[i] = v1 * 255; d[i + 1] = v2 * 255; d[i + 2] = v3 * 255; d[i + 3] = 255;
   }
   NOISE_TEX = new THREE.DataTexture(d, S, S); NOISE_TEX.wrapS = NOISE_TEX.wrapT = THREE.RepeatWrapping; NOISE_TEX.magFilter = THREE.LinearFilter; NOISE_TEX.minFilter = THREE.LinearMipmapLinearFilter; NOISE_TEX.generateMipmaps = true; NOISE_TEX.needsUpdate = true;
@@ -49,7 +51,7 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         diffuseColor *= tc;
         vec3 nA = triN(vObjPos * 0.35, bw); vec3 nB = triN(vObjPos * 1.6, bw);
         float yL = vObjPos.y + uYOff;
-        float mud = smoothstep(uDirtY, uDirtY - 0.55, yL + (nA.r - 0.5) * 0.5);
+        float mud = 1.0 - smoothstep(uDirtY - 0.55, uDirtY, yL + (nA.r - 0.5) * 0.5);
         diffuseColor.rgb = mix(diffuseColor.rgb, uMud * (0.75 + 0.5 * nB.g), clamp(mud * 0.85, 0.0, 0.85));
         float up = smoothstep(0.55, 0.95, normalize(vObjN).y);
         diffuseColor.rgb = mix(diffuseColor.rgb, uDust, up * (0.06 + 0.16 * nA.g));
@@ -57,23 +59,26 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         if (normalize(vObjN).y < -0.4) diffuseColor.rgb *= 0.72;
         // v4 weathering: vertical rain/oil streaks on side faces, paint chipping (bare primer/steel) and soot near the top
         vec3 nN = normalize(vObjN); float side = 1.0 - abs(nN.y);
-        float streak = texture2D(uNoise, vec2((vObjPos.x + vObjPos.z) * 1.1, yL * 0.06)).g;
-        diffuseColor.rgb *= 1.0 - side * smoothstep(0.6, 0.85, streak) * 0.14;
-        float chip = triN(vObjPos * 5.5, bw).b * 0.6 + nB.g * 0.4;
-        float chipM = smoothstep(0.78, 0.82, chip) * (0.4 + 0.6 * nA.b);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.21, 0.19), chipM * 0.75);
-        float vRough = 0.86 + 0.3 * nB.r + mud * 0.2 - chipM * 0.35;`)
+        vec2 dripUV = vec2((vObjPos.x - vObjPos.z) * 1.42, yL * 0.16);
+        vec3 streak = texture2D(uNoise, dripUV).rgb;
+        float rain = side * smoothstep(0.52, 0.74, streak.g) * (1.0 - mud);
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(0.53, 0.48, 0.39), rain * 0.34);
+        vec3 fine = triN(vObjPos * 5.5, bw);
+        float wear = smoothstep(0.64, 0.80, fine.b * 0.57 + nB.g * 0.43) * (1.0 - mud * 0.80);
+        vec3 primer = mix(diffuseColor.rgb * vec3(0.61, 0.51, 0.42), vec3(0.24, 0.22, 0.19), wear);
+        diffuseColor.rgb = mix(diffuseColor.rgb, primer, wear * 0.82);
+        float vRough = 0.85 + 0.31 * nB.r + mud * 0.20 - wear * 0.46 + rain * 0.16;`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0);')
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
-          float hgt = (nA.r * uCast + nB.b * 0.12 + nB.r * 0.25) ;
+          float hgt = nA.r * uCast + nB.b * 0.12 + nB.r * 0.25 + fine.g * 0.068 - wear * 0.044;
           vec2 dHdxy = vec2(dFdx(hgt), dFdy(hgt)) * 0.9;
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX); float fDet = dot(vSigmaX, R1) * faceDirection;
           vec3 vGrad = sign(fDet) * (dHdxy.x * R1 + dHdxy.y * R2); normal = normalize(abs(fDet) * normal - vGrad * 0.02);
         }`);
   };
-  m.customProgramCacheKey = () => 'paint3';
+  m.customProgramCacheKey = () => 'paint4';
   return m;
 }
 const MATS = {};
@@ -158,8 +163,8 @@ function wheelGeometryLo(paintHex) {
 function sprocketGeometry(paintHex, id = '') {
   const col = new THREE.Color(paintHex).multiplyScalar(0.85); const parts = [];
   const add = (g) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = col.r; a[i * 3 + 1] = col.g; a[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
-  if (id === 'is2') {
-    // The IS-2 uses two removable 14-tooth drive rims on the rear sprocket.
+  if (id === 'is2' || id === 'm6a1') {
+    // Distinct 14-tooth drive rims on the rear sprocket.
     add(cylX(0.74, 0.72, 24, 0, 0, 0));
     add(cylX(0.38, 1.00, 16, 0, 0, 0));
     for (const side of [-1, 1]) {
@@ -228,7 +233,14 @@ function buildSherman(d) {
   for (const s of [-1, 1]) { P.add('hull', 'metal', cylZ(0.08, 0.12, 10, s * 1.05, 1.28, 2.82)); P.add('hull', 'glass', cylZ(0.06, 0.02, 10, s * 1.05, 1.28, 2.89)); }
   for (const x of [-0.55, 0.55]) { P.add('hull', 'paint', cylY(0.3, 0.05, 14, x, 1.95, 1.0)); P.add('hull', 'dark', box(0.12, 0.08, 0.05, x, 1.99, 1.3)); }
   // engine deck grilles, rear exhausts deflector, tools, fenders
-  for (let i = 0; i < 7; i++) P.add('hull', 'dark', box(1.7, 0.02, 0.06, 0, 1.93, -1.2 - i * 0.18));
+  for (const side of [-1, 1]) {
+    const x = side * 0.46;
+    P.add('hull', 'dark', box(0.86, 0.019, 1.28, x, 1.929, -1.77));
+    for (let i = 0; i < 11; i++) P.add('hull', 'paint', box(0.79, 0.021, 0.062, x, 1.944, -1.21 - i * 0.108, 0.20));
+    for (const dx of [-0.43, 0.43]) P.add('hull', 'paint', box(0.038, 0.034, 1.3, x + dx, 1.946, -1.77));
+    for (const z of [-2.41, -1.13]) P.add('hull', 'paint', box(0.87, 0.034, 0.041, x, 1.946, z));
+    K.grabRail(P, 'hull', [x - 0.14, 1.96, -2.39], [x + 0.14, 1.96, -2.39], 0.038);
+  }
   P.add('hull', 'paint', box(1.9, 0.3, 0.1, 0, 1.35, -3.12, -0.35));
   P.add('hull', 'wood', box(0.05, 0.05, 1.2, -1.15, 1.95, -0.4)); P.add('hull', 'metal', box(0.18, 0.04, 0.3, -1.15, 1.95, 0.3));
   for (const s of [-1, 1]) P.add('hull', 'paint', box(0.36, 0.03, 6.0, s * 1.31, 1.17, -0.05));
@@ -340,7 +352,17 @@ function buildT34(d) {
     for(const dz of [-0.30,0.30]) P.add('hull','metal',T(new THREE.TorusGeometry(0.203,0.014,6,24),side*1.28,1.25,z+dz,0,0,0));
     P.add('hull','paint',cylY(0.045,0.045,12,side*1.28,1.455,z));
   }
-  P.add('hull', 'dark', box(1.2, 0.03, 1.1, 0, 1.67, -1.4)); for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.3, 10, s * 0.55, 1.15, -3.0, 0.08, 0.6));
+  P.add('hull', 'dark', box(1.20, 0.025, 1.10, 0, 1.664, -1.40));
+  for (const s of [-1, 1]) {
+    P.add('hull', 'paint', box(0.065, 0.037, 1.14, s * 0.588, 1.677, -1.40));
+    for (let i = 0; i < 6; i++) {
+      const z = -1.84 + i * 0.149;
+      P.add('hull', 'paint', box(0.53, 0.037, 0.083, s * 0.28, 1.683, z, 0.27));
+    }
+    P.add('hull', 'metal', cylZ(0.08, 0.3, 10, s * 0.55, 1.15, -3.0, 0.08, 0.6));
+  }
+  P.add('hull', 'paint', box(0.041, 0.048, 1.13, 0, 1.682, -1.40));
+  for (const z of [-1.96, -0.84]) P.add('hull', 'paint', box(1.23, 0.041, 0.048, 0, 1.677, z));
   P.add('hull', 'metal', box(1.5, 0.05, 0.4, 0, 1.6, -2.6, 0.45));
   P.add('hull', 'wood', cylX(0.1, 2.0, 8, 0, 1.4, -3.05));
   // turret (cast)
@@ -518,13 +540,20 @@ const EXTRAS = {
 const templates = {};
 // one track link (shoe + grouser + guide horns + pins + optional rubber pad); outer side is -y (see placement)
 function linkGeometry(w, pitch, th, id) {
-  const rubberPad=['sherman','pershing','centurion','leo1','leo2a6','m1a2','chally2','merkava4','type99a'].includes(id);
+  const rubberPad=['sherman','m6a1','pershing','centurion','leo1','leo2a6','m1a2','chally2','merkava4','type99a'].includes(id);
   const eastern=['t34','is2','t72','t90m'].includes(id);
   const parts = [];
   const add = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   const steel = new THREE.Color(0x5b5750), dark = new THREE.Color(0x2c2a27), rub = new THREE.Color(0x151514), shiny = new THREE.Color(0x8a857c);
-  add(box(w, th * 0.6, pitch * 0.82, 0, 0, 0), steel);
-  add(box(w * 0.94, th * 0.5, pitch * 0.18, 0, -th * 0.45, 0), shiny); // grouser (outer, -y)
+  if (id === 'm6a1') {
+    for (const side of [-1, 1]) {
+      add(box(w * 0.47, th * 0.6, pitch * 0.82, side * w * 0.26, 0, 0), steel);
+      add(box(w * 0.43, th * 0.50, pitch * 0.16, side * w * 0.26, -th * 0.45, 0), shiny);
+    }
+  } else {
+    add(box(w, th * 0.6, pitch * 0.82, 0, 0, 0), steel);
+    add(box(w * 0.94, th * 0.5, pitch * 0.18, 0, -th * 0.45, 0), shiny); // grouser (outer, -y)
+  }
   if (rubberPad) for (const s of [-1,1]) {
     add(box(w*0.38,th*0.55,pitch*0.62,s*w*0.25,-th*0.45,0),rub);
     add(box(w*0.39,th*0.18,pitch*0.68,s*w*0.25,-th*0.22,0),steel);
@@ -621,7 +650,8 @@ function getTemplate(spec) {
   gunMount(b.P, b, spec, lathe);
   const gunPitchFloor = expansion ? expansionGunClearance(spec) : (yaw, min, max) => hullPitchFloor(b, yaw, min, max);
   const mats = sharedMats();
-  const seed = spec.id.length * 31 + 7; const dirtY = d.clearance + 0.75;
+  const seed = [...spec.id].reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 7);
+  const dirtY = d.clearance + 0.75;
   const opts = { dirtY, cast: b.cast ?? 0.5, mud: spec.paint.mud, dust: spec.paint.dust };
   const paint = paintMaterial(spec.paint, seed, 0, opts);
   const paintT = paintMaterial(spec.paint, seed, b.turretPos[1], { ...opts, cast: b.castTurret ?? opts.cast });

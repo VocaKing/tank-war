@@ -6,6 +6,7 @@ const detailedExteriorIds = new Set([
   '2s38', 'archer', 'bmpt', 'centauro2', 'fv4005s1', 'm50ontos', 'sprutsd', 'strv103', 't14', 'xm8ags',
 ]);
 const exteriorRevision = '2026-11-exterior-detail';
+const conceptRevision = '2026-11-concept-detail';
 const fleetIds = new Set([
   ...detailedExteriorIds,
   'aegis140', 'bastion125', 'cerberus135', 'harrier105', 'lancer120', 'leviathan160', 'raptor90',
@@ -40,12 +41,12 @@ export function loadFleetModel(spec) {
     import('three/addons/libs/meshopt_decoder.module.js'),
   ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
     const referenceImage = referenceImages.get(id);
-    const revision = detailedExteriorIds.has(id) ? exteriorRevision : null;
-    const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb${revision ? `?v=${revision}` : ''}`;
+    const revision = detailedExteriorIds.has(id) ? exteriorRevision : conceptRevision;
+    const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb?v=${revision}`;
     const { scene } = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);
     const root = required(scene, id);
     if (root.userData.fleetModelId !== id) throw new Error(`Incorrect vehicle in ${url}`);
-    if (revision && root.userData.fleetModelRevision !== revision) {
+    if (root.userData.fleetModelRevision !== revision) {
       throw new Error(`Incorrect detail revision in ${url}`);
     }
     if (referenceImage && root.userData.referenceImage !== referenceImage) {

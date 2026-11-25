@@ -19,7 +19,7 @@ for (const file of files) {
   const id = file.slice(0, -4);
   const asset = await readFile(new URL(file, root));
   const size = asset.readUInt32LE(12);
-  const { nodes, scenes } = JSON.parse(asset.subarray(20, 20 + size));
+  const { nodes, scenes, materials } = JSON.parse(asset.subarray(20, 20 + size));
   assert.ok(hasFleetModel(id), id + ' is missing its game binding');
   const model = nodes[scenes[0].nodes[0]];
   assert.equal(model.name, id);
@@ -27,6 +27,13 @@ for (const file of files) {
   if (expectedExterior.has(id)) {
     assert.equal(model.extras.fleetModelRevision, '2026-11-exterior-detail', id + ' is missing the revised model');
     assert.ok(model.extras.exteriorDetailParts > 16, id + ' is missing layered exterior fittings');
+  } else {
+    assert.equal(model.extras.fleetModelRevision, '2026-11-concept-detail', id + ' is missing the revised concept model');
+    assert.ok(model.extras.exteriorDetailParts > 22, id + ' is missing its new hull and turret fittings');
+    for (const suffix of ['track', 'rubber']) {
+      assert.ok(materials.some(m => m.name.toLowerCase().endsWith('_' + suffix) && m.normalTexture),
+        id + ' is missing its ' + suffix + ' surface relief');
+    }
   }
   if (expectedReferences.has(id)) {
     assert.equal(model.extras.referenceImage, expectedReferences.get(id), id + ' has the wrong reference image');
