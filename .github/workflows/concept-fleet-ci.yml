@@ -1,0 +1,63 @@
+name: Concept fleet gameplay and Blender verification
+
+on:
+  push:
+    branches:
+      - feature/concept-fleet-mechanics-blender-2026-11-24
+  workflow_dispatch:
+
+jobs:
+  gameplay:
+    name: Game build and browser mechanics
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Start development preview server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/vite.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:5173/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/vite.log
+          exit 1
+      - run: node tools_concept_fleet.mjs http://127.0.0.1:5173/
+      - run: node tools_vehicle_systems.mjs http://127.0.0.1:5173/
+      - run: node tools_spg.mjs http://127.0.0.1:5173/
+
+  blender:
+    name: Blender source and ten GLB exports
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source syntax
+        run: python3 -m py_compile tools/blender/build_concept_fleet.py
+      - name: Install Blender headless
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+          blender --version
+      - name: Export all ten models
+        run: |
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background --python tools/blender/build_concept_fleet.py -- --all
+          for id in aegis140 bastion125 harrier105 warden130 lancer120 leviathan160 thunderclad155 tempest155 cerberus135 raptor90; do
+            test -s "artifacts/concept-fleet/$id.glb"
+            test -s "artifacts/concept-fleet/$id.blend"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: concept-fleet-blender-assets
+          if-no-files-found: warn
+          path: |
+            artifacts/concept-fleet/*.glb
+            artifacts/concept-fleet/*.blend

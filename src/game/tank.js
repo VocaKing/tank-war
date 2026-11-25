@@ -5,6 +5,8 @@ import { DEG, clamp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
+import { findEraTile, useEraTile } from '../models/conceptERA.js';
+import { updateConceptTimers, precisionMultiplier, dozerSlopeBonus, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
 import { advanceBloom, incidence, MAX_BLOOM, MIN_DISPERSION_100M } from './combatMath.js';
 
 export const GRAVITY = 9.81;
@@ -38,6 +40,8 @@ export class Tank {
     this.suspensionMode = 'normal'; this.suspensionOffset = 0; this.hydroPitch = 0;
     this.weaponModeIndex = 0; this.burstLeft = 0; this.burstTimer = 0; this.burstShellIdx = 0; this.burstOffsetIndex = 0;
     this.apsCharges = spec.aps?.charges || 0; this.apsCooldown = 0;
+    this.apsRechargeTime = 0; this.eraSpent = new Set();
+    this.stationarySeconds = 0; this.suppressedFor = 0; this.mrsiQueue = null;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
     this.input = { throttle: 0, steer: 0, aim: new THREE.Vector3(0, 0, 0) };
     this.lastFired = -100; this.inBush = null; this.visibleUntil = [0, 0]; this.spotted = [false, false]; this.lastSeenPos = [null, null];
@@ -59,11 +63,11 @@ export class Tank {
   usesSpade() { return !!(this.spec.artillery?.spade || this.spec.recoilBrace); }
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
   reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= (s.artillery || s.recoilBrace) ? 0.9 : 0.7; return r; }
-  aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; return a; }
+  aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; if (this.spec.turretElectronicsWeakness && this.modules.turret < 1) a *= this.spec.turretElectronicsWeakness; if (this.suppressedFor > 0) a *= this.spec.openTop ? 1.9 : 1.28; return a; }
   // base dispersion: spec.dispersion = circle radius in metres at 100 m (fully aimed) -> radians
-  baseDispersion() { let d = Math.atan(Math.max(MIN_DISPERSION_100M,this.spec.dispersion) / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; return d; }
+  baseDispersion() { let d = Math.atan(Math.max(MIN_DISPERSION_100M,this.spec.dispersion) / 100); if (this.modules.gun < 1) d *= 1.5; if (!this.crewAlive('Gunner')) d *= 1.3; if (this.spec.turretElectronicsWeakness && this.modules.turret < 1) d *= 1.55; return d; }
   // current dispersion-circle radius (radians); every shell lands inside this cone
-  dispersion() { return this.baseDispersion() * this.bloom * (this.spec.hydroSuspension && this.suspensionMode === 'low' ? 0.88 : 1); }
+  dispersion() { return this.baseDispersion() * this.bloom * (this.spec.hydroSuspension && this.suspensionMode === 'low' ? 0.88 : 1) * precisionMultiplier(this) * (this.suppressedFor > 0 ? (this.spec.openTop ? 1.55 : 1.2) : 1); }
   placeAt(x, z, heading) {
     this.pos.set(x, this.game.world.groundHeight(x, z), z); this.heading = heading; this.turretYaw = 0; this.updateGround(1, true); this.syncModel();
   }
@@ -75,6 +79,7 @@ export class Tank {
     this.equip.update(dt); if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
     if (this.trackRepair > 0) { this.trackRepair -= dt; if (this.trackRepair <= 0) { this.modules[this.mobilityModule] = 1; if (this.isPlayer) this.game.hud.message(this.mobilityLabel + ' repaired', '#9fd39f'); } }
     if (this.apsCooldown > 0) this.apsCooldown = Math.max(0, this.apsCooldown - dt);
+    updateConceptTimers(this, dt);
     if (this.burning > 0) { this.burning -= dt; this.damage(this.maxHp * 0.012 * dt, this.lastAttacker, 'fire'); if (!this.alive) return; }
     const mobile = this.modules[this.mobilityModule] > 0;
     const driver = this.crewAlive('Driver') ? 1 : 0.65;
@@ -90,7 +95,8 @@ export class Tank {
     // Grade and power-to-weight reduce traction smoothly, but never zero it or force an
     // unwanted reverse command. This prevents tanks from becoming immobilised on river banks.
     const climbFactor = clamp(18 / ptw, 0.6, 1.5);
-    const slopeF = uphill > 0 ? clamp(1 - uphill * 0.9 * climbFactor, 0.25, 1) : 1 + Math.min(0.25, -uphill * 0.8);
+    let slopeF = uphill > 0 ? clamp(1 - uphill * 0.9 * climbFactor, 0.25, 1) : 1 + Math.min(0.25, -uphill * 0.8);
+    slopeF = Math.min(1.25, slopeF + dozerSlopeBonus(this, uphill));
     const wl = T.waterLevel(this.pos.x, this.pos.z); const depth = wl - this.groundY; this.inWater = depth > 0.15;
     // Deep water remains a meaningful slowdown, but must not reduce either gear to a crawl.
     const waterF = s.amphibious ? 1 : depth > 0 ? clamp(1 - depth * 0.18, 0.5, 1) : 1;
@@ -130,6 +136,7 @@ export class Tank {
     if (this.usesSpade()) this.updateSpade(dt, time);
     if (s.artillery?.autoDeploy) this.updateAutoArtillery(dt, time);
     if (this.burstLeft > 0) { this.burstTimer -= dt; if (this.burstTimer <= 0 && this.reloadLeft <= 0) this.fireBurstRound(time); }
+    if (this.mrsiQueue) updateConceptMRSI(this, dt, time);
     this.recoil = Math.max(0, this.recoil - dt * (s.artillery?.recoilRecovery || s.recoilBrace?.recoilRecovery || 1.2));
     // hull rocking spring (firing / braking)
     const decel = (this.speed - (this._lastSpeed ?? this.speed)) / Math.max(dt, 1e-4); this._lastSpeed = this.speed;
@@ -278,7 +285,7 @@ export class Tank {
     if (!(projectile.type?.heat || projectile.spec?.guided || projectile.spec?.apsThreat)) return false;
     const centre = this.pos.clone(); centre.y += this.spec.dims.hullH * 0.62;
     if (point.distanceTo(centre) > a.radius) return false;
-    this.apsCharges--; this.apsCooldown = a.cooldown;
+    this.apsCharges--; this.apsCooldown = a.cooldown; this.apsRechargeTime = 0;
     if (this.isPlayer) this.game.hud.message('ACTIVE PROTECTION · THREAT INTERCEPTED · ' + this.apsCharges + ' CHARGES', '#7edcff');
     return true;
   }
@@ -345,6 +352,7 @@ export class Tank {
     }
     if (this.spec.fireArc && Math.abs(this.turretYaw) > this.spec.fireArc * DEG + 0.01) return false;
     this.pendingFire = false;
+    if (this.spec.mrsi && this.ammo[this.shellIdx] >= 2) return fireConceptMRSI(this, time);
     const g = this.game, sh = this.shell;
     const mode = this.spec.multiTube?.modes?.[this.weaponModeIndex] || { count: 1, reloadMult: 1 };
     const count = Math.min(mode.count || 1, this.ammo[this.shellIdx]);
@@ -421,6 +429,12 @@ export class Tank {
       if (A.eraSide && (hullSide || turretSide)) eff += A.eraSide;
       if (A.skirt && hullSide) eff += A.skirt;
     } else if (!typeInfo.he && A.eraKE && (front || hullSide || turretSide)) eff += A.eraKE * (front ? 1 : 0.55);
+    const tile = findEraTile(this.spec, hit);
+    if (tile && !this.eraSpent.has(tile.key)) {
+      if (typeInfo.heat) eff += tile.group.heat || 0;
+      else if (!typeInfo.he && !typeInfo.hesh) eff += tile.group.ke || 0;
+    }
+    if (typeInfo.heat && this.spec.slatArmor && hit.face === 'rear') eff += this.spec.slatArmor.rearHeatBonus || 0;
     let tracks = false;
     if (hullSide && hit.local.y < zoneLowerSideY(this.spec.dims)) { tracks = true; eff += 20; }
     const overmatch = shellSpec.caliber > tmm * 3;
@@ -428,6 +442,14 @@ export class Tank {
     // world normal (for ricochet reflection)
     const nw = n.clone(); if (hit.part === 'turret') nw.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.turretYaw); nw.applyQuaternion(this.quat);
     return { eff, los, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
+  }
+  consumeERA(hit, shellSpec, typeInfo) {
+    const tile = findEraTile(this.spec, hit);
+    if (!tile || this.eraSpent.has(tile.key)) return false;
+    if (!typeInfo.heat && (typeInfo.he || typeInfo.hesh || !(tile.group.ke > 0))) return false;
+    this.eraSpent.add(tile.key);
+    useEraTile(this.model, tile.key);
+    return true;
   }
   // ----- damage -----
   damage(amount, attacker, cause) {

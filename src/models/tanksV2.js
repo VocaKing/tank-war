@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, taper, superEllipse, castLoft, Parts } from './geom.js';
 import * as K from './kit.js';
+import { buildConceptModel } from './conceptModels.js';
 
 const DEG = Math.PI / 180;
 // keep the part of a side profile polygon above y = fy (Sutherland–Hodgman against a horizontal line)
@@ -677,6 +678,7 @@ function pzh2000(d) {
 
 const V2 = { panther, is2, pershing, centurion, leo1, leo2a6, t90m, chally2, type99a, merkava4, pzh2000 };
 export function buildV2(d, spec) {
+  if (spec?.conceptFleet) return buildConceptModel(d, spec);
   const f = V2[spec && spec.id]; if (!f) throw new Error('No builder for ' + (spec && spec.id));
   return f(d);
 }

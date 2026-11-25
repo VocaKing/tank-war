@@ -83,6 +83,7 @@ export class Ballistics {
   heBlast(s, p) {
     const g = this.game; const R = s.spec.blastRadius || s.spec.caliber / 22;
     for (const t of g.tanks) { if (!t.alive) continue; const d = t.pos.distanceTo(p) - t.spec.dims.W * 0.5; if (d > R) continue;
+      if (t.spec.openTop && d < R) t.suppressedFor = Math.max(t.suppressedFor || 0, 4.5);
       const top = (t.armorProfile || t.spec.armor).hull.top[0]; const exposure = t.spec.openTop ? 1.55 : 1; const dmg = s.spec.damage * 0.25 * exposure * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
       if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
       if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) t.breakTracks(); }
@@ -110,6 +111,10 @@ export class Ballistics {
       g.effects.sparks(p, 30, [1, 0.85, 0.5], v.clone().normalize()); g.audio.impact(p, 'ricochet');
       if (fromPlayer) g.hud.hitMarker('ricochet'); if (toPlayer) g.hud.damageFrom(shooter, 0, 'Ricochet');
       return false;
+    }
+    if (tank.consumeERA?.(hit, s.spec, s.type)) {
+      g.effects.sparks(p, 16);
+      if (toPlayer) g.hud.message('Reactive armour tile spent', '#ffd27f');
     }
     const roll = ev.pen * g.rng.range(1 - PEN_RNG, 1 + PEN_RNG);
     g.lastTankHit = { pen: ev.pen, eff: ev.eff, waterF: ev.waterF || 1, waterDist: s.waterDist || 0, penetrated: roll >= ev.eff, tank };
