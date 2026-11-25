@@ -1,11 +1,10 @@
 // Main menu: garage (3D preview), tank stats, map selection, comparison table
-import { TANKS, TANK_BY_ID, SHELL_TYPES, TIER_NAMES, sanitizeLoadout } from '../game/tankData.js';
+import { TANKS, TANK_BY_ID, TIER_NAMES, sanitizeLoadout } from '../game/tankData.js';
 import { ITEMS, ITEM_IDS, ITEM_SLOTS, sanitizeItems, itemsKg, loadFactor, LOAD_AMPLIFY } from '../game/items.js';
 import { describeTankAbilities } from '../game/abilities.js';
 import { MAPS } from '../world/maps.js';
 import { equipmentIcon } from './equipment.js';
 
-const los = (a) => Math.round(a[0] / Math.cos((a[1] * Math.PI) / 180));
 const typeBadge = (type) => `<span class="ability-badge ${type}">${type === 'active' ? '主动' : '被动'}</span>`;
 
 function tankCard(t) {
@@ -88,7 +87,7 @@ export class Menu {
       const atk = TANK_BY_ID[this.atkTank] || TANK_BY_ID[this.tank];
       const tanks = TANKS.map((t) => `<option value="${t.id}" ${t.id === atk.id ? 'selected' : ''}>${t.short}</option>`).join('');
       const shells = atk.shells.map((s, i) => `<option value="${i}" ${i === (this.atkShellIdx || 0) ? 'selected' : ''}>${s.name} · ${s.type} · ${s.pen} mm</option>`).join('');
-      ban.innerHTML = `<b>ARMOR PREVIEW</b> vs <select id="av-tank">${tanks}</select> <select id="av-shell">${shells}</select> <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span>`;
+      ban.innerHTML = `<b>ARMOR PREVIEW · 100 m</b> vs <select id="av-tank">${tanks}</select> <select id="av-shell">${shells}</select> <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen</span>`;
       ban.style.display = 'flex';
       ban.querySelector('#av-tank').onchange = (e) => { this.atkTank = e.target.value; this.atkShellIdx = 0; this.refreshArmor(); };
       ban.querySelector('#av-shell').onchange = (e) => { this.atkShellIdx = +e.target.value; this.refreshArmor(); };
@@ -130,7 +129,7 @@ export class Menu {
       ${t.systemTag ? `<div class="tag">SYSTEM · ${t.systemTag}</div>` : ''}
       <p>${t.desc}</p>
       ${t.casemate ? `<p>Fixed gun. Release ${this.mobile ? 'the drive joystick' : 'WASD'} to aim with the hull.</p>` : ''}
-      ${bar('Hit points', t.hp, 2000)}${bar('Damage (' + (sh.type === 'HE' ? 'HE' : 'AP') + ')', sh.damage, 450)}${bar('Penetration', sh.pen, 760, ' mm')}${bar('Hull front (LOS)', los(a.hull.front), 700, ' mm')}${bar(upperArmor + ' front (LOS)', los(a.turret.front), 950, ' mm')}
+      ${bar('Hit points', t.hp, 2000)}${bar('Damage (' + (sh.type === 'HE' ? 'HE' : 'AP') + ')', sh.damage, 450)}${bar('Penetration', sh.pen, 760, ' mm')}${bar('Hull front thickness', a.hull.front[0], 700, ' mm')}${bar(upperArmor + ' front thickness', a.turret.front[0], 950, ' mm')}
       ${bar('Top speed', t.maxSpeed, 72, ' km/h')}${bar('Reload', t.reload, 19, ' s', true)}${t.casemate ? bar('Hull traverse', t.hullTraverse, 45, '°/s') : bar('Turret traverse', t.turretTraverse, 45, '°/s')}${bar('View range', t.viewRange, 520, ' m')}
       <table class="armor"><tr><th></th><th>Front</th><th>Side</th><th>Rear</th><th>Top</th></tr>
         <tr><td>Hull</td>${['front', 'side', 'rear', 'top'].map((k) => `<td>${a.hull[k][0]}<small>${a.hull[k][1] ? ' @' + a.hull[k][1] + '°' : ''}</small></td>`).join('')}</tr>
@@ -191,14 +190,14 @@ export class Menu {
   showTable(v) {
     const o = this.root.querySelector('#m-tbl'); if (!v) { o.style.display = 'none'; return; }
     const rows = [['Nation / era', (t) => `${t.nation} · ${t.era} (${t.year})`], ['Mass / power', (t) => `${t.mass} t · ${t.power} hp`], ['Hit points', (t) => t.hp], ['Main gun shell', (t) => t.shells[0].name], ['Damage (AP / alt / HE)', (t) => t.shells.map((s) => s.damage).join(' / ')], ['Penetration mm @100 m', (t) => t.shells.map((s) => s.pen).join(' / ')], ['Muzzle velocity m/s', (t) => t.shells.map((s) => s.velocity).join(' / ')],
-      ['Hull armor F/S/R mm', (t) => ['front', 'side', 'rear'].map((k) => t.armor.hull[k][0] + (t.armor.hull[k][1] ? '@' + t.armor.hull[k][1] + '°' : '')).join(' / ')], ['Turret armor F/S/R mm', (t) => ['front', 'side', 'rear'].map((k) => t.armor.turret[k][0] + (t.armor.turret[k][1] ? '@' + t.armor.turret[k][1] + '°' : '')).join(' / ')],
-      ['Effective hull front (LOS)', (t) => los(t.armor.hull.front) + ' mm'], ['Reload', (t) => t.reload + ' s'], ['Aim time / dispersion', (t) => `${t.aimTime} s / ${t.dispersion}–${t.maxDispersion} m @100 m`], ['Top speed fwd / rev', (t) => `${t.maxSpeed} / ${t.reverseSpeed} km/h`], ['Hull / turret traverse', (t) => `${t.hullTraverse} / ${t.turretTraverse} °/s`], ['Gun depression / elevation', (t) => `−${t.gunDepression}° / +${t.gunElevation}°`], ['View range', (t) => t.viewRange + ' m'], ['Crew', (t) => t.crew.length + (t.autoloader ? ' (autoloader)' : '')]];
+      ['Hull armor F/S/R mm', (t) => ['front', 'side', 'rear'].map((k) => t.armor.hull[k][0]).join(' / ')], ['Turret armor F/S/R mm', (t) => ['front', 'side', 'rear'].map((k) => t.armor.turret[k][0]).join(' / ')],
+      ['Reload', (t) => t.reload + ' s'], ['Aim time / dispersion', (t) => `${t.aimTime} s / ${t.dispersion}–${t.maxDispersion} m @100 m`], ['Top speed fwd / rev', (t) => `${t.maxSpeed} / ${t.reverseSpeed} km/h`], ['Hull / turret traverse', (t) => `${t.hullTraverse} / ${t.turretTraverse} °/s`], ['Gun depression / elevation', (t) => `−${t.gunDepression}° / +${t.gunElevation}°`], ['View range', (t) => t.viewRange + ' m'], ['Crew', (t) => t.crew.length + (t.autoloader ? ' (autoloader)' : '')]];
     rows.unshift(
       ['Tier / class', (t) => `${['I', 'II', 'III', 'IV'][t.tier - 1]} · ${t.cls}`],
       ['Chassis L × W (m)', (t) => `${t.dims.L.toFixed(2)} × ${t.dims.W.toFixed(2)}`],
     );
     o.innerHTML = `<div class="box wide"><h2>Tank comparison (${TANKS.length} tanks)</h2><div class="cmpwrap"><table class="cmp"><tr><th>Tank</th>${rows.map(([l]) => `<th>${l}</th>`).join('')}</tr>${TANKS.map((t) => `<tr class="${t.id === this.tank ? 'me' : ''}"><td><b>${t.short}</b></td>${rows.map(([, f]) => `<td>${f(t)}</td>`).join('')}</tr>`).join('')}</table></div>
-      <p class="note">Penetration falls with range (AP −18%/km, APCR −35%/km, APFSDS −6%/km, HEAT constant). Effective armor = thickness ÷ cos(impact angle). Ricochet above ${SHELL_TYPES.APCBC.ricochet}° (AP), ${SHELL_TYPES.APDS.ricochet}° (APDS), ${SHELL_TYPES.APFSDS.ricochet}° (APFSDS); HEAT/HESH ignore ricochet but are stopped by ERA, composite (×HEAT multiplier) and spaced skirts. Penetration rolls ±${Math.round(8)}% unless the shell caliber overmatches the plate (3×).</p><button id="m-close">Close</button></div>`;
+      <p class="note">Listed armor values are nominal plate thicknesses. Each impact angle comes from the struck model surface and the shell's arrival direction. Shell type, range and the target's armor modifiers determine the outcome. Penetration rolls vary by ±8%.</p><button id="m-close">Close</button></div>`;
     o.style.display = 'flex'; o.querySelector('#m-close').onclick = () => this.showTable(false);
   }
   show(v) { this.root.style.display = v ? '' : 'none'; }

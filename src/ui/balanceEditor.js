@@ -25,6 +25,7 @@ function render(){
  const t=draft.find(x=>x.id===selected),stock=STOCK_TANKS.find(x=>x.id===selected),published=PUBLISHED_TANKS.find(x=>x.id===selected);
  const title=make('div','section-title');title.append(make('h2','',t.name));const reset=make('button','','恢复本车发布值');reset.onclick=()=>{if(!confirm('恢复 '+t.short+' 的发布版数值？'))return;draft[draft.indexOf(t)]=clone(published);changed();render()};title.append(reset);main.append(title);
  const summary=make('div','balance-metrics');const metrics=()=>{summary.replaceChildren();for(const [name,value] of [['功重比',(t.power/t.mass).toFixed(1)+' hp/t'],['标准弹 DPM',Math.round(t.shells[0].damage*60/t.reload)],['总弹药',t.shells.reduce((a,s)=>a+s.count,0)+' 发']]){const card=make('div','balance-metric');card.append(make('small','',name),make('strong','',String(value)));summary.append(card);}};metrics();main.append(summary);
+ main.append(make('p','muted','装甲倾角由模型表面决定。每次命中的入射角、等效装甲和跳弹结果按弹道与命中面计算。本页可编辑标称厚度和附加防护。'));
  let group='',section,grid;
  for(const f of fields(stock)){
   if(group!==f.group){

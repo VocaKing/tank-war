@@ -62,7 +62,9 @@ function prepareSide(body, side, spec) {
   const simplified = new THREE.Group();
   simplified.name = 'Distant running gear ' + side;
   simplified.position.copy(track.position);
-  simplified.add(new THREE.Mesh(makeTrackBelt(poses, spec.dims.trackW), beltMaterial));
+  const belt = new THREE.Mesh(makeTrackBelt(poses, spec.dims.trackW), beltMaterial);
+  belt.userData.armorTrack = true;
+  simplified.add(belt);
   const rig = geometry[spec.id];
   const wheels = [...rig.wheels, ...rig.sprockets, ...rig.idlers, ...rig.rollers];
   const sign = Math.sign(track.position.x);

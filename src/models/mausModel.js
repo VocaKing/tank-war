@@ -102,6 +102,7 @@ function addRunningGear(track, source) {
   model.name = 'Maus detailed running gear';
   const low = new THREE.Mesh(source.lowBelt, lowTrackMaterial);
   low.name = 'Maus distant track silhouette';
+  low.userData.armorTrack = true;
   track.add(model, low);
   const batches = source.batches.map(({ geometry, material, parts }) => {
     const mesh = new THREE.InstancedMesh(geometry, material, parts.length);

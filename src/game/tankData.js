@@ -4,7 +4,7 @@ import { EXPANSION_TANKS } from './expansionTanks.js';
 import publishedBalance from './balanceDefaults.json';
 import { clone, effective, legacyMaxDispersion, loadLocal } from './balanceConfig.js';
 // Tank specifications. Figures are grounded in published real-world data
-// (armor in mm RHA / RHA-equivalent, slope in degrees from vertical,
+// (armor in mm RHA / RHA-equivalent, legacy slope annotations in degrees from vertical,
 // penetration in mm RHA at 100 m vs a flat plate, muzzle velocity in m/s).
 // HP / damage are gameplay abstractions layered on top of the armor model.
 // Dimensions are in metres. L is the chassis length, W is the configured
@@ -380,14 +380,14 @@ export const PEN_RNG = 0.08;
 export const TIER_NAMES = ['', 'Lights', 'Heavies', 'Mediums', 'Modern mediums'];
 // Effective armour model shared by hit resolution, AI, HUD and the armour-view shader.
 // part: 'hull'|'turret', face: 'front'|'side'|'rear'|'top'|'bottom', local: hit point in part space.
-export function armorZone(spec, part, face, local) {
+export function armorZone(spec, part, face, local, mantlet = false) {
   const A = spec.armor, d = spec.dims;
   if (part === 'hull') {
     if (face === 'front' && A.lowerFront && local.y < zoneLowerFrontY(d)) return [A.lowerFront, 'lower front'];
     if (face === 'side' && A.lowerSide && local.y < zoneLowerSideY(d)) return [A.lowerSide, 'lower side'];
     return [A.hull[face] || A.hull.bottom, face];
   }
-  if (face === 'front' && A.mantlet && Math.abs(local.x) < d.turretW * 0.24 && local.y > d.turretH * 0.12 && local.y < d.turretH * 0.88) return [A.mantlet, 'mantlet'];
+  if (A.mantlet && (mantlet || (face === 'front' && Math.abs(local.x) < d.turretW * 0.24 && local.y > d.turretH * 0.12 && local.y < d.turretH * 0.88))) return [A.mantlet, 'mantlet'];
   return [A.turret[face] || A.hull.top, face];
 }
 export const zoneLowerFrontY = (d) => d.clearance + (d.hullH - d.clearance) * 0.42;

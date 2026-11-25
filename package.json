@@ -12,7 +12,8 @@
     "@dimforge/rapier3d-compat": "0.19.3",
     "n8ao": "^2.1.0",
     "postprocessing": "^6.39.0",
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "three-mesh-bvh": "0.8.3"
   },
   "devDependencies": {
     "playwright": "1.48",

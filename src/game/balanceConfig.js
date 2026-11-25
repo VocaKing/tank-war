@@ -26,12 +26,12 @@ export function fields(t){
   for(const part of ['hull','turret']){
    if(!t.armor[part]?.[face])continue;
    const name=part==='hull'?'车体':t.casemate?'战斗室':'炮塔',p='armor.'+part+'.'+face;
-   out.push(def(p+'.0',name+'厚度','mm',0.1,3000,0.1,group),def(p+'.1',name+'倾角','°',0,89,0.1,group));
+   out.push(def(p+'.0',name+'厚度','mm',0.1,3000,0.1,group));
   }
  }
  for(const [key,name] of [['lowerFront','首下装甲'],['lowerSide','下侧装甲'],['mantlet','炮盾装甲']])if(t.armor[key]){
   const group=name;
-  out.push(def('armor.'+key+'.0','厚度','mm',0.1,3000,0.1,group),def('armor.'+key+'.1','倾角','°',0,89,0.1,group));
+  out.push(def('armor.'+key+'.0','厚度','mm',0.1,3000,0.1,group));
  }
  for(const [key,name,max] of [['era','正面 HEAT 反应装甲附加量',3000],['eraSide','侧面 HEAT 反应装甲附加量',3000],['eraKE','动能弹反应装甲附加量',3000],['skirt','侧裙附加防护',3000],['heatMult','HEAT 防护倍率',10]])if(key in t.armor)out.push(def('armor.'+key,name,key==='heatMult'?'×':'mm',key==='heatMult'?0.1:0,max,key==='heatMult'?0.01:1,'附加防护'));
  for(let i=0;i<t.shells.length;i++){
@@ -69,6 +69,8 @@ export function fields(t){
 }
 export const read=(obj,path)=>path.split('.').reduce((v,k)=>v[k],obj);
 function write(obj,path,value){const keys=path.split('.'),last=keys.pop();keys.reduce((v,k)=>v[k],obj)[last]=value;}
+// Discard retired angle fields on import without dropping the other saved values.
+const retiredArmorAngle = /^armor\.(?:(?:hull|turret)\.(?:front|side|rear|top|bottom)|lowerFront|lowerSide|mantlet)\.1$/;
 const plain=o=>o!==null&&typeof o==='object'&&!Array.isArray(o);
 export const clone=o=>JSON.parse(JSON.stringify(o));
 export function validate(config,baseline){
@@ -78,6 +80,7 @@ export function validate(config,baseline){
   const t=byId.get(id);if(!t||!plain(patch))throw Error('未知坦克或配置：'+id);
   const allowed=new Map(fields(t).map(f=>[f.path,f])), next={};
   for(const [path,value] of Object.entries(patch)){
+   if (retiredArmorAngle.test(path)) continue;
    const f=allowed.get(path);if(!f)throw Error(id+' 不支持字段 '+path);
    if(typeof value!=='number'||!Number.isFinite(value)||value<f.min||value>f.max||(f.step===1&&!Number.isInteger(value)))throw Error(t.short+' / '+f.label+'：必须为 '+f.min+' 至 '+f.max+' 的'+(f.step===1?'整数':'数值'));
    next[path]=value;

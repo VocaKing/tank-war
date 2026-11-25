@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createTankModel, updateRunningGear, burnModel } from '../models/tankModel.js';
 import { DEG, clamp, lerp, approach, approachAngle, wrapAngle } from '../util.js';
 import { armorZone, zoneLowerSideY } from './tankData.js';
+import { intersectArmor } from './armorGeometry.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 import { Abilities } from './abilities.js';
 import { Equipment } from './items.js';
@@ -54,9 +55,6 @@ export class Tank {
     this.lastFired = -100; this.inBush = null; this.visibleUntil = [0, 0]; this.spotted = [false, false]; this.lastSeenPos = [null, null];
     this.stats = { damage: 0, kills: 0, shots: 0, hits: 0, pens: 0, received: 0 };
     this.lastAttacker = null; this.lastDamagedAt = -100; this.inWater = false; this.groundY = 0; this.moved = 0;
-    this.hullBox = { x: spec.dims.W / 2, y0: 0.3, y1: spec.dims.hullH, z: spec.dims.L / 2 };
-    const d = spec.dims; const tc = d.turretBoxZ || 0;
-    this.turBox = { x: d.turretW / 2, y0: 0, y1: d.turretH, z0: tc - d.turretL / 2, z1: tc + d.turretL / 2 };
     this.inv = new THREE.Matrix4(); this.equip = new Equipment(this, items);
   }
   get shell() { return this.abilities.usingSecondary ? this.spec.secondary.shell : this.spec.shells[this.shellIdx]; }
@@ -492,39 +490,18 @@ export class Tank {
     if (i === this.shellIdx || !this.spec.shells[i] || this.ammo[i] <= 0) return;
     this.shellIdx = i; this.reloadLeft = Math.max(this.reloadLeft, this.reloadTime() * (this.reloadLeft > 0 ? 1 : 0.85));
   }
-  // ----- hit testing -----
-  // segment (world) vs hull and turret boxes; returns {t, part, face, local, n}
+  // Segment hit on the armor geometry at its current pose.
   rayTest(a, b) {
-    const la = _v.copy(a).applyMatrix4(this.inv), lb = _v2.copy(b).applyMatrix4(this.inv);
-    let best = null;
-    const hb = this.hullBox; const h = slab(la, lb, -hb.x, hb.x, hb.y0, hb.y1, -hb.z, hb.z);
-    if (h) best = { t: h.t, part: 'hull', axis: h.axis, sign: h.sign };
-    // turret local
-    const tp = this.model.turret.position; const c = Math.cos(this.turretYaw), s = Math.sin(this.turretYaw);
-    const ta = new THREE.Vector3(la.x - tp.x, la.y - tp.y, la.z - tp.z), tb = new THREE.Vector3(lb.x - tp.x, lb.y - tp.y, lb.z - tp.z);
-    const rot = (p) => { const x = p.x * c - p.z * s, z = p.x * s + p.z * c; p.x = x; p.z = z; return p; }; rot(ta); rot(tb);
-    const tbx = this.turBox; const t2 = this.turretGone ? null : slab(ta, tb, -tbx.x, tbx.x, tbx.y0, tbx.y1, tbx.z0, tbx.z1);
-    if (t2 && (!best || t2.t < best.t)) best = { t: t2.t, part: 'turret', axis: t2.axis, sign: t2.sign };
-    if (!best) return null;
-    const A = best.part === 'hull' ? la : ta, B = best.part === 'hull' ? lb : tb;
-    best.local = new THREE.Vector3().lerpVectors(A, B, best.t); best.ldir = new THREE.Vector3().subVectors(B, A).normalize();
-    best.face = best.axis === 1 ? (best.sign > 0 ? 'top' : 'bottom') : best.axis === 2 ? (best.sign > 0 ? 'front' : 'rear') : 'side'; best.sideSign = best.axis === 0 ? best.sign : 0;
-    return best;
+    return intersectArmor(this.model, this.spec, a, b, this.turretGone);
   }
-  // effective armour for a hit (from rayTest) and a shell; dist = shell travel
   armorAt(hit, shellSpec, typeInfo) {
     const armorSpec = this.armorProfile ? { ...this.spec, armor: this.armorProfile } : this.spec;
-    const A = armorSpec.armor; const [arm, zone] = armorZone(armorSpec, hit.part, hit.face, hit.local); const tmm = arm[0], slope = arm[1] * DEG;
-    let n;
-    if (hit.face === 'front') n = new THREE.Vector3(0, Math.sin(slope), Math.cos(slope));
-    else if (hit.face === 'rear') n = new THREE.Vector3(0, Math.sin(slope), -Math.cos(slope));
-    else if (hit.face === 'side') n = new THREE.Vector3(hit.sideSign * Math.cos(slope), Math.sin(slope), 0);
-    else n = new THREE.Vector3(0, hit.face === 'top' ? 1 : -1, 0);
-    // A ray's angle to the plate normal includes both armour slope and tank orientation.
-    // Use the geometric path length exactly, before ERA/skirts and track modifiers.
-    const cosA = -hit.ldir.dot(n);
+    const A = armorSpec.armor;
+    const [arm, zone] = armorZone(armorSpec, hit.part, hit.face, hit.local, hit.mantlet);
+    const tmm = arm[0];
+    const cosA = -hit.dirW.dot(hit.normalW);
     const { angle, los } = incidence(cosA, tmm);
-    if (cosA < 0) n.negate();
+    const normalW = hit.normalW.clone().multiplyScalar(cosA < 0 ? -1 : 1);
     let eff = los;
     const front = hit.face === 'front', hullSide = hit.part === 'hull' && hit.face === 'side';
     if (typeInfo.heat) { eff *= A.heatMult || 1; if (A.era && front) eff += A.era; if (A.eraSide && (hullSide || hit.part === 'turret' && hit.face === 'side')) eff += A.eraSide; if (A.skirt && hullSide) eff += A.skirt; }
@@ -535,13 +512,11 @@ export class Tank {
       else if (!typeInfo.he && !typeInfo.hesh) eff += tile.group.ke || 0;
     }
     if (typeInfo.heat && this.spec.slatArmor && hit.face === 'rear') eff += this.spec.slatArmor.rearHeatBonus || 0;
-    let tracks = false;
-    if (hullSide && hit.local.y < zoneLowerSideY(this.spec.dims)) { tracks = true; eff += 20; }
+    const tracks = hit.gear || (hullSide && hit.local.y < zoneLowerSideY(this.spec.dims));
+    if (tracks) eff += 20;
     const overmatch = shellSpec.caliber > tmm * 3;
     const ricochet = !typeInfo.he && angle > typeInfo.ricochet && !overmatch;
-    // world normal (for ricochet reflection)
-    const nw = n.clone(); if (hit.part === 'turret') nw.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.turretYaw); nw.applyQuaternion(this.quat);
-    return { eff, los, angle, ricochet, tracks, nominal: tmm, zone, normalW: nw };
+    return { eff, los, angle, ricochet, tracks, nominal: tmm, zone, normalW };
   }
   // ----- damage -----
   consumeERA(hit, shellSpec, typeInfo) {
@@ -620,18 +595,4 @@ export class Tank {
     this.trackRepairs.fill(0);
     this.updateTrackCondition();
   }
-}
-
-// slab test: returns {t, axis, sign} where sign is outward direction of entered face
-function slab(a, b, x0, x1, y0, y1, z0, z1) {
-  let tmin = 0, tmax = 1, axis = -1, sign = 0;
-  const A = [a.x, a.y, a.z], B = [b.x, b.y, b.z], lo = [x0, y0, z0], hi = [x1, y1, z1];
-  for (let i = 0; i < 3; i++) {
-    const d = B[i] - A[i];
-    if (Math.abs(d) < 1e-9) { if (A[i] < lo[i] || A[i] > hi[i]) return null; continue; }
-    let t0 = (lo[i] - A[i]) / d, t1 = (hi[i] - A[i]) / d, s = -1; if (t0 > t1) { const tt = t0; t0 = t1; t1 = tt; s = 1; }
-    if (t0 > tmin) { tmin = t0; axis = i; sign = s; } if (t1 < tmax) tmax = t1; if (tmin > tmax) return null;
-  }
-  if (axis < 0) return null; // started inside
-  return { t: tmin, axis, sign };
 }

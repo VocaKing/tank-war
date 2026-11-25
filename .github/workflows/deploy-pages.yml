@@ -27,6 +27,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install chromium
       - run: node tools_fleet_assets.mjs
+      - run: node tools_armor_geometry.mjs
+      - run: node tools_balance.mjs
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
       - run: npm run build

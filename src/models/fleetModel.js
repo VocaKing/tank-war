@@ -86,6 +86,7 @@ export function loadFleetModel(spec) {
       ), 0) / poses.length;
       const belt = new THREE.Mesh(makeTrackBelt(poses, spec.dims.trackW), beltMaterial);
       belt.name = `distant_track_${side}`;
+      belt.userData.armorTrack = true;
       belt.receiveShadow = true;
       belt.visible = false;
       body.add(belt);
@@ -167,7 +168,10 @@ export function createFleetModel(spec) {
     if (node.name.startsWith('wheel_') && node.userData.radius > 0) {
       const steer = node.parent;
       wheels.push({ node, radius: node.userData.radius, side: steer.position.x < 0 ? 0 : 1 });
-      node.traverse(part => { part.userData.runningGear = true; });
+      node.traverse(part => {
+        part.userData.runningGear = true;
+        if (part.isMesh && /rubber/i.test(part.material.name)) part.userData.armorTrack = true;
+      });
     }
     if (node.name.startsWith('steering_') && node.userData.steering) steerAxles.push(node);
     if (/^stabilizer_(left|right)$/.test(node.name)) stabilizers.push(node);

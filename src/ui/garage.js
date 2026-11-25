@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createTankModel, hasDetailedTankModel, loadDetailedTankModel } from '../models/tankModel.js';
 import { createFleetModel, hasFleetModel } from '../models/fleetModel.js';
-import { applyArmorPreview, clearArmorPreview } from './armorPreview.js';
+import { applyArmorPreview, clearArmorPreview, updateArmorPreview } from './armorPreview.js';
 import { pbrTex } from '../world/textures.js';
 import { sharedMediaUrl } from '../media.js';
 
@@ -60,7 +60,10 @@ export class Garage {
     window.addEventListener('pointercancel', end);
   }
   show(spec) {
-    if (this.current) this.turntable.remove(this.current.root);
+    if (this.current) {
+      clearArmorPreview(this.current);
+      this.turntable.remove(this.current.root);
+    }
     this.current = null;
     this.spec = spec;
     const id = spec.id;
@@ -144,6 +147,7 @@ export class Garage {
     const distance = Math.hypot(ORBIT_RADIUS, rise) * setback;
     this.scene.fog.near = distance;
     this.scene.fog.far = distance + 27;
+    if (this.armorMode) updateArmorPreview(this.current);
     this.renderer.render(this.scene, this.camera);
   }
 }

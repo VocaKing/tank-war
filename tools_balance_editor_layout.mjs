@@ -41,8 +41,9 @@ try {
    }
    for(const face of ['正面装甲','侧面装甲','后面装甲','顶部装甲','底部装甲']){
     const item=actual.find(x=>x.title===face);
-    if(item&&item.labels.length>4)throw new Error(TANKS[i].id+': '+face+' has more than four inputs');
+    if(item&&item.labels.length>2)throw new Error(TANKS[i].id+': '+face+' must only expose plate thickness');
    }
+   if(actual.some(section=>section.labels.some(label=>label.includes('倾角'))))throw new Error(TANKS[i].id+': obsolete armor angle input');
    report.push({id:TANKS[i].id,groups:actual.length,front:actual.find(x=>x.title==='正面装甲')?.labels.length||0,side:actual.find(x=>x.title==='侧面装甲')?.labels.length||0});
   }
   buttons[0].click();

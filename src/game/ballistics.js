@@ -72,7 +72,6 @@ export class Ballistics {
         if (kind) {
           const p = new THREE.Vector3().lerpVectors(_a, _b, bestT); s.dist += _a.distanceTo(p);
           done = this.onImpact(s, kind, p, hitTank, hitInfo);
-          if (!done) { s.pos.copy(p); if (kind === 'water') s.pos.y -= 0.02; }
         } else { s.dist += _a.distanceTo(_b); s.pos.copy(_b); }
       }
       const maxFlight = s.owner?.spec?.artillery?.maxFlightSeconds || (s.owner?.spec?.cls === 'Artillery' ? 42 : 8);

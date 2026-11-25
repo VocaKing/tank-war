@@ -346,11 +346,11 @@ export class Game {
     let state = 'neutral', text = `${Math.round(dist)} m`;
     if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
       const ev = this.ballistics.evaluate(hitTank, hitInfo, p.previewShell, dist);
-      if (ev.ricochet) { state = 'red'; text = `RICOCHET · ${ev.angle.toFixed(0)}°`; }
+      if (ev.ricochet) { state = 'red'; text = 'RICOCHET'; }
       else if (ev.eff <= ev.pen * (1-PEN_RNG)) { state = 'green'; text = `PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
       else if (ev.eff <= ev.pen * (1+PEN_RNG)) { state = 'yellow'; text = `CHANCE ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
       else { state = 'red'; text = `NO PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
-      text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(dist)} m`;
+      text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(ev.angle)}° · ${Math.round(dist)} m`;
     }
     if (p.afloat) { state = 'neutral'; text = '浮航中 · 主炮锁定'; }
     if (p.fireReloadLeft > 0 || p.afloat) state += ' reloading';

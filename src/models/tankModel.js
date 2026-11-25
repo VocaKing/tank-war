@@ -751,7 +751,7 @@ export function createTankModel(spec, opts = {}) {
   for (const s of [-1, 1]) {
     const tex = trackTexture().clone();
     const tm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0.55, color: 0x9a948c, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(tpl.track.geo, tm); m.position.x = s * trackX; m.castShadow = true; m.receiveShadow = true; body.add(m); tracks.push(m); meshes.push(m); trackTex.push(tex);
+    const m = new THREE.Mesh(tpl.track.geo, tm); m.position.x = s * trackX; m.userData.armorTrack = true; m.castShadow = true; m.receiveShadow = true; body.add(m); tracks.push(m); meshes.push(m); trackTex.push(tex);
     const li = new THREE.InstancedMesh(tpl.linkGeo, tpl.linkMat, tpl.nLinks); li.position.x = m.position.x; li.castShadow = true; li.receiveShadow = true; li.visible = false; li.frustumCulled = false; body.add(li); links.push(li); meshes.push(li);
   }
   // wheels: instanced (road wheels + idlers + return rollers) and sprockets

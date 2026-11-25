@@ -1,5 +1,5 @@
 // Gameplay-only ERA tile mapping. Visual tile meshes are deliberately deferred until bespoke vehicle models are ready.
-function bounds(spec, group) {
+export function eraBounds(spec, group) {
   const d = spec.dims, turret = group.part === 'turret';
   const width = turret ? d.turretW : d.W;
   const height = turret ? d.turretH : d.hullH;
@@ -16,7 +16,7 @@ export function findEraTile(spec, hit) {
   if (!hit || !groups.length) return null;
   for (const [groupIndex, group] of groups.entries()) {
     if (group.part !== hit.part || group.face !== hit.face) continue;
-    const b = bounds(spec, group);
+    const b = eraBounds(spec, group);
     const side = group.face === 'side' ? (hit.sideSign > 0 ? 1 : -1) : 0;
     const horizontal = group.face === 'side' ? hit.local.z : hit.local.x;
     const lo = group.face === 'side' ? b.zMin : b.crossMin;
