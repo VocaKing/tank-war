@@ -529,7 +529,7 @@ export class Tank {
   damage(amount, attacker, cause) {
     if (!this.alive || amount <= 0) return;
     amount = Math.min(amount, this.hp); this.hp -= amount; this.stats.received += amount; this.lastDamagedAt = this.game.time;
-    if (this.game.player && this.team !== this.game.player.team) this.game.hud?.recordEnemyDamage(this, amount, cause !== 'fire');
+    if (cause !== 'fire') this.game.hud?.recordDamage(this, amount);
     if (attacker && attacker !== this && attacker.team !== this.team) { attacker.stats.damage += amount; this.lastAttacker = attacker; }
     if (this.hp <= 0.5) this.destroy(attacker, cause);
   }
@@ -537,6 +537,7 @@ export class Tank {
     if (!this.alive) return;
     this.alive = false; this.hp = 0; this.burning = 0;
     const g = this.game; burnModel(this.model);
+    if (cause === 'ammo') g.hud?.recordModuleLoss(this, '弹药架殉爆');
     const d = this.spec.dims;
     const p = this.model.body.localToWorld(new THREE.Vector3(0, d.hullH, 0));
     const groundY = g.world.groundHeight(p.x, p.z);
@@ -555,20 +556,31 @@ export class Tank {
     if (attacker && attacker !== this && attacker.team !== this.team) attacker.stats.kills++;
     g.onKill(attacker, this, cause);
   }
+  damageModule(module) {
+    if (this.modules[module] !== 1) return false;
+    this.modules[module] = 0.5;
+    const label = {
+      engine: '发动机受损',
+      gun: '主炮受损',
+      turret: this.spec.casemate ? '炮架受损' : '炮塔座圈卡住',
+    }[module];
+    this.game.hud?.recordModuleLoss(this, label);
+    return true;
+  }
   // apply a resolved hit (penetration or HE blast) with module & crew effects
   applyPenetration(hit, shellSpec, attacker, dmg, trackHit = false) {
     const g = this.game; const r = g.rng; const msgs = [];
     const L = this.spec.dims.L; const lz = hit.local.z;
     if (hit.part === 'hull') {
-      if ((this.spec.engineZone === 'rear' && (lz < -L * 0.22 || hit.face === 'rear')) || (this.spec.engineZone === 'front' && (lz > L * 0.22 || hit.face === 'front'))) { if (this.modules.engine === 1) msgs.push('Engine damaged'); this.modules.engine = 0.5; if (r.next() < 0.22) { this.burning = 7; msgs.push('Fire!'); } }
+      if ((this.spec.engineZone === 'rear' && (lz < -L * 0.22 || hit.face === 'rear')) || (this.spec.engineZone === 'front' && (lz > L * 0.22 || hit.face === 'front'))) { if (this.damageModule('engine')) msgs.push('Engine damaged'); if (r.next() < 0.22) { this.burning = 7; msgs.push('Fire!'); } }
       const ar = this.spec.ammoRack;
       if (!ar.turretBustle && lz > ar.zMin && lz < ar.zMax && hit.local.y < ar.yMax && r.next() < ar.chance * (shellSpec.type === 'HEAT' ? 1.3 : 1)) { this.damage(this.hp + 1, attacker, 'ammo'); return ['AMMO RACK DETONATED']; }
       if (trackHit || hit.local.y < this.spec.dims.clearance + 0.5) {
         msgs.push(this.breakTracks(hit.sideSign || Math.sign(hit.local.x)));
       }
     } else {
-      if (hit.face === 'front' && r.next() < 0.35) { if (this.modules.gun === 1) msgs.push('Gun damaged'); this.modules.gun = 0.5; }
-      if (!this.spec.casemate && (hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3) { if (this.modules.turret === 1) msgs.push('Turret ring jammed'); this.modules.turret = 0.5; }
+      if (hit.face === 'front' && r.next() < 0.35 && this.damageModule('gun')) msgs.push('Gun damaged');
+      if (!this.spec.casemate && (hit.face === 'side' || hit.face === 'rear') && r.next() < 0.3 && this.damageModule('turret')) msgs.push('Turret ring jammed');
       if (this.spec.ammoRack.turretBustle && hit.face === 'rear') { this.ammo = this.ammo.map((n) => Math.floor(n * 0.4)); msgs.push('Bustle ammo cooked off – blow-out panels vented'); }
     }
     for (const c of this.crew) {
@@ -590,8 +602,15 @@ export class Tank {
     this.modules[this.mobilityModule] = (Number(this.trackRepairs[0] === 0) + Number(this.trackRepairs[1] === 0)) / 2;
   }
   breakTracks(side = 0) {
-    if (side <= 0) this.trackRepairs[0] = TRACK_REPAIR_TIME;
-    if (side >= 0) this.trackRepairs[1] = TRACK_REPAIR_TIME;
+    const part = this.mobilityModule === 'wheels' ? '侧车轮损毁' : '履带断裂';
+    if (side <= 0) {
+      if (!this.trackRepairs[0]) this.game.hud?.recordModuleLoss(this, '左' + part);
+      this.trackRepairs[0] = TRACK_REPAIR_TIME;
+    }
+    if (side >= 0) {
+      if (!this.trackRepairs[1]) this.game.hud?.recordModuleLoss(this, '右' + part);
+      this.trackRepairs[1] = TRACK_REPAIR_TIME;
+    }
     this.updateTrackCondition();
     if (side < 0) return 'Left ' + this.mobilityLabel.toLowerCase() + ' damaged';
     if (side > 0) return 'Right ' + this.mobilityLabel.toLowerCase() + ' damaged';

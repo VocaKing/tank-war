@@ -8,6 +8,33 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 const formatHp = new Intl.NumberFormat('en-US').format;
 const setText = (node, value) => { if (node.textContent !== value) node.textContent = value; };
 
+const DAMAGE_HOLD = 0.22;
+const DAMAGE_DRAIN = 0.65;
+const HEALTH_LAYERS = '<i class="hp-trail"></i><i class="hp-fill"></i>';
+const HEALTH_EVENTS = '<div class="hp-events"><div class="damage"></div><div class="module-loss"></div></div>';
+
+function trailingHp(state, hp, now) {
+  if (!state || state.trailStart <= hp) return hp;
+  const progress = Math.min(1, Math.max(0, (now - state.hitAt - DAMAGE_HOLD) / DAMAGE_DRAIN));
+  return hp + (state.trailStart - hp) * (1 - progress) ** 2;
+}
+
+function updateHealthDisplay(parts, tank, state, now) {
+  const hp = tank.hp / tank.maxHp;
+  parts.bar.style.setProperty('--hp-fill', hp);
+  parts.bar.style.setProperty('--hp-trail', trailingHp(state, tank.hp, now) / tank.maxHp);
+  parts.bar.classList.toggle('hp-hit', !!state && now - state.hitAt < DAMAGE_HOLD);
+  setText(parts.damage, state?.damageUntil > now ? '−' + formatHp(Math.max(1, Math.round(state.damageTotal))) : '');
+  let modules = '';
+  if (state?.moduleNotices) {
+    for (const [name, until] of state.moduleNotices) {
+      if (until <= now) state.moduleNotices.delete(name);
+      else modules += (modules ? ' · ' : '') + name;
+    }
+  }
+  setText(parts.modules, modules);
+}
+
 export class HUD {
   constructor(root, game) {
     this.g = game; this.root = el('div', 'hud'); root.appendChild(this.root);
@@ -25,7 +52,9 @@ export class HUD {
       <div class="msgs" id="h-msgs"></div>
       <div class="dmgdir" id="h-dmgdir"></div>
       <div class="spotted" id="h-spotted">⚠ SPOTTED</div>
-      <div class="panel left" id="h-veh"></div>
+      <div class="panel left" id="h-veh"><div class="vn" id="h-veh-name"></div>
+        <div class="hpwrap"><div class="hpbar health-track">${HEALTH_LAYERS}<span id="h-veh-hp"></span></div><div class="magfan" id="h-veh-magazine" title="magazine"></div>${HEALTH_EVENTS}</div>
+        <div id="h-veh-info"></div></div>
       <div class="combat-deck"><div class="status" id="h-status"></div><div class="panel items" id="h-items"></div><div class="panel ammo" id="h-ammo"></div></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
       <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>G vehicle ability · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
@@ -48,7 +77,14 @@ export class HUD {
       else container.appendChild(count);
       return { count, pips, aliveClass: team === 0 ? 'a' : 'e' };
     });
+    const playerPanel = this.$('h-veh');
+    this.playerHealth = {
+      bar: playerPanel.querySelector('.hpbar'),
+      damage: playerPanel.querySelector('.damage'),
+      modules: playerPanel.querySelector('.module-loss')
+    };
     this.markerPosition = new THREE.Vector3();
+    this.hullCorner = new THREE.Vector3();
     const point = game.world.controlPoint;
     this.controlPosition = new THREE.Vector3(point.x, game.world.groundHeight(point.x, point.z) + 14, point.z);
     this.mini = this.$('h-mini').getContext('2d'); this.markerPool = []; this.markerStates = new WeakMap(); this.msgTimer = 0; this.feed = [];
@@ -146,107 +182,103 @@ export class HUD {
     if (src) { this.dmgSrc = src.pos.clone(); this.dmgT = 2.5; }
     this.$('h-veh').classList.add('flash'); setTimeout(() => this.$('h-veh').classList.remove('flash'), 300);
   }
-  recordEnemyDamage(tank, amount, showNumber = true) {
-    if (!tank || !Number.isFinite(amount) || amount <= 0 || tank.team === this.g.player.team) return;
+  healthState(tank) {
     let state = this.markerStates.get(tank);
     if (!state) {
-      // Damage is applied immediately; reconstruct the pre-hit value for the visual drain.
-      state = { displayHp: Math.min(tank.maxHp, tank.hp + amount), pendingDamage: 0, tickElapsed: 0, damageTotal: 0, damageTimer: 0, flashTimer: 0 };
+      state = { trailStart: 0, hitAt: -Infinity, damageTotal: 0, damageUntil: 0, destroyedUntil: 0 };
       this.markerStates.set(tank, state);
     }
-    if (state.pendingDamage <= 0) state.tickElapsed = 0;
-    state.pendingDamage += amount;
-    state.flashTimer = Math.max(state.flashTimer, 0.2);
-    if (showNumber) {
-      state.damageTotal = state.damageTimer > 0 ? state.damageTotal + amount : amount;
-      state.damageTimer = 2;
-    }
+    return state;
+  }
+  recordDamage(tank, amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const state = this.healthState(tank);
+    const now = this.g.time;
+    const before = Math.min(tank.maxHp, tank.hp + amount);
+    state.trailStart = trailingHp(state, before, now);
+    state.hitAt = now;
+    state.damageTotal = (state.damageUntil > now ? state.damageTotal : 0) + amount;
+    state.damageUntil = now + 1.65;
+  }
+  recordModuleLoss(tank, label) {
+    const state = this.healthState(tank);
+    state.moduleNotices ??= new Map();
+    state.moduleNotices.set(label, this.g.time + 2.4);
   }
   kill(attacker, victim, cause) {
+    const player = this.g.player;
+    const now = this.g.time;
+    const state = this.markerStates.get(victim);
+    if (state && (victim.team === player.team || victim.spotted[player.team])) {
+      state.destroyedUntil = Math.max(now, state.hitAt + DAMAGE_HOLD + DAMAGE_DRAIN);
+      if (state.moduleNotices) {
+        for (const until of state.moduleNotices.values()) state.destroyedUntil = Math.max(state.destroyedUntil, until);
+      }
+    }
     const c = (t) => (t ? `<span class="${t.team === this.g.player.team ? 'a' : 'e'}">${t.name} <small>${t.spec.short}</small></span>` : '?');
     const f = el('div', 'kf', `${c(attacker)} <b>${cause === 'ammo' ? '💥' : '✖'}</b> ${c(victim)}`); this.$('h-feed').prepend(f); setTimeout(() => f.remove(), 12000);
     if (attacker && attacker.isPlayer) this.message('ENEMY DESTROYED', '#ffd34d', true);
     if (victim.isPlayer) this.message('YOU WERE DESTROYED — spectating allies (Esc for menu)', '#ff6050', true);
   }
-  updateMarkers(camera, dt = 0) {
-    const G = this.g; const W = innerWidth, H = innerHeight; let n = 0; const v = this.markerPosition;
-
-    // Advance damage animations even while an enemy marker is temporarily off-screen.
-    for (const t of G.tanks) {
-      if (t.team === G.player.team) continue;
-      let state = this.markerStates.get(t);
-      if (!state) {
-        state = { displayHp: t.hp, pendingDamage: 0, tickElapsed: 0, damageTotal: 0, damageTimer: 0, flashTimer: 0 };
-        this.markerStates.set(t, state);
-      }
-      state.damageTimer = Math.max(0, state.damageTimer - dt);
-      if (state.damageTimer <= 0) state.damageTotal = 0;
-      state.flashTimer = Math.max(0, state.flashTimer - dt);
-      if (state.displayHp < t.hp) state.displayHp = t.hp;
-
-      if (state.pendingDamage > 0) {
-        state.tickElapsed += dt;
-        // Drain at 200 HP per 100 ms, with a smaller final step when needed.
-        while (state.tickElapsed + 1e-9 >= 0.1 && state.pendingDamage > 1e-6) {
-          const available = Math.max(0, state.displayHp - t.hp);
-          const step = Math.min(200, state.pendingDamage, available);
-          state.displayHp = Math.max(t.hp, state.displayHp - step);
-          state.pendingDamage = Math.max(0, state.pendingDamage - step);
-          state.tickElapsed -= 0.1;
-          if (step > 0) state.flashTimer = Math.max(state.flashTimer, 0.14);
-        }
-        if (state.pendingDamage <= 1e-6 || state.displayHp <= t.hp + 1e-6) {
-          state.displayHp = t.hp;
-          state.pendingDamage = 0;
-          state.tickElapsed = 0;
-        }
-      }
+  healthBarWidth(tank, camera, viewportWidth) {
+    const { W, L, hullH } = tank.spec.dims;
+    const corner = this.hullCorner;
+    const maxWidth = Math.min(240, viewportWidth * 0.28);
+    let left = Infinity, right = -Infinity;
+    // Project the hull envelope in its current pose, independent of barrel length.
+    for (let i = 0; i < 8; i++) {
+      corner.set((i & 1 ? W : -W) / 2, i & 2 ? hullH : 0, (i & 4 ? L : -L) / 2)
+        .applyQuaternion(tank.quat).add(tank.pos).applyMatrix4(camera.matrixWorldInverse);
+      if (corner.z >= -camera.near) return maxWidth;
+      const x = corner.applyMatrix4(camera.projectionMatrix).x;
+      left = Math.min(x, left);
+      right = Math.max(x, right);
     }
-
+    return Math.min(maxWidth, Math.max(14, Math.round((right - left) * viewportWidth * 0.5 * 1.75)));
+  }
+  updateMarkers(camera) {
+    const G = this.g; const W = innerWidth, H = innerHeight; let n = 0; const v = this.markerPosition;
     for (const t of G.tanks) {
-      if (t === G.player && t.alive) continue; if (!t.alive) continue;
+      if (t === G.player) continue;
+      const state = this.markerStates.get(t);
+      if (!t.alive && !(state?.destroyedUntil > G.time)) continue;
       const ally = t.team === G.player.team; if (!ally && !t.spotted[G.player.team]) continue;
       v.copy(t.pos); v.y += t.spec.dims.hullH + t.spec.dims.turretH + 1.6; const d = camera.position.distanceTo(v); if (ally && d > 500) continue;
       v.project(camera); if (v.z > 1 || v.z < -1) continue; const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * H; if (sx < -70 || sx > W + 70 || sy < -50 || sy > H + 50) continue;
       let m = this.markerPool[n];
       if (!m) {
-        m = el('div', 'mk', '<div class="nm"></div><div class="hp-meta"></div><div class="hp-row"><div class="hp"><i></i></div><div class="damage"></div></div><div class="rl"><i></i></div><div class="ar">▼</div>');
+        m = el('div', 'mk', `<div class="nm"></div><div class="hp-meta"></div><div class="hp-row"><div class="hp health-track">${HEALTH_LAYERS}</div>${HEALTH_EVENTS}</div><div class="rl"><i></i></div><div class="ar">▼</div>`);
         m._parts = {
           name: m.querySelector('.nm'),
           hpMeta: m.querySelector('.hp-meta'),
           hpRow: m.querySelector('.hp-row'),
-          hpFill: m.querySelector('.hp i'),
+          bar: m.querySelector('.hp'),
           damage: m.querySelector('.damage'),
+          modules: m.querySelector('.module-loss'),
           reload: m.querySelector('.rl'),
           reloadFill: m.querySelector('.rl i')
         };
         this.$('h-markers').appendChild(m); this.markerPool.push(m);
       }
-      const state = ally ? null : this.markerStates.get(t);
+      const barWidth = this.healthBarWidth(t, camera, W);
       m.style.display = 'block';
       m.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
-      const cls = 'mk ' + (ally ? 'a' : 'e') + (!ally && state.flashTimer > 0 ? ' hit' : '');
+      const cls = 'mk ' + (ally ? 'a' : 'e') + (sx + barWidth * 0.5 + 170 > W ? ' events-left' : '');
       if (m.className !== cls) m.className = cls;
       const parts = m._parts;
       setText(parts.name, `${t.spec.short}${d < 700 ? ' · ' + Math.round(d) + 'm' : ''}`);
+      parts.hpRow.style.width = barWidth + 'px';
+      updateHealthDisplay(parts, t, state, G.time);
       if (ally) {
-        parts.hpMeta.style.display = 'none';
-        setText(parts.damage, '');
-        parts.hpRow.style.width = '56px';
-        parts.hpFill.style.width = (t.hp / t.maxHp * 100) + '%';
-        if (t.reloadLeft > 0) { parts.reload.style.display = 'block'; parts.reloadFill.style.width = ((1 - t.reloadLeft / t.reloadTime()) * 100) + '%'; }
+        if (t.alive && t.reloadLeft > 0) { parts.reload.style.display = 'block'; parts.reloadFill.style.width = ((1 - t.reloadLeft / t.reloadTime()) * 100) + '%'; }
         else parts.reload.style.display = 'none';
       } else {
-        parts.hpMeta.style.display = 'block';
         const hp = Math.ceil(t.hp), maxHp = Math.round(t.maxHp);
         if (parts.hp !== hp || parts.maxHp !== maxHp) {
           parts.hpMeta.textContent = `HP ${formatHp(hp)} / ${formatHp(maxHp)}`;
           parts.hp = hp;
           parts.maxHp = maxHp;
         }
-        parts.hpRow.style.width = '132px';
-        parts.hpFill.style.width = (state.displayHp / t.maxHp * 100) + '%';
-        setText(parts.damage, state.damageTimer > 0 ? '−' + formatHp(Math.round(state.damageTotal)) : '');
         parts.reload.style.display = 'none';
       }
       n++;
@@ -281,9 +313,9 @@ export class HUD {
     const kitStatus = s.armorPackages ? `装甲套件 · ${s.armorPackages[p.armorPackageIndex]?.name || '基础'}` : '';
     const movementStatus = p.afloat ? '浮航 · 主炮锁定' : [dozerStatus, specialStatus, kitStatus].filter(Boolean).join(' · ');
     const trackStatus = mobilityStatus;
-    this.setPanelHtml('h-veh', `<div class="vn">${s.short} <small>${s.nation} · ${s.era}</small></div>
-      <div class="hpwrap"><div class="hpbar"><i style="width:${p.hp / p.maxHp * 100}%"></i><span>${Math.ceil(p.hp)} / ${p.maxHp}</span></div>${(p.abilities && p.abilities.magazine) ? `<div class="magfan" title="magazine">${Array.from({length: p.abilities.magazine.size}, (_, i) => `<i class="${i < p.abilities.magLeft ? 'on' : ''}"></i>`).join('')}</div>` : ''}</div>
-      <div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
+    this.setPanelHtml('h-veh-name', `${s.short} <small>${s.nation} · ${s.era}</small>`);
+    this.setPanelHtml('h-veh-magazine', ability.magazine ? Array.from({ length: ability.magazine.size }, (_, i) => `<i class="${i < ability.magLeft ? 'on' : ''}"></i>`).join('') : '');
+    this.setPanelHtml('h-veh-info', `<div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       ${movementStatus ? `<div class="crew"><span>${movementStatus}</span></div>` : ''}
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`);
@@ -316,7 +348,9 @@ export class HUD {
     // damage direction
     const dd = this.$('h-dmgdir'); if (this.dmgT > 0 && this.dmgSrc) { this.dmgT -= dt; const ang = Math.atan2(this.dmgSrc.x - p.pos.x, this.dmgSrc.z - p.pos.z) - G.cam.yaw; dd.style.display = 'block'; dd.style.transform = `translate(-50%,-50%) rotate(${-ang}rad)`; dd.style.opacity = Math.min(1, this.dmgT); } else dd.style.display = 'none';
     this.miniT -= dt; if (this.miniT <= 0) { this.miniT = 0.15; this.drawMini(); }
-    this.updateMarkers(camera, dt);
+    setText(this.$('h-veh-hp'), `${Math.ceil(p.hp)} / ${p.maxHp}`);
+    updateHealthDisplay(this.playerHealth, p, this.markerStates.get(p), G.time);
+    this.updateMarkers(camera);
     this.$('h-scope').style.display = G.cam.sniper ? 'block' : 'none'; setText(this.$('h-zoom'), '×' + G.cam.zoom + '  ·  ' + G.camera.fov.toFixed(1) + '°');
     // aim-assist lock marker (just under the crosshair centre)
     const A = G.assist; const ah = this.$('h-assist'); let aTxt = '', aCls = 'assist';

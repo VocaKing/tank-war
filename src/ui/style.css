@@ -88,21 +88,25 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .mk{position:absolute;left:0;top:0;text-align:center;font-size:11px;white-space:nowrap}
 .mk .nm{font-weight:600}
 .mk .hp-meta{display:none}
-.mk .hp-row{display:flex;align-items:center;gap:5px;width:56px;margin:2px auto 0}
-.mk .hp{width:56px;height:4px;flex:0 0 56px;margin:0;background:rgba(0,0,0,.72);border-radius:3px;overflow:hidden}
-.mk .hp i{display:block;height:100%;background:var(--ally);transition:width .06s linear}
-.mk .damage{display:none}
+.mk .hp-row{position:relative;margin:2px auto 0}
+.mk .hp{height:7px;background:rgba(0,0,0,.86);border-radius:3px;box-shadow:0 0 0 1px #ffffff54,0 1px 4px #000}
+.health-track{position:relative;overflow:hidden}
+.health-track i{position:absolute;inset:0;transform-origin:left}
+.health-track .hp-fill{transform:scaleX(var(--hp-fill,1))}
+.health-track .hp-trail{transform:scaleX(var(--hp-trail,1));background:linear-gradient(#fff5c1,#ffae43)}
+.health-track.hp-hit .hp-trail{background:linear-gradient(#fff,#ffd474)}
+.hp-events{position:absolute;left:calc(100% + 7px);top:50%;transform:translateY(-50%);display:grid;justify-items:start;gap:2px;text-align:left;line-height:1.15}
+.events-left .hp-events{left:auto;right:calc(100% + 7px);justify-items:end;text-align:right}
+.hp-events .damage,.hp-events .module-loss{width:max-content;padding:2px 4px;border-radius:3px;background:#151619ea;font-size:11px;font-weight:800;text-shadow:0 1px 2px #000}
+.hp-events .damage{color:#ffcb80}
+.hp-events .module-loss{max-width:min(156px,36vw);white-space:normal;color:#ffe5a8;border:1px solid #f8bd6969}
+.hp-events .damage:empty,.hp-events .module-loss:empty{display:none}
 .mk.e .nm,.mk.e .ar{color:var(--enemy)}
-.mk.e .hp-meta{display:block;width:120px;margin:2px auto 0;color:#fff;font-size:10px;line-height:12px;font-weight:800;letter-spacing:.15px;text-align:center;text-shadow:0 1px 3px #000}
-.mk.e .hp-row{width:120px;gap:6px;margin:1px auto 0}
-.mk.e .hp{width:76px;height:6px;flex:0 0 76px;border:1px solid rgba(255,255,255,.22);box-shadow:0 0 3px rgba(0,0,0,.9)}
-.mk.e .hp i{background:linear-gradient(90deg,#b92520,#ff6557);transition:width .06s linear}
-.mk.e .damage{display:block;min-width:38px;text-align:left;color:#ffbd76;font-size:11px;font-weight:900;line-height:11px;text-shadow:0 0 5px rgba(255,70,35,.8),0 1px 2px #000}
-.mk.e .damage:empty{display:none}
-.mk.e.hit .hp{box-shadow:0 0 8px rgba(255,80,40,.95)}
-.mk.e.hit .hp i{filter:brightness(1.7)}
+.mk.e .hp-meta{display:block;margin:2px auto 0;color:#fff;font-size:10px;line-height:12px;font-weight:800;letter-spacing:.15px;text-shadow:0 1px 3px #000}
+.mk.e .hp-fill{background:linear-gradient(90deg,#b92520,#ff6557)}
 .mk.a .nm,.mk.a .ar{color:var(--ally)}
-.mk.a .hp i{background:var(--ally)}
+.mk.a .hp-fill{background:var(--ally)}
+.mk .hp-hit{box-shadow:0 0 0 1px #ffe0a6,0 0 8px #ff9a4fcc}
 .mk .ar{font-size:10px;line-height:8px}
 .cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 2px #000}
 .reticle{position:absolute;left:0;top:0;will-change:transform}
@@ -127,7 +131,7 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .panel{box-sizing:border-box;position:absolute;bottom:14px;background:linear-gradient(160deg,rgba(28,38,42,.88),rgba(11,16,19,.91));border:1px solid #b9cad12b;border-radius:9px;padding:10px 12px;box-shadow:0 5px 18px #0005;backdrop-filter:blur(4px)}
 .panel.left{left:14px;width:var(--flank-width)}.panel.left.flash{border-color:#ff4a3a;box-shadow:0 0 18px rgba(255,60,40,.6)}
 .vn{font-size:16px;font-weight:700;color:var(--acc)}
-.hpbar{position:relative;height:16px;background:rgba(255,255,255,.1);border-radius:3px;margin:6px 0;overflow:hidden}.hpbar i{display:block;height:100%;background:linear-gradient(90deg,#3b9f48,#71d97c)}.hpbar span{position:absolute;inset:0;text-align:center;font-size:11.5px;line-height:16px;font-weight:700}
+.hpbar{height:16px;background:rgba(255,255,255,.1);border-radius:3px;margin:6px 0}.hpbar .hp-fill{background:linear-gradient(90deg,#3b9f48,#71d97c)}.hpbar span{position:absolute;inset:0;text-align:center;font-size:11.5px;line-height:16px;font-weight:700}
 .row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.spd{font-size:20px;font-weight:700;margin-right:6px;min-width:70px}
 .mod{font-size:10px;padding:2px 5px;border-radius:3px;font-weight:700}.mod.ok{background:rgba(80,160,90,.35)}.mod.dmg{background:rgba(220,150,40,.7)}.mod.dead{background:rgba(220,50,40,.8)}
 .crew,.kits{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}.crew span,.kits span{font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,.08)}.crew .dead{background:rgba(220,50,40,.7);text-decoration:line-through}.kits .used{opacity:.35;text-decoration:line-through}.kits .fire{background:#c33}
@@ -236,25 +240,13 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 
 .mk .rl{width:56px;height:3px;margin:1px auto 0;background:rgba(0,0,0,.55);border-radius:2px;overflow:hidden;display:none}
 .mk .rl i{display:block;height:100%;background:var(--acc)}
-.hpwrap{display:flex;align-items:center;gap:8px}
+.hpwrap{position:relative;display:flex;align-items:center;gap:8px}
 .hpwrap .hpbar{flex:1}
 .magfan{display:flex;gap:3px;align-items:flex-end;height:16px}
+.magfan:empty{display:none}
 .magfan i{width:5px;height:8px;background:rgba(255,255,255,.18);border-radius:1px 1px 0 0;transform-origin:bottom center}
 .magfan i:nth-child(1){transform:rotate(-18deg);height:7px}
 .magfan i:nth-child(2){transform:rotate(-6deg);height:10px}
 .magfan i:nth-child(3){transform:rotate(6deg);height:10px}
 .magfan i:nth-child(4){transform:rotate(18deg);height:7px}
 .magfan i.on{background:var(--acc)}
-
-/* Enemy HP readout and damage accumulation; allied markers retain the compact bar. */
-.mk .hp-meta{display:none}
-.mk .hp-row{display:flex;align-items:center;gap:5px;width:56px;margin:2px auto 0}
-.mk .damage{display:none}
-.mk.e .hp-meta{display:block;width:132px;margin:2px auto 0;color:#fff;font-size:10px;line-height:12px;font-weight:800;letter-spacing:.15px;text-align:center;text-shadow:0 1px 3px #000}
-.mk.e .hp-row{width:132px;gap:6px;margin:1px auto 0}
-.mk.e .hp{width:76px;height:6px;flex:0 0 76px;border:1px solid rgba(255,255,255,.22);box-shadow:0 0 3px rgba(0,0,0,.9)}
-.mk.e .hp i{background:linear-gradient(90deg,#b92520,#ff6557);transition:width .06s linear}
-.mk.e .damage{display:block;min-width:42px;text-align:left;color:#ffbd76;font-size:11px;font-weight:900;line-height:11px;text-shadow:0 0 5px rgba(255,70,35,.8),0 1px 2px #000}
-.mk.e .damage:empty{display:none}
-.mk.e.hit .hp{box-shadow:0 0 8px rgba(255,80,40,.95)}
-.mk.e.hit .hp i{filter:brightness(1.7)}
