@@ -1,0 +1,27 @@
+{
+  "revision": "00fe26fad97af5653892a407c01594e2f3c40fc5",
+  "description": "Exact high-quality web MapBuilder tree, bush and rock X/Z locations, limited to the 1200m playable area; transforms adapted to Unreal axes and 4m imported terrain. Grass remains native fallback. Road is the original 2m sample grid, quantized to 8 bits.",
+  "maps": [
+    {
+      "id": "village",
+      "count": 4859,
+      "y0": 11.256155014038086,
+      "roadBytes": 361201,
+      "sfdBytes": 155496
+    },
+    {
+      "id": "forest",
+      "count": 7901,
+      "y0": 25.397415161132812,
+      "roadBytes": 361201,
+      "sfdBytes": 252840
+    },
+    {
+      "id": "desert",
+      "count": 1118,
+      "y0": 6.092325210571289,
+      "roadBytes": 361201,
+      "sfdBytes": 35784
+    }
+  ]
+}
