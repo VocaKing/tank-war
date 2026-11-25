@@ -28,7 +28,7 @@ for (const file of files) {
     assert.equal(model.extras.fleetModelRevision, '2026-11-exterior-detail', id + ' is missing the revised model');
     assert.ok(model.extras.exteriorDetailParts > 16, id + ' is missing layered exterior fittings');
   } else {
-    assert.equal(model.extras.fleetModelRevision, '2026-11-concept-detail-v2', id + ' is missing the revised concept model');
+    assert.equal(model.extras.fleetModelRevision, '2026-11-concept-detail-v3', id + ' is missing the revised concept model');
     assert.ok(model.extras.exteriorDetailParts > 22, id + ' is missing its new hull and turret fittings');
     for (const suffix of ['track', 'rubber']) {
       assert.ok(materials.some(m => m.name.toLowerCase().endsWith('_' + suffix) && m.normalTexture),
