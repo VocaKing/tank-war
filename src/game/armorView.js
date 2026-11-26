@@ -37,7 +37,7 @@ export class ArmorView {
     const dir = worldPoint.clone().sub(muzzle).normalize();
     const end = worldPoint.clone().addScaledVector(dir, 2.5);
     const hit = target.rayTest(muzzle, end);
-    if (!hit) return { cls: 'none' };
+    if (!hit || hit.wheel) return { cls: 'none' };
     const delta = end.sub(muzzle).multiplyScalar(hit.t);
     const dist = delta.length();
     delta.y -= impactDrop(delta.lengthSq(), delta.y, shell.velocity);

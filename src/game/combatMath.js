@@ -15,6 +15,11 @@ export function zoomFov(zoom, baseFov = BASE_FOV) {
 export function dispersionPixels(cone, projectionY, viewportHeight) {
   return Math.tan(cone) * projectionY * viewportHeight / 2;
 }
+// Bound the angular spread after projecting the displaced impact onto the screen.
+export function projectedSpreadRadius(radius, lateral, depth, projectionY, viewportHeight) {
+  const focalLength = projectionY * viewportHeight / 2;
+  return radius * Math.hypot(1, lateral / depth) * focalLength / Math.max(depth - radius, depth * 0.1);
+}
 // Density per unit area on the aiming disk is proportional to exp(-k * r).
 // A ring's area contributes the factor r, so its radius is sampled from
 // Gamma(2, k) and conditioned on staying inside the unit disk.

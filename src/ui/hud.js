@@ -192,7 +192,7 @@ export class HUD {
     while (this.$('h-msgs').children.length > 5) this.$('h-msgs').firstChild.remove();
   }
   hitMarker(kind, dmg = 0, msgs = [], tank) {
-    const T = { pen: ['PENETRATION', '#ffd34d'], ricochet: ['RICOCHET', '#9ab'], nonpen: ['NOT PENETRATED', '#aaa'], blast: ['HE BLAST', '#ffb060'], splash: ['SPLASH', '#ffb060'] }[kind];
+    const T = { pen: ['PENETRATION', '#ffd34d'], ricochet: ['RICOCHET', '#9ab'], nonpen: ['NOT PENETRATED', '#aaa'], blast: ['HE BLAST', '#ffb060'], splash: ['SPLASH', '#ffb060'], mobility: ['命中行走机构', '#d8c69c'] }[kind];
     this.message(`${T[0]}${dmg ? ' −' + dmg : ''}${msgs && msgs.length ? '<small>' + msgs.join(' · ') + '</small>' : ''}`, T[1], kind === 'pen');
     void tank;
   }

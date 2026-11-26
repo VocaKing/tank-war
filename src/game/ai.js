@@ -110,7 +110,7 @@ export class AIController {
       if (!t.spec.artillery && g.world.losBlocked(muzzle.x, muzzle.y, muzzle.z, w.x, w.y, w.z)) continue;
       const dir = w.clone().sub(muzzle); const dist = dir.length(); dir.normalize();
       const hit = e.rayTest(muzzle.clone().addScaledVector(dir, Math.max(0, dist - 8)), w.clone().addScaledVector(dir, 6));
-      if (!hit) continue;
+      if (!hit || hit.wheel) continue;
       if (secondary) {
         const ev = g.ballistics.evaluate(e, hit, secondary.shell, dist);
         if (!ev.ricochet && ev.ratio > Math.max(1.05, auxiliary?.ratio ?? 0)) auxiliary = { ratio: ev.ratio, local: c };

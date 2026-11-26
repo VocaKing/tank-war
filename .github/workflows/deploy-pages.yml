@@ -28,6 +28,7 @@ jobs:
       - run: npx playwright install chromium
       - run: node tools_fleet_assets.mjs
       - run: node tools_armor_geometry.mjs
+      - run: node tools_ballistics_consistency.mjs
       - run: node tools_aim_assist.mjs
       - run: node tools_wreck_vfx.mjs
       - run: node tools_balance.mjs

@@ -16,6 +16,7 @@ import { GRAVITY } from './physics.js';
 export { GRAVITY };
 let NEXT_ID = 1;
 const TRACK_REPAIR_TIME = 9;
+const UP = new THREE.Vector3(0, 1, 0), AXIS_X = new THREE.Vector3(1, 0, 0);
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
 export function ballisticAngle(v, R, dy, highArc = false) {
@@ -257,6 +258,42 @@ export class Tank {
     // its first plate so the normal hit test sees the entry surface.
     return first < 1 && reach > 0 ? pivot.lerp(muzzle, Math.max(0, first - 0.05 / reach)) : muzzle;
   }
+  gunDirection() {
+    return new THREE.Vector3(0, 0, 1).applyQuaternion(this.gunMount.getWorldQuaternion(_q)).normalize();
+  }
+  spreadDirection(dir) {
+    const cone = Math.tan(this.dispersion());
+    const radius = cone > 0 ? cone * sampleDispersionRadius(this.game.rng) : 0;
+    this.lastDeviation = Math.atan(radius);
+    if (!radius) return dir;
+    const angle = this.game.rng.range(0, 2 * Math.PI);
+    const tangent = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) < 0.95 ? UP : AXIS_X).normalize();
+    const bitangent = new THREE.Vector3().crossVectors(dir, tangent);
+    return dir.addScaledVector(tangent, radius * Math.cos(angle)).addScaledVector(bitangent, radius * Math.sin(angle)).normalize();
+  }
+  roundMuzzle(offset = null, index = 0) {
+    const { muzzles, gun, muzzle } = this.model;
+    const pos = new THREE.Vector3();
+    if (muzzles?.length) return muzzles[index % muzzles.length].getWorldPosition(pos);
+    return offset ? gun.localToWorld(pos.fromArray(offset)) : muzzle.getWorldPosition(pos);
+  }
+  roundSpec(shell, origin, aim) {
+    if (!shell.airburst) return shell;
+    const fuseTime = Math.max(0.05, (origin.distanceTo(aim) - (shell.fuseLeadDistance || 0)) / Math.max(1, shell.velocity));
+    return { ...shell, fuseTime };
+  }
+  previewLaunch(aim) {
+    const multi = !this.abilities.usingSecondary && (this.spec.multiTube || this.spec.burst || this.spec.mrsi);
+    const muzzles = multi && (this.burstLeft > 0 ? this.spec.burst?.offsets : this.spec.multiTube?.offsets);
+    const index = multi && this.burstLeft > 0 ? this.burstOffsetIndex : 0;
+    const muzzle = multi ? this.roundMuzzle(muzzles?.length ? muzzles[index % muzzles.length] : null, index)
+      : this.muzzleNode.getWorldPosition(new THREE.Vector3());
+    const origin = this.shotOrigin(muzzle);
+    const shell = this.roundSpec(this.previewShell, origin, aim);
+    const direction = this.gunDirection();
+    const velocity = direction.clone().multiplyScalar(shell.velocity).add(this.vel);
+    return { origin, shell, velocity };
+  }
   tryFire(time) {
     if (!this.alive || this.afloat || this.fireReloadLeft > 0) return false;
     if (!this.abilities.usingSecondary && this.usesSpade() && this.spadeState !== 'deployed') {
@@ -276,28 +313,15 @@ export class Tank {
     const rounds = secondary ? this.secondaryRounds : this.ammo[this.shellIdx];
     if (!this.alive || this.afloat || this.fireReloadLeft > 0 || rounds <= 0) return false;
     const g = this.game; const sh = this.shell;
-    const muzzle = this.muzzleNode.getWorldPosition(new THREE.Vector3());
-    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.gunMount.getWorldQuaternion(_q)).normalize();
-    // The disk on the gun's tangent plane projects to the HUD's angular spread.
-    const radius = Math.tan(this.dispersion());
-    const offset = radius > 0 ? radius * sampleDispersionRadius(g.rng) : 0;
-    if (offset > 0) {
-      const angle = g.rng.range(0, 2 * Math.PI);
-      const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-      const tangent = new THREE.Vector3().crossVectors(dir, up).normalize();
-      const bitangent = new THREE.Vector3().crossVectors(dir, tangent).normalize();
-      dir.addScaledVector(tangent, offset * Math.cos(angle)).addScaledVector(bitangent, offset * Math.sin(angle)).normalize();
-    }
-    this.lastDeviation = Math.atan(offset);
+    const origin = this.shotOrigin(this.muzzleNode.getWorldPosition(new THREE.Vector3()));
+    const dir = this.spreadDirection(this.gunDirection());
     const vel = dir.clone().multiplyScalar(sh.velocity).add(this.vel);
-    let fireShell = sh;
+    let fireShell = this.roundSpec(sh, origin, this.input.aim);
     if (this.abilities && this.abilities.overpenLeft > 0) {
       const mult = this.abilities.consumeOverpen();
-      fireShell = { ...sh, pen: Math.round(sh.pen * mult) };
+      fireShell = { ...fireShell, pen: Math.round(sh.pen * mult) };
     }
-    const origin = this.shotOrigin(muzzle);
-    const projectile = g.ballistics.spawn(this, fireShell, origin, vel);
-    if (sh.guided) projectile.target = this.input.aim.clone();
+    g.ballistics.spawn(this, fireShell, origin, vel, sh.guided ? this.input.aim.clone() : undefined);
     this.lastFired = time; this.stats.shots++;
     if (secondary) {
       this.secondaryRounds--;
@@ -411,30 +435,16 @@ export class Tank {
     return true;
   }
   spawnRound(shellIndex, offset = null, muzzleIndex = 0) {
-    const shell = this.spec.shells[shellIndex], model = this.model;
-    const markers = model.muzzles;
-    const muzzle = markers ? markers[muzzleIndex % markers.length].getWorldPosition(new THREE.Vector3())
-      : offset ? model.gun.localToWorld(new THREE.Vector3(...offset)) : model.muzzle.getWorldPosition(new THREE.Vector3());
-    const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(model.gun.getWorldQuaternion(_q)).normalize();
-    const up = Math.abs(dir.y) < 0.95 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    const tangent = new THREE.Vector3().crossVectors(dir, up).normalize();
-    const bitangent = new THREE.Vector3().crossVectors(dir, tangent).normalize();
-    const radius = Math.tan(this.dispersion());
-    let gx = this.game.rng.gauss() / 2.2, gy = this.game.rng.gauss() / 2.2;
-    const gl = Math.hypot(gx, gy); if (gl > 1) { gx /= gl; gy /= gl; }
-    dir.addScaledVector(tangent, gx * radius).addScaledVector(bitangent, gy * radius).normalize();
-    let fireShell = shell;
-    if (shell.airburst) {
-      const range = muzzle.distanceTo(this.input.aim);
-      fireShell = { ...shell, fuseTime: Math.max(0.05, (range - (shell.fuseLeadDistance || 0)) / Math.max(1, shell.velocity)) };
-    }
+    const shell = this.spec.shells[shellIndex];
+    const muzzle = this.shotOrigin(this.roundMuzzle(offset, muzzleIndex));
+    const dir = this.spreadDirection(this.gunDirection());
     const velocity = dir.clone().multiplyScalar(shell.velocity).add(this.vel);
+    let fireShell = this.roundSpec(shell, muzzle, this.input.aim);
     if (this.abilities?.overpenLeft > 0) {
       const mult = this.abilities.consumeOverpen();
       fireShell = { ...fireShell, pen: Math.round(fireShell.pen * mult) };
     }
-    const projectile = this.game.ballistics.spawn(this, fireShell, muzzle, velocity);
-    if (shell.guided) projectile.target = this.input.aim.clone();
+    this.game.ballistics.spawn(this, fireShell, muzzle, velocity, shell.guided ? this.input.aim.clone() : undefined);
     return { muzzle, dir, caliber: shell.caliber };
   }
   fireBurstRound(time) {
@@ -492,7 +502,7 @@ export class Tank {
   }
   // Segment hit on the armor geometry at its current pose.
   rayTest(a, b) {
-    return intersectArmor(this.model, this.spec, a, b, this.turretGone);
+    return intersectArmor(this.model, this.spec, a, b, this.turretGone, true);
   }
   armorAt(hit, shellSpec, typeInfo) {
     const armorSpec = this.armorProfile ? { ...this.spec, armor: this.armorProfile } : this.spec;

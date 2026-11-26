@@ -76,7 +76,9 @@ function prepareSide(body, side, spec) {
     return g.rotateZ(Math.PI / 2).translate(sign * x, y, z);
   });
   const wheelMaterial = new THREE.MeshStandardMaterial({ color: spec.paint.accent, roughness: 0.86, metalness: 0.18 });
-  simplified.add(new THREE.Mesh(mergeGeometries(discs), wheelMaterial));
+  const wheelMesh = new THREE.Mesh(mergeGeometries(discs), wheelMaterial);
+  wheelMesh.userData.armorWheel = true;
+  simplified.add(wheelMesh);
   for (const disc of discs) disc.dispose();
   body.add(simplified);
   for (const group of [track, gear, simplified]) group.traverse(node => { node.userData.runningGear = true; });

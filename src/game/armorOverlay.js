@@ -100,7 +100,8 @@ void main() {
   else if (effective <= lo) color = vec3(0.16, 0.82, 0.22);
   else color = mix(vec3(1.0, 0.42, 0.05), vec3(1.0, 0.86, 0.12), (hi - effective) / max(0.01, hi - lo));
   float rim = pow(1.0 - abs(dot(normalW, normalize(cameraPosition - vArmorWorld))), 2.0);
-  gl_FragColor = vec4(color, 0.46 + rim * 0.21);
+  float opacity = avGarage ? 0.46 + rim * 0.21 : 0.14 + rim * 0.10;
+  gl_FragColor = vec4(color, opacity);
   #include <colorspace_fragment>
 }
 `;

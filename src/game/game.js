@@ -21,10 +21,7 @@ import { TrackMarks } from '../render/trackMarks.js';
 import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
-import { zoomFov, dispersionPixels } from './combatMath.js';
-const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
-function segmentDistanceSquared(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceToSquared(p); }
-
+import { zoomFov, projectedSpreadRadius } from './combatMath.js';
 function withinPathXZ(p, origin, dx, dz, radius) {
   const x = p.x - origin.x, z = p.z - origin.z;
   const lengthSquared = dx * dx + dz * dz;
@@ -409,44 +406,37 @@ export class Game {
     this.aimDist = this.aimPoint.distanceTo(muzzle);
   }
   updateReticle() {
-    // simulate actual gun trajectory to find where the shell would land
-    const p = this.player; const hud = this.hud; if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
-    const pos = p.shotOrigin(p.muzzleNode.getWorldPosition(new THREE.Vector3()));
-    const q = p.gunMount.getWorldQuaternion(new THREE.Quaternion());
-    const v = new THREE.Vector3(0, 0, 1).applyQuaternion(q).multiplyScalar(p.shell.velocity).add(p.vel); const W = this.world; const a = new THREE.Vector3(), b = new THREE.Vector3();
-    let hitP = null, hitTank = null, hitInfo = null, dist = 0; const h = 0.02, steps = 200;
-    const dx = v.x * h * steps, dz = v.z * h * steps;
-    const candidates = this.tanks.filter((t) => t !== p && (t.team === 0 || t.spotted[0] || !t.alive)
-      && withinPathXZ(t.pos, pos, dx, dz, 12));
-    for (let i = 0; i < steps && !hitP; i++) {
-      a.copy(pos); v.y -= 9.81 * h; b.copy(pos).addScaledVector(v, h);
-      let best = 2; const tt = W.terrain.segmentHit(a.x, a.y, a.z, b.x, b.y, b.z, 2); if (tt >= 0) best = tt;
-      const ts = W.structureHit(a.x, a.y, a.z, b.x, b.y, b.z); if (ts >= 0 && ts < best) best = ts;
-      let stepTank = null, stepInfo = null;
-      for (const t of candidates) { if (segmentDistanceSquared(t.pos, a, b) > 144) continue; const hh = t.rayTest(a, b); if (hh && hh.t < best) { best = hh.t; stepTank = t; stepInfo = hh; } }
-      if (best <= 1) { hitP = a.clone().lerp(b, best); dist += a.distanceTo(hitP); hitTank = stepTank; hitInfo = stepInfo; }
-      else { dist += a.distanceTo(b); pos.copy(b); }
-    }
-    if (!hitP) hitP = pos;
-    // Project the impact for the center. Size the ring from the gun's cone
-    // and the camera's magnification, independent of the impact distance.
-    const sp = hitP.clone().applyMatrix4(this.camera.matrixWorldInverse);
-    const depth = -sp.z;
-    sp.applyMatrix4(this.camera.projectionMatrix);
-    const sx = (sp.x * 0.5 + 0.5) * this.viewportWidth, sy = (-sp.y * 0.5 + 0.5) * this.viewportHeight;
-    const cone = p.dispersion();
-    const radPx = dispersionPixels(cone, this.camera.projectionMatrix.elements[5], this.viewportHeight);
-    this.reticleRadiusWorld = Math.tan(cone) * dist;
-    this.reticleWorld = hitP.clone(); this.reticleDist = dist;
-    if (depth <= this.camera.near || !Number.isFinite(sx+sy+radPx)) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    const p = this.player, hud = this.hud;
+    if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    const shot = p.previewLaunch(this.aimPoint);
+    const predicted = this.ballistics.predict(p, shot.shell, shot.origin, shot.velocity, shot.shell.guided ? this.aimPoint : undefined);
+    const { pos, dist, tank, hit, kind } = predicted;
+    const cameraPoint = pos.clone().applyMatrix4(this.camera.matrixWorldInverse);
+    const depth = -cameraPoint.z;
+    const radius = 2 * shot.shell.velocity * predicted.time * Math.sin(p.dispersion() * 0.5);
+    this.reticleRadiusWorld = radius;
+    this.reticleWorld = pos; this.reticleDist = dist;
+    if (depth <= this.camera.near) { hud.setReticle(-100, -100, 0, '', ''); return; }
+    const radPx = projectedSpreadRadius(radius, Math.hypot(cameraPoint.x, cameraPoint.y),
+      depth, this.camera.projectionMatrix.elements[5], this.viewportHeight);
+    const screen = cameraPoint.applyMatrix4(this.camera.projectionMatrix);
+    const sx = (screen.x * 0.5 + 0.5) * this.viewportWidth, sy = (-screen.y * 0.5 + 0.5) * this.viewportHeight;
+    if (!Number.isFinite(sx + sy + radPx)) { hud.setReticle(-100, -100, 0, '', ''); return; }
     let state = 'neutral', text = `${Math.round(dist)} m`;
-    if (hitTank && hitInfo && hitTank.alive && hitTank.team !== p.team) {
-      const ev = this.ballistics.evaluate(hitTank, hitInfo, p.previewShell, dist);
-      if (ev.ricochet) { state = 'red'; text = 'RICOCHET'; }
-      else if (ev.eff <= ev.pen * (1-PEN_RNG)) { state = 'green'; text = `PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
-      else if (ev.eff <= ev.pen * (1+PEN_RNG)) { state = 'yellow'; text = `CHANCE ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
-      else { state = 'red'; text = `NO PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
-      text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(ev.angle)}° · ${Math.round(dist)} m`;
+    if (tank?.alive && tank.team !== p.team) {
+      if (hit.wheel) text = `行走机构 · ${tank.spec.short} · ${Math.round(dist)} m`;
+      else {
+        const ev = this.ballistics.evaluate(tank, hit, shot.shell, dist, predicted.waterDist);
+        if (ev.ricochet) { state = 'red'; text = 'RICOCHET'; }
+        else if (ev.eff <= ev.pen * (1-PEN_RNG)) { state = 'green'; text = `PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+        else if (ev.eff <= ev.pen * (1+PEN_RNG)) { state = 'yellow'; text = `CHANCE ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+        else { state = 'red'; text = `NO PEN ${Math.round(ev.pen)} vs ${Math.round(ev.eff)} mm`; }
+        text += ` · ${tank.spec.short} ${hit.part} ${hit.face} · ${Math.round(ev.angle)}° · ${Math.round(dist)} m`;
+      }
+    } else if (this.aimTank?.alive && this.aimTank.team !== p.team && kind &&
+      shot.origin.distanceTo(pos) + 0.5 < shot.origin.distanceTo(this.cursorPoint)) {
+      const obstacle = { structure: '障碍物', ground: '地形', water: '水面', tank: '车辆' }[kind];
+      text = `${obstacle}遮挡 · ${text}`;
     }
     if (p.afloat) { state = 'neutral'; text = '浮航中 · 主炮锁定'; }
     if (p.fireReloadLeft > 0 || p.afloat) state += ' reloading';
