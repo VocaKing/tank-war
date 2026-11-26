@@ -228,6 +228,7 @@ export class Tank {
   // ----- damage -----
   damage(amount, attacker, cause) {
     if (!this.alive || amount <= 0) return;
+    this.game.resetCaptureContribution?.(this);
     amount = Math.min(amount, this.hp); this.hp -= amount; this.stats.received += amount; this.lastDamagedAt = this.game.time;
     if (this.game.player && this.team !== this.game.player.team) this.game.hud?.recordEnemyDamage(this, amount, cause !== 'fire');
     if (attacker && attacker !== this && attacker.team !== this.team) { attacker.stats.damage += amount; this.lastAttacker = attacker; }
@@ -235,6 +236,7 @@ export class Tank {
   }
   destroy(attacker, cause = 'destroyed') {
     if (!this.alive) return;
+    this.game.resetCaptureContribution?.(this);
     this.alive = false; this.hp = 0; this.speed = 0; this.burning = 0;
     const g = this.game; burnModel(this.model);
     const p = this.pos.clone(); p.y += this.spec.dims.hullH;

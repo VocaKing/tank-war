@@ -17,3 +17,7 @@ Concealment: bushes / standing still / camo net raise CAMO %; enemies spot you a
 viewRange x (1 - camo), but always within ~50 m. Firing reveals you for 5 s.
 Water slows shells: tanks hull-down in water are harder (not impossible) to penetrate.
 Use a desktop browser with a dedicated GPU for best results; pick "Medium" or "Low" graphics on weaker machines.
+
+Base capture: a single attacker needs 240 seconds (4 minutes); multiple attackers add independent credit.
+Leaving the base, being hit (even without penetration), taking damage or being destroyed erases only that tank's credit.
+Defenders pause accrual; capture succeeds when valid credit from attackers still inside totals 100%.

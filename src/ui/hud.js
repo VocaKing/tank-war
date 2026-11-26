@@ -9,7 +9,7 @@ export class HUD {
     this.g = game; this.root = el('div', 'hud'); root.appendChild(this.root);
     this.root.innerHTML = `
       <div class="top"><div class="teams"><div class="tcount ally" id="h-ally"></div><div class="timer" id="h-timer">15:00</div><div class="tcount enemy" id="h-enemy"></div></div>
-        <div class="caps"><div class="cap ally"><span>Allied base</span><div class="bar"><i id="h-cap0"></i></div></div><div class="cap enemy"><span>Enemy base</span><div class="bar"><i id="h-cap1"></i></div></div></div></div>
+        <div class="caps"><div class="cap ally"><span id="h-caplabel0">Allied base · 0%</span><div class="bar"><i id="h-cap0"></i></div></div><div class="cap enemy"><span id="h-caplabel1">Enemy base · 0%</span><div class="bar"><i id="h-cap1"></i></div></div></div></div>
       <div class="killfeed" id="h-feed"></div>
       <div class="markers" id="h-markers"></div>
       <div class="scope" id="h-scope"><div class="scope-ring"></div><div class="mil"></div><div class="ticks"></div><div class="zoom" id="h-zoom">x4</div><div class="avhint" id="h-av"></div></div>
@@ -24,7 +24,7 @@ export class HUD {
       <div class="panel items" id="h-items"></div>
       <div class="panel ammo" id="h-ammo"></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i><br><i>Capture: 240 tank-seconds. Leaving or taking a hit erases your own credit; defenders pause capture.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
@@ -196,7 +196,11 @@ export class HUD {
     const pips = (team, cls) => G.tanks.filter((t) => t.team === team).map((t) => `<i class="${t.alive ? cls : 'dead'}" title="${t.name}"></i>`).join('');
     this.$('h-ally').innerHTML = `<b>${alive(0)}</b>${pips(0, 'a')}`; this.$('h-enemy').innerHTML = `${pips(1, 'e')}<b>${alive(1)}</b>`; void tot;
     const tl = Math.max(0, G.timeLimit - G.time); this.$('h-timer').textContent = `${Math.floor(tl / 60)}:${String(Math.floor(tl % 60)).padStart(2, '0')}`;
-    this.$('h-cap0').style.width = G.capture[0].points + '%'; this.$('h-cap1').style.width = G.capture[1].points + '%';
+    for (let i = 0; i < 2; i++) {
+      const cap = G.capture[i];
+      this.$('h-cap' + i).style.width = cap.points + '%';
+      this.$('h-caplabel' + i).textContent = (i === 0 ? 'Allied base' : 'Enemy base') + ' · ' + Math.floor(cap.points) + '%' + (cap.contested ? ' · Contested' : '');
+    }
     this.panelT = (this.panelT || 0) - dt; const doPanel = this.panelT <= 0; if (doPanel) this.panelT = 0.1;
     // vehicle panel
     if (doPanel) {

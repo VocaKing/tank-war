@@ -61,7 +61,7 @@ export class Ballistics {
     for (const t of g.tanks) { if (!t.alive) continue; const d = t.pos.distanceTo(p) - t.spec.dims.W * 0.5; if (d > R) continue;
       const top = t.spec.armor.hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
       if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
-      if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) t.breakTracks(); }
+      if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) { g.resetCaptureContribution?.(t); t.breakTracks(); } }
   }
   // returns true if the shell is consumed
   onImpact(s, kind, p, tank, hit) {
@@ -81,6 +81,8 @@ export class Ballistics {
     if (shooter && tank.alive && shooter.team !== tank.team) shooter.stats.hits++;
     const dirN = s.vel.clone().normalize();
     if (!tank.alive) { g.effects.sparks(p, 20); g.audio.impact(p, 'metal'); return true; }
+    // Every genuine direct hit interrupts capture, including ricochets and non-penetrations.
+    g.resetCaptureContribution?.(tank);
     if (ev.ricochet && s.ricochets < 1) {
       const n = ev.normalW; const v = s.vel; v.addScaledVector(n, -2 * v.dot(n)).multiplyScalar(0.55); s.pos.copy(p).addScaledVector(n, 0.08); s.ricochets++; s.noDamage = true; s.life = Math.max(s.life, 6.5);
       g.effects.sparks(p, 30, [1, 0.85, 0.5], v.clone().normalize()); g.audio.impact(p, 'ricochet');

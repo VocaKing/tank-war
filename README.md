@@ -24,3 +24,9 @@ Open `?balance=1` on the same game origin. Modify tank values, save, then reload
 
 ## Mobile touch mode
 Mobile browsers automatically use touch controls and a responsive garage. Use landscape for battle, left joystick to drive, drag the battlefield to aim, and hold Fire to shoot. Scope, zoom, armor, lock, special ability, ammo, equipment, scoreboard and pause are available as touch actions. Force mobile mode via `?mobile=1`. The garage includes fullscreen 3D inspection and the balance editor. Low graphics is the initial mobile preset. Desktop settings remain available.
+
+## Base capture rules
+- Each living attacking tank earns its own capture credit only while continuously inside the enemy base and no defender is present. A lone tank needs 240 seconds (4 minutes); two need 120 seconds, three 80 seconds, and seven about 34.3 seconds if all enter together and remain uninterrupted.
+- Leaving the circle, being hit (including ricochets and non-penetrations), taking damage or being destroyed immediately erases only that tank's contribution. Re-entering or recovering from a hit starts from zero; teammates retain their valid credit.
+- Defenders in the circle pause accrual, but do not erase the credit of attackers who stay inside. Capture succeeds when the sum of current attackers' valid contributions reaches 100%. The HUD displays this sum, including any loss of credit.
+- Run `node tools_capture.mjs` for capture regression tests.

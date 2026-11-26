@@ -19,6 +19,7 @@ import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, dispersionPixels } from './combatMath.js';
+import { createCaptureState, resetCaptureContribution, updateCaptureState } from './capture.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
 function _segDist(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceTo(p); }
 
@@ -34,7 +35,7 @@ export class Game {
     this.time = 0; this.timeLimit = 15 * 60; this.paused = false; this.ended = false; this.flying = [];
     this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46]);
     this.ballistics = new Ballistics(this); this.spotting = new Spotting(this); this.nav = new NavGrid(this.world);
-    this.capture = [{ points: 0 }, { points: 0 }]; this.smokes = [];
+    this.capture = [createCaptureState(), createCaptureState()]; this.smokes = [];
     this.tanks = []; this.ai = [];
     this.spawnTeams(opts.tankId);
     this.player = this.tanks[0];
@@ -211,15 +212,13 @@ export class Game {
     p.input.aim.copy(this.aimPoint);
     if (this.mouseDown || this.touch?.firing) p.tryFire(this.time);
   }
+  resetCaptureContribution(tank) {
+    if (!this.ended) resetCaptureContribution(this.capture, tank, this.time);
+  }
   updateCapture(dt) {
+    if (this.ended) return;
     for (let i = 0; i < 2; i++) {
-      const b = this.world.bases[i]; const cap = this.capture[i];
-      const inside = (team) => this.tanks.filter((t) => t.alive && t.team === team && Math.hypot(t.pos.x - b.x, t.pos.z - b.z) < b.r);
-      const att = inside(1 - i), def = inside(i);
-      if (att.length && !def.length) {
-        if (att.some((t) => this.time - t.lastDamagedAt < 0.05)) cap.points = Math.max(0, cap.points - 30);
-        cap.points = Math.min(100, cap.points + dt * (100 / 90) * Math.min(3, att.length));
-      } else if (!att.length) cap.points = Math.max(0, cap.points - dt * 6);
+      updateCaptureState(this.capture[i], this.world.bases[i], this.tanks, i, dt, this.time);
     }
   }
   // tank footprint (oriented rectangle) vs structure OBBs: separating-axis test, minimal push-out
