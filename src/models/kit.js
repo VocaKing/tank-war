@@ -191,6 +191,25 @@ function removeBarrelCapAtZ(geometry,z) {
   }
   out.computeBoundingBox();out.computeBoundingSphere();geometry.dispose();return out;
 }
+function slottedBrakeShell(P, part, start, length, radius) {
+  // Model the visible side openings with separate collars and curved bridges.
+  const bands = [[0, 0.19], [0.40, 0.56], [0.80, 1]];
+  for (const [from, to] of bands) {
+    const a = start + from * length, b = start + to * length;
+    P.add(part, 'paint', lathe([[0.001, a], [radius * 0.89, a], [radius, a + 0.019],
+      [radius, b - 0.020], [radius * 0.91, b], [0.001, b]], 32));
+  }
+  for (let i = 0; i < bands.length - 1; i++) {
+    const a = start + bands[i][1] * length - 0.012;
+    const b = start + bands[i + 1][0] * length + 0.012;
+    const outline = [[radius, a], [radius * 0.92, a + 0.02], [radius * 0.92, b - 0.02],
+      [radius, b], [radius * 0.81, b], [radius * 0.81, a], [radius, a]];
+    for (const angle of [0, Math.PI]) {
+      const bridge = new THREE.LatheGeometry(outline.map(([r, z]) => new THREE.Vector2(r, z)), 12, angle - 0.88, 1.76);
+      P.add(part, 'paint', bridge.rotateX(Math.PI / 2));
+    }
+  }
+}
 export function barrel(P, part, len, opts = {}) {
   const r0 = opts.r0 ?? 0.12, r1 = opts.r1 ?? 0.08; const pr = [[0.001, -0.25], [r0 * 1.2, -0.25], [r0 * 1.2, 0.15], [r0, 0.25]];
   const brakeLen = opts.brake ? opts.brake.len : 0; const end = len - brakeLen;
@@ -207,7 +226,9 @@ export function barrel(P, part, len, opts = {}) {
   if (opts.sleeve) { const n = opts.sleeve; for (let i = 1; i < n; i++) { const z = 0.4 + (end - 0.6) * (i / n); if (ev && Math.abs(z - ev.z) < ev.len / 2 + 0.1) continue; const rr = r0 + (r1 - r0) * (z / end); P.add(part, 'metal', cylZ(rr * 1.18, 0.05, 16, 0, 0, z)); } }
   if (opts.brake) {
     const b = opts.brake; const z0 = end; const rb = b.r;
-    if (b.type === 'double') {
+    if (b.type === 'double' && b.openSides) {
+      slottedBrakeShell(P, part, z0, b.len, rb);
+    } else if (b.type === 'double') {
       P.add(part, 'paint', lathe([[0.001, z0], [rb, z0], [rb, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.55], [rb, z0 + b.len * 0.55], [rb, z0 + b.len], [rb * 0.72, z0 + b.len], [0.001, z0 + b.len]], 32));
       for (const f of [0.45, 0.8]) for (const side of [-1, 1]) P.add(part, 'dark', box(0.03, rb * 1.3, b.len * 0.18, side * rb * 0.98, 0, z0 + b.len * f));
     } else if (b.type === 'single') {

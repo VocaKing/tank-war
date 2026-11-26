@@ -1,25 +1,13 @@
 // Launch roster. The hull, turret and elevating mantlet use their own local
 // coordinates in metres; the chassis faces +Z and the turret plans are top views.
 import * as THREE from 'three';
-import { Parts, T, box, castLoft, cylX, cylY, cylZ, lathe, sideExtrude, taper, topExtrude } from './geom.js';
+import { Parts, T, box, castLoft, cylX, cylY, cylZ, glacis, lathe, sideExtrude, taper, topExtrude } from './geom.js';
 import { trackCenterOffset } from '../game/vehicleDimensions.js';
 import * as K from './kit.js';
 
 const sides = [-1, 1];
 const quarterTurn = Math.PI / 2;
 const rad = (degrees) => degrees * Math.PI / 180;
-
-// Local X runs across the plate; local Y runs up it and local Z points outwards.
-function glacis(y0, z0, y1, z1) {
-  const length = Math.hypot(y1 - y0, z1 - z0);
-  const up = [(y1 - y0) / length, (z1 - z0) / length];
-  const pitch = Math.atan2(up[1], up[0]);
-  const point = (x, u, depth = 0) => [x, y0 + u * up[0] - depth * up[1], z0 + u * up[1] + depth * up[0]];
-  return {
-    length, up, point, pitch,
-    place: (geometry, x, u, depth = 0) => T(geometry, ...point(x, u, depth), pitch),
-  };
-}
 
 function rod(P, part, mat, a, b, radius, segments = 6) {
   const start = new THREE.Vector3(...a);

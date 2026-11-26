@@ -35,12 +35,18 @@ function noiseTexture() {
 // Triplanar camo paint with procedural cast/rolled-plate surface relief, mud build-up near the running gear,
 // dust on upward faces and roughness variation. yOff converts part-local y to hull height (turret/gun parts).
 function paintMaterial(paint, seed, yOff = 0, opts = {}) {
-  const m = new THREE.MeshStandardMaterial({ map: camoTexture(paint, seed), roughness: 0.74, metalness: 0.2 });
+  const finish = opts.finish;
+  const m = new THREE.MeshStandardMaterial({ map: camoTexture(paint, seed), roughness: finish?.roughness ?? 0.74, metalness: finish ? 0.10 : 0.20 });
   const U = {
     uNoise: { value: noiseTexture() }, uYOff: { value: yOff }, uDirtY: { value: opts.dirtY ?? 0.9 },
     uCast: { value: opts.cast ?? 0.5 }, uWeather: { value: opts.weather ?? 1 },
     uMud: { value: new THREE.Color(opts.mud || '#4a3d2c') }, uDust: { value: new THREE.Color(opts.dust || '#8f8166') },
   };
+  if (finish) {
+    m.defines = { ...m.defines, TANK_FINISH: 1 };
+    U.uPrimer = { value: new THREE.Color(finish.primer ?? '#615041') };
+    U.uAbrasion = { value: finish.abrasion };
+  }
   m.userData.uniforms = U;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
@@ -48,6 +54,10 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjPos = position; vObjN = normal;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
       varying vec3 vObjPos; varying vec3 vObjN; uniform sampler2D uNoise; uniform float uYOff, uDirtY, uCast, uWeather; uniform vec3 uMud, uDust;
+      #ifdef TANK_FINISH
+        uniform vec3 uPrimer;
+        uniform float uAbrasion;
+      #endif
       vec3 triN(vec3 p, vec3 bw) { return texture2D(uNoise, p.zy).rgb * bw.x + texture2D(uNoise, p.xz).rgb * bw.y + texture2D(uNoise, p.xy).rgb * bw.z; }`)
       .replace('#include <map_fragment>', `
         vec3 bw = pow(abs(normalize(vObjN)), vec3(4.0)); bw /= (bw.x + bw.y + bw.z + 1e-5);
@@ -69,14 +79,38 @@ function paintMaterial(paint, seed, yOff = 0, opts = {}) {
         float rain = side * smoothstep(0.52, 0.74, streak.g) * (1.0 - mud);
         diffuseColor.rgb *= mix(vec3(1.0), vec3(0.53, 0.48, 0.39), rain * 0.34 * uWeather);
         vec3 fine = triN(vObjPos * 5.5, bw);
+        #ifdef TANK_FINISH
+          // Estimate local curvature to put the chipped paint on bevels and rolled edges.
+          float bendX = length(dFdx(nN)) / max(length(dFdx(vObjPos)), 0.0001);
+          float bendY = length(dFdy(nN)) / max(length(dFdy(vObjPos)), 0.0001);
+          float edge = smoothstep(4.0, 22.0, max(bendX, bendY));
+          float grain = fine.b * 0.58 + nB.g * 0.42;
+          float wear = smoothstep(0.61, 0.79, grain + edge * 0.18) * uAbrasion * (1.0 - mud * 0.80);
+          float exposedSteel = wear * smoothstep(0.68, 0.83, grain + edge * 0.23);
+          diffuseColor.rgb *= mix(0.90, 1.08, nB.r);
+          diffuseColor.rgb = mix(diffuseColor.rgb, uPrimer * (0.75 + 0.32 * nA.r), wear);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.19, 0.18, 0.165), exposedSteel * 0.75);
+          float vRough = 0.92 + nB.r * 0.18 + mud * 0.25 + rain * 0.09 - exposedSteel * 0.64;
+        #else
         float wear = smoothstep(0.64, 0.80, fine.b * 0.57 + nB.g * 0.43) * (1.0 - mud * 0.80);
         vec3 primer = mix(diffuseColor.rgb * vec3(0.61, 0.51, 0.42), vec3(0.24, 0.22, 0.19), wear);
         diffuseColor.rgb = mix(diffuseColor.rgb, primer, wear * 0.82 * uWeather);
-        float vRough = mix(0.98, 0.85 + 0.31 * nB.r + mud * 0.20 - wear * 0.46 + rain * 0.16, uWeather);`)
+        float vRough = mix(0.98, 0.85 + 0.31 * nB.r + mud * 0.20 - wear * 0.46 + rain * 0.16, uWeather);
+        #endif`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * vRough, 0.3, 1.0);')
+      .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+        #ifdef TANK_FINISH
+          metalnessFactor = mix(metalnessFactor, 0.78, exposedSteel);
+        #endif`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
         {
+          #ifdef TANK_FINISH
+          float pits = 1.0 - smoothstep(0.34, 0.60, fine.g);
+          float hgt = nB.b * 0.12 + nB.r * 0.14 + fine.g * 0.035
+            + uCast * (1.0 - up * 0.78) * (nA.r * 0.29 - pits * 0.19) - wear * 0.055;
+          #else
           float hgt = nA.r * uCast + nB.b * 0.12 + nB.r * 0.25 + fine.g * 0.068 - wear * 0.044;
+          #endif
           vec2 dHdxy = vec2(dFdx(hgt), dFdy(hgt)) * (0.45 + 0.45 * uWeather);
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX); float fDet = dot(vSigmaX, R1) * faceDirection;
@@ -94,6 +128,7 @@ function sharedMats() {
   MATS.dark = new THREE.MeshStandardMaterial({ color: 0x0c0d0e, roughness: 0.6, metalness: 0.3 });
   MATS.bore = new THREE.MeshStandardMaterial({ color: 0x050607, roughness: 0.96, metalness: 0.08, side: THREE.DoubleSide });
   MATS.glass = new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.08, metalness: 0.9, emissive: 0x050a10 });
+  MATS.optic = new THREE.MeshStandardMaterial({ color: 0x385255, roughness: 0.23, metalness: 0.64, emissive: 0x030b10 });
   MATS.lens = new THREE.MeshStandardMaterial({ color: 0xb3aca0, roughness: 0.34, metalness: 0.47 });
   MATS.wood = new THREE.MeshStandardMaterial({ color: 0x6a5134, roughness: 0.9 });
   MATS.canvas = new THREE.MeshStandardMaterial({ color: 0x5e5a43, roughness: 1.0 });
@@ -115,6 +150,31 @@ function wheelGeometry(paintHex, type = 'disc', id = '') {
   const tyre = type === 'steel' ? metal : rub;
   const paintC = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   const lx = (pts, seg = 24) => new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), seg).rotateZ(-Math.PI / 2);
+  if (id === 'is2') {
+    const rim = new THREE.Color(0x434139);
+    paintC(lx([[0.86,0.072],[0.97,0.078],[1,0.121],[1,0.404],[0.984,0.453],[0.934,0.479],[0.89,0.481]], 32), rim);
+    paintC(lx([[0.928,0.473],[0.904,0.496],[0.867,0.493],[0.843,0.472]], 32), metal);
+    const face = lx([[0.890,0.484],[0.821,0.486],[0.765,0.447],[0.661,0.418],[0.55,0.398],
+      [0.447,0.382],[0.334,0.390],[0.292,0.437],[0.24,0.471],[0,0.471]], 48);
+    const vertex = face.attributes.position;
+    for (let i = 0; i < vertex.count; i++) {
+      const y = vertex.getY(i), z = vertex.getZ(i), r = Math.hypot(y, z);
+      if (r < 0.29 || r >= 0.83) continue;
+      const radial = Math.sin(Math.PI * (r - 0.29) / 0.54);
+      const recess = Math.pow(0.5 + Math.cos(Math.atan2(z, y) * 12) * 0.5, 2);
+      vertex.setX(i, vertex.getX(i) - radial * recess * 0.053);
+    }
+    face.computeVertexNormals();
+    paintC(face, col);
+    paintC(cylX(0.217, 0.079, 24, 0.470, 0, 0), hub);
+    paintC(cylX(0.114, 0.035, 14, 0.518, 0, 0), metal);
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      paintC(cylX(0.026, 0.026, 6, 0.511, Math.cos(a) * 0.173, Math.sin(a) * 0.173), rim);
+    }
+    for (const geometry of parts.slice()) parts.push(geometry.clone().rotateY(Math.PI));
+    return mergeGeometries(parts);
+  }
   // Single-disc road wheels for interleaved German running gear. Unlike the
   // paired road-wheel units used by Soviet and many post-war tanks, Tiger I
   // and Panther each place individual wheels in staggered rows across the track.
@@ -158,31 +218,35 @@ function wheelGeometry(paintHex, type = 'disc', id = '') {
     const a = (i / 10) * 2 * Math.PI;
     paintC(box(0.064, 0.20, 0.063, 0.37, Math.cos(a) * 0.56, Math.sin(a) * 0.56, a), col);
   }
-  // IS-2 cast road wheels have a distinctive star-indented face rather than a plain disc.
-  if (id === 'is2') for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    paintC(box(0.028, 0.18, 0.052, 0.48, Math.cos(a) * 0.56, Math.sin(a) * 0.56, a), dark);
-  }
   // mirror for the inner tyre
   const half = parts.length; const mir = new THREE.Matrix4().makeScale(-1, 1, 1);
   for (let k = 0; k < half; k++) { const g = parts[k].clone(); g.applyMatrix4(mir); const p = g.attributes.position, n = g.attributes.normal, c = g.attributes.color; for (let t = 0; t < p.count; t += 3) for (const a of [p, n, c]) for (let q = 0; q < a.itemSize; q++) { const i0 = t * a.itemSize + q, i2 = (t + 2) * a.itemSize + q; const tmp = a.array[i0]; a.array[i0] = a.array[i2]; a.array[i2] = tmp; } parts.push(g); }
   return mergeGeometries(parts);
 }
-function wheelGeometryLo(paintHex) {
-  const col = new THREE.Color(paintHex), rub = new THREE.Color(0x181817); const parts = [];
+function wheelGeometryLo(paintHex, steel = false) {
+  const col = new THREE.Color(paintHex), rim = new THREE.Color(steel ? 0x434139 : 0x181817); const parts = [];
   const add = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
-  add(new THREE.CylinderGeometry(1, 1, 0.96, 12, 1, true).rotateZ(Math.PI / 2), rub); add(cylX(0.86, 1.0, 12, 0, 0, 0), col);
+  add(new THREE.CylinderGeometry(1, 1, 0.96, 12, 1, true).rotateZ(Math.PI / 2), rim); add(cylX(0.86, 1.0, 12, 0, 0, 0), col);
   return mergeGeometries(parts);
 }
 function sprocketGeometry(paintHex, id = '') {
   const col = new THREE.Color(paintHex).multiplyScalar(0.85); const parts = [];
-  const add = (g) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = col.r; a[i * 3 + 1] = col.g; a[i * 3 + 2] = col.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
+  const add = (g, color = col) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = color.r; a[i * 3 + 1] = color.g; a[i * 3 + 2] = color.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   if (id === 'is2' || id === 'm6a1') {
     // Distinct 14-tooth drive rims on the rear sprocket.
     add(cylX(0.74, 0.72, 24, 0, 0, 0));
     add(cylX(0.38, 1.00, 16, 0, 0, 0));
     for (const side of [-1, 1]) {
       add(cylX(0.84, 0.10, 28, side * 0.34, 0, 0));
+      if (id === 'is2') {
+        const wornSteel = new THREE.Color(0x4a473e);
+        add(T(new THREE.TorusGeometry(0.693, 0.023, 5, 28), side * 0.39, 0, 0, 0, Math.PI / 2), wornSteel);
+        add(cylX(0.248, 0.045, 20, side * 0.505, 0, 0), wornSteel);
+        for (let i = 0; i < 8; i++) {
+          const a = i * Math.PI / 4;
+          add(cylX(0.045, 0.039, 6, side * 0.399, Math.cos(a) * 0.522, Math.sin(a) * 0.522), wornSteel);
+        }
+      }
       for (let i = 0; i < 14; i++) {
         const a = (i / 14) * Math.PI * 2;
         add(T(new THREE.BoxGeometry(0.12, 0.22, 0.18), side * 0.34, Math.cos(a) * 0.94, Math.sin(a) * 0.94, a, 0, 0));
@@ -245,11 +309,20 @@ function linkGeometry(w, pitch, th, id) {
   const parts = [];
   const add = (g, c) => { g = clean(g); const n = g.attributes.position.count; const a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); parts.push(g); };
   const steel = new THREE.Color(0x5b5750), dark = new THREE.Color(0x2c2a27), rub = new THREE.Color(0x151514);
-  const shiny = new THREE.Color(id === 't34' || id === 'tiger' ? 0x645e54 : 0x8a857c);
+  const shiny = new THREE.Color(['t34', 'tiger', 'is2'].includes(id) ? 0x645e54 : 0x8a857c);
   if (id === 'm6a1') {
     for (const side of [-1, 1]) {
       add(box(w * 0.47, th * 0.6, pitch * 0.82, side * w * 0.26, 0, 0), steel);
       add(box(w * 0.43, th * 0.50, pitch * 0.16, side * w * 0.26, -th * 0.45, 0), shiny);
+    }
+  } else if (id === 'is2') {
+    add(box(w, th * 0.55, pitch * 0.85, 0, 0, 0), steel);
+    add(box(w * 0.14, th * 0.46, pitch * 0.68, 0, -th * 0.37, 0), shiny);
+    for (const side of [-1, 1]) {
+      const x = side * w * 0.261;
+      add(box(w * 0.40, th * 0.40, pitch * 0.23, x, -th * 0.39, pitch * 0.21, 0, side * 0.16), shiny);
+      add(box(w * 0.37, th * 0.36, pitch * 0.17, x, -th * 0.38, -pitch * 0.21, 0, -side * 0.13), steel);
+      add(box(w * 0.053, th * 0.34, pitch * 0.53, side * w * 0.443, -th * 0.38, 0), steel);
     }
   } else if (id === 't34') {
     add(box(w, th * 0.6, pitch * 0.86, 0, 0, 0), steel);
@@ -264,7 +337,7 @@ function linkGeometry(w, pitch, th, id) {
   if (rubberPad) for (const s of [-1,1]) {
     add(box(w*0.38,th*0.55,pitch*0.62,s*w*0.25,-th*0.45,0),rub);
     add(box(w*0.39,th*0.18,pitch*0.68,s*w*0.25,-th*0.22,0),steel);
-  } else if (id !== 't34') {
+  } else if (id !== 't34' && id !== 'is2') {
     // Raised steel chevrons/crossbars rather than rubber pads.
     for(const s of [-1,1]) add(T(new THREE.BoxGeometry(w*0.43,th*0.40,pitch*0.13),s*w*0.24,-th*0.40,-pitch*0.09,0,s*(eastern?0.28:0.13),0),shiny);
   }
@@ -348,7 +421,7 @@ function getTemplate(spec) {
   const specialist = hasFleetModel(spec.id) || spec.conceptFleet || spec.dozer || spec.secondary || spec.rearDriver || spec.amphibious;
   const builder = expansion ? buildExpansionFallback : specialist ? buildSpecialist : BUILDERS[spec.id] || buildV2;
   const b = builder(d, spec);
-  if (!expansion && !BUILDERS[spec.id]) {
+  if (!expansion && !BUILDERS[spec.id] && !b.finishedDetails) {
     finishDetails(b.P, d, b, spec);
     refineRoofDetails(b.P, spec);
   }
@@ -359,10 +432,14 @@ function getTemplate(spec) {
   const seed = [...spec.id].reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 7);
   const dirtY = d.clearance + 0.75;
   const appearance = b.paint ? { ...spec.paint, ...b.paint } : spec.paint;
-  const opts = { dirtY, cast: b.cast ?? 0.5, weather: b.weather, mud: appearance.mud, dust: appearance.dust };
+  const opts = { dirtY, cast: b.cast ?? 0.5, weather: b.weather, mud: appearance.mud, dust: appearance.dust, finish: b.finish };
   const paint = paintMaterial(appearance, seed, 0, opts);
   const paintT = paintMaterial(appearance, seed, b.turretPos[1], { ...opts, cast: b.castTurret ?? opts.cast });
-  const paintG = paintMaterial(appearance, seed, b.turretPos[1] + b.gunPos[1], { ...opts, cast: 0.15 });
+  const paintG = paintMaterial(appearance, seed, b.turretPos[1] + b.gunPos[1], { ...opts, cast: b.castMantlet ?? 0.15 });
+  const paintB = b.castMantlet === undefined ? paintG
+    : paintMaterial(appearance, seed, b.turretPos[1] + b.gunPos[1], {
+      ...opts, cast: 0.15, finish: b.finish && { ...b.finish, abrasion: b.finish.abrasion * 0.42 },
+    });
   const geo = b.P.merged();
   const attachments = {};
   if (spec.secondary) {
@@ -384,12 +461,12 @@ function getTemplate(spec) {
   const track = trackGeometry(trackCircles, d.trackW, 0.075, pitch);
   const wheelGeo = wheelGeometry(appearance.base, b.wheelType || (b.wheels[0].spoked ? 'spoked' : spec.era === 'WWII' ? 'disc' : 'modern'), spec.id);
   const sprocketGeo = sprocketGeometry(appearance.base, spec.id);
-  const wheelGeoLo = wheelGeometryLo(appearance.base);
+  const wheelGeoLo = wheelGeometryLo(appearance.base, spec.id === 'is2');
   const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.25 });
   const nLinks = Math.round(track.length / pitch);
   const linkGeo = linkGeometry(d.trackW, track.length / nLinks, 0.06, spec.id);
   const linkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.45 });
-  templates[spec.id] = { b, geo, paint, paintT, paintG, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch, attachments, gunPitchFloor };
+  templates[spec.id] = { b, geo, paint, paintT, paintG, paintB, mats, track, wheelGeo, wheelGeoLo, sprocketGeo, wheelMat, linkGeo, linkMat, nLinks, pitch, attachments, gunPitchFloor };
   return templates[spec.id];
 }
 
@@ -438,7 +515,7 @@ export function createTankModel(spec, opts = {}) {
   const gun = new THREE.Group(); gun.position.set(...b.gunPos); turret.add(gun);
   for (const [k, g] of Object.entries(geo.gun || {})) mk(g, k, gun, tpl.paintG);
   const barrel = new THREE.Group(); barrel.name='recoiling-barrel'; gun.add(barrel);
-  for (const [k,g] of Object.entries(geo.barrel || {})) mk(g,k,barrel,tpl.paintG);
+  for (const [k,g] of Object.entries(geo.barrel || {})) mk(g,k,barrel,tpl.paintB);
   const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, b.barrelLength); barrel.add(muzzle);
   let secondaryGun, secondaryMuzzle, blade, trim;
   if (spec.secondary) {

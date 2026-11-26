@@ -24,7 +24,7 @@ try {
    const model=createTankModel(spec,{links:false});
    const boreMeshes=model.barrel.children.filter(x=>x.isMesh&&x.userData.matKey==='bore');
    let forcedElevation;
-   if(spec.id==='tiger'||spec.id==='t72'){
+   if(['tiger','t72','is2'].includes(spec.id)){
     const rad=Math.PI/180;
     const min=-spec.gunDepression*rad, max=spec.gunElevation*rad;
     forcedElevation=-Infinity;
