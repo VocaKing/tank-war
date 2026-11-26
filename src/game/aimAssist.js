@@ -1,117 +1,235 @@
-// Instant camera soft-lock: the first visible red outline is the lock itself.
-// A real camera ray hit is required; no dwell timer, manual-motion gate or through-wall tolerance.
-// Small inputs can refine the local weak-spot anchor; an independent directional drag accumulator
-// supplies resistance even when that anchor is updated. A deliberate flick or sustained pull breaks lock.
 import * as THREE from 'three';
 import { clamp, DEG } from '../util.js';
-import { AimDrag, AIM_DRAG } from './aimDrag.js';
 
-export const AIM_ASSIST = Object.freeze({
-  ...AIM_DRAG, AUTO_ZOOM: 1.4, RELOCK_COOLDOWN: 0.30, OFFSET_RETURN_RATE: 14,
-});
-const _v = new THREE.Vector3(), _d = new THREE.Vector3();
+export const AIM_ASSIST = {
+  FOCUS_TOL_PX: 14,
+  ACQUIRE_TIME: 0.18,
+  MANUAL_WINDOW: 1.5,
+  EDGE_DRAG: 0.62,
+  BREAK_PX: 30,
+  RELOCK_COOLDOWN: 1.2,
+};
+
+const _point = new THREE.Vector3(), _direction = new THREE.Vector3();
+
 export class AimAssist {
   constructor(game, enabled = true) {
-    this.g = game; this.enabled = enabled; this.target = null; this.part = 'hull'; this.local = new THREE.Vector3();
-    this.off = { yaw: 0, pitch: 0 }; this.applied = { yaw: 0, pitch: 0 }; this.moved = false;
-    this.focus = null; this.blocked = null; this.blockedUntil = 0; this.blockLeft = false;
-    this.drag = new AimDrag(); this.lastBreak = null; this.stats = { locks: 0, breaks: 0 };
+    this.g = game;
+    this.enabled = enabled;
+    this.target = null;
+    this.manual = false;
+    this.part = 'hull';
+    this.local = new THREE.Vector3();
+    this.offset = new THREE.Vector2();
+    this.pending = new THREE.Vector2();
+    this.moved = false;
+    this.lastMouse = -Infinity;
+    this.lastFactor = 1;
+    this.focus = null;
+    this.candidate = null;
+    this.candidateTime = 0;
+    this.candidateAimed = false;
+    this.released = null;
+    this.lastBreak = null;
+    this.stats = { locks: 0, breaks: 0 };
   }
+
   get locked() { return !!this.target; }
-  setEnabled(v) {
-    this.enabled = v;
-    if (!v) { this.release('off'); this.focus = null; this.blocked = null; }
+  setEnabled(value) {
+    this.enabled = value;
+    if (!value && !this.manual) this.release('off');
   }
-  pxPerRad() { return (innerHeight / 2) / Math.tan(this.g.camera.fov * DEG / 2); }
-  offPx() { return Math.hypot(this.off.yaw * Math.cos(this.g.cam.pitch), this.off.pitch) * this.pxPerRad(); }
-  dragFactor() { return this.target ? this.drag.factor() : 1; }
-  breakProgress() { return this.target ? this.drag.fraction : 0; }
-  look(dx, dy, k) {
-    const normal = [-dx * k, -dy * k];
-    if (!this.enabled || !this.target || this.g.lock || !this.validTarget(this.target)) return normal;
+  pxPerRad() { return this.g.viewportHeight / (2 * Math.tan(this.g.camera.fov * DEG / 2)); }
+  offPx() {
+    return Math.hypot(this.offset.x * Math.cos(this.g.cam.pitch), this.offset.y) * this.pxPerRad();
+  }
+  dragFactor() { return this.lastFactor; }
+
+  look(dx, dy, sensitivity) {
+    const yaw = -dx * sensitivity, pitch = -dy * sensitivity;
+    if (this.target && !this.g.camOverride && !this.g.debugAim) {
+      // Coalesce device events so a high polling-rate mouse only probes once per frame.
+      this.pending.x += yaw;
+      this.pending.y += pitch;
+      return [0, 0];
+    }
+    if (yaw || this.g.limitCameraPitch(this.g.cam.pitch + pitch) !== this.g.cam.pitch) this.recordLook();
+    return [yaw, pitch];
+  }
+
+  recordLook() {
     this.moved = true;
-    const { reason, factor } = this.drag.push(dx, dy, performance.now());
-    if (reason) {
-      // Transfer only offset not already applied by the previous camera update; the breaking event
-      // itself uses full sensitivity, so it is neither swallowed nor counted twice.
-      const result = [normal[0] + this.off.yaw - this.applied.yaw, normal[1] + this.off.pitch - this.applied.pitch];
-      this.breakLock(reason); return result;
-    }
-    this.off.yaw -= dx * k * factor; this.off.pitch -= dy * k * factor;
-    const mag = Math.hypot(this.off.yaw, this.off.pitch);
-    if (mag > AIM_DRAG.MAX_OFFSET_RAD) {
-      this.off.yaw *= AIM_DRAG.MAX_OFFSET_RAD / mag; this.off.pitch *= AIM_DRAG.MAX_OFFSET_RAD / mag;
-    }
-    return [0, 0];
+    this.lastMouse = this.g.time;
   }
+  clearLook() {
+    this.pending.set(0, 0);
+    this.moved = false;
+  }
+
   anchorWorld(out = new THREE.Vector3()) {
-    const m = this.target.model; out.copy(this.local); return (this.part === 'turret' ? m.turret : m.root).localToWorld(out);
+    const model = this.target.model;
+    const anchor = this.part === 'turret' && !this.target.turretGone ? model.turret : model.body;
+    return anchor.localToWorld(out.copy(this.local));
   }
-  setAnchor(t, worldP, part) {
-    this.target = t; this.part = part === 'turret' && !t.turretGone ? 'turret' : 'hull';
-    t.model.root.updateMatrixWorld(true); this.local.copy(worldP); (this.part === 'turret' ? t.model.turret : t.model.root).worldToLocal(this.local);
+
+  setAnchor(tank, point, part) {
+    if (tank !== this.target) this.stats.locks++;
+    this.target = tank;
+    const model = tank.model;
+    this.part = part === 'turret' && !tank.turretGone ? 'turret' : 'hull';
+    const anchor = this.part === 'turret' ? model.turret : model.body;
+    anchor.worldToLocal(this.local.copy(point));
+    this.offset.set(0, 0);
+    this.released = null;
   }
-  clearOffset() { this.off.yaw = this.off.pitch = this.applied.yaw = this.applied.pitch = 0; }
+
   release(reason) {
-    if (this.target) this.lastRelease = reason;
-    this.target = null; this.focus = null; this.clearOffset(); this.drag.reset(); this.moved = false;
-  }
-  breakLock(reason) {
-    const t = this.target; if (!t) return;
-    this.blocked = t; this.blockedUntil = this.g.time + AIM_ASSIST.RELOCK_COOLDOWN; this.blockLeft = false;
-    this.stats.breaks++; this.lastBreak = reason; this.release(reason);
-  }
-  validTarget(t) {
-    const g = this.g;
-    return !!(t && t.alive && t.team !== g.player.team && t.spotted[g.player.team] && t.model.root.visible);
-  }
-  preCamera(dt = 0) {
-    const g = this.g;
-    if (this.target && (!this.enabled || !g.player.alive || g.ended || g.lock || g.debugAim || g.camOverride || !this.validTarget(this.target))) {
-      this.release(g.lock ? 'gunlock' : 'lost');
+    if (this.target) {
+      this.released = { tank: this.target, time: this.g.time, manual: this.manual, handoff: reason === 'edge' };
+      this.lastBreak = reason;
+      this.stats.breaks++;
     }
-    if (!this.target) return;
-    this.drag.decay(performance.now());
-    if (!this.moved) {
-      const k = Math.exp(-AIM_ASSIST.OFFSET_RETURN_RATE * dt);
-      this.off.yaw *= k; this.off.pitch *= k;
-    }
-    const P = this.anchorWorld(_v), c = g.cam;
-    const lo = c.sniper ? -0.35 : -0.9, hi = c.sniper ? 0.45 : 0.35;
-    // Match the desired camera position rather than tracking a stale render transform.
-    let yaw = c.yaw - this.applied.yaw, pitch = c.pitch - this.applied.pitch;
-    for (let i = 0; i < 5; i++) {
-      const pos = g.camPosFor(g.camDir(yaw + this.off.yaw, pitch + this.off.pitch), c.sniper);
-      _d.copy(P).sub(pos); if (_d.lengthSq() < 1e-6) break; _d.normalize();
-      yaw = Math.atan2(_d.x, _d.z); pitch = Math.asin(clamp(_d.y, -1, 1));
-    }
-    c.yaw = yaw + this.off.yaw; c.pitch = clamp(pitch + this.off.pitch, lo, hi);
-    this.applied.yaw = this.off.yaw; this.applied.pitch = this.off.pitch;
+    this.target = null;
+    this.manual = false;
+    this.offset.set(0, 0);
+    this.clearLook();
+    this.candidate = null;
+    this.candidateTime = 0;
+    this.candidateAimed = false;
+    this.lastMouse = -Infinity;
   }
-  postAim() {
+
+  validTarget(tank) {
+    return !!(tank?.alive && tank.team !== this.g.player.team && tank.spotted[this.g.player.team] && tank.model.root.visible);
+  }
+
+  toggleManual() {
+    if (this.manual) { this.release('manual'); return 'released'; }
     const g = this.g;
-    if (!g.player.alive || g.ended || g.debugAim || g.camOverride) { this.release('inactive'); return false; }
-    if (g.lock) {
-      if (this.target) this.release('gunlock');
-      this.focus = this.validTarget(g.lock) ? g.lock : null;
+    if (g.aimHit && this.validTarget(g.aimTank)) this.setAnchor(g.aimTank, g.cursorPoint, g.aimHit.part);
+    if (!this.validTarget(this.target)) return null;
+    this.manual = true;
+    return 'locked';
+  }
+
+  probe(yaw, pitch, dt) {
+    const g = this.g;
+    const dir = g.camDir(yaw, pitch);
+    return g.traceAim(g.cameraPositionFor(dir, g.cam.sniper, dt), dir, true);
+  }
+
+  preCamera(dt) {
+    const g = this.g, c = g.cam;
+    const turn = this.pending.x, tilt = this.pending.y;
+    this.pending.set(0, 0);
+    this.lastFactor = 1;
+    if (this.target && (!g.player.alive || g.ended || !this.validTarget(this.target))) this.release('lost');
+    if (g.debugAim || g.camOverride) return;
+    if (this.target) g.alignCamTo(this.anchorWorld(_point), dt, this.offset.x, this.offset.y);
+    if (!turn && !tilt) return;
+
+    const yaw = c.yaw + turn, pitch = g.limitCameraPitch(c.pitch + tilt);
+    if (yaw === c.yaw && pitch === c.pitch) return;
+    this.recordLook();
+    if (this.target && this.resistExit(yaw, pitch, dt)) return;
+    c.yaw = yaw;
+    c.pitch = pitch;
+  }
+
+  resistExit(yaw, pitch, dt) {
+    const c = this.g.cam;
+    // Let the normal aim pass re-anchor or switch after applying the full movement.
+    if (this.validTarget(this.probe(yaw, pitch, dt)?.tank)) return false;
+
+    let edgeYaw = c.yaw - this.offset.x, edgePitch = c.pitch - this.offset.y;
+    const start = this.probe(c.yaw, c.pitch, dt);
+    const onTarget = start?.tank === this.target;
+    if (onTarget) {
+      // Keep the entire part of the movement that is still on the target.
+      let lo = 0, hi = 1, edge = start;
+      for (let i = 0; i < 5; i++) {
+        const mid = (lo + hi) / 2;
+        const hit = this.probe(THREE.MathUtils.lerp(c.yaw, yaw, mid), THREE.MathUtils.lerp(c.pitch, pitch, mid), dt);
+        if (hit?.tank === this.target) { lo = mid; edge = hit; }
+        else hi = mid;
+      }
+      edgeYaw = THREE.MathUtils.lerp(c.yaw, yaw, lo);
+      edgePitch = THREE.MathUtils.lerp(c.pitch, pitch, lo);
+      this.setAnchor(this.target, edge.point, edge.hit.part);
+    }
+
+    const towardEdge = !onTarget &&
+      Math.hypot((yaw - edgeYaw) * Math.cos(pitch), pitch - edgePitch) <=
+      Math.hypot(this.offset.x * Math.cos(c.pitch), this.offset.y);
+    this.lastFactor = towardEdge ? 1 : AIM_ASSIST.EDGE_DRAG;
+    const fromYaw = onTarget ? edgeYaw : c.yaw;
+    const fromPitch = onTarget ? edgePitch : c.pitch;
+    const nextYaw = THREE.MathUtils.lerp(fromYaw, yaw, this.lastFactor);
+    const nextPitch = THREE.MathUtils.lerp(fromPitch, pitch, this.lastFactor);
+    this.offset.set(nextYaw - edgeYaw, nextPitch - edgePitch);
+    if (this.offPx() > AIM_ASSIST.BREAK_PX) {
+      this.release('edge');
+      this.recordLook();
+      this.lastFactor = 1;
       return false;
     }
-    if (!this.enabled) { if (this.target) this.release('off'); this.focus = null; return false; }
-    const f = this.validTarget(g.aimTank) && g.aimHit ? g.aimTank : null;
-    if (this.blocked && f !== this.blocked) this.blockLeft = true;
-    if (this.target && !this.validTarget(this.target)) this.release('lost');
-    if (this.target) {
-      // Re-anchor on a chosen weak spot without clearing the independent drag pressure.
-      if (this.moved && f === this.target) { this.setAnchor(f, g.aimPoint, g.aimHit.part); this.clearOffset(); }
-      this.focus = this.target; this.moved = false; return false;
+    c.yaw = nextYaw;
+    c.pitch = nextPitch;
+    return true;
+  }
+
+  postAim(dt) {
+    const g = this.g;
+    if (!g.player.alive || g.ended || g.debugAim || g.camOverride) {
+      this.focus = null;
+      this.clearLook();
+      return;
     }
-    this.moved = false; this.focus = null;
-    if (!f || (f === this.blocked && (!this.blockLeft || g.time < this.blockedUntil))) return false;
-    this.setAnchor(f, g.aimPoint, g.aimHit.part); this.clearOffset(); this.drag.reset();
-    this.focus = f; this.stats.locks++; this.blocked = null; return true;
+    const tank = this.validTarget(g.aimTank) ? g.aimTank : null;
+    if (tank !== this.candidate) {
+      this.candidate = tank;
+      this.candidateTime = 0;
+      this.candidateAimed = false;
+    }
+    this.candidateAimed ||= this.moved;
+    this.candidateTime += dt;
+    if (tank && this.target && this.moved) {
+      this.setAnchor(tank, g.cursorPoint, g.aimHit.part);
+    } else if (tank && !this.target) {
+      const released = this.released;
+      const handoff = this.moved && released?.handoff && (this.enabled || released.manual) && tank !== released.tank &&
+        g.time - released.time < AIM_ASSIST.MANUAL_WINDOW;
+      const canAcquire = this.enabled && this.candidateAimed && this.candidateTime >= AIM_ASSIST.ACQUIRE_TIME &&
+        g.time - this.lastMouse < AIM_ASSIST.MANUAL_WINDOW &&
+        !(released?.tank === tank && g.time - released.time < AIM_ASSIST.RELOCK_COOLDOWN);
+      if (handoff || canAcquire) {
+        this.manual = !!(handoff && released.manual);
+        this.setAnchor(tank, g.cursorPoint, g.aimHit.part);
+      }
+    }
+    this.focus = this.target || tank || this.toleranceFocus();
+    this.moved = false;
   }
-  outlineTarget() {
-    const t = this.g.lock || (this.enabled ? this.target : null);
-    return this.validTarget(t) ? t : null;
+
+  toleranceFocus() {
+    const g = this.g, cam = g.camera, ppr = this.pxPerRad();
+    cam.getWorldDirection(_direction);
+    let best = null, bestPx = AIM_ASSIST.FOCUS_TOL_PX;
+    for (const tank of g.tanks) {
+      if (!this.validTarget(tank)) continue;
+      const { W, hullH, turretH } = tank.spec.dims;
+      _point.set(0, (hullH + turretH) * 0.5, 0);
+      tank.model.root.localToWorld(_point).sub(cam.position);
+      const distance = _point.length();
+      if (distance < 1) continue;
+      const cos = clamp(_point.dot(_direction) / distance, -1, 1);
+      if (cos <= 0) continue;
+      const radius = Math.max(W, hullH + turretH) * 0.5;
+      const px = (Math.acos(cos) - Math.atan(radius / distance)) * ppr;
+      if (px < bestPx) { bestPx = px; best = tank; }
+    }
+    return best;
   }
+
+  outlineTarget() { return this.validTarget(this.focus) ? this.focus : null; }
 }

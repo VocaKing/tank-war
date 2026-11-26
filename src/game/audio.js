@@ -33,6 +33,11 @@ export class Audio {
     if (kind === 'ricochet') { const o = this.ctx.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(2400, t0); o.frequency.exponentialRampToValueAtTime(700, t0 + 0.5); const g = this.ctx.createGain(); g.gain.setValueAtTime(0.35 * att, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.55); o.connect(g); g.connect(this.master); o.start(t0); o.stop(t0 + 0.6); this._noiseBurst(t0, 0.15, 4000, 0.4 * att, 'highpass'); }
     else if (kind === 'metal') { this._noiseBurst(t0, 0.4, 1800, 0.9 * att, 'bandpass', 2); const o = this.ctx.createOscillator(); o.type = 'square'; o.frequency.value = 180; const g = this.ctx.createGain(); g.gain.setValueAtTime(0.25 * att, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4); o.connect(g); g.connect(this.master); o.start(t0); o.stop(t0 + 0.45); }
     else if (kind === 'explosion') { this._noiseBurst(t0, 3.0, 400, 1.6 * att, 'lowpass'); this._noiseBurst(t0, 0.6, 1500, 0.7 * att); }
+    else if (kind === 'wreck') {
+      this._noiseBurst(t0, 3.8, 245, 1.25 * att);
+      this._noiseBurst(t0, 0.53, 1650, 0.55 * att, 'bandpass', 0.65);
+      this._noiseBurst(t0 + 0.09, 1.9, 630, 0.34 * att);
+    }
     else { this._noiseBurst(t0, 0.9, 600, 0.8 * att, 'lowpass'); }
   }
   engine(load, speed, rpm0 = 1) {

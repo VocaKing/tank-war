@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/equipment-ui]
   workflow_dispatch:
 
 permissions:
@@ -12,11 +12,12 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,13 +25,31 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node tools_capture.mjs
-      - run: node tools_frame_pacing.mjs
+      - run: npx playwright install chromium
+      - run: node tools_fleet_assets.mjs
+      - run: node tools_armor_geometry.mjs
+      - run: node tools_ballistics_consistency.mjs
       - run: node tools_aim_assist.mjs
+      - run: node tools_wreck_vfx.mjs
+      - run: node tools_balance.mjs
+      - run: node tools_battlefield_timing.mjs
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
       - run: npm run build
+      - name: Smoke-test representative vehicles on all maps
+        run: |
+          ln -s . dist/tank-war
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist > /tmp/tank-war-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/tank-war/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4173/tank-war/ >/dev/null || { cat /tmp/tank-war-preview.log; exit 1; }
+          node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "t72,pzh2000,aegis140" "village,forest,desert"
+      - name: Remove QA-only path mapping
+        run: rm -f dist/tank-war
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:

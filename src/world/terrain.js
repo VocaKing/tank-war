@@ -5,6 +5,7 @@ export class Terrain {
   constructor(half = 700, res = 2) {
     this.half = half; this.res = res; this.n = Math.round((2 * half) / res) + 1;
     const N = this.n * this.n;
+    this.maxHeight = Infinity;
     this.h = new Float32Array(N); this.road = new Float32Array(N); this.water = new Float32Array(N).fill(-1e9);
     this.maskB = new Float32Array(N); this.tint = new Float32Array(N * 3).fill(1); this.occ = new Uint8Array(N);
   }
@@ -31,6 +32,7 @@ export class Terrain {
   occAt(x, z) { const i = this.x2i(x), j = this.x2i(z); if (!this.inside(i, j)) return 255; return this.occ[this.idx(i, j)]; }
   // first t in [0,1] along segment a->b where it dips below terrain (-1 if none)
   segmentHit(ax, ay, az, bx, by, bz, step = 3) {
+    if (ay >= this.maxHeight && by >= this.maxHeight) return -1;
     const dx = bx - ax, dy = by - ay, dz = bz - az; const len = Math.hypot(dx, dy, dz); const n = Math.max(1, Math.ceil(len / step));
     let prevT = 0, prevD = ay - this.height(ax, az);
     if (prevD < 0) return 0;
@@ -64,11 +66,12 @@ export class Grid2D {
   // cells traversed by a segment (coarse; samples every half cell)
   querySegment(ax, az, bx, bz, out = []) {
     const s = (Grid2D._stamp = (Grid2D._stamp || 0) + 1); const len = Math.hypot(bx - ax, bz - az); const n = Math.max(1, Math.ceil(len / (this.cell * 0.5)));
-    let last = -2;
+    let previousI, previousJ;
     for (let k = 0; k <= n; k++) { const t = k / n; const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
       const c = this.cell, h = this.half; const ci = Math.floor((x + h) / c), cj = Math.floor((z + h) / c);
-      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= this.n || j >= this.n) continue; const key = j * this.n + i; if (key === last) continue; const l = this.cells[key]; if (!l) continue; for (const o of l) { if (o._qs === s) continue; o._qs = s; out.push(o); } }
-      last = -2;
+      if (ci === previousI && cj === previousJ) continue;
+      previousI = ci; previousJ = cj;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= this.n || j >= this.n) continue; const key = j * this.n + i; const l = this.cells[key]; if (!l) continue; for (const o of l) { if (o._qs === s) continue; o._qs = s; out.push(o); } }
     }
     return out;
   }
@@ -79,11 +82,14 @@ export class OBB {
   constructor(x, z, hx, hz, rot, y0, y1, kind = 'building') { this.x = x; this.z = z; this.hx = hx; this.hz = hz; this.rot = rot; this.c = Math.cos(rot); this.s = Math.sin(rot); this.y0 = y0; this.y1 = y1; this.kind = kind; this.r = Math.hypot(hx, hz); }
   toLocal(x, z) { const dx = x - this.x, dz = z - this.z; return [dx * this.c - dz * this.s, dx * this.s + dz * this.c]; }
   // returns t of first hit in [0,1] or -1
-  segment(ax, ay, az, bx, by, bz) {
-    const [lax, laz] = this.toLocal(ax, az), [lbx, lbz] = this.toLocal(bx, bz);
+  segment(ax, ay, az, bx, by, bz, padding = 0) {
+    const dx = ax - this.x, dz = az - this.z, ex = bx - this.x, ez = bz - this.z;
+    const lax = dx * this.c - dz * this.s, laz = dx * this.s + dz * this.c;
+    const lbx = ex * this.c - ez * this.s, lbz = ex * this.s + ez * this.c;
+    const hx = this.hx + padding, hz = this.hz + padding;
     let t0 = 0, t1 = 1;
-    const slab = (a, b, lo, hi) => { const d = b - a; if (Math.abs(d) < 1e-9) return a >= lo && a <= hi; let ta = (lo - a) / d, tb = (hi - a) / d; if (ta > tb) [ta, tb] = [tb, ta]; t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); return t0 <= t1; };
-    if (!slab(lax, lbx, -this.hx, this.hx)) return -1; if (!slab(laz, lbz, -this.hz, this.hz)) return -1; if (!slab(ay, by, this.y0, this.y1)) return -1;
+    const slab = (a, b, lo, hi) => { const d = b - a; if (Math.abs(d) < 1e-9) return a >= lo && a <= hi; let ta = (lo - a) / d, tb = (hi - a) / d; if (ta > tb) { const tmp = ta; ta = tb; tb = tmp; } t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); return t0 <= t1; };
+    if (!slab(lax, lbx, -hx, hx)) return -1; if (!slab(laz, lbz, -hz, hz)) return -1; if (!slab(ay, by, this.y0 - padding, this.y1 + padding)) return -1;
     return t0;
   }
   // push circle (x,z,r) out; returns [nx,nz,depth] or null

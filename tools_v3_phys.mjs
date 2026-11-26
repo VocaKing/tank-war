@@ -24,20 +24,34 @@ for (const map of maps) {
       const [mx, mz] = at(dk, dk.len / 2); let turn = 0; for (let k = 1; k < dk.segs.length; k++) { let a = Math.atan2(dk.segs[k].ux, dk.segs[k].uz) - Math.atan2(dk.segs[k - 1].ux, dk.segs[k - 1].uz); a = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) * 57.3; turn = Math.max(turn, Math.round(a)); }
       out.bridges.push({ len: Math.round(dk.len), segs: dk.segs.length, deckMidY: +dk.deckY(0.5).toFixed(2), terrainMidY: +W.terrain.height(mx, mz).toFixed(2), onDeckSamples: samples, maxYErr: +maxErr.toFixed(3), crossed: maxS > dk.len + 3, reached_m: Math.round(maxS), speed: +p.speed.toFixed(2), maxTurnDeg: turn, near: maxS < dk.len ? near : undefined, inWater: p.inWater });
     }
+    const maxFixedPenetration = (tank) => {
+      const physics = g.physics.world, hull = tank.vehicle.body.collider(0);
+      let deepest = 0;
+      physics.contactPairsWith(hull, other => {
+        if (other.parent()) return;
+        physics.contactPair(hull, other, manifold => {
+          for (let i = 0; i < manifold.numContacts(); i++) deepest = Math.max(deepest, -manifold.contactDist(i));
+        });
+      });
+      return deepest;
+    };
     // building: drive straight into the nearest building for 6 s, measure footprint overlap
     const B = W.colliders.filter((c) => c.kind === 'building' && c.hx > 3); let worst = 0; let tests = 0;
     for (const c of B.slice(0, 4)) {
       const dir = [c.s, c.c]; const sx = c.x - dir[0] * (c.hz + 12), sz = c.z - dir[1] * (c.hz + 12);
       if (!g.nav.walkable(...g.nav.toCell(sx, sz))) continue; tests++;
       D.teleport(sx, sz, Math.atan2(dir[0], dir[1])); g.keys.KeyW = true; let pen = 0;
-      for (let i = 0; i < 180; i++) { D.simulate(1 / 30); const d = p.spec.dims; const res = g.constructor.rectPush(p.pos.x, p.pos.z, d.W / 2, d.L / 2, p.heading, c); if (res) pen = Math.max(pen, res[2]); }
+      for (let i = 0; i < 180; i++) { D.simulate(1 / 30); pen = Math.max(pen, maxFixedPenetration(p)); }
       g.keys.KeyW = false; worst = Math.max(worst, pen);
     }
     out.building = { tests, worstOverlap_m: +worst.toFixed(3) };
     const badT = g.tanks.filter((t) => !Number.isFinite(t.pos.x + t.pos.y + t.pos.z) || !Number.isFinite(t.heading)).map((t) => t.name + ':' + [t.pos.x, t.pos.y, t.pos.z, t.heading, t.speed].join(',')); if (badT.length) return { ...out, badT };
     // NPC: unfreeze 20 s and measure worst footprint overlap of any tank with any building/wall
     D.freeze(false); let npcWorst = 0;
-    for (let k = 0; k < 20; k++) { D.simulate(1); for (const t of g.tanks) { if (!t.alive) continue; const d = t.spec.dims; for (const c of W.colGrid.query(t.pos.x, t.pos.z, d.L)) { if (c.kind === 'deck' || c.y1 < t.pos.y + 0.3) continue; const res = g.constructor.rectPush(t.pos.x, t.pos.z, d.W / 2, d.L / 2, t.heading, c); if (res) npcWorst = Math.max(npcWorst, res[2]); } } }
+    for (let k = 0; k < 20; k++) {
+      D.simulate(1);
+      for (const t of g.tanks) if (t.alive) npcWorst = Math.max(npcWorst, maxFixedPenetration(t));
+    }
     out.npcWorstOverlap_m = +npcWorst.toFixed(3);
     return out;
   });

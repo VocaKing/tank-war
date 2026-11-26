@@ -2,7 +2,6 @@
 // team-shared spotting, target selection with weak-spot & ammo choice, hull angling, retreat.
 import * as THREE from 'three';
 import { clamp, wrapAngle, DEG } from '../util.js';
-import { insideCapture } from './capture.js';
 
 const _p = new THREE.Vector3(), _q = new THREE.Vector3();
 
@@ -16,6 +15,9 @@ export class AIController {
     this.retreatUntil = 0; this.sniperIdle = 0; this.lastHp = tank.hp; this.reserved = null; this.idleScan = Math.random() * 6;
     this.angleOff = (tank.spec.id === 'tiger' || tank.spec.id === 'sherman') ? (Math.random() < 0.5 ? 1 : -1) * 25 * DEG : 0;
     this.enemyBase = game.world.bases[1 - tank.team]; this.ownBase = game.world.bases[tank.team];
+    this.lastContact = 0;
+    this.controlDelay = 30 + game.ai.length * 0.75;
+    this.controlAngle = game.ai.length * 2.4;
     if (role === 'sniper' || role === 'defender') this.pickHold();
   }
   // --- helpers ---
@@ -50,11 +52,25 @@ export class AIController {
       return;
     } else if (this.state === 'defendBase') { this.state = 'advance'; if (this.hold) this.setGoal(this.hold); }
     if (this.state === 'retreat') { if (g.time > this.retreatUntil) { this.state = 'advance'; this.path = []; } return; }
+    const point = g.world.controlPoint;
+    if (this.state !== 'controlPoint' && !this.target && g.time - this.lastContact >= this.controlDelay) {
+      const radius = point.r * 0.52;
+      const cell = g.nav.nearestWalkable(...g.nav.toCell(
+        point.x + Math.cos(this.controlAngle) * radius,
+        point.z + Math.sin(this.controlAngle) * radius,
+      ));
+      const goal = g.nav.center(...cell);
+      this.hold = null;
+      this.claim(null);
+      this.state = 'controlPoint';
+      this.setGoal(Math.hypot(goal[0] - point.x, goal[1] - point.z) < point.r - 5 ? goal : [point.x, point.z]);
+      return;
+    }
+    if (this.state === 'controlPoint') return;
     if (this.hold) {
       if (this.role === 'sniper' && this.sniperIdle > 75) { this.hold = null; this.claim(null); this.role = 'assault'; this.path = []; }
       else return;
     }
-    if (this.state === 'capture' && insideCapture(t, this.enemyBase)) return;
     if (!this.path.length || this.pi >= this.path.length) {
       if (this.wp < this.lane.length - 1) {
         const p = this.lane[this.wp];
@@ -73,7 +89,7 @@ export class AIController {
       if (!e.alive || e.team === t.team || !e.spotted[t.team]) continue;
       const d = t.pos.distanceTo(e.pos); if (d > 900) continue;
       const eye = t.model.gun.getWorldPosition(_p);
-      const los = !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH * 0.7, e.pos.z) || !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH + e.spec.dims.turretH * 0.6, e.pos.z);
+      const los = t.spec.artillery || !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH * 0.7, e.pos.z) || !g.world.losBlocked(eye.x, eye.y, eye.z, e.pos.x, e.pos.y + e.spec.dims.hullH + e.spec.dims.turretH * 0.6, e.pos.z);
       if (!los) continue;
       let s = 600 / (d + 50) + (1 - e.hp / e.maxHp) * 1.2 + (e === this.target ? 1.0 : 0) + (e.lastAttacker === t ? 0.3 : 0) + (t.lastAttacker === e ? 1.2 : 0);
       if (s > bs) { bs = s; best = e; }
@@ -87,12 +103,18 @@ export class AIController {
     const muzzle = t.model.gun.getWorldPosition(new THREE.Vector3());
     const cands = [new THREE.Vector3(0, d.hullH * 0.62, 0), new THREE.Vector3(0, d.hullH + d.turretH * 0.5, d.turretZ), new THREE.Vector3(0, d.clearance + 0.75, d.L * 0.25), new THREE.Vector3(0, d.hullH * 0.62, -d.L * 0.3)];
     let best = { ratio: -1 }; let curBest = -1;
+    let auxiliary = null;
+    const secondary = t.secondaryRounds > 0 && t.secondaryReloadLeft + 0.8 < t.reloadLeft ? t.spec.secondary : null;
     for (const c of cands) {
       const w = e.model.root.localToWorld(c.clone());
-      if (g.world.losBlocked(muzzle.x, muzzle.y, muzzle.z, w.x, w.y, w.z)) continue;
+      if (!t.spec.artillery && g.world.losBlocked(muzzle.x, muzzle.y, muzzle.z, w.x, w.y, w.z)) continue;
       const dir = w.clone().sub(muzzle); const dist = dir.length(); dir.normalize();
       const hit = e.rayTest(muzzle.clone().addScaledVector(dir, Math.max(0, dist - 8)), w.clone().addScaledVector(dir, 6));
-      if (!hit) continue;
+      if (!hit || hit.wheel) continue;
+      if (secondary) {
+        const ev = g.ballistics.evaluate(e, hit, secondary.shell, dist);
+        if (!ev.ricochet && ev.ratio > Math.max(1.05, auxiliary?.ratio ?? 0)) auxiliary = { ratio: ev.ratio, local: c };
+      }
       for (let si = 0; si < t.spec.shells.length; si++) {
         if (t.ammo[si] <= 0) continue; const sh = t.spec.shells[si]; const ev = g.ballistics.evaluate(e, hit, sh, dist);
         let ratio = ev.ricochet ? 0.05 : ev.ratio; if (sh.type === 'HE') ratio = ev.ratio > 1 ? ratio : Math.min(0.7, sh.damage * 0.45 * (1 - ev.eff / (sh.caliber * 1.2)) / 150);
@@ -100,6 +122,12 @@ export class AIController {
         if (score > (best.score ?? -9)) best = { score, ratio, si, local: c, dist };
         if (si === t.shellIdx && ratio > curBest) curBest = ratio;
       }
+    }
+    if (t.abilities.usingSecondary !== !!auxiliary) t.tryAbility();
+    if (auxiliary) {
+      this.bestRatio = auxiliary.ratio;
+      this.aimLocal.copy(auxiliary.local);
+      return;
     }
     if (best.ratio < 0) { this.bestRatio = 0; this.aimLocal.set(0, d.hullH * 0.62, 0); return; }
     this.bestRatio = best.ratio; this.aimLocal.copy(best.local);
@@ -132,7 +160,9 @@ export class AIController {
         else if (k === 'selfDestruct' && this.t.hp < this.t.maxHp * 0.25 && this.target && this.t.pos.distanceTo(this.target.pos) < 25) this.t.tryAbility();
       }
       this.think = 0.25 + Math.random() * 0.1;
-      this.chooseTarget(); this.strategicGoal();
+      this.chooseTarget();
+      if (this.target) this.lastContact = g.time;
+      this.strategicGoal();
       if (this.target) this.planShot();
       if (this.hold && !this.target) this.sniperIdle += 0.3; else this.sniperIdle = 0;
       if (this.state !== 'retreat' && t.hp < t.maxHp * 0.3 && this.target && t.pos.distanceTo(this.target.pos) < 450 && !t.inBush) {
@@ -146,12 +176,11 @@ export class AIController {
     if (this.reverseT > 0) { this.reverseT -= dt; t.input.throttle = -0.8; t.input.steer = this.revSteer; if (this.reverseT <= 0) this.setGoal(this.goal || [this.enemyBase.x, this.enemyBase.z]); }
     else {
       const atHold = this.hold && Math.hypot(t.pos.x - this.hold[0], t.pos.z - this.hold[1]) < 3.5;
-      const inCap = this.state === 'capture' && insideCapture(t, this.enemyBase);
-      const engageStop = tgt && ((this.role === 'assault' && this.state !== 'capture' && dTgt < 380 && this.bestRatio > 0.7) || inCap || atHold || (this.state === 'retreat' && t.inBush));
-      if (atHold || engageStop || inCap) {
+      const engageStop = tgt && ((t.spec.artillery && dTgt < (t.spec.artillery.aiEngageRange || 980)) || (this.role === 'assault' && dTgt < 380 && this.bestRatio > 0.7) || this.state === 'capture' || atHold || (this.state === 'retreat' && t.inBush));
+      if (atHold || engageStop) {
         moving = false;
-        if (tgt) this.faceHeading(Math.atan2(tgt.pos.x - t.pos.x, tgt.pos.z - t.pos.z) + this.angleOff);
-        else if (this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);
+        if (tgt && !t.spec.fixedGun) this.faceHeading(Math.atan2(tgt.pos.x - t.pos.x, tgt.pos.z - t.pos.z) + this.angleOff);
+        else if (!tgt && this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);
         else { t.input.throttle = 0; t.input.steer = 0; }
         if (this.state === 'capture' && !tgt) { const b = this.enemyBase; if (Math.hypot(t.pos.x - b.x, t.pos.z - b.z) > b.r * 0.7) { moving = true; this.steerTo(b.x, b.z, 0.6); } }
       } else if (this.path.length && this.pi < this.path.length) {
@@ -166,16 +195,24 @@ export class AIController {
     if (this.stuckT > 2.5) { const moved = t.pos.distanceTo(this.lastPos); if (moving && Math.abs(t.input.throttle) > 0.3 && moved < 1.5 && this.reverseT <= 0) { const h = t.heading; this.g.nav.penalize(t.pos.x + Math.sin(h) * 5, t.pos.z + Math.cos(h) * 5); this.g.nav.penalize(t.pos.x, t.pos.z, 4); this.reverseT = 1.8; this.revSteer = Math.random() < 0.5 ? -1 : 1; } this.lastPos.copy(t.pos); this.stuckT = 0; }
     // ---- gunnery ----
     if (tgt) {
-      const flight = dTgt / t.shell.velocity; const w = tgt.model.root.localToWorld(_q.copy(this.aimLocal));
+      const w = tgt.model.root.localToWorld(_q.copy(this.aimLocal));
+      let flight = dTgt / t.shell.velocity;
+      if (t.spec.artillery) {
+        const v = t.shell.velocity, R = Math.max(1, dTgt), dy = w.y - t.model.gun.getWorldPosition(_p).y;
+        const disc = v*v*v*v - 9.81 * (9.81*R*R + 2*dy*v*v);
+        const theta = disc > 0 ? Math.atan((v*v + Math.sqrt(disc)) / (9.81*R)) : Math.atan2(dy, R);
+        flight = Math.min(t.spec.artillery.maxFlightSeconds || 42, R / Math.max(1, v * Math.cos(theta)));
+      }
       w.addScaledVector(tgt.vel, flight * (0.7 + 0.3 * this.skill)); w.x += this.aimErr.x * dTgt; w.y += this.aimErr.y * dTgt; w.z += this.aimErr.z * dTgt;
       t.input.aim.copy(w);
-      const ready = t.reloadLeft <= 0 && g.time > this.reactUntil && t.aimError < 0.004 + 0.002 / this.skill && t.bloom < (t.spec.stabilizer < 0.5 ? 2.6 : 1.7);
-      const worth = this.bestRatio > 0.85 || (this.bestRatio > 0.55 && g.time - (this.recentlyHit || -99) < 6) || dTgt < 60;
-      const concealOK = !t.inBush || this.bestRatio > 1.0 || dTgt < 250 || this.role !== 'sniper';
-      if (ready && worth && concealOK && !this.allyInLine(tgt)) { if (t.tryFire(g.time)) this.resampleError(); }
+      const ready = t.fireReloadLeft <= 0 && g.time > this.reactUntil && t.aimError < (t.spec.artillery ? 0.035 : 0.004 + 0.002 / this.skill) && (t.spec.artillery || t.dispersionProgress < (t.spec.stabilizer < 0.5 ? 0.46 : 0.2));
+      const worth = t.spec.artillery || this.bestRatio > 0.85 || (this.bestRatio > 0.55 && g.time - (this.recentlyHit || -99) < 6) || dTgt < 60;
+      const concealOK = t.spec.artillery || !t.inBush || this.bestRatio > 1.0 || dTgt < 250 || this.role !== 'sniper';
+      if (ready && worth && concealOK && (t.spec.artillery || !this.allyInLine(tgt))) { if (t.tryFire(g.time)) this.resampleError(); }
     } else {
       this.idleScan += dt * 0.25; const base = this.enemyBase; const h = Math.atan2(base.x - t.pos.x, base.z - t.pos.z) + Math.sin(this.idleScan) * 0.6;
       t.input.aim.set(t.pos.x + Math.sin(h) * 300, t.pos.y + 2, t.pos.z + Math.cos(h) * 300);
+      if (t.abilities.usingSecondary) t.tryAbility();
       // keep a reasonable round loaded
       if (t.shellIdx !== 0 && t.ammo[0] > 0 && t.reloadLeft <= 0) t.selectShell(0);
     }

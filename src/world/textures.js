@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RNG, makeNoise2D, fbm, tileField, sampleField } from '../util.js';
+import { sharedMediaUrl } from '../media.js';
 
 const loader = new THREE.TextureLoader();
 const cache = new Map();
@@ -9,11 +10,35 @@ export function setMaxAniso(a) { maxAniso = a; }
 // Poly Haven CC0 textures shipped in /public/tex
 // v5: 2k sets for terrain layers on High (1k otherwise); 'arm' = AO/Roughness/Metal packed (linear)
 const HI_SETS = new Set(['leafy_grass', 'forest_ground_04', 'aerial_rocks_02', 'gravel_road', 'coast_sand_01', 'dry_ground_01']);
+const FALLBACK_COLORS = {
+  leafy_grass: '#727e4b', forest_ground_04: '#796955', aerial_rocks_02: '#888075',
+  gravel_road: '#9b8978', coast_sand_01: '#c3ae84', dry_ground_01: '#aa8b64',
+  plastered_stone_wall: '#b3ab9b', red_brick_03: '#955748', clay_plaster: '#bca981',
+  damaged_plaster: '#a99573', clay_roof_tiles_02: '#a26752',
+  brown_planks_05: '#8b725b', bark_brown_02: '#7a6552', rusty_metal_02: '#776457',
+};
+const fallbackImages = new Map();
+function fallbackImage(name, kind) {
+  const color = kind === 'nor' ? '#8080ff' : kind === 'arm' ? '#ffc800' : (FALLBACK_COLORS[name] ?? '#aaa498');
+  if (!fallbackImages.has(color)) {
+    const [image, context] = canvas(1, 1);
+    context.fillStyle = color; context.fillRect(0, 0, 1, 1);
+    fallbackImages.set(color, image);
+  }
+  return fallbackImages.get(color);
+}
 let texHi = false;
 export function setTexQuality(q) { texHi = q === 'high'; }
 function loadPbr(name, kind) {
   const hi = texHi && kind !== 'arm' && HI_SETS.has(name);
-  const t = loader.load(`./tex/${name}_${kind}${hi ? '_2k' : ''}.jpg`);
+  const t = loader.load(sharedMediaUrl(`tex/${name}_${kind}${hi ? '_2k' : ''}.jpg`), texture => {
+    // WebGL2 texture storage is immutable. Release the placeholder's
+    // allocation before uploading the decoded image at its actual size.
+    texture.dispose();
+  });
+  // TextureLoader swaps this image out as soon as the real map decodes.
+  t.image = fallbackImage(name, kind);
+  t.needsUpdate = true;
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = maxAniso;
   if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -124,6 +149,7 @@ export function camoTexture(paint, seed = 1) {
   g.fillStyle = paint.base; g.fillRect(0, 0, S, S);
   const img = g.getImageData(0, 0, S, S); const d = img.data;
   const camo = (paint.camo || []).map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  const grimeAmount = paint.grime ?? 1;
   const dig = paint.pattern === 'digital'; const N = 128;
   const f1 = tileField(noise, N, dig ? 5 : 3.2, 4, 0, 0), f2 = tileField(noise, N, dig ? 5 : 3.2, 4, 31.7, 17.3), fg = tileField(noise, N, 9, 3, 71, 5);
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
@@ -134,12 +160,12 @@ export function camoTexture(paint, seed = 1) {
       else if (camo[1] && n2 > 0.16) { d[i] = camo[1][0]; d[i + 1] = camo[1][1]; d[i + 2] = camo[1][2]; }
       else if (camo[2] && n2 < -0.2) { d[i] = camo[2][0]; d[i + 1] = camo[2][1]; d[i + 2] = camo[2][2]; }
     }
-    const grime = sampleField(fg, N, x / S, y / S) * 22 + (r.next() - 0.5) * 6;
+    const grime = (sampleField(fg, N, x / S, y / S) * 22 + (r.next() - 0.5) * 6) * grimeAmount;
     d[i] = Math.max(0, Math.min(255, d[i] + grime - 4)); d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + grime - 4)); d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + grime * 0.8 - 4));
   }
   g.putImageData(img, 0, 0);
   // chipped paint / mud spots
-  for (let k = 0; k < 350; k++) {
+  for (let k = 0; k < 350 * grimeAmount; k++) {
     g.fillStyle = r.next() < 0.6 ? `rgba(60,48,32,${r.range(0.08, 0.3)})` : `rgba(30,28,25,${r.range(0.1, 0.35)})`;
     g.beginPath(); g.arc(r.range(0, S), r.range(0, S), r.range(1, 5), 0, Math.PI * 2); g.fill();
   }

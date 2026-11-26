@@ -1,11 +1,16 @@
 import * as THREE from 'three';
 import { Garage } from './ui/garage.js';
 import { Menu } from './ui/menu.js';
+import { initPhysics } from './game/physics.js';
 import { Game } from './game/game.js';
+import { TANK_BY_ID, refreshLocalBalance } from './game/tankData.js';
+import { STORAGE_KEY } from './game/balanceConfig.js';
+import { loadDetailedTankModel } from './models/tankModel.js';
+import { RNG } from './util.js';
 import { Audio } from './game/audio.js';
 import { setMaxAniso } from './world/textures.js';
 import { isMobile } from './ui/touchControls.js';
-import { FramePacing } from './render/framePacing.js';
+import { renderPixelRatio } from './render/pixelRatio.js';
 import './ui/mobile.css';
 
 const canvas = document.getElementById('gl'); const ui = document.getElementById('ui');
@@ -18,16 +23,32 @@ catch(e) {
   document.getElementById('fallback-balance').onclick=()=>import('./ui/balanceEditor.js');
   throw e;
 }
-const maxRatio = (quality) => Math.min(devicePixelRatio, mobile ? 0.85 : quality === 'low' ? 1 : quality === 'medium' ? 1.25 : 1.5);
-renderer.setPixelRatio(maxRatio(params.get('q') || 'high'));
-renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+function resizeRenderer(quality) {
+  const ratio = renderPixelRatio(quality, innerWidth, innerHeight, devicePixelRatio, mobile);
+  if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
+  renderer.setSize(innerWidth, innerHeight);
+}
+resizeRenderer('menu');
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9; renderer.outputColorSpace = THREE.SRGBColorSpace;
 setMaxAniso(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 const audio = new Audio();
 const garage = new Garage(renderer); garage.resize(innerWidth, innerHeight);
-let game = null; let mode = 'menu'; let pacing = null, warmup = 0;
+let game = null; let mode = 'menu';
 const loading = document.createElement('div'); loading.className = 'loading'; loading.innerHTML = '<div><h2>Generating battlefield…</h2><p>Sculpting 1.4 km of terrain, planting forests, building villages</p><div class="spin"></div></div>'; ui.appendChild(loading);
 const menu = new Menu(ui, garage, start, openBalance);
+function syncGarageBalance() {
+  if (mode !== 'menu' || !refreshLocalBalance()) return;
+  menu.select(menu.tank);
+  if (menu.armorOn) menu.refreshArmor();
+}
+addEventListener('storage', (event) => {
+  if (event.storageArea === localStorage && (event.key === STORAGE_KEY || event.key === null)) syncGarageBalance();
+});
+addEventListener('pageshow', syncGarageBalance);
+const requestedTank = params.get('tank');
+const tankId = Object.prototype.hasOwnProperty.call(TANK_BY_ID, requestedTank) ? requestedTank : null;
+if (tankId && !params.has('autostart')) menu.select(tankId);
 if (mobile) { if (!localStorage.getItem('tw_mobile_q_init')) { menu.quality='low'; menu.root.querySelector('#m-q').value='low'; localStorage.setItem('tw_q','low'); localStorage.setItem('tw_mobile_q_init','1'); } const hint=document.createElement('div');hint.className='mobile-garage-hint';hint.textContent='手机版 v2 · 滑动查看全部功能 · 战斗建议横屏';menu.root.prepend(hint);
  const inspect=document.createElement('button');inspect.className='mobile-inspect';inspect.textContent='全屏查看 3D 模型';menu.root.append(inspect);
  const back=document.createElement('button');back.className='mobile-inspect-back';back.textContent='返回车库';back.hidden=true;ui.append(back);
@@ -41,13 +62,22 @@ async function openBalance() {
   catch(e) { console.error(e); mode = 'menu'; alert('Unable to open balance editor. Please reload and retry.'); }
 }
 function start(opts, gesture = true) {
+  syncGarageBalance();
   if (gesture) { audio.init(); audio.resume(); }
   menu.show(false); loading.style.display = 'flex'; mode = 'loading';
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
-      renderer.setPixelRatio(maxRatio(opts.quality));
-      pacing = new FramePacing(renderer.getPixelRatio(), mobile ? 0.55 : 0.7); warmup = 3;
-      game = new Game(renderer, ui, audio, { ...opts, seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; pacing = null; renderer.setPixelRatio(maxRatio(menu.quality)); mode = 'menu'; menu.show(true); } });
+      const seed = Number(params.get('seed')) || ((Math.random() * 1e9) | 0) || 1;
+      // Preview the seeded lineup so only assets used in this battle are requested.
+      const lineup = new Set(Game.matchmake(opts.tankId, new RNG(seed)));
+      const [physicsEngine] = await Promise.all([
+        initPhysics(), ...Array.from(lineup, id => loadDetailedTankModel(TANK_BY_ID[id])),
+      ]);
+      resizeRenderer(opts.quality);
+      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, onExit: () => {
+        game = null; window.__game = null; mode = 'menu';
+        resizeRenderer('menu'); syncGarageBalance(); menu.show(true); garage.resize(innerWidth, innerHeight);
+      } });
       window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';
@@ -56,28 +86,21 @@ function start(opts, gesture = true) {
   }, 50);
 }
 window.__start = start; window.__menu = menu;
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); garage.resize(innerWidth, innerHeight); });
-let last = null, fpsAcc = 0, fpsN = 0; window.__fps = 0;
-addEventListener('visibilitychange', () => { last = null; pacing?.resetWindow(); if (pacing) pacing.goodWindows = 0; });
-function loop(now) {
-  requestAnimationFrame(loop);
-  const realDt = last === null ? 1 / 60 : Math.max(0, (now - last) / 1000); last = now;
-  if (document.hidden) return;
-  const dt = Math.min(0.1, realDt);
-  fpsAcc += realDt; fpsN++; if (fpsAcc > 1) { window.__fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+addEventListener('resize', () => { resizeRenderer(game?.quality ?? 'menu'); garage.resize(innerWidth, innerHeight); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && game) game.frameRequested = true;
+});
+let last = performance.now(); let fpsAcc = 0, fpsN = 0; window.__fps = 0;
+function loop() {
+  requestAnimationFrame(loop); const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  fpsAcc += dt; fpsN++; if (fpsAcc > 1) { window.__fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
   if (mode === 'menu') { renderer.toneMappingExposure = 0.9; garage.render(dt); }
   else if (mode === 'game' && game) {
-    if (!game.paused && !game.debugPaused && pacing && params.get('adaptive') !== '0') {
-      warmup -= dt;
-      if (warmup <= 0) {
-        const ratio = pacing.sample(realDt);
-        if (ratio !== null) { renderer.setPixelRatio(ratio); game.resize(); }
-      }
-    }
-    if (game.debugPaused) game.updateCamera(dt); else game.update(dt);
-    game.render();
+    if (game.debugPaused) game.updateCamera(1 / 60);
+    else game.update(dt);
+    if (!game.paused || game.debugPaused || game.frameRequested) game.render();
   }
 }
-requestAnimationFrame(loop);
+loop();
 window.__ready = true;
-if (params.get('autostart')) start({ tankId: params.get('tank') || 'sherman', mapId: params.get('map') || 'village', quality: params.get('q') || (mobile?'low':'high'), loadout: params.get('loadout') ? params.get('loadout').split(',').map(Number) : undefined, items: params.get('items') ? params.get('items').split(',') : undefined, aimAssist: params.get('aa') !== '0' && localStorage.getItem('tw_aa') !== '0' }, false);
+if (params.get('autostart')) start({ tankId: tankId || 'sherman', mapId: params.get('map') || 'village', quality: params.get('q') || (mobile?'low':'high'), loadout: params.get('loadout') ? params.get('loadout').split(',').map(Number) : undefined, items: params.get('items') ? params.get('items').split(',') : undefined, aimAssist: params.get('aa') !== '0' && localStorage.getItem('tw_aa') !== '0' }, false);

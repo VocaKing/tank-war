@@ -18,11 +18,11 @@ if (only.includes('disp')) {
     for (const t of g.tanks) if (t !== p && t !== e) t.placeAt(t.team ? 560 : -560, t.team ? 560 - t.id * 9 : -560 + t.id * 9, 0);
     e.visibleUntil[0] = 1e9; e.spotted[0] = true; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0));
     D.cam(h + 0.2, -0.08, 13); D.aim(P.x, P.y, P.z); D.simulate(3); g.keys.KeyW = true; D.simulate(1.6); g.keys.KeyW = false; D.pause(true);
-    return { speed_kmh: Math.round(Math.abs(p.speed) * 3.6), dist: Math.round(e.pos.distanceTo(p.pos)), bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; })()`);
+    return { speed_kmh: Math.round(Math.abs(p.speed) * 3.6), dist: Math.round(e.pos.distanceTo(p.pos)), dispersionProgress: +p.dispersionProgress.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; })()`);
   console.log('third', JSON.stringify(r)); await shot(page, 'dispersion_thirdperson');
-  const r2 = await page.evaluate(() => { const g = window.__game, D = g.debug, e = window.__e, p = g.player; D.pause(false); g.cam.sniper = true; g.cam.zoom = 8; g._camInit = false; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0)); g.alignCamTo(P); D.simulate(0.1); g.alignCamTo(P); p.speed = 0; D.aim(P.x, P.y, P.z); D.simulate(4); g.alignCamTo(P); D.simulate(0.05); D.pause(true); return { bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2), dist: Math.round(g.reticleDist) }; });
+  const r2 = await page.evaluate(() => { const g = window.__game, D = g.debug, e = window.__e, p = g.player; D.pause(false); g.cam.sniper = true; g.cam.zoom = 8; g._camInit = false; const P = e.model.root.localToWorld(new e.pos.constructor(0, e.spec.dims.hullH * 0.7, 0)); g.alignCamTo(P); D.simulate(0.1); g.alignCamTo(P); p.speed = 0; D.aim(P.x, P.y, P.z); D.simulate(4); g.alignCamTo(P); D.simulate(0.05); D.pause(true); return { dispersionProgress: +p.dispersionProgress.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2), dist: Math.round(g.reticleDist) }; });
   console.log('scoped', JSON.stringify(r2)); await shot(page, 'dispersion_scoped');
-  const r3 = await page.evaluate(() => { const g = window.__game, D = g.debug, p = g.player; D.pause(false); p.reloadLeft = 0; p.tryFire(g.time); D.simulate(0.12); D.pause(true); return { bloom: +p.bloom.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; });
+  const r3 = await page.evaluate(() => { const g = window.__game, D = g.debug, p = g.player; D.pause(false); p.reloadLeft = 0; p.tryFire(g.time); D.simulate(0.12); D.pause(true); return { dispersionProgress: +p.dispersionProgress.toFixed(2), circleRadius_m: +(g.reticleRadiusWorld || 0).toFixed(2) }; });
   console.log('scoped after shot', JSON.stringify(r3)); await shot(page, 'dispersion_scoped_after_shot');
   await page.close();
 }

@@ -40,21 +40,19 @@ export function gunMount(P,b,spec,lathe){
   collar.translate(b.gunPos[0],b.gunPos[1],pivot);
   P.add('turret','paint',collar);
  }
- // Per-part bounds for the hull, retained as collision proxies for gun depression.
- b.gunHullBoxes=[];
- const pivotY=b.turretPos[1]+b.gunPos[1];
- const minY=pivotY-spec.dims.gunLen*Math.sin(Math.min(45,spec.gunDepression)*Math.PI/180)-0.25;
- for(const [key,parts] of Object.entries(P.b))if(key.startsWith('hull|'))for(const g of parts){
-  g.computeBoundingBox();const q=g.boundingBox;
-  if(q&&q.max.y>minY)b.gunHullBoxes.push([q.min.x,q.max.x,q.min.z,q.max.z,q.max.y]);
- }
- // Preserve the original neutral muzzle reach where possible after moving
- // the trunnion forward. Keep the chamber and mantlet connection unscaled.
+ // Measure gun-forward length from the chassis rear datum, even on models
+ // with external drums or other stowage. Keep the chamber and mount intact.
  const tubes=Object.entries(P.b).filter(([k])=>k.startsWith('barrel|')).flatMap(([,v])=>v);
  let originalEnd=0;
  for(const g of tubes){g.computeBoundingBox();originalEnd=Math.max(originalEnd,g.boundingBox.max.z);}
  const shoulder=0.65;
- const factor=originalEnd>shoulder?Math.max(0.78,(originalEnd-shoulder-shift)/(originalEnd-shoulder)):1;
+ const { L, gunForwardL } = spec.dims;
+ const neutralEnd = gunForwardL === undefined
+  ? originalEnd - shift
+  : gunForwardL - L / 2 - b.turretPos[2] - pivot;
+ const factor = originalEnd > shoulder
+  ? Math.max(gunForwardL === undefined ? 0.78 : 0.1, (neutralEnd - shoulder) / (originalEnd - shoulder))
+  : 1;
  for(const g of tubes){
   const a=g.attributes.position;
   for(let i=0;i<a.count;i++)if(a.getZ(i)>shoulder)a.setZ(i,shoulder+(a.getZ(i)-shoulder)*factor);
@@ -74,6 +72,15 @@ export function gunMount(P,b,spec,lathe){
   for(let i=0;i<a.count;i++)rad=Math.max(rad,Math.hypot(a.getX(i),a.getY(i)));
  }
  b.barrelLength=end||spec.dims.gunLen;b.barrelRadius=Math.max(0.12,rad);
+ // Per-part bounds for the hull, retained as collision proxies for gun depression.
+ b.gunHullBoxes=[];
+ const pivotY=b.turretPos[1]+b.gunPos[1];
+ const minY=pivotY-b.barrelLength*Math.sin(Math.min(45,spec.gunDepression)*Math.PI/180)-0.25;
+ for(const [key,parts] of Object.entries(P.b))if(key.startsWith('hull|'))for(const g of parts){
+  if(g.userData.flexible)continue;
+  g.computeBoundingBox();const q=g.boundingBox;
+  if(q&&q.max.y>minY)b.gunHullBoxes.push([q.min.x,q.max.x,q.min.z,q.max.z,q.max.y]);
+ }
  b.gunClearance={original,front,pivot,shift};
 }
 // Conservative hull clearance: intersect the barrel's horizontal sweep with

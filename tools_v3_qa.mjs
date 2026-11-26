@@ -68,7 +68,7 @@ out.water = await page.evaluate(() => {
   if (!spot) return 'no water';
   // shell descends at 10° onto the hull side plate, hitting it 0.4 m below the water surface (≈2.3 m of water path)
   const trial = (x, z, wl, n) => { let pens = 0, hits = 0, wf = 0, wd = 0; const kinds = {}; const V = tiger.pos.constructor; let from = null, aim = null;
-    for (let a = 0; a < 8 && !from; a++) { const hd = a * 0.785; tiger.placeAt(x, z, hd); tiger.updateGround(1, true); const ay = wl !== null ? wl - 0.4 : tiger.pos.y + 0.9;
+    for (let a = 0; a < 8 && !from; a++) { const hd = a * 0.785; tiger.placeAt(x, z, hd); const ay = wl !== null ? wl - 0.4 : tiger.pos.y + 0.9;
       const right = new V(Math.cos(hd), 0, -Math.sin(hd)); const ap = new V(x, ay, z).addScaledVector(right, tiger.spec.dims.W / 2 + 0.02);
       const f = ap.clone().addScaledVector(right, 25 * Math.cos(0.1745)); f.y += 25 * Math.sin(0.1745);
       if (T.segmentHit(f.x, f.y, f.z, ap.x, ap.y, ap.z, 1) < 0 && W.structureHit(f.x, f.y, f.z, ap.x, ap.y, ap.z) < 0) { from = f; aim = ap; } }

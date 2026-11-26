@@ -8,6 +8,8 @@ export class MapBuilder {
   constructor(def, quality = 'high') {
     this.def = def; this.rng = new RNG(def.seed); this.noise = makeNoise2D(def.seed); this.noise2 = makeNoise2D(def.seed * 7 + 3);
     this.t = new Terrain(def.terrainHalf || 700, 2);
+    this.roadDetail = new Float32Array(this.t.n * this.t.n * 3);
+    this.roadSurface = new Int8Array(this.t.n * this.t.n);
     this.play = def.playHalf || 600;
     this.buildings = []; this.walls = []; this.trees = []; this.bushes = []; this.rocks = []; this.props = []; this.rivers = []; this.lakes = []; this.bridges = []; this.roads = [];
     this.bases = []; this.lanes = []; this.quality = quality;
@@ -94,15 +96,39 @@ export class MapBuilder {
     const pts = this._dense(points, opts.smooth ?? 10);
     const t = this.t; const N = t.n * t.n; const dist = new Float32Array(N).fill(1e9), lvl = new Float32Array(N);
     const half = width / 2, R = half + 7;
+    const surface = kind === 'asphalt' ? 1 : kind === 'dirt' ? -1 : 0;
     let bridgeStart = -1;
     pts.forEach(([x, z], i) => {
       const onWater = t.waterLevel(x, z) > -1e8 || t.occAt(x, z) === OCC.WATER;
       if (onWater) { const wl = t.waterLevel(x, z) > -1e8 ? t.waterLevel(x, z) : pts[i][2]; pts[i][2] = Math.max(pts[i][2], wl + 1.6); if (bridgeStart < 0) bridgeStart = i; }
       else if (bridgeStart >= 0) { if (!opts.noBridges) this.bridges.push({ pts: pts.slice(Math.max(0, bridgeStart - 4), Math.min(pts.length, i + 4)), width: width + 1 }); bridgeStart = -1; }
     });
-    for (const [x, z, h] of pts) this.forCells(x, z, R, (k, cx, cz, d) => { if (d < dist[k]) { dist[k] = d; lvl[k] = h; } });
+    const lateral = new Float32Array(N);
+    const along = new Float32Array(N);
+    let distance = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const [x, z, h] = pts[i];
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const fx = (b[0] - a[0]) / length, fz = (b[1] - a[1]) / length;
+      if (i > 0) distance += Math.hypot(x - a[0], z - a[1]);
+      this.forCells(x, z, R, (k, cx, cz, d) => {
+        if (d >= dist[k]) return;
+        dist[k] = d; lvl[k] = h;
+        lateral[k] = (cx - x) * fz - (cz - z) * fx;
+        along[k] = distance + (cx - x) * fx + (cz - z) * fz;
+      });
+    }
     for (let k = 0; k < N; k++) {
       const d = dist[k]; if (d > R) continue; const h = lvl[k];
+      const strength = 1 - smoothstep(half * 0.76, half + 1.7, d);
+      const detail = k * 3;
+      if (strength > this.roadDetail[detail + 2]) {
+        this.roadDetail[detail] = lateral[k];
+        this.roadDetail[detail + 1] = along[k];
+        this.roadDetail[detail + 2] = strength;
+        this.roadSurface[k] = surface;
+      }
       if (d < half) { t.h[k] = h; t.road[k] = Math.max(t.road[k], 1 - smoothstep(half * 0.7, half, d) * 0.6); if (t.occ[k] === OCC.WATER) t.water[k] = -1e9; t.occ[k] = OCC.ROAD; }
       else { const f = smoothstep(half, R, d); t.h[k] = lerp(h, t.h[k], f); t.road[k] = Math.max(t.road[k], (1 - f) * 0.25); }
     }
@@ -151,9 +177,10 @@ export class MapBuilder {
   }
   // finalize: splat weights per grid vertex [A,B,rock,road] and tint
   finalize(maskBFn, tintFn) {
-    const t = this.t; const n = t.n; this.splat = new Float32Array(n * n * 4);
+    const t = this.t; const n = t.n; let maxHeight = -Infinity; this.splat = new Float32Array(n * n * 4);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i; const x = t.i2x(i), z = t.i2x(j);
+      maxHeight = Math.max(maxHeight, t.h[k]);
       const i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(n - 1, j + 1);
       const gx = (t.h[j * n + i1] - t.h[j * n + i0]) / ((i1 - i0) * t.res), gz = (t.h[j1 * n + i] - t.h[j0 * n + i]) / ((j1 - j0) * t.res);
       const slope = Math.hypot(gx, gz);
@@ -164,5 +191,6 @@ export class MapBuilder {
       const s = wa + wb + wk + wr || 1; this.splat.set([wa / s, wb / s, wk / s, wr / s], k * 4);
       if (tintFn) { const c = tintFn(x, z, slope); t.tint[k * 3] = c[0]; t.tint[k * 3 + 1] = c[1]; t.tint[k * 3 + 2] = c[2]; }
     }
+    t.maxHeight = maxHeight;
   }
 }

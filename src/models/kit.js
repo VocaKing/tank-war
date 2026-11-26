@@ -118,8 +118,8 @@ export function stowageBox(P, part, x, y, z, w, h, d, ry = 0) {
   }
   const [lx, lz] = rot(0, d / 2 + 0.01, ry); P.add(part, 'metal', box(0.06, 0.08, 0.02, x + lx, y + h / 2 - 0.08, z + lz, 0, ry)); // latch
 }
-export function headlight(P, part, x, y, z, guard = true) {
-  P.add(part, 'metal', cylZ(0.085, 0.12, 12, x, y, z)); P.add(part,'glass',cylZ(0.07,0.015,24,x,y,z+0.065));
+export function headlight(P, part, x, y, z, guard = true, lens = 'glass') {
+  P.add(part, 'metal', cylZ(0.085, 0.12, 12, x, y, z)); P.add(part,lens,cylZ(0.07,0.015,24,x,y,z+0.065));
   P.add(part,'metal',T(new THREE.TorusGeometry(0.074,0.009,6,24),x,y,z+0.07,0,0,0));
   if (guard) for (const a of [-0.6, 0, 0.6]) P.add(part, 'metal', T(new THREE.TorusGeometry(0.11, 0.01, 4, 10, Math.PI), x, y, z + 0.02, 0, 0, a * 0.2));
   P.add(part, 'metal', box(0.04, 0.12, 0.04, x, y - 0.1, z - 0.04));
@@ -130,7 +130,11 @@ export function grabRail(P, part, a, b, h = 0.07, r = 0.012) {
   P.add(part, 'metal', T(new THREE.CylinderGeometry(r, r, L, 5).rotateX(Math.PI / 2), (a[0] + b[0]) / 2, a[1] + h, (a[2] + b[2]) / 2, 0, yaw, 0));
   for (const p of [a, b]) P.add(part, 'metal', cylY(r, h, 5, p[0], p[1] + h / 2, p[2]));
 }
-export function antenna(P, part, x, y, z, h = 2.2) { P.add(part, 'dark', cylY(0.05, 0.12, 8, x, y + 0.06, z)); P.add(part, 'metal', cylY(0.006, h, 4, x, y + h / 2, z, 0.012)); }
+export function antenna(P, part, x, y, z, h = 2.2) {
+  P.add(part, 'dark', cylY(0.05, 0.12, 8, x, y + 0.06, z));
+  const whip = P.add(part, 'metal', cylY(0.006, h, 4, x, y + h / 2, z, 0.012));
+  whip.userData.flexible = true;
+}
 export function jerrycans(P, part, x, y, z, n = 2, ry = 0) {
   for (let i = 0; i < n; i++) { const [ox, oz] = rot((i - (n - 1) / 2) * 0.19, 0, ry); P.add(part,'paint',box(0.17,0.42,0.34,x+ox,y+0.21,z+oz,0,ry));
     const [cx,cz]=rot(0,0.108,ry);
@@ -187,6 +191,25 @@ function removeBarrelCapAtZ(geometry,z) {
   }
   out.computeBoundingBox();out.computeBoundingSphere();geometry.dispose();return out;
 }
+function slottedBrakeShell(P, part, start, length, radius) {
+  // Model the visible side openings with separate collars and curved bridges.
+  const bands = [[0, 0.19], [0.40, 0.56], [0.80, 1]];
+  for (const [from, to] of bands) {
+    const a = start + from * length, b = start + to * length;
+    P.add(part, 'paint', lathe([[0.001, a], [radius * 0.89, a], [radius, a + 0.019],
+      [radius, b - 0.020], [radius * 0.91, b], [0.001, b]], 32));
+  }
+  for (let i = 0; i < bands.length - 1; i++) {
+    const a = start + bands[i][1] * length - 0.012;
+    const b = start + bands[i + 1][0] * length + 0.012;
+    const outline = [[radius, a], [radius * 0.92, a + 0.02], [radius * 0.92, b - 0.02],
+      [radius, b], [radius * 0.81, b], [radius * 0.81, a], [radius, a]];
+    for (const angle of [0, Math.PI]) {
+      const bridge = new THREE.LatheGeometry(outline.map(([r, z]) => new THREE.Vector2(r, z)), 12, angle - 0.88, 1.76);
+      P.add(part, 'paint', bridge.rotateX(Math.PI / 2));
+    }
+  }
+}
 export function barrel(P, part, len, opts = {}) {
   const r0 = opts.r0 ?? 0.12, r1 = opts.r1 ?? 0.08; const pr = [[0.001, -0.25], [r0 * 1.2, -0.25], [r0 * 1.2, 0.15], [r0, 0.25]];
   const brakeLen = opts.brake ? opts.brake.len : 0; const end = len - brakeLen;
@@ -203,7 +226,9 @@ export function barrel(P, part, len, opts = {}) {
   if (opts.sleeve) { const n = opts.sleeve; for (let i = 1; i < n; i++) { const z = 0.4 + (end - 0.6) * (i / n); if (ev && Math.abs(z - ev.z) < ev.len / 2 + 0.1) continue; const rr = r0 + (r1 - r0) * (z / end); P.add(part, 'metal', cylZ(rr * 1.18, 0.05, 16, 0, 0, z)); } }
   if (opts.brake) {
     const b = opts.brake; const z0 = end; const rb = b.r;
-    if (b.type === 'double') {
+    if (b.type === 'double' && b.openSides) {
+      slottedBrakeShell(P, part, z0, b.len, rb);
+    } else if (b.type === 'double') {
       P.add(part, 'paint', lathe([[0.001, z0], [rb, z0], [rb, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.35], [rb * 0.82, z0 + b.len * 0.55], [rb, z0 + b.len * 0.55], [rb, z0 + b.len], [rb * 0.72, z0 + b.len], [0.001, z0 + b.len]], 32));
       for (const f of [0.45, 0.8]) for (const side of [-1, 1]) P.add(part, 'dark', box(0.03, rb * 1.3, b.len * 0.18, side * rb * 0.98, 0, z0 + b.len * f));
     } else if (b.type === 'single') {

@@ -1,9 +1,15 @@
+import { SPECIALIST_TANKS } from './specialistTanks.js';
+import { CONCEPT_VEHICLES } from './conceptVehicles.js';
+import { EXPANSION_TANKS } from './expansionTanks.js';
 import publishedBalance from './balanceDefaults.json';
-import { clone, effective, loadLocal, EMPTY } from './balanceConfig.js';
+import { clone, effective, legacyMaxDispersion, loadLocal } from './balanceConfig.js';
 // Tank specifications. Figures are grounded in published real-world data
-// (armor in mm RHA / RHA-equivalent, slope in degrees from vertical,
+// (armor in mm RHA / RHA-equivalent, legacy slope annotations in degrees from vertical,
 // penetration in mm RHA at 100 m vs a flat plate, muzzle velocity in m/s).
 // HP / damage are gameplay abstractions layered on top of the armor model.
+// Dimensions are in metres. L is the chassis length, W is the configured
+// width over the fenders/skirts, and gunForwardL is the length with the
+// main gun level and facing forwards. Removable kit can overhang these.
 
 export const TANKS = [
   {
@@ -11,7 +17,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 33.7, power: 900, maxSpeed: 88, reverseSpeed: 22, hullTraverse: 70, turretTraverse: 50, gunSpeed: 9,
     gunDepression: 10, gunElevation: 25, hp: 900, viewRange: 380, reload: 6.0, aimTime: 2.2, dispersion: 2.64, stabilizer: 0.6,
-    dims: { L: 6.27, W: 3.00, hullH: 1.9, clearance: 0.43, trackW: 0.58, turretZ: 0.35, turretL: 2.3, turretW: 2.55, turretH: 0.85, gunLen: 3.1 },
+    dims: { L: 6.27, W: 3.00, hullH: 1.92, clearance: 0.43, trackW: 0.58, trackGauge: 2.26, turretZ: 0.35, turretL: 2.3, turretW: 2.55, turretH: 0.82, gunLen: 3.1, gunForwardL: 7.54 },
     armor: {
       hull: { front: [50, 47], side: [32, 0], rear: [32, 10], top: [16, 0], bottom: [13, 0] },
       turret: { front: [70, 30], side: [50, 5], rear: [50, 0], top: [20, 0] },
@@ -32,7 +38,7 @@ export const TANKS = [
     mass: 66, power: 700, maxSpeed: 20, reverseSpeed: 4, hullTraverse: 12, turretTraverse: 5, gunSpeed: 3,
     gunDepression: 8, gunElevation: 15, hp: 1600, viewRange: 400, reload: 11.0, aimTime: 2.6, dispersion: 2.76, stabilizer: 1.0,
     selfDestruct: { radius: 18 },
-    dims: { turretBoxZ: -0.15, L: 6.32, W: 3.70, hullH: 1.95, clearance: 0.47, trackW: 0.72, turretZ: 0.15, turretL: 2.95, turretW: 2.5, turretH: 0.85, gunLen: 3.9 },
+    dims: { turretBoxZ: -0.15, L: 6.316, W: 3.705, hullH: 1.8, clearance: 0.47, trackW: 0.725, trackGauge: 2.835, turretZ: 0.15, turretL: 2.95, turretW: 2.5, turretH: 0.815, gunLen: 3.9, gunForwardL: 8.45 },
     armor: {
       hull: { front: [520, 9], side: [140, 0], rear: [80, 9], top: [16, 0], bottom: [25, 0] },
       turret: { front: [520, 0], side: [150, 0], rear: [80, 0], top: [25, 0] },
@@ -53,7 +59,7 @@ export const TANKS = [
     mass: 32, power: 1000, maxSpeed: 96, reverseSpeed: 18, hullTraverse: 75, turretTraverse: 55, gunSpeed: 9,
     gunDepression: 5, gunElevation: 22, hp: 850, viewRange: 340, reload: 7.5, aimTime: 2.5, dispersion: 2.76, stabilizer: 1.0,
     scan: { cooldown: 24, maxTargets: 3, range: 400 },
-    dims: { L: 6.1, W: 3.0, hullH: 1.65, clearance: 0.4, trackW: 0.5, turretZ: 0.6, turretL: 2.45, turretW: 2.15, turretH: 0.85, gunLen: 3.5 },
+    dims: { L: 6.1, W: 3.0, hullH: 1.65, clearance: 0.4, trackW: 0.5, turretZ: 0.6, turretL: 2.45, turretW: 2.15, turretH: 0.78, gunLen: 3.5, gunForwardL: 8.10 },
     armor: {
       hull: { front: [40, 60], side: [40, 40], rear: [40, 45], top: [16, 0], bottom: [16, 0] },
       turret: { front: [70, 20], side: [55, 20], rear: [45, 10], top: [16, 0] },
@@ -74,7 +80,7 @@ export const TANKS = [
     mass: 44.5, power: 840, maxSpeed: 44, reverseSpeed: 5, hullTraverse: 32, turretTraverse: 24, gunSpeed: 6,
     gunDepression: 6, gunElevation: 14, hp: 1500, viewRange: 420, reload: 7.1, aimTime: 2, dispersion: 2.10, stabilizer: 0.35,
     magazine: { size: 4, intraReload: 1.2, fullReload: 9.5 },
-    dims: { L: 6.95, W: 3.59, hullH: 1.5, clearance: 0.47, trackW: 0.58, turretZ: 0.35, turretL: 2.6, turretW: 2.3, turretH: 0.75, gunLen: 4.65 },
+    dims: { L: 6.86, W: 3.59, hullH: 1.5, clearance: 0.47, trackW: 0.58, trackGauge: 2.79, turretZ: 0.35, turretL: 2.6, turretW: 2.3, turretH: 0.722, gunLen: 4.65, gunForwardL: 9.53 },
     armor: {
       // RHA-equivalent vs KE. Composite upper glacis (~200 mm LOS-adj @68°), cast turret w/ "super-Dorchester"-style insert.
       hull: { front: [300, 68], side: [80, 0], rear: [45, 0], top: [16, 0], bottom: [20, 0] },
@@ -96,7 +102,7 @@ export const TANKS = [
     mass: 62, power: 1500, maxSpeed: 48, reverseSpeed: 24, hullTraverse: 36, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 10, gunElevation: 20, hp: 1800, viewRange: 500, reload: 6.0, aimTime: 1.5, dispersion: 1.32, stabilizer: 0.2,
     stabilize: { duration: 7, cooldown: 22 },
-    dims: { turretBoxZ: -0.15, L: 7.93, W: 3.66, hullH: 1.55, clearance: 0.48, trackW: 0.64, turretZ: -0.25, turretL: 4.3, turretW: 3.4, turretH: 0.8, gunLen: 4.1 },
+    dims: { turretBoxZ: -0.15, L: 7.917, W: 3.658, hullH: 1.52, clearance: 0.432, trackW: 0.635, trackGauge: 2.845, turretZ: -0.25, turretL: 4.3, turretW: 3.4, turretH: 0.72, gunLen: 4.1, gunForwardL: 9.828 },
     armor: {
       // RHA-equivalent vs KE (DU-reinforced Chobham-type composite on frontal arc)
       hull: { front: [400, 20], side: [90, 0], rear: [35, 0], top: [16, 0], bottom: [25, 0] },
@@ -119,7 +125,7 @@ export const TANKS = [
     mass: 44.8, power: 700, maxSpeed: 36, reverseSpeed: 7, hullTraverse: 24, turretTraverse: 18, gunSpeed: 5,
     gunDepression: 8, gunElevation: 18, hp: 1150, viewRange: 400, reload: 7.0, aimTime: 2.3, dispersion: 2.46, stabilizer: 1.0,
     overpen: { shots: 2, mult: 1.35, cooldown: 35 },
-    dims: { L: 6.87, W: 3.42, hullH: 1.98, clearance: 0.56, trackW: 0.66, turretZ: 0.15, turretL: 2.6, turretW: 2.05, turretH: 0.85, gunLen: 4.1, turretBoxZ: 0.0 },
+    dims: { L: 6.87, W: 3.42, hullH: 1.98, clearance: 0.56, trackW: 0.66, trackGauge: 2.61, turretZ: 0.15, turretL: 2.6, turretW: 2.05, turretH: 0.74, gunLen: 4.1, gunForwardL: 8.86, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [160, 55], side: [50, 29], rear: [40, 30], top: [12, 0], bottom: [14, 0] },
       turret: { front: [180, 11], side: [55, 25], rear: [45, 25], top: [12, 0] },
@@ -139,7 +145,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 58, power: 520, maxSpeed: 18, reverseSpeed: 3, hullTraverse: 12, turretTraverse: 7, gunSpeed: 2.5,
     gunDepression: 3, gunElevation: 20, hp: 1700, viewRange: 360, reload: 20.0, aimTime: 2.8, dispersion: 3.12, stabilizer: 1.0,
-    dims: { L: 6.77, W: 3.09, hullH: 1.60, clearance: 0.42, trackW: 0.65, trackPitch: 0.168, turretZ: 0.12, turretL: 2.80, turretW: 2.65, turretH: 0.87, gunLen: 4.97, turretBoxZ: 0.05 },
+    dims: { L: 6.77, W: 3.07, hullH: 1.60, clearance: 0.42, trackW: 0.65, trackPitch: 0.168, turretZ: 0.12, turretL: 2.80, turretW: 2.65, turretH: 0.87, gunLen: 4.97, gunForwardL: 9.83, turretBoxZ: 0.05 },
     armor: {
       hull: { front: [540, 60], side: [150, 15], rear: [60, 49], top: [16, 0], bottom: [20, 0] },
       turret: { front: [540, 20], side: [160, 20], rear: [90, 30], top: [30, 0] },
@@ -159,7 +165,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner'], autoloader: false,
     mass: 52, power: 500, maxSpeed: 22, reverseSpeed: 6, hullTraverse: 16, turretTraverse: 12, gunSpeed: 3,
     gunDepression: 10, gunElevation: 20, hp: 1450, viewRange: 390, reload: 10.0, aimTime: 2.5, dispersion: 2.88, stabilizer: 1.0,
-    dims: { L: 6.33, W: 3.51, hullH: 1.93, clearance: 0.44, trackW: 0.61, turretZ: 0.3, turretL: 3.0, turretW: 2.7, turretH: 0.85, gunLen: 4.11, turretBoxZ: -0.05 },
+    dims: { L: 6.327, W: 3.513, hullH: 1.83, clearance: 0.437, trackW: 0.61, trackGauge: 2.794, turretZ: 0.3, turretL: 3.0, turretW: 2.7, turretH: 0.57, gunLen: 4.11, gunForwardL: 8.648, turretBoxZ: -0.05 },
     armor: {
       hull: { front: [520, 46], side: [280, 0], rear: [51, 10], top: [16, 0], bottom: [13, 0] },
       turret: { front: [540, 0], side: [300, 0], rear: [76, 0], top: [25, 0] },
@@ -179,7 +185,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 49, power: 650, maxSpeed: 30, reverseSpeed: 7, hullTraverse: 24, turretTraverse: 30, gunSpeed: 5,
     gunDepression: 10, gunElevation: 20, hp: 1350, viewRange: 410, reload: 6.0, aimTime: 2, dispersion: 2.16, stabilizer: 0.5,
-    dims: { L: 7.6, W: 3.39, hullH: 1.95, clearance: 0.51, trackW: 0.61, turretZ: 0.35, turretL: 3.1, turretW: 2.6, turretH: 0.85, gunLen: 4.45, turretBoxZ: -0.2 },
+    dims: { L: 7.556, W: 3.378, hullH: 1.75, clearance: 0.51, trackW: 0.61, trackGauge: 2.666, turretZ: 0.35, turretL: 3.1, turretW: 2.6, turretH: 0.82, gunLen: 4.45, gunForwardL: 9.829, turretBoxZ: -0.2 },
     armor: {
       hull: { front: [170, 57], side: [55, 12], rear: [38, 0], top: [14, 0], bottom: [15, 0] },
       turret: { front: [190, 15], side: [70, 20], rear: [60, 0], top: [14, 0] },
@@ -199,7 +205,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 42.4, power: 830, maxSpeed: 46, reverseSpeed: 16, hullTraverse: 34, turretTraverse: 30, gunSpeed: 6,
     gunDepression: 9, gunElevation: 20, hp: 1250, viewRange: 450, reload: 6.5, aimTime: 1.8, dispersion: 1.92, stabilizer: 0.3,
-    dims: { L: 6.94, W: 3.41, hullH: 1.62, clearance: 0.44, trackW: 0.55, turretZ: 0.1, turretL: 3.4, turretW: 2.6, turretH: 0.82, gunLen: 4.62, turretBoxZ: -0.25 },
+    dims: { L: 6.94, W: 3.37, hullH: 1.62, clearance: 0.44, trackW: 0.55, turretZ: 0.1, turretL: 3.4, turretW: 2.6, turretH: 0.77, gunLen: 4.62, gunForwardL: 9.54, turretBoxZ: -0.25 },
     armor: {
       hull: { front: [200, 60], side: [40, 0], rear: [25, 0], top: [14, 0], bottom: [15, 0] },
       turret: { front: [220, 35], side: [60, 30], rear: [60, 0], top: [14, 0] },
@@ -219,7 +225,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62.3, power: 1500, maxSpeed: 46, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 40, gunSpeed: 8,
     gunDepression: 9, gunElevation: 20, hp: 1850, viewRange: 510, reload: 30.0, aimTime: 1.5, dispersion: 1.20, stabilizer: 0.15,
-    dims: { L: 7.72, W: 3.75, hullH: 1.58, clearance: 0.54, trackW: 0.635, turretZ: -0.35, turretL: 4.1, turretW: 3.45, turretH: 0.8, gunLen: 6.05, turretBoxZ: -0.1 },
+    dims: { L: 7.72, W: 3.75, hullH: 1.72, clearance: 0.54, trackW: 0.635, turretZ: -0.35, turretL: 4.1, turretW: 3.45, turretH: 0.92, gunLen: 6.05, gunForwardL: 10.97, turretBoxZ: -0.1 },
     armor: {
       hull: { front: [410, 20], side: [100, 0], rear: [40, 0], top: [16, 0], bottom: [25, 0] },
       turret: { front: [480, 0], side: [190, 0], rear: [70, 0], top: [16, 0] },
@@ -239,7 +245,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true,
     mass: 46.5, power: 1130, maxSpeed: 42, reverseSpeed: 8, hullTraverse: 34, turretTraverse: 40, gunSpeed: 7,
     gunDepression: 6, gunElevation: 14, hp: 1650, viewRange: 470, reload: 6.5, aimTime: 1.7, dispersion: 1.50, stabilizer: 0.2,
-    dims: { L: 7.075, W: 3.78, hullH: 1.5, clearance: 0.47, trackW: 0.58, turretZ: 0.3, turretL: 3.2, turretW: 3.0, turretH: 0.75, gunLen: 4.9, turretBoxZ: -0.25 },
+    dims: { L: 7.075, W: 3.96, hullH: 1.5, clearance: 0.404, trackW: 0.58, trackGauge: 2.79, turretZ: 0.3, turretL: 3.2, turretW: 3.0, turretH: 0.725, gunLen: 4.9, gunForwardL: 9.83, turretBoxZ: -0.25 },
     armor: {
       hull: { front: [340, 68], side: [80, 0], rear: [40, 0], top: [16, 0], bottom: [20, 0] },
       turret: { front: [420, 30], side: [180, 25], rear: [70, 0], top: [16, 0] },
@@ -259,7 +265,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 62.5, power: 1200, maxSpeed: 42, reverseSpeed: 32, hullTraverse: 32, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 10, gunElevation: 20, hp: 1900, viewRange: 500, reload: 6.5, aimTime: 1.6, dispersion: 1.38, stabilizer: 0.15,
-    dims: { L: 8.33, W: 3.52, hullH: 1.62, clearance: 0.5, trackW: 0.635, turretZ: -0.3, turretL: 4.2, turretW: 3.45, turretH: 0.85, gunLen: 5.9, turretBoxZ: -0.25 },
+    dims: { L: 8.33, W: 3.52, hullH: 1.62, clearance: 0.5, trackW: 0.635, turretZ: -0.3, turretL: 4.2, turretW: 3.45, turretH: 0.87, gunLen: 5.9, gunForwardL: 11.55, turretBoxZ: -0.25 },
     armor: {
       hull: { front: [420, 20], side: [90, 0], rear: [40, 0], top: [16, 0], bottom: [25, 0] },
       turret: { front: [440, 10], side: [200, 0], rear: [80, 0], top: [16, 0] },
@@ -280,7 +286,7 @@ export const TANKS = [
     mass: 55, power: 1500, maxSpeed: 48, reverseSpeed: 20, hullTraverse: 36, turretTraverse: 40, gunSpeed: 7,
     gunDepression: 6, gunElevation: 16, hp: 1750, viewRange: 490, reload: 6.5, aimTime: 1.6, dispersion: 1.44, stabilizer: 0.15,
     overspeed: { mult: 1.45, duration: 8, cooldown: 30 },
-    dims: { L: 7.6, W: 3.5, hullH: 1.55, clearance: 0.48, trackW: 0.6, turretZ: -0.1, turretL: 3.6, turretW: 3.3, turretH: 0.75, gunLen: 5.9, turretBoxZ: -0.1 },
+    dims: { L: 7.6, W: 3.5, hullH: 1.55, clearance: 0.48, trackW: 0.6, turretZ: -0.1, turretL: 3.6, turretW: 3.3, turretH: 0.75, gunLen: 5.9, gunForwardL: 11.0, turretBoxZ: -0.1 },
     armor: {
       hull: { front: [360, 68], side: [80, 0], rear: [40, 0], top: [16, 0], bottom: [20, 0] },
       turret: { front: [430, 0], side: [180, 15], rear: [70, 0], top: [16, 0] },
@@ -300,7 +306,7 @@ export const TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 65, power: 1500, maxSpeed: 44, reverseSpeed: 14, hullTraverse: 34, turretTraverse: 36, gunSpeed: 7,
     gunDepression: 7, gunElevation: 20, hp: 1950, viewRange: 480, reload: 6.0, aimTime: 1.6, dispersion: 1.38, stabilizer: 0.15,
-    dims: { L: 7.97, W: 3.72, hullH: 1.66, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.8, gunLen: 4.3, turretBoxZ: 0.0 },
+    dims: { L: 7.60, W: 3.72, hullH: 1.74, clearance: 0.53, trackW: 0.64, turretZ: -0.9, turretL: 4.6, turretW: 3.2, turretH: 0.92, gunLen: 4.3, gunForwardL: 9.04, turretBoxZ: 0.0 },
     armor: {
       hull: { front: [390, 30], side: [100, 0], rear: [80, 0], top: [16, 0], bottom: [30, 0] },
       turret: { front: [450, 20], side: [190, 10], rear: [100, 0], top: [16, 0] },
@@ -315,6 +321,9 @@ export const TANKS = [
     paint: { base: '#8d8a72', camo: null, accent: '#75725c' },
     desc: 'Crew survivability first: front-mounted engine, modular wedge armor with a long sloped turret, rear hatch and ball-and-chain curtains under the bustle.',
   },
+  ...SPECIALIST_TANKS,
+  ...EXPANSION_TANKS,
+  ...CONCEPT_VEHICLES,
 ];
 TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // ---- v3 ammunition balance & loadouts ----
@@ -323,7 +332,10 @@ TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 // less damage per hit (and APCR/APDS also lose penetration faster with range); HE/HESH have little penetration
 // but the highest damage, splash and module/crew damage. HEAT is countered by ERA, composite and spaced armour.
 for (const t of TANKS) {
-  const s0 = t.shells[0]; const D0 = s0.damage;
+  // The casemate classification also enables hull aiming for this vehicle.
+  t.fixedGun = Boolean(t.casemate);
+  t.maxDispersion = legacyMaxDispersion(t.dispersion);
+  const s0 = t.shells[0]; const D0 = s0.baseDamage ?? s0.damage;
   t.ammoCap = t.shells.reduce((a, s) => a + s.count, 0); t.defaultLoadout = t.shells.map((s) => s.count);
   for (let i = 0; i < t.shells.length; i++) {
     const s = t.shells[i]; s.baseDamage ??= s.damage;
@@ -370,26 +382,41 @@ export const PEN_RNG = 0.08;
 export const TIER_NAMES = ['', 'Lights', 'Heavies', 'Mediums', 'Modern mediums'];
 // Effective armour model shared by hit resolution, AI, HUD and the armour-view shader.
 // part: 'hull'|'turret', face: 'front'|'side'|'rear'|'top'|'bottom', local: hit point in part space.
-export function armorZone(spec, part, face, local) {
+export function armorZone(spec, part, face, local, mantlet = false) {
   const A = spec.armor, d = spec.dims;
   if (part === 'hull') {
     if (face === 'front' && A.lowerFront && local.y < zoneLowerFrontY(d)) return [A.lowerFront, 'lower front'];
     if (face === 'side' && A.lowerSide && local.y < zoneLowerSideY(d)) return [A.lowerSide, 'lower side'];
     return [A.hull[face] || A.hull.bottom, face];
   }
-  if (face === 'front' && A.mantlet && Math.abs(local.x) < d.turretW * 0.24 && local.y > d.turretH * 0.12 && local.y < d.turretH * 0.88) return [A.mantlet, 'mantlet'];
+  if (A.mantlet && (mantlet || (face === 'front' && Math.abs(local.x) < d.turretW * 0.24 && local.y > d.turretH * 0.12 && local.y < d.turretH * 0.88))) return [A.mantlet, 'mantlet'];
   return [A.turret[face] || A.hull.top, face];
 }
 export const zoneLowerFrontY = (d) => d.clearance + (d.hullH - d.clearance) * 0.42;
 export const zoneLowerSideY = (d) => d.clearance + 0.6;
 
-// Apply overrides AFTER automatic stock ammunition balancing, before any game/menu constructor.
+// Apply overrides after automatic stock ammunition balancing.
 export const STOCK_TANKS = clone(TANKS);
 let published = STOCK_TANKS, publishedError = '';
 try { published = effective(STOCK_TANKS, publishedBalance); }
 catch(e) { publishedError = String(e.message||e); console.error('Published balance rejected',e); }
 export const PUBLISHED_TANKS = clone(published);
-const local = loadLocal(STOCK_TANKS);
-export const BALANCE_STATUS = { source: local.config ? 'local' : 'published', error: [publishedError,local.error].filter(Boolean).join('; ') };
-const active = local.config ? effective(STOCK_TANKS,local.config) : clone(PUBLISHED_TANKS);
-for(let i=0;i<TANKS.length;i++) Object.assign(TANKS[i],active[i]);
+export const BALANCE_STATUS = { source: 'published', error: '' };
+let appliedLocalConfig;
+
+export function refreshLocalBalance() {
+  const { config, error } = loadLocal(STOCK_TANKS);
+  BALANCE_STATUS.source = config ? 'local' : 'published';
+  BALANCE_STATUS.error = [publishedError, error].filter(Boolean).join('; ');
+  const serialized = JSON.stringify(config);
+  if (serialized === appliedLocalConfig) return false;
+
+  const active = config ? effective(STOCK_TANKS, config) : clone(PUBLISHED_TANKS);
+  for (const [i, spec] of active.entries()) {
+    TANKS[i] = spec;
+    TANK_BY_ID[spec.id] = spec;
+  }
+  appliedLocalConfig = serialized;
+  return true;
+}
+refreshLocalBalance();

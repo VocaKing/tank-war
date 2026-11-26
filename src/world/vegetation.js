@@ -50,10 +50,21 @@ function card(w, h, cx, cy, cz, yaw, pitch, center) {
   for (let i = 0; i < p.count; i++) { v.set(p.getX(i) - center.x, (p.getY(i) - center.y) * 0.8, p.getZ(i) - center.z).normalize(); n.setXYZ(i, v.x, v.y + 0.25, v.z); }
   return g;
 }
-function trunk(r0, r1, h, seg = 7, bend = 0) {
-  const g = new THREE.CylinderGeometry(r1, r0, h, seg, 4, true); g.translate(0, h / 2, 0);
-  const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * h / 2);
-  if (bend) { const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const t = p.getY(i) / h; p.setX(i, p.getX(i) + bend * t * t); } }
+function trunk(r0, r1, h, segments = 7, bend = 0) {
+  const close = segments > 5;
+  const rings = close ? [0, 0.035, 0.12, 0.3, 0.52, 0.76, 1] : [0, 0.12, 0.45, 1];
+  const g = new THREE.CylinderGeometry(r1, r0, h, segments, rings.length - 1, true);
+  const uv = g.attributes.uv, p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const t = rings[Math.round(uv.getY(i) * (rings.length - 1))];
+    const angle = Math.atan2(p.getZ(i), p.getX(i)), root = Math.max(0, 1 - t * 12);
+    const flare = (0.30 + 0.19 * Math.cos(angle * 4) + 0.11 * Math.sin(angle * 7)) * root;
+    const radius = (r0 + (r1 - r0) * t) * (1 + flare);
+    const sway = close ? Math.sin(t * 4.2) * r0 * t * 0.45 : 0;
+    p.setXYZ(i, Math.cos(angle) * radius + bend * t * t + sway, h * t, Math.sin(angle) * radius);
+    uv.setXY(i, uv.getX(i) * 2, t * h / 2);
+  }
+  g.computeVertexNormals();
   return g;
 }
 function withGroups(trunkG, leafG) {
@@ -115,8 +126,8 @@ function bushGeo(lod, r) {
   return withGroups(core, merge(cards));
 }
 // v4: several boulder shapes (layered noise, flattened base, strata facets) instead of one shared rock
-function rockGeo(r, v = 0) {
-  const g = new THREE.IcosahedronGeometry(1, 3); const p = g.attributes.position;
+function rockGeo(v, detail) {
+  const g = new THREE.IcosahedronGeometry(1, detail); const p = g.attributes.position;
   const f = [[3.1, 2.7, 3.3, 1.2, 0.7], [2.2, 3.6, 1.8, 1.0, 0.9], [4.0, 1.9, 2.6, 1.45, 0.55], [1.6, 2.2, 4.4, 1.1, 0.8]][v % 4]; const ph = v * 1.7 + 0.3;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -152,7 +163,8 @@ export class Vegetation {
     }
     this.geos = {}; for (const k of Object.keys(TYPES)) this.geos[k] = [TYPES[k].geo(0, r), TYPES[k].geo(1, r)];
     this.rockMat = new THREE.MeshStandardMaterial({ map: pbrTex('aerial_rocks_02', 'diff'), normalMap: pbrTex('aerial_rocks_02', 'nor'), roughnessMap: pbrTex('aerial_rocks_02', 'arm'), aoMap: pbrTex('aerial_rocks_02', 'arm'), roughness: 1.0, color: mb.def.id === 'desert' ? 0xd2b48c : 0xaaa49a });
-    this.rockGeos = [0, 1, 2, 3].map((v) => rockGeo(r, v));
+    this.rockGeos = [0, 1, 2, 3].map((v) => [rockGeo(v, 3), rockGeo(v, 1)]);
+    this.rockDetailDistance = quality === 'high' ? 130 : quality === 'medium' ? 96 : 72;
     // records
     this.trees = mb.trees.map((t, i) => ({ ...t, id: i, alive: true, fall: 0 }));
     this.bushes = mb.bushes.map((b, i) => ({ ...b, id: i }));
@@ -176,26 +188,63 @@ export class Vegetation {
         ch.meshes[type] = pair; void key;
       }
     }
-    // rocks: single instanced mesh
-    if (this.rocks.length) {
-      const col = new THREE.Color(); this.rockMeshes = [];
-      for (let vv = 0; vv < 4; vv++) {
-        const list = this.rocks.filter((k, i) => i % 4 === vv); if (!list.length) continue;
-        const im = new THREE.InstancedMesh(this.rockGeos[vv], this.rockMat, list.length);
-        list.forEach((k, i) => { e.set(k.tilt, k.rot, k.tilt * 0.5); q.setFromEuler(e); m4.compose(v.set(k.x, k.y - k.s * 0.25, k.z), q, s.set(k.s, k.s, k.s)); im.setMatrixAt(i, m4); const h = ((k.x * 12.9898 + k.z * 78.233) % 1 + 1) % 1; col.setRGB(0.82 + h * 0.3, 0.8 + h * 0.28, 0.78 + h * 0.26); im.setColorAt(i, col); });
-        im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); this.group.add(im); this.rockMeshes.push(im);
-      }
-      this.rockMesh = this.rockMeshes[0];
-    }
+    // Keep the rock draw count bounded while retaining detailed geometry
+    // around the current camera. Each variant has two instance buffers.
+    const rocks = Array.from({ length: 4 }, () => []);
+    this.rocks.forEach((rock, i) => {
+      e.set(rock.tilt, rock.rot, rock.tilt * 0.5); q.setFromEuler(e);
+      m4.compose(v.set(rock.x, rock.y - rock.s * 0.25, rock.z), q, s.setScalar(rock.s));
+      const tint = ((rock.x * 12.9898 + rock.z * 78.233) % 1 + 1) % 1;
+      const color = new THREE.Color().setRGB(0.82 + tint * 0.3, 0.80 + tint * 0.28, 0.78 + tint * 0.26);
+      rocks[i % 4].push({ x: rock.x, z: rock.z, matrix: m4.clone(), color, near: false });
+    });
+    this.rockBatches = rocks.flatMap((list, variant) => {
+      if (!list.length) return [];
+      const meshes = this.rockGeos[variant].map((geometry) => {
+        const mesh = new THREE.InstancedMesh(geometry, this.rockMat, list.length);
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        mesh.frustumCulled = false; mesh.count = 0;
+        this.group.add(mesh);
+        return mesh;
+      });
+      return [{ list, meshes }];
+    });
+    this.lastRockView = new THREE.Vector2(Infinity, Infinity);
+    this.updateRockLOD({ x: 0, z: 0 });
     // ghost bush for the one the player sits in (see-through from inside)
     this.ghostBush = null;
     this.ghostMats = {};
   }
   updateLOD(camPos) {
     for (const ch of this.chunks.values()) {
-      const d = Math.hypot(ch.cx - camPos.x, ch.cz - camPos.z) - this.chunkSize * 0.7; const near = d < this.lodDist * (ch.near === true ? 1.08 : ch.near === false ? 0.92 : 1);
-      if (ch.near === near) continue; ch.near = near;
+      const d = Math.hypot(ch.cx - camPos.x, ch.cz - camPos.z) - this.chunkSize * 0.7; const near = d < this.lodDist;
       for (const pair of Object.values(ch.meshes)) { pair[0].visible = near; pair[1].visible = !near; }
+    }
+    this.updateRockLOD(camPos);
+  }
+  updateRockLOD(camera) {
+    const dx = this.lastRockView.x - camera.x, dz = this.lastRockView.y - camera.z;
+    if (dx * dx + dz * dz < 12 * 12) return;
+    this.lastRockView.set(camera.x, camera.z);
+    for (const { list, meshes } of this.rockBatches) {
+      const count = [0, 0];
+      for (const rock of list) {
+        const x = rock.x - camera.x, z = rock.z - camera.z;
+        const limit = this.rockDetailDistance + (rock.near ? 18 : 0);
+        rock.near = x * x + z * z < limit * limit;
+        const lod = rock.near ? 0 : 1;
+        meshes[lod].setMatrixAt(count[lod], rock.matrix);
+        meshes[lod].setColorAt(count[lod], rock.color);
+        count[lod]++;
+      }
+      for (let lod = 0; lod < meshes.length; lod++) {
+        const mesh = meshes[lod];
+        mesh.count = count[lod];
+        if (!mesh.count) continue;
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.instanceColor.needsUpdate = true;
+      }
     }
   }
   bushAt(x, z, pad = 0) {

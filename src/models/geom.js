@@ -8,6 +8,14 @@ export const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THR
 export function T(g, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
   _e.set(rx, ry, rz, 'YXZ'); _q.setFromEuler(_e); _m.compose(new V3(x, y, z), _q, new V3(sx, sy, sz)); g.applyMatrix4(_m); return g;
 }
+// Local X runs across the plate, Y runs up it, and Z points outwards.
+export function glacis(y0, z0, y1, z1) {
+  const length = Math.hypot(y1 - y0, z1 - z0);
+  const up = [(y1 - y0) / length, (z1 - z0) / length];
+  const pitch = Math.atan2(up[1], up[0]);
+  const point = (x, u, depth = 0) => [x, y0 + u * up[0] - depth * up[1], z0 + u * up[1] + depth * up[0]];
+  return { length, up, point, pitch, place: (geometry, x, u, depth = 0) => T(geometry, ...point(x, u, depth), pitch) };
+}
 // Keep thin plate, track and hardware shapes inexpensive; large cast fittings
 // and equipment housings get genuinely radiused edges instead of sharp cubes.
 export function box(w,h,d,x=0,y=0,z=0,rx=0,ry=0,rz=0){
@@ -94,7 +102,11 @@ export function clean(g) {
 }
 export class Parts {
   constructor() { this.b = {}; }
-  add(part, mat, g) { (this.b[part + '|' + mat] ||= []).push(clean(g)); }
+  add(part, mat, g) {
+    const piece = clean(g);
+    (this.b[part + '|' + mat] ||= []).push(piece);
+    return piece;
+  }
   merged() { const out = {}; for (const [k, list] of Object.entries(this.b)) { const [part, mat] = k.split('|'); (out[part] ||= {})[mat] = mergeGeometries(list); } return out; }
 }
 
