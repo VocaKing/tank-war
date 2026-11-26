@@ -45,7 +45,7 @@
 .mobile-mode .touch-hud .scope .avhint{left:auto;right:8px;top:40%;width:100px;font-size:9px;padding:3px 5px}
 .mobile-mode .touch-hud .killfeed{display:none}
 .mobile-mode .touch-hud .top{font-size:10px}
-.mobile-mode .touch-hud .caps{max-width:35vw}
+.mobile-mode .touch-hud .caps{max-width:min(75vw,370px);margin-inline:auto}.mobile-mode .touch-hud .cap{width:135px;padding:3px;font-size:10px}.mobile-mode .touch-hud .cap small{font-size:9px}.mobile-mode .touch-hud .cap-personal{font-size:10px;max-width:75vw}
 .mobile-mode .touch-hud .reticle .pen{font-size:10px}
 @media(orientation:landscape){.mobile-mode .menu{display:grid;grid-template-columns:minmax(150px,28%) 1fr minmax(190px,37%);grid-template-rows:auto auto auto 1fr;align-items:start;overflow:auto}.mobile-mode .menu .brand{grid-column:1;grid-row:1}.mobile-mode .mobile-garage-hint{grid-column:2;grid-row:1}.mobile-mode .menu #m-balance{grid-column:3;grid-row:1}.mobile-mode .menu .tanklist{grid-column:1;grid-row:2/4;max-height:56vh;grid-template-columns:1fr}.mobile-mode .menu .menutools{grid-column:1;grid-row:4}.mobile-mode .menu .stats{grid-column:3;grid-row:2/5;max-height:74vh;overflow:auto}.mobile-mode .menu .bottom{grid-column:2;grid-row:4}.mobile-mode .menu .armor-ban{grid-column:2;grid-row:2}.mobile-mode .mapgrid{grid-template-columns:repeat(3,1fr)}}
 @media(orientation:portrait){.mobile-mode .menu{padding-top:12px}.mobile-mode .menu .tanklist{max-height:190px}.mobile-mode .menu .stats{margin-top:36vh}.touch-actions{bottom:105px}.touch-drive{bottom:108px}.touch-ammo{width:85vw;bottom:22px}.mobile-mode .touch-hud .status{bottom:100px}}

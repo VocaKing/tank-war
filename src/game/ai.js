@@ -2,6 +2,7 @@
 // team-shared spotting, target selection with weak-spot & ammo choice, hull angling, retreat.
 import * as THREE from 'three';
 import { clamp, wrapAngle, DEG } from '../util.js';
+import { insideCapture } from './capture.js';
 
 const _p = new THREE.Vector3(), _q = new THREE.Vector3();
 
@@ -53,6 +54,7 @@ export class AIController {
       if (this.role === 'sniper' && this.sniperIdle > 75) { this.hold = null; this.claim(null); this.role = 'assault'; this.path = []; }
       else return;
     }
+    if (this.state === 'capture' && insideCapture(t, this.enemyBase)) return;
     if (!this.path.length || this.pi >= this.path.length) {
       if (this.wp < this.lane.length - 1) {
         const p = this.lane[this.wp];
@@ -144,8 +146,9 @@ export class AIController {
     if (this.reverseT > 0) { this.reverseT -= dt; t.input.throttle = -0.8; t.input.steer = this.revSteer; if (this.reverseT <= 0) this.setGoal(this.goal || [this.enemyBase.x, this.enemyBase.z]); }
     else {
       const atHold = this.hold && Math.hypot(t.pos.x - this.hold[0], t.pos.z - this.hold[1]) < 3.5;
-      const engageStop = tgt && ((this.role === 'assault' && dTgt < 380 && this.bestRatio > 0.7) || this.state === 'capture' || atHold || (this.state === 'retreat' && t.inBush));
-      if (atHold || engageStop) {
+      const inCap = this.state === 'capture' && insideCapture(t, this.enemyBase);
+      const engageStop = tgt && ((this.role === 'assault' && this.state !== 'capture' && dTgt < 380 && this.bestRatio > 0.7) || inCap || atHold || (this.state === 'retreat' && t.inBush));
+      if (atHold || engageStop || inCap) {
         moving = false;
         if (tgt) this.faceHeading(Math.atan2(tgt.pos.x - t.pos.x, tgt.pos.z - t.pos.z) + this.angleOff);
         else if (this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);

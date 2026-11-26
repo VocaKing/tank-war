@@ -1,6 +1,7 @@
 // In-game HUD (DOM overlay)
 import * as THREE from 'three';
 import { TANKS } from '../game/tankData.js';
+import { CAPTURE_SECONDS, insideCapture, personalCapturePercent } from '../game/capture.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 
@@ -9,7 +10,7 @@ export class HUD {
     this.g = game; this.root = el('div', 'hud'); root.appendChild(this.root);
     this.root.innerHTML = `
       <div class="top"><div class="teams"><div class="tcount ally" id="h-ally"></div><div class="timer" id="h-timer">15:00</div><div class="tcount enemy" id="h-enemy"></div></div>
-        <div class="caps"><div class="cap ally"><span id="h-caplabel0">Allied base · 0%</span><div class="bar"><i id="h-cap0"></i></div></div><div class="cap enemy"><span id="h-caplabel1">Enemy base · 0%</span><div class="bar"><i id="h-cap1"></i></div></div></div></div>
+        <div class="caps"><div class="cap ally"><span id="h-caplabel0">A · Allied base</span><div class="bar"><i id="h-cap0"></i></div><small id="h-capstate0">0.0% · Clear</small></div><div class="cap enemy"><span id="h-caplabel1">B · Enemy base</span><div class="bar"><i id="h-cap1"></i></div><small id="h-capstate1">0.0% · Clear</small></div></div><div id="h-cap-personal" class="cap-personal" hidden></div></div>
       <div class="killfeed" id="h-feed"></div>
       <div class="markers" id="h-markers"></div>
       <div class="scope" id="h-scope"><div class="scope-ring"></div><div class="mil"></div><div class="ticks"></div><div class="zoom" id="h-zoom">x4</div><div class="avhint" id="h-av"></div></div>
@@ -53,7 +54,7 @@ export class HUD {
     g.fillStyle = 'rgba(60,55,50,0.9)';
     for (const c2 of W.colliders) { if (c2.kind === 'prop') continue; g.save(); const [mx, my] = toM(c2.x, c2.z); g.translate(mx, my); g.rotate(-c2.rot); const sx = c2.hx / half * S / 2, sz = c2.hz / half * S / 2; g.fillRect(-sx, -sz, sx * 2, sz * 2); g.restore(); }
     g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 1; for (let i = 1; i < 10; i++) { g.beginPath(); g.moveTo(i * S / 10, 0); g.lineTo(i * S / 10, S); g.stroke(); g.beginPath(); g.moveTo(0, i * S / 10); g.lineTo(S, i * S / 10); g.stroke(); }
-    W.bases.forEach((b, i) => { const [mx, my] = toM(b.x, b.z); g.strokeStyle = i === 0 ? '#5fd36f' : '#ff5a4a'; g.lineWidth = 2; g.beginPath(); g.arc(mx, my, b.r / half * S / 2, 0, 6.3); g.stroke(); });
+    // Draw objectives over vehicle markers in the live minimap.
     this.miniBase = c; this.toM = toM;
   }
   drawMini() {
@@ -74,6 +75,15 @@ export class HUD {
       if (!t.alive) { g.strokeStyle = '#222'; g.beginPath(); g.moveTo(mx - 3, my - 3); g.lineTo(mx + 3, my + 3); g.moveTo(mx + 3, my - 3); g.lineTo(mx - 3, my + 3); g.stroke(); }
     }
     if (p.alive) { g.save(); g.translate(px, py); g.rotate(-p.heading + Math.PI); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.beginPath(); g.moveTo(0, -8); g.lineTo(5.5, 6); g.lineTo(0, 3); g.lineTo(-5.5, 6); g.closePath(); g.fill(); g.stroke(); g.restore(); }
+    G.world.bases.forEach((b,i) => {
+      const [mx,my] = this.toM(b.x,b.z), radius = b.r / half * S / 2;
+      const color = i === 0 ? '#67f28b' : '#ff5552';
+      g.save(); g.strokeStyle='#101418'; g.lineWidth=4; g.beginPath(); g.arc(mx,my,radius,0,Math.PI*2); g.stroke();
+      g.strokeStyle=color; g.lineWidth=2; g.stroke();
+      g.font='bold 12px sans-serif'; g.textAlign='center'; g.textBaseline='bottom';
+      g.strokeStyle='#101418'; g.lineWidth=3; g.strokeText(i===0?'A':'B',mx,my-radius-2);
+      g.fillStyle=color; g.fillText(i===0?'A':'B',mx,my-radius-2); g.restore();
+    });
   }
   message(text, color = '#fff', big = false) {
     const m = el('div', 'msg' + (big ? ' big' : ''), text); m.style.color = color; this.$('h-msgs').appendChild(m); setTimeout(() => m.remove(), big ? 3500 : 2600);
@@ -203,8 +213,16 @@ export class HUD {
     for (let i = 0; i < 2; i++) {
       const cap = G.capture[i];
       this.$('h-cap' + i).style.width = cap.points + '%';
-      this.$('h-caplabel' + i).textContent = (i === 0 ? 'Allied base' : 'Enemy base') + ' · ' + Math.floor(cap.points) + '%' + (cap.contested ? ' · Contested' : '');
+      const state = cap.points >= 100 ? 'CAPTURED' : cap.contested ? 'CONTESTED' : cap.attackers ? 'CAPTURING' : 'Clear';
+      const eta = cap.attackers && !cap.contested && cap.points < 100 ? ' · ' + Math.ceil((100-cap.points)/100*CAPTURE_SECONDS/cap.attackers) + 's' : '';
+      this.$('h-capstate' + i).textContent = (cap.points >= 100 ? '100' : (Math.floor(cap.points*10)/10).toFixed(1)) + '% · ' + state + (cap.attackers ? ' · '+cap.attackers : '') + eta;
+      this.$('h-caplabel' + i).parentElement.classList.toggle('active',cap.attackers > 0);
+      this.$('h-caplabel' + i).parentElement.classList.toggle('contested',cap.contested);
     }
+    const enemyBase = G.world.bases[1-p.team], enemyCap = G.capture[1-p.team];
+    const personal = this.$('h-cap-personal'), inside = insideCapture(p,enemyBase);
+    personal.hidden = !inside;
+    if (inside) personal.textContent = (enemyCap.contested ? 'CONTESTED · ' : 'CAPTURING · ') + 'Your contribution: ' + personalCapturePercent(enemyCap,p).toFixed(1) + '%' + (enemyCap.contested ? ' · Enemy inside, progress paused' : ' · Stay inside the ring');
     this.panelT = (this.panelT || 0) - dt; const doPanel = this.panelT <= 0; if (doPanel) this.panelT = 0.1;
     // vehicle panel
     if (doPanel) {

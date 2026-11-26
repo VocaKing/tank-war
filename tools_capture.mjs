@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { CAPTURE_SECONDS, createCaptureState, resetCaptureContribution, updateCaptureState } from './src/game/capture.js';
+import { CAPTURE_SECONDS, CAPTURE_RADIUS, insideCapture, personalCapturePercent, createCaptureState, resetCaptureContribution, updateCaptureState } from './src/game/capture.js';
+import { captureRingData } from './src/world/baseMarker.js';
 const base = { x: 0, z: 0, r: 20 };
 const tank = (team = 1) => ({ team, alive: true, pos: { x: 0, z: 0 } });
 const fixture = (tanks) => {
@@ -37,5 +38,24 @@ const fixture = (tanks) => {
 }
 {
   const ts = Array.from({length:7},()=>tank()); const f = fixture(ts); f.tick(); f.tick(30); f.near(87.5); f.tick(5); f.near(100);
+}
+{
+  const b = {x:10,z:20,r:CAPTURE_RADIUS}, a=tank(), d=tank(0), cap=createCaptureState();
+  a.pos={x:35,z:20}; assert.equal(insideCapture(a,b),false);
+  a.pos.x=34.99; assert.equal(insideCapture(a,b),true);
+  d.pos={x:10,z:20};
+  updateCaptureState(cap,b,[a,d],0,1,1);
+  assert.equal(cap.attackers,1); assert.equal(cap.defenders,1); assert.equal(cap.contested,true);
+  d.pos.x=100; updateCaptureState(cap,b,[a,d],0,1,2);
+  assert.equal(cap.contested,false); assert.ok(personalCapturePercent(cap,a)>0);
+  a.pos.x=35; updateCaptureState(cap,b,[a,d],0,1,3); assert.equal(cap.points,0); assert.equal(cap.attackers,0);
+  const height=(x,z)=>x*0.04+z*0.1;
+  const ring=captureRingData(b,height);
+  assert.equal(ring.positions.length,129*2*3);
+  for(let i=0;i<ring.positions.length;i+=3){
+    const [x,y,z]=ring.positions.slice(i,i+3);
+    assert.ok(Math.abs(y-height(x,z)-0.65)<1e-9);
+    assert.ok(Math.abs(Math.hypot(x-b.x,z-b.z)-(i%6===3?25:23.2))<1e-9);
+  }
 }
 console.log('Capture regression tests passed.');

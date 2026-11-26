@@ -2,6 +2,7 @@
 // with terrain extending to 1.4 km plus a far-terrain horizon ring.
 import { smoothstep, clamp, ridged } from '../util.js';
 import { OCC } from './mapgen.js';
+import { CAPTURE_RADIUS } from '../game/capture.js';
 
 const houseStyle = (r) => ({ style: 'stone', floors: r.next() < 0.45 ? 2 : 1, roof: 'gable', ruined: r.next() < 0.12 });
 
@@ -17,7 +18,7 @@ export const MAPS = [
     generate(mb) {
       const r = mb.rng;
       mb.setHeights((x, z) => 12 + 13 * mb.fbm(x, z, 420, 4) + 4.5 * mb.fbm(x + 300, z, 140, 3) + 0.7 * mb.fbm(x, z, 33, 2) + 26 * smoothstep(320, 700, -z) + 10 * smoothstep(380, 700, x + z * 0.2));
-      mb.bases = [{ x: -470, z: -20, r: 45 }, { x: 470, z: 40, r: 45 }];
+      mb.bases = [{ x: -470, z: -20, r: CAPTURE_RADIUS }, { x: 470, z: 40, r: CAPTURE_RADIUS }];
       for (const b of mb.bases) mb.flatten(b.x, b.z, 60, 40);
       mb.flatten(190, -10, 140, 50);
       mb.river([[-40, -720], [10, -520], [-35, -320], [40, -130], [15, 60], [-45, 250], [5, 450], [55, 720]], 16, 2.5);
@@ -79,7 +80,7 @@ export const MAPS = [
       const r = mb.rng;
       const valley = (x, z) => { const d = (x + z + 40 * mb.noise(x / 300, z / 300)) / Math.SQRT2; return Math.exp(-((d / 170) ** 2)); };
       mb.setHeights((x, z) => 40 + 26 * mb.fbm(x, z, 520, 4) + 34 * ridged(mb.noise, x / 380, z / 380, 4) - 34 * valley(x, z) + 1.2 * mb.fbm(x, z, 40, 2) + (x - z) * 0.018);
-      mb.bases = [{ x: -430, z: -430, r: 45 }, { x: 430, z: 430, r: 45 }];
+      mb.bases = [{ x: -430, z: -430, r: CAPTURE_RADIUS }, { x: 430, z: 430, r: CAPTURE_RADIUS }];
       for (const b of mb.bases) mb.flatten(b.x, b.z, 70, 50);
       mb.flatten(30, -40, 110, 50);
       mb.river([[700, -720], [480, -470], [300, -330], [140, -170], [80, -60], [-60, 70], [-200, 170], [-380, 360], [-720, 690]], 11, 2.0);
@@ -131,7 +132,7 @@ export const MAPS = [
         const mesaN = mb.fbm(x + 200, z - 300, 260, 4); const mesa = smoothstep(0.05, 0.16, mesaN) * 34 * smoothstep(-150, -380, z);
         return 6 + 5 * mb.fbm(x, z, 380, 3) + dune + mesa + 0.4 * mb.fbm(x, z, 25, 2);
       });
-      mb.bases = [{ x: -460, z: 430, r: 45 }, { x: 460, z: -400, r: 45 }];
+      mb.bases = [{ x: -460, z: 430, r: CAPTURE_RADIUS }, { x: 460, z: -400, r: CAPTURE_RADIUS }];
       for (const b of mb.bases) mb.flatten(b.x, b.z, 60, 50);
       mb.flatten(0, 0, 250, 90);
       mb.river([[-720, 260], [-450, 300], [-250, 340], [-50, 380], [150, 350], [350, 420], [720, 470]], 34, 2.8, { dry: true });
