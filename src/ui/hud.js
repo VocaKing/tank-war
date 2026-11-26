@@ -12,6 +12,11 @@ const DAMAGE_HOLD = 0.22;
 const DAMAGE_DRAIN = 0.65;
 const HEALTH_LAYERS = '<i class="hp-trail"></i><i class="hp-fill"></i>';
 const HEALTH_EVENTS = '<div class="hp-events"><div class="damage"></div><div class="module-loss"></div></div>';
+const DISPERSION_ARCS = Array.from({ length: 4 }, (_, i) => {
+  const angle = (i + 0.5) * Math.PI / 2;
+  const point = a => `${50 * Math.cos(a)} ${50 * Math.sin(a)}`;
+  return `M${point(angle - Math.PI / 10)} A50 50 0 0 1 ${point(angle + Math.PI / 10)}`;
+}).join(' ');
 
 function trailingHp(state, hp, now) {
   if (!state || state.trailStart <= hp) return hp;
@@ -48,7 +53,21 @@ export class HUD {
       <div class="scope" id="h-scope"><div class="scope-ring"></div><div class="mil"></div><div class="ticks"></div><div class="zoom" id="h-zoom">x4</div><div class="avhint" id="h-av"></div></div>
       <div class="cross" id="h-cross"></div>
       <div class="assist" id="h-assist"></div>
-      <div class="reticle" id="h-ret"><div class="ring"></div><div class="dot"></div><div class="lockbr"></div><div class="pen" id="h-pen"></div></div>
+      <div class="reticle" id="h-ret">
+        <svg class="dispersion-ring" id="h-dispersion-ring" viewBox="-50 -50 100 100" aria-hidden="true" hidden>
+          <defs>
+            <path id="h-dispersion-arcs" d="${DISPERSION_ARCS}" vector-effect="non-scaling-stroke"/>
+            <path id="h-dispersion-ticks" vector-effect="non-scaling-stroke"/>
+          </defs>
+          <circle class="dispersion-shadow" r="50" vector-effect="non-scaling-stroke"/>
+          <circle class="dispersion-boundary" r="50" vector-effect="non-scaling-stroke"/>
+          <use class="dispersion-arcs dispersion-shadow" href="#h-dispersion-arcs"/>
+          <use class="dispersion-arcs dispersion-accent" href="#h-dispersion-arcs"/>
+          <use class="dispersion-ticks dispersion-shadow" href="#h-dispersion-ticks"/>
+          <use class="dispersion-ticks dispersion-index" href="#h-dispersion-ticks"/>
+        </svg>
+        <div class="dot"></div><div class="lockbr"></div><div class="pen" id="h-pen"></div>
+      </div>
       <div class="msgs" id="h-msgs"></div>
       <div class="dmgdir" id="h-dmgdir"></div>
       <div class="spotted" id="h-spotted">⚠ SPOTTED</div>
@@ -363,10 +382,23 @@ export class HUD {
     if (avh._t !== avTxt) { avh.innerHTML = avTxt; avh._t = avTxt; }
   }
   setReticle(sx, sy, radius, state, text) {
-    const r = this.$('h-ret'); r.style.transform = `translate(${sx}px, ${sy}px)`; r.style.visibility = sx === -100 && sy === -100 ? 'hidden' : ''; const ring = r.firstChild; const R = Math.max(0, Number.isFinite(radius) ? radius : 0);
-    ring.hidden = R === 0;
-    ring.style.width = ring.style.height = R * 2 + 'px'; ring.style.marginLeft = ring.style.marginTop = -R + 'px'; ring.style.boxSizing = 'border-box';
-    const cls = 'reticle ' + state + (this.g.player && this.g.player.dispersionProgress < 0.025 ? ' aimed' : '');
+    const r = this.$('h-ret');
+    r.style.transform = `translate(${sx}px, ${sy}px)`;
+    r.style.visibility = sx === -100 && sy === -100 ? 'hidden' : '';
+    const R = Math.max(0, Number.isFinite(radius) ? radius : 0);
+    const compact = R < 11;
+    if (this.reticleRadius !== R) {
+      this.reticleRadius = R;
+      const ring = this.$('h-dispersion-ring');
+      ring.toggleAttribute('hidden', R === 0);
+      ring.style.width = ring.style.height = R * 2 + 'px';
+      if (!compact) {
+        // Keep the tick length in screen pixels and the endpoints on the true perimeter.
+        const inner = 50 - Math.min(10, 250 / R);
+        this.$('h-dispersion-ticks').setAttribute('d', `M0 -50V-${inner} M50 0H${inner} M0 50V${inner} M-50 0H-${inner}`);
+      }
+    }
+    const cls = 'reticle ' + state + (compact ? ' compact' : '') + (this.g.player?.dispersionProgress < 0.025 ? ' aimed' : '');
     if (r.className !== cls) r.className = cls;
     const pen = this.$('h-pen'); setText(pen, text); pen.style.top = Math.max(22, Math.min(R + 8, 80)) + 'px';
   }

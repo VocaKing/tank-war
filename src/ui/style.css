@@ -109,11 +109,21 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .mk .hp-hit{box-shadow:0 0 0 1px #ffe0a6,0 0 8px #ff9a4fcc}
 .mk .ar{font-size:10px;line-height:8px}
 .cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 2px #000}
-.reticle{position:absolute;left:0;top:0;will-change:transform}
-.reticle .ring{position:absolute;border:2px solid rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.8)}
-.reticle.green .ring{border-color:#5df06a}.reticle.yellow .ring{border-color:#ffd84a}.reticle.red .ring{border-color:#ff4a3a}
-.reticle.reloading .ring{border-style:dashed;opacity:.8}
-.reticle .ring{transition:border-width .15s}.reticle.aimed .ring{border-width:2.5px;box-shadow:0 0 4px rgba(0,0,0,.9),inset 0 0 3px rgba(0,0,0,.6)}
+.reticle{--reticle-ink:#eef8fa;position:absolute;left:0;top:0;will-change:transform}
+.reticle.green{--reticle-ink:#5df06a}.reticle.yellow{--reticle-ink:#ffd84a}.reticle.red{--reticle-ink:#ff4a3a}
+.dispersion-ring{position:absolute;left:0;top:0;transform:translate(-50%,-50%);overflow:visible;fill:none;stroke-linecap:round}
+.dispersion-ring[hidden]{display:none}
+.dispersion-shadow{stroke:#071013;stroke-width:3.6px;stroke-opacity:.82}
+.dispersion-ring>circle.dispersion-shadow{stroke-width:2.1px;stroke-opacity:.52}
+.dispersion-boundary,.dispersion-accent,.dispersion-index{stroke:var(--reticle-ink)}
+.dispersion-boundary{stroke-width:.9px;stroke-opacity:.63}
+.dispersion-accent{stroke-width:1.8px;stroke-opacity:.88}
+.dispersion-index{stroke-width:1.3px;stroke-opacity:.94}
+.reticle.aimed .dispersion-accent{stroke-width:2.3px;stroke-opacity:1}
+.reticle.reloading .dispersion-arcs{stroke-dasharray:3px 3px}
+.reticle.reloading .dispersion-accent,.reticle.reloading .dispersion-index{stroke-opacity:.86}
+.reticle.compact .dispersion-arcs,.reticle.compact .dispersion-ticks{display:none}
+.reticle.compact .dispersion-boundary{stroke-opacity:.95}
 .reticle .pen{position:absolute;left:0;top:22px;transform:translateX(-50%);font-size:11.5px;font-weight:600;white-space:nowrap;background:rgba(0,0,0,.45);padding:1px 6px;border-radius:3px}
 .reticle.green .pen{color:#7dff8a}.reticle.yellow .pen{color:#ffe070}.reticle.red .pen{color:#ff7a6a}
 .scope{display:none;position:absolute;inset:0;pointer-events:none}
@@ -147,8 +157,7 @@ table.cmp th{color:var(--acc);position:sticky;top:0;background:#141618;font-size
 .hud .box h1{font-size:48px;letter-spacing:8px;margin:0 0 6px}.hud .box h1.win{color:var(--ally)}.hud .box h1.lose{color:var(--enemy)}.hud .box h1.draw{color:var(--acc)}
 .hud table{border-collapse:collapse;font-size:12.5px}.hud td,.hud th{padding:3px 10px;border-bottom:1px solid var(--line)}.hud tr.dead{opacity:.45}.hud tr.me{color:var(--acc)}
 
-.reticle .dot{position:absolute;left:-2px;top:-2px;width:4px;height:4px;border-radius:50%;background:#fff;box-shadow:0 0 2px #000}
-.reticle.green .dot{background:#5df06a}.reticle.yellow .dot{background:#ffd84a}.reticle.red .dot{background:#ff4a3a}
+.reticle .dot{position:absolute;left:-2px;top:-2px;width:4px;height:4px;border-radius:1px;transform:rotate(45deg);background:var(--reticle-ink);box-shadow:0 0 0 1px #071013d9}
 .reticle .lockbr{display:none;position:absolute;left:-26px;top:-26px;width:52px;height:52px;border:2px solid #ffd84a;clip-path:polygon(0 0,30% 0,30% 8%,8% 8%,8% 30%,0 30%,0 70%,8% 70%,8% 92%,30% 92%,30% 100%,0 100%,0 0,100% 0,100% 30%,92% 30%,92% 8%,70% 8%,70% 0,100% 0,100% 100%,70% 100%,70% 92%,92% 92%,92% 70%,100% 70%)}
 .reticle.locked .lockbr{display:block}
 .scope .ticks{position:absolute;left:50%;top:50%;width:76vh;height:76vh;transform:translate(-50%,-50%);background:
