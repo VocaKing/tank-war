@@ -173,6 +173,9 @@ function warden(P, model) {
 }
 
 function lancer(P, model) {
+  // Seat the trunnion higher within the new shield, clear of the existing deck bins.
+  model.gun.position.y += .075;
+  const trunnionHeight = model.gun.position.y;
   // The main cheeks sweep past the offset sights into a shallow rear bustle.
   const rim = [[-.54, 1.42], [.51, 1.47], [1.12, 1.0], [1.42, .40], [1.30, -1.15],
     [.86, -1.72], [-.83, -1.68], [-1.31, -1.07], [-1.44, .29], [-1.14, 1.07]];
@@ -190,8 +193,8 @@ function lancer(P, model) {
     P.beam(turretDetail, 'metal', [side * 1.48, .282, .22], [side * 1.38, .292, -.42], .019);
     kit.grabRail(P, turretDetail, [side * .98, .618, -.36], [side * .974, .66, -.92], .042);
   }
-  P.box(turret, 'dark', [0, .30, 1.30], [.69, .49, .39], [-.12]);
-  P.add(turret, 'armor', cylZ(.318, .28, 24, 0, .316, 1.35, .274), '#b5b59c');
+  P.box(turret, 'dark', [0, trunnionHeight - .016, 1.30], [.69, .49, .39], [-.12]);
+  P.add(turret, 'armor', cylZ(.318, .28, 24, 0, trunnionHeight, 1.35, .274), '#b5b59c');
   lid(P, turretDetail, .49, .58, -.12, .57, .67);
   lid(P, turretDetail, -.48, .665, -.48, .50, .57);
   optics(P, turret, [-.62, .566, .89], .46, .199, .40, -.13);
@@ -221,14 +224,15 @@ function lancer(P, model) {
   }
 
   const end = model.muzzle.position.z;
-  shapedTube(P, end, [[.188, .01], [.202, .23], [.181, .61], [.14, .79], [.131, 1.55],
-    [.131, 2.65], [.116, 2.86], [.105, end - .39]], .107, '#d6d3c0');
-  // A distinct flat-sided thermal sleeve with recessed longitudinal strips.
+  shapedTube(P, end, [[.149, .01], [.150, .23], [.143, .52], [.132, .68], [.118, .87],
+    [.117, 2.65], [.113, 2.86], [.105, end - .39]], .107, '#d6d3c0');
+  // Leave clearance under the tube when it depresses across the rear engine deck.
   for (const s of [-1, 1]) {
-    P.box(barrel, 'paint', [s * .116, .001, 1.79], [.109, .209, 1.95], [0, 0, s * -.12], '#d6cc9e');
-    P.box(barrel, 'dark', [s * .175, .036, 1.78], [.024, .059, 1.76], [0, 0, s * -.12]);
+    P.box(barrel, 'paint', [s * .110, .083, 1.79], [.110, .140, 1.95], [0, 0, s * -.12], '#d6cc9e');
+    P.box(barrel, 'dark', [s * .167, .109, 1.78], [.024, .055, 1.76], [0, 0, s * -.12]);
   }
-  for (const [z, r, d] of [[.78, .197, .16], [1.98, .18, .10], [2.79, .17, .15], [4.44, .121, .09], [6.05, .121, .092]]) {
+  P.box(barrel, 'paint', [0, .131, 1.77], [.22, .054, 1.99], [0, 0, 0], '#b9bd9d');
+  for (const [z, r, d] of [[.78, .142, .16], [1.98, .128, .10], [2.79, .128, .15], [4.44, .121, .09], [6.05, .121, .092]]) {
     P.add(barrel, 'paint', cylZ(r, d, 24, 0, 0, z), '#c7c2a2');
   }
 }
