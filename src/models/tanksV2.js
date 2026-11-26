@@ -6,11 +6,12 @@ import { T, box, cylY, cylX, cylZ, sideExtrude, topExtrude, taper, superEllipse,
 import * as K from './kit.js';
 
 const DEG = Math.PI / 180;
-// keep the part of a side profile polygon above y = fy (Sutherland–Hodgman against a horizontal line)
-function clipAbove(poly, fy) {
+// Clip a side profile against a horizontal line.
+function clipProfile(poly, fy, direction = 1) {
   const out = [];
   for (let i = 0; i < poly.length; i++) {
-    const a = poly[i], b = poly[(i + 1) % poly.length]; const ia = a[1] >= fy, ib = b[1] >= fy;
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const ia = direction * (a[1] - fy) >= 0, ib = direction * (b[1] - fy) >= 0;
     if (ia) out.push(a);
     if (ia !== ib) { const t = (fy - a[1]) / (b[1] - a[1]); out.push([a[0] + (b[0] - a[0]) * t, fy]); }
   }
@@ -19,8 +20,9 @@ function clipAbove(poly, fy) {
 // lower hull between the tracks + upper hull / fenders above the track run
 function hullShell(P, d, prof, fy, o = {}) {
   const inner = 2 * trackCenterOffset(d) - d.trackW - 0.04;
-  P.add('hull', 'paint', sideExtrude(prof, inner, 0, 0.02));
-  const up = clipAbove(prof, fy);
+  const lower = o.lowerBevel ? clipProfile(prof, fy + .10, -1) : prof;
+  P.add('hull', 'paint', sideExtrude(lower, inner, 0, o.lowerBevel ?? 0.02));
+  const up = clipProfile(prof, fy);
   let g = sideExtrude(up, o.upperW ?? d.W - 0.02, 0, 0.025);
   if (o.sideTaper) g = taper(g, fy, d.hullH, o.sideTaper, 1);
   P.add('hull', 'paint', g);
@@ -72,6 +74,14 @@ function sightWindow(P, width, height, x, y, z) {
   P.add('turret', 'paintDetail', box(width + 0.068, 0.030, 0.098, x, y + height / 2 + 0.028, z + 0.024));
   K.bolts(P, 'turret', 'metal', [-1, 1].map(side => [x + side * (width / 2 + 0.024), y, z + 0.017]), 0.009, 0.012, 'z');
 }
+function bustleRoll(P, x, y, z, length, radius) {
+  P.add('turret', 'canvas', cylX(radius, length, 14, x, y, z, radius * 0.94));
+  for (const side of [-1, 1]) {
+    P.add('turret', 'canvas', cylX(radius * 0.82, 0.054, 12, x + side * length * 0.48, y, z));
+    P.add('turret', 'rubber', cylX(radius * 1.03, 0.032, 16, x + side * length * 0.31, y, z));
+    P.add('turret', 'metal', box(0.046, 0.023, 0.064, x + side * length * 0.31, y + radius, z));
+  }
+}
 function chainCurtain(P, x0, x1, y, z, n = 18, len = 0.42) {
   for (let i = 0; i < n; i++) { const x = x0 + ((x1 - x0) * i) / (n - 1); for(let k=0;k<6;k++) {
       const g=new THREE.TorusGeometry(len/12,0.008,5,10);
@@ -115,19 +125,34 @@ function panther(d) {
   K.antenna(P, 'hull', 1.0, H, -hl + 0.5, 1.9);
   // turret: narrow-fronted, steeply sloped sides
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0;
-  const turretOutline = superEllipse(tw, tl * 0.86, tl * 1.02, 2.55, 64, (x, z) => [x * (z > 0.25 ? 1 - (z - 0.25) * 0.12 : 1), z]).map(([x, z]) => [x, z + bz]);
-  turretBody(P, turretOutline, d.turretH, 0.82, 0.92, bz);
+  const turretOutline = [[-.63,1.11],[.63,1.11],[.79,.86],[tw,-.63],[.83,-1.29],
+    [-.83,-1.29],[-tw,-.63],[-.79,.86]].map(([x,z]) => [x,z + bz]);
+  turretBody(P, turretOutline, d.turretH, 0.86, 0.96, bz);
   K.cupola(P, 'turret', -0.52, d.turretH, bz - 0.55, 0.33, 0.16, 7, 'ww2');
   K.mg(P, 'turret', -0.52, d.turretH + 0.29, bz - 0.55, 0, 'mg34');
   K.hatch(P, 'turret', 0.42, d.turretH, bz - 0.2, 0.26); K.periscope(P, 'turret', 0.42, d.turretH, bz + 0.25, 0, 0.8);
-  P.add('turret', 'paint', cylZ(0.36, 0.08, 16, 0, 0.42, bz - tl + 0.08)); // rear escape hatch
+  P.add('turret', 'dark', cylZ(0.352, 0.052, 22, 0, 0.36, bz - tl + 0.004));
+  P.add('turret', 'paintDetail', cylZ(0.32, 0.073, 24, 0, 0.36, bz - tl - 0.018));
+  for (const x of [-0.205, 0.205]) {
+    P.add('turret', 'paintDetail', box(0.095, 0.090, 0.094, x, 0.594, bz - tl - 0.017));
+    P.add('turret', 'metal', cylX(0.026, 0.107, 10, x, 0.607, bz - tl - 0.052));
+  }
   for (const s of [-1, 1]) for (let i = 0; i < 3; i++) P.add('turret', 'metal', cylZ(0.04, 0.24, 8, s * 0.82, 0.62, bz + 0.6 - i * 0.12, 0.04, -0.6));
   K.liftHooks(P, 'turret', [[-0.6, d.turretH, bz + 0.6], [0.6, d.turretH, bz + 0.6], [0, d.turretH, bz - 0.9]]);
   // gun: "chin" mantlet + 75 mm KwK 42 L/70 with double-baffle brake
   const gz = bz + tl - 0.1;
-  P.add('gun', 'paint', cylX(0.38, 1.25, 20, 0, -0.02, 0.05)); P.add('gun', 'paint', box(1.25, 0.25, 0.3, 0, -0.32, 0.05)); P.add('gun', 'dark', box(0.1, 0.07, 0.04, 0.38, 0.12, 0.43));
+  P.add('gun', 'paint', sideExtrude([[-.22,-.36],[.31,-.38],[.40,-.25],[.37,.11],
+    [.30,.255],[.17,.33],[-.19,.32],[-.24,.18]], 1.25, 0, .050));
+  P.add('gun', 'paintDetail', cylZ(0.186, .18, 26, 0, 0, .38, .166));
+  P.add('gun', 'dark', cylZ(0.045, .033, 12, -.38, .14, .367));
+  P.add('gun', 'optic', cylZ(0.022, .012, 12, -.38, .14, .386));
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.07, brake: { type: 'double', r: 0.105, len: 0.42 } });
-  return { P, ...g, wheelType: 'single', cast: 0.35, castTurret: 0.4, turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, gz], decals: [...decalsSide('cross', '', 'turret', tw * 0.9 + 0.05, 0.42, bz - 0.4, 0.42), ...decalsSide('text', '211', 'turret', tw * 0.9 + 0.05, 0.42, bz + 0.25, 0.5)] };
+  const sideMark = (kind, text, z, size) => [-1, 1].map(side => ({ kind, text, part: 'turret',
+    pos: [side * (0.95 - 0.14 * (z + 0.4)), 0.39, bz + z], ry: side * 1.42, s: size, projectDepth: .25 }));
+  return { P, ...g, wheelType: 'single', cast: 0.35, castTurret: 0.13, castMantlet: .65,
+    finish: { roughness: .78, abrasion: .22, primer: '#776847' },
+    turretPos: [0, H, d.turretZ], gunPos: [0, 0.42, gz],
+    decals: [...sideMark('cross', '', -.45, .32), ...sideMark('text', '211', .27, .37)] };
 }
 
 function is2CastLoft(poly, h, cz = 0, y0 = 0, wallAngles = { left: 4, right: 20 }) {
@@ -440,27 +465,48 @@ function pershing(d) {
   const g = gear({ n: 6, z0: -2.15, z1: 2.0, r: 0.33, w: 0.48, rollers: [-1.9, -1.0, 0.0, 1.0, 1.9], ry: 0.98, rr: 0.085, spr: { z: -hl + 0.35, y: 0.78, r: 0.33 }, idl: { z: hl - 0.33, y: 0.72, r: 0.3 } });
   const fy = trackTop(g);
   const prof = [[-hl + 0.25, c], [hl - 0.5, c], [hl, 0.95], [hl - 1.12, H], [-hl + 0.05, H], [-hl, 1.38], [-hl + 0.05, c + 0.15]];
-  const inner = hullShell(P, d, prof, fy, {});
+  const inner = hullShell(P, d, prof, fy, { upperW: 3.05, lowerBevel: .085 });
   torsionArms(P, inner, g, c);
   P.add('hull', 'paint', T(new THREE.SphereGeometry(0.14, 12, 8), 0.6, 1.35, hl - 0.6)); P.add('hull', 'dark', cylZ(0.02, 0.35, 6, 0.6, 1.4, hl - 0.45));
-  for (const s of [-1, 1]) { K.headlight(P, 'hull', s * 1.3, fy + 0.12, hl - 0.15, true, 'lens'); K.hatch(P, 'hull', s * 0.6, H, hl - 1.45, 0.27, { periscope: true }); P.add('hull', 'paint', box(0.06, 0.32, d.L * 0.92, s * (d.W / 2 - 0.03), fy - 0.15, 0)); }
+  for (const s of [-1, 1]) {
+    K.headlight(P, 'hull', s * 1.3, fy + 0.12, hl - 0.15, true, 'lens');
+    K.hatch(P, 'hull', s * 0.6, H, hl - 1.45, 0.27, { periscope: true });
+    P.add('hull', 'paintDetail', sideExtrude([[-hl + .09, fy - .20], [-hl + .48, fy - .068],
+      [hl - .59, fy - .068], [hl - .19, fy - .21], [hl - .13, fy - .13],
+      [hl - .54, fy + .016], [-hl + .45, fy + .016]], .061, s * (d.W / 2 - .035), .012));
+    P.add('hull', 'paintDetail', box(.21,.048,.94,s*1.615,fy+.004,hl-.64));
+    P.add('hull', 'metal', box(.164,.043,.15,s*1.476,fy+.041,hl-.39));
+    for (const z of [-1.64,-.56,1.13]) P.add('hull', 'paintDetail', box(.193,.10,.075,s*1.619,fy+.036,z));
+  }
   for (const s of [-1, 1]) P.add('hull', 'metal', cylZ(0.08, 0.12, 10, s * 0.9, c + 0.3, hl - 0.15));
   const bow = glacis(0.95, hl, H, hl - 1.12);
   weld(P, 'hull', [bow.point(-1.19, 0.407, 0.021), bow.point(1.19, 0.407, 0.021)], 0.013);
+  for (const side of [-1, 1]) {
+    P.add('hull', 'paintDetail', bow.place(box(.23,.17,.085), side*.95, .25, .029));
+    P.add('hull', 'metal', T(new THREE.TorusGeometry(.074,.027,6,16), ...bow.point(side*.95,.21,.106), bow.pitch));
+  }
+  P.add('hull', 'paintDetail', bow.place(box(.47,.17,.069), 0,.19,.034));
+  P.add('hull', 'metal', bow.place(cylX(.034,.46,10,0,0,0), 0,.21,.083));
   for (const side of [-1, 1]) {
     for (const z of [-2.32, -0.95, 0.66, 2.48]) {
       P.add('hull', 'paintDetail', box(0.058, 0.132, 0.062, side * (d.W / 2 - 0.014), fy - 0.117, z));
       K.bolts(P, 'hull', 'metal', [[side * (d.W / 2 + 0.011), fy - 0.077, z]], 0.014, 0.014, 'x');
     }
   }
-  deckGrilles(P, -1.1, 1.1, H, -hl + 0.35, -hl + 1.75, 9);
+  deckGrilles(P, -1.11, -0.105, H, -hl + 0.35, -hl + 1.75, 12);
+  deckGrilles(P, 0.105, 1.11, H, -hl + 0.35, -hl + 1.75, 12);
+  for (const x of [-0.80, 0.80]) {
+    K.grabRail(P, 'hull', [x - .13, H + .016, -hl + 1.83], [x + .13, H + .016, -hl + 1.83], .042);
+  }
   P.add('hull','paint',box(2.2,0.35,0.1,0,1.25,-hl-0.08));
   for(const side of [-1,1])for(let i=0;i<4;i++)P.add('hull','metal',box(0.36,0.022,0.055,side*0.65,1.12+i*0.075,-hl-0.155)); for (const s of [-1, 1]) P.add('hull', 'metal', box(0.5, 0.28, 0.1, s * 0.6, 1.25, -hl - 0.15));
   K.tools(P, 'hull', 0.0, H, -hl + 2.6, 1); K.towCable(P, 'hull', 1.4, fy + 0.04, -2.0, 1.0); K.jerrycans(P, 'hull', -1.45, fy, -2.4, 3, Math.PI / 2);
   K.stowageBox(P, 'hull', -1.4, fy + 0.18, 0.6, 0.45, 0.34, 1.0);
   // cast turret with bustle
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
-  turretBody(P, superEllipse(tw,1.05,1.62,2.5,64).map(([x, z]) => [x, z + bz]), d.turretH, 0.84, 0.9, bz);
+  const castOutline = superEllipse(tw, 1.08, 1.62, 2.56, 64, (x, z) =>
+    [x * (z > 0 ? 1 - .17 * z : 1 + .07 * z), z]).map(([x, z]) => [x, z + bz]);
+  turretBody(P, castOutline, d.turretH, 0.78, 0.90, bz);
   K.cupola(P, 'turret', 0.55, d.turretH, bz - 0.5, 0.33, 0.26, 6, 'ww2'); K.mg(P, 'turret', 0.55, d.turretH + 0.40, bz - 0.5, 0, 'm2');
   K.hatch(P, 'turret', -0.5, d.turretH, bz - 0.35, 0.27); K.periscope(P, 'turret', -0.45, d.turretH, bz + 0.35, 0, 0.8);
   K.antenna(P, 'turret', -0.8, d.turretH * 0.8, bz - 1.2, 2.2); K.stowageBox(P, 'turret', 0, 0.35, bz - 1.75, 1.6, 0.35, 0.3);
@@ -468,11 +514,16 @@ function pershing(d) {
   // M26's large rounded gun shield and coaxial aperture.
   P.add('gun', 'paint', castLoft(superEllipse(0.82, 0.22, 0.22, 2.35, 48), 0.58, 0.98, 0.96, 0.02, -0.29));
   P.add('gun', 'paint', cylZ(0.22, 0.22, 24, 0, 0, 0.22));
-  P.add('gun', 'dark', cylZ(0.028, 0.035, 12, 0.43, 0.08, 0.245));
-  P.add('gun', 'dark', cylZ(0.035, 0.04, 12, -0.43, 0.08, 0.245));
+  for (const [x, r] of [[.43, .028], [-.43, .038]]) {
+    P.add('gun', 'paintDetail', cylZ(r + .028, .068, 16, x, .08, .218));
+    P.add('gun', 'dark', cylZ(r, .015, 16, x, .08, .257));
+  }
   // Standard M26 90 mm M3 uses the large double-baffle muzzle brake (not the M26A1 single-baffle type).
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.075, brake: { type: 'double', r: 0.14, len: 0.42 } });
-  return { P, ...g, wheelType: 'disc', cast: 0.7, castTurret: 1.0, turretPos: [0, H, d.turretZ], gunPos: [0, 0.30, bz + 1.12], decals: [...decalsSide('usstar', '', 'hull', d.W / 2 + 0.002, fy - 0.15, -0.3, 0.3), ...decalsSide('usstar', '', 'turret', tw * 0.93, 0.37, bz - 0.2, 0.50)] };
+  return { P, ...g, wheelType: 'disc', cast: 0.48, castTurret: .95, castMantlet: .83,
+    finish: { roughness: .74, abrasion: .20, primer: '#625340' },
+    turretPos: [0, H, d.turretZ], gunPos: [0, 0.30, bz + 1.12],
+    decals: decalsSide('usstar', '', 'turret', tw * 0.88, .31, bz - .15, .43).map(mark => ({ ...mark, projectDepth: .27 })) };
 }
 
 // ---------------- Cold War ----------------
@@ -484,23 +535,54 @@ function centurion(d) {
   const prof = [[-hl + 0.3, c], [hl - 0.9, c], [hl - 0.05, 0.98], [hl - 1.15, H], [-hl + 0.1, H], [-hl, 1.45], [-hl, c + 0.3]];
   const inner = hullShell(P, d, prof, fy, { upperW: d.W - 2 * d.trackW + 0.3 });
   // Horstmann bogies (pairs of wheels on one coil-sprung unit)
-  for (const s of [-1, 1]) for (let b = 0; b < 3; b++) { const zc = (zs[b * 2] + zs[b * 2 + 1]) / 2; const x = s * (inner / 2 + 0.1); P.add('hull', 'metal', box(0.12, 0.3, 0.7, x, 0.55, zc)); for (const o of [-0.12, 0.12]) P.add('hull', 'metal', cylZ(0.06, 0.45, 8, x + s * 0.06, 0.62, zc + o)); }
+  for (const side of [-1, 1]) for (let i = 0; i < zs.length; i += 2) {
+    const z = (zs[i] + zs[i + 1]) / 2;
+    const x = side * (inner / 2 + .115);
+    const axleHeight = g.wheels[i].y;
+    P.add('hull', 'paintDetail', sideExtrude([[z-.39,.70],[z-.26,.83],[z+.26,.83],
+      [z+.39,.70],[z+.24,.53],[z-.24,.53]], .16, x, .023));
+    for (const end of [-1, 1]) {
+      P.add('hull', 'metal', box(.17,.116,.32,x,axleHeight+.095,z+end*.22,-end*.42));
+      P.add('hull', 'paintDetail', cylX(.09,.14,14,x+side*.085,axleHeight+.16,z+end*.24));
+      P.add('hull', 'metal', cylX(.034,.035,8,x+side*.16,axleHeight+.16,z+end*.24));
+      P.add('hull', 'steel', cylZ(.071,.062,12,x+side*.093,.64,z+end*.234));
+    }
+    P.add('hull', 'dark', cylZ(.055,.56,12,x+side*.093,.64,z));
+  }
   // bazooka plates, track-guard bins
   for (const s of [-1, 1]) {
-    K.skirt(P, s * (d.W / 2 - 0.03), fy + 0.02, -hl + 0.45, hl - 0.55, 0.5, 6, 0.03);
+    const x = s * (d.W / 2 - .035), start = -hl + .45, length = (d.L - 1) / 5;
+    for (let i = 0; i < 5; i++) {
+      const a = start + i * length + .011, b = a + length - .026;
+      const top = fy + .02, bottom = fy - .45;
+      P.add('hull', 'paint', sideExtrude([[a,top],[b,top],[b,bottom+.07],[b-.12,bottom],
+        [a+.11,bottom],[a,bottom+.085]], .033, x, .008));
+      for (const z of [a+.16,b-.16]) P.add('hull', 'metal', cylZ(.022,.14,8,x+s*.022,top-.044,z));
+    }
     for (const z of [-1.9, -0.6, 0.7]) K.stowageBox(P, 'hull', s * (d.W / 2 - 0.3), fy + 0.25, z, 0.5, 0.46, 1.15);
     K.headlight(P, 'hull', s * 1.2, fy + 0.15, hl - 0.25, true, 'lens');
   }
   K.tools(P, 'hull', 1.2, fy + 0.5, 1.7, 1); K.towCable(P, 'hull', -1.25, fy + 0.52, -2.4, 1.2);
   deckGrilles(P, -0.95, 0.95, H, -hl + 0.4, -hl + 2.2, 10); K.hatchRect(P, 'hull', 0.6, H, hl - 1.6, 0.55, 0.5);
   K.periscope(P, 'hull', 0.6, H, hl - 1.25, 0);
+  const bow = glacis(.98, hl - .05, H, hl - 1.15);
+  const chin = bow.point(0,.305,.036);
+  P.add('hull', 'paintDetail', bow.place(box(.61,.183,.061), 0,.305,.021));
+  P.add('hull', 'dark', bow.place(box(.46,.125,.043),0,.30,.061));
+  P.add('hull', 'metal', cylX(.033,.44,10,chin[0],chin[1]+.018,chin[2]+.065));
+  for (const side of [-1, 1]) {
+    P.add('hull', 'metal', T(new THREE.TorusGeometry(.076,.025,6,16), ...bow.point(side*.99,.235,.092),bow.pitch));
+    K.bolts(P, 'hull', 'metal', [bow.point(side*.40,.204,.062),bow.point(side*.40,.387,.062)], .016,.02,'z');
+  }
   for (const s of [-1, 1]) K.exhaust(P, 'hull', s * 0.6, 1.25, -hl - 0.1, 'ww2', 0.09, 0.4);
   // cast/welded turret with side bins and rear basket
   const tw = d.turretW / 2, bz = d.turretBoxZ || 0;
-  turretBody(P, superEllipse(tw*0.9,1.35,1.6,3.0,64).map(([x, z]) => [x, z + bz]), d.turretH, 0.86, 0.93, bz);
+  const turretOutline = superEllipse(tw*.95,1.35,1.60,3.1,64,(x,z) =>
+    [x * (z > .18 ? 1 - (z - .18)*.22 : 1),z]).map(([x,z]) => [x,z + bz]);
+  turretBody(P, turretOutline, d.turretH, .86, .93, bz);
   for (const s of [-1, 1]) { K.stowageBox(P, 'turret', s * (tw * 0.92 + 0.05), 0.38, bz - 0.3, 0.26, 0.5, 1.7); K.smokeDischargers(P, 'turret', s * 0.95, 0.72, bz + 1.1, s * 0.7, 6, 0.08, 0.2, 0.035); }
   for (let i = 0; i < 6; i++) P.add('turret', 'metal', box(0.02, 0.4, 0.02, -1.0 + i * 0.4, 0.35, bz - 1.75)); P.add('turret', 'metal', box(2.05, 0.03, 0.4, 0, 0.16, bz - 1.6)); P.add('turret', 'metal', box(2.05, 0.03, 0.03, 0, 0.55, bz - 1.78));
-  P.add('turret', 'canvas', box(1.6, 0.25, 0.25, 0, 0.3, bz - 1.6));
+  bustleRoll(P, 0, .31, bz - 1.66, 1.58, .133);
   K.cupola(P, 'turret', 0.55, d.turretH, bz - 0.3, 0.36, 0.25, 8, 'modern'); K.mg(P, 'turret', 0.55, d.turretH + 0.45, bz - 0.3, 0, 'mag');
   K.hatch(P, 'turret', -0.55, d.turretH, bz - 0.25, 0.3); K.antenna(P, 'turret', -0.9, d.turretH * 0.8, bz - 1.0); K.antenna(P, 'turret', 0.95, d.turretH * 0.8, bz - 1.05, 1.6);
   P.add('gun', 'paint', box(0.72, 0.52, 0.28, 0, 0, 0.02));
@@ -508,7 +590,9 @@ function centurion(d) {
     [0.225, 0.303], [0.196, 0.36], [0.211, 0.409], [0.169, 0.466], [0.152, 0.494]], 22));
   P.add('gun', 'metal', T(new THREE.TorusGeometry(0.162, 0.011, 5, 24), 0, 0, 0.478));
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.074, evac: { z: 2.9, r: 0.14, len: 0.75 } });
-  return { P, ...g, wheelType: 'disc', cast: 0.4, castTurret: 0.9, turretPos: [0, H, d.turretZ], gunPos: [0, 0.4, bz + 1.45], decals: decalsSide('text', '31', 'turret', tw * 0.92 + 0.19, 0.42, bz - 0.3, 0.42) };
+  return { P, ...g, wheelType: 'disc', cast: 0.32, castTurret: .91, castMantlet: .42,
+    finish: { roughness: .79, abrasion: .21, primer: '#605a43' },
+    turretPos: [0, H, d.turretZ], gunPos: [0, 0.4, bz + 1.45], decals: decalsSide('text', '31', 'turret', tw * 0.92 + 0.19, 0.42, bz - 0.3, 0.42) };
 }
 
 function leo1(d) {
@@ -522,22 +606,47 @@ function leo1(d) {
     K.skirt(P, s * (d.W / 2 - 0.022), fy + 0.03, -hl + 0.35, hl - 0.4, 0.48, 7, 0.025, 0, 'rubber');
     K.headlight(P, 'hull', s * 1.35, H - 0.1, hl - 0.9, true, 'lens'); P.add('hull', 'metal', cylZ(0.08, 0.12, 10, s * 0.9, c + 0.3, hl - 0.6));
     deckGrilles(P, s * 0.4, s * 1.5, H, -hl + 0.3, -hl + 1.9, 10);
-    K.exhaust(P, 'hull', s * 1.25, fy + 0.22, -hl - 0.02, 'modern', 0.12, 0.6);
+    const x = s * (d.W / 2 - .003), y = (fy + H) / 2, z = -hl + .79;
+    P.add('hull', 'paintDetail', box(.063,.29,1.03,x,y,z));
+    P.add('hull', 'dark', box(.025,.228,.936,x+s*.04,y,z));
+    for (let i = 0; i < 6; i++) P.add('hull', 'metal', box(.043,.018,.918,x+s*.055,y+(i-2.5)*.036,z,0,0,s*.38));
+    for (const dz of [-.23,.23]) P.add('hull', 'paintDetail', box(.032,.229,.018,x+s*.077,y,z+dz));
   }
   K.tools(P, 'hull', -0.2, H, -hl + 2.7, 1); K.towCable(P, 'hull', 0.0, H + 0.03, hl - 2.2, hl - 1.15);
   K.hatchRect(P, 'hull', -0.65, H, hl - 1.3, 0.55, 0.5); for (let i = 0; i < 3; i++) K.periscope(P, 'hull', -0.85 + i * 0.2, H, hl - 1.0, 0, 0.7);
-  // 1A5 welded add-on armour turret: angular wedge
+  // The 1A5 uses a cast turret with spaced add-on panels on stand-offs.
   const tw = d.turretW / 2, tl = d.turretL / 2, bz = d.turretBoxZ || 0;
-  turretBody(P, [[tw * 0.42, bz + tl], [tw, bz + tl - 0.85], [tw, bz - tl + 0.45], [tw * 0.86, bz - tl], [-tw * 0.86, bz - tl], [-tw, bz - tl + 0.45], [-tw, bz + tl - 0.85], [-tw * 0.42, bz + tl]], d.turretH, 0.9, 0.95, bz);
-  for (const s of [-1, 1]) { K.boltRow(P, 'turret', [s * tw * 0.98, d.turretH * 0.6, bz - 0.8], [s * tw * 0.98, d.turretH * 0.6, bz + 0.6], 6, 0.02, 'x'); K.smokeDischargers(P, 'turret', s * (tw - 0.05), d.turretH * 0.85, bz - 0.6, s * Math.PI / 2, 4, 0.1, 0.22, 0.04); }
+  const castOutline = superEllipse(tw, tl * .935, tl, 2.8, 64, (x, z) =>
+    [x * (z > 0 ? 1 - .13 * z : 1), z]).map(([x, z]) => [x, z + bz]);
+  turretBody(P, castOutline, d.turretH, .82, .91, bz);
+  for (const side of [-1, 1]) {
+    const x = side * (tw + .073);
+    for (const [a, b] of [[-1.38,-.27],[-.22,.72]]) {
+      const profile = [[bz+a,.29],[bz+a+.11,.23],[bz+b-.09,.22],[bz+b,.31],
+        [bz+b-.13,.65],[bz+a+.11,.65]];
+      P.add('turret', 'paint', sideExtrude(profile, .052, 0, .012).rotateZ(side*.17).translate(x,0,0));
+      for (const z of [a+.19,b-.25]) {
+        P.add('turret', 'dark', box(.18,.079,.099,side*(tw-.015),.455,bz+z));
+        P.add('turret', 'metal', cylX(.017,.021,8,x-side*.057,.463,bz+z));
+      }
+    }
+    K.smokeDischargers(P, 'turret', side * (tw - .05), d.turretH * .85, bz - .6, side*Math.PI/2, 4, .1, .22, .04);
+  }
   P.add('turret', 'paint', box(0.55, 0.35, 0.65, -0.65, d.turretH + 0.17, bz + 0.9)); sightWindow(P, 0.4, 0.2, -0.65, d.turretH + 0.2, bz + 1.23); // EMES 18
   P.add('turret', 'paint', cylY(0.2, 0.3, 12, 0.55, d.turretH + 0.15, bz + 0.2)); P.add('turret', 'paint', box(0.32, 0.25, 0.35, 0.55, d.turretH + 0.42, bz + 0.2)); sightWindow(P, 0.22, 0.12, 0.55, d.turretH + 0.44, bz + 0.38); // PERI R12
   K.hatch(P, 'turret', 0.6, d.turretH, bz - 0.4, 0.3); K.hatch(P, 'turret', -0.6, d.turretH, bz - 0.35, 0.3); K.mg(P, 'turret', -0.6, d.turretH + 0.3, bz - 0.1, 0, 'mag');
-  for (let i = 0; i < 5; i++) P.add('turret', 'metal', box(0.02, 0.35, 0.02, -0.9 + i * 0.45, d.turretH * 0.6, bz - tl - 0.35)); P.add('turret', 'metal', box(1.9, 0.03, 0.4, 0, 0.12, bz - tl - 0.18)); P.add('turret', 'canvas', box(1.5, 0.3, 0.3, 0, 0.3, bz - tl - 0.18));
+  for (let i = 0; i < 5; i++) P.add('turret', 'metal', box(.023,.35,.026,-.9+i*.45,.341,bz-tl-.34));
+  P.add('turret', 'metal', box(1.88,.028,.40,0,.16,bz-tl-.18));
+  P.add('turret', 'metal', box(1.88,.026,.031,0,.518,bz-tl-.34));
+  bustleRoll(P, -.08, .303, bz-tl-.183, 1.44, .132);
   K.antenna(P, 'turret', -1.0, d.turretH, bz - 1.2); K.antenna(P, 'turret', 1.0, d.turretH, bz - 1.25, 1.6);
   P.add('gun', 'paint', box(0.55, 0.5, 0.45, 0, 0, 0.0)); P.add('gun', 'rubber', cylZ(0.2, 0.25, 12, 0, 0, 0.3));
   K.barrel(P, 'barrel', d.gunLen, { r0: 0.12, r1: 0.072, evac: { z: 2.3, r: 0.13, len: 0.7 }, sleeve: 5 });
-  return { P, ...g, wheelType: 'modern', cast: 0.25, castTurret: 0.2, turretPos: [0, H, d.turretZ], gunPos: [0, 0.4, bz + tl - 0.1], decals: [...decalsSide('cross', '', 'turret', tw * 0.95 + 0.06, 0.42, bz - 0.95, 0.4), ...decalsSide('cross', '', 'hull', d.W / 2 + 0.05, fy - 0.2, 1.8, 0.3)] };
+  return { P, ...g, wheelType: 'modern', cast: .24, castTurret: .78, castMantlet: .47,
+    finish: { roughness: .76, abrasion: .17, primer: '#666052' },
+    turretPos: [0, H, d.turretZ], gunPos: [0, .4, bz + tl - .1],
+    decals: [...decalsSide('cross', '', 'hull', d.W / 2 + .005, fy - .17, 1.8, .30),
+      ...decalsSide('cross', '', 'turret', tw + .03, .42, bz - .90, .32).map(mark => ({ ...mark, projectDepth: .20 }))] };
 }
 
 // ---------------- Modern ----------------
