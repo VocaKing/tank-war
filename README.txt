@@ -17,3 +17,6 @@ Concealment: bushes / standing still / camo net raise CAMO %; enemies spot you a
 viewRange x (1 - camo), but always within ~50 m. Firing reveals you for 5 s.
 Water slows shells: tanks hull-down in water are harder (not impossible) to penetrate.
 Use a desktop browser with a dedicated GPU for best results; pick "Medium" or "Low" graphics on weaker machines.
+
+Control point C: 25 m radius; 240 seconds solo, with diminishing extra-vehicle returns.
+Only current occupants contribute. Leaving, damage, hits or death reset individual credit.
