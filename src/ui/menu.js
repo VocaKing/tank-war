@@ -18,7 +18,7 @@ export class Menu {
       <button id="m-balance" class="balance-menu-btn" style="position:absolute;top:24px;right:24px;z-index:40;pointer-events:auto;padding:10px 16px;border:1px solid #8ca7bc;border-radius:6px;background:#263b4e;color:#fff;font:inherit;cursor:pointer">⚙ 游戏平衡编辑器 / Balance Editor</button>\n      <div class="menutools"><button class="tbl-btn" id="m-table">📊 Compare all tanks</button><button class="tbl-btn" id="m-armor">🛡️ Armor Preview</button></div>
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
-        <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to soft-lock the camera on it; mouse input is dampened near the target, pull away firmly to break"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
+        <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Touch a visible enemy with the crosshair to lock instantly and zoom; flick or pull firmly to release"><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
         <div class="mode">Team Battle · 7 vs 7 · Base capture · tier-matched</div><div class="losum" id="m-losum"></div><button class="tbl-btn lo-btn" id="m-lo-btn">🎒 Ammo &amp; equipment</button><button class="battle" id="m-battle">BATTLE!</button></div>
       </div>
       <button class="mobile-deploy" id="m-mobile-deploy" aria-label="进入战斗">进入战斗 · BATTLE</button>

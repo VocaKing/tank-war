@@ -33,3 +33,6 @@ Mobile browsers automatically use touch controls and a responsive garage. Use la
 
 ## Motion smoothness
 The battle renderer now uses bounded simulation substeps, translation-locked chase camera, non-accumulating AO, shadow updates once per displayed frame, hysteresis for tank/vegetation LOD, and staged grass uploads. Adaptive rendering resolution reduces GPU load when frames are consistently slow without modifying tank speed or game rules. Use `?adaptive=0` to lock the selected preset's initial resolution for comparisons. The high preset retains bloom, AO and spatial anti-aliasing.
+
+## Instant aim assist
+With aim assist enabled, a direct crosshair hit on a spotted enemy immediately locks the camera and shows the red outline in the same frame. Third-person view smoothly magnifies 1.4×; manual sniper magnification is unchanged. The mouse is damped to 18–35% sensitivity while locked, with independent directional pull pressure that is not erased when refining a weak spot. A fast flick (82 input pixels within 100 ms) or sustained pull (190 decaying pressure units) releases the target, restores normal sensitivity, and returns to the original third-person field of view. The same target cannot re-lock until the crosshair has left it and a 0.30 s cooldown has elapsed. E gun lock remains independent. Run `node tools_aim_assist.mjs` for regression coverage.

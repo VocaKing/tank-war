@@ -21,3 +21,6 @@ Use a desktop browser with a dedicated GPU for best results; pick "Medium" or "L
 Base capture: a single attacker needs 240 seconds (4 minutes); multiple attackers add independent credit.
 Leaving the base, being hit (even without penetration), taking damage or being destroyed erases only that tank's credit.
 Defenders pause accrual; capture succeeds when valid credit from attackers still inside totals 100%.
+
+Aim assist: red outline means instant camera lock; automatic 1.4x third-person zoom.
+Small mouse movements are damped; flick or pull firmly to release. Manual scope zoom and E gun lock remain independent.

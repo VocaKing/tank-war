@@ -16,7 +16,7 @@ import { setTrackLOD } from '../models/tankModel.js';
 import { RNG, clamp, DEG, wrapAngle } from '../util.js';
 import { Post } from '../render/post.js';
 import { Outline } from '../render/outline.js';
-import { AimAssist } from './aimAssist.js';
+import { AimAssist, AIM_ASSIST } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, dispersionPixels } from './combatMath.js';
 import { createCaptureState, resetCaptureContribution, updateCaptureState } from './capture.js';
@@ -126,7 +126,7 @@ export class Game {
   }
   // mouse look (also used by the headless tests): the aim assist may absorb / dampen the movement while locked
   mouseLook(dx, dy) {
-    const k = this.cam.sniper ? 0.0022 / this.cam.zoom * 2.2 : 0.0024;
+    const k = this.cam.sniper ? 0.0022 / this.cam.zoom * 2.2 : 0.0024 * Math.tan(this.camera.fov * DEG / 2) / Math.tan(60 * DEG / 2);
     const [dyaw, dpitch] = this.assist.look(dx, dy, k);
     this.cam.yaw += dyaw; this.cam.pitch = clamp(this.cam.pitch + dpitch, this.cam.sniper ? -0.35 : -0.9, this.cam.sniper ? 0.45 : 0.35);
   }
@@ -334,7 +334,7 @@ export class Game {
       text += ` · ${hitTank.spec.short} ${hitInfo.part} ${hitInfo.face} · ${Math.round(dist)} m`;
     }
     if (p.reloadLeft > 0) state += ' reloading';
-    if (this.lock) state += ' locked';
+    if (this.lock || this.assist.target) state += ' locked';
     hud.setReticle(sx, sy, radPx, state, text);
   }
   updateCamera(dt) {
@@ -357,7 +357,13 @@ export class Game {
     } else {
       const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2; const pos = this.camPosFor(dir, false, m);
       const pullIn = pos.distanceTo(focus) < this.camera.position.distanceTo(focus);
-      this.camera.position.lerp(pos, !this._camInit || !sameFollow || this._wasSn || pullIn ? 1 : smoothingAlpha(14, dt)); this._camInit = true; c.fov = 60; this.camera.fov = 60;
+      this.camera.position.lerp(pos, !this._camInit || !sameFollow || this._wasSn || pullIn || this.assist.target ? 1 : smoothingAlpha(14, dt));
+      this._camInit = true;
+      const targetFov = this.assist.target && !this.lock ? zoomFov(AIM_ASSIST.AUTO_ZOOM) : 60;
+      if (this._wasSn) c.fov = 60;
+      c.fov += (targetFov - c.fov) * smoothingAlpha(24, dt);
+      if (Math.abs(targetFov - c.fov) < 0.02) c.fov = targetFov;
+      this.camera.fov = c.fov;
     }
     this._wasSn = sn;
     this.camera.updateProjectionMatrix();
@@ -415,9 +421,15 @@ export class Game {
         if (t.pos.distanceToSquared(this.camera.position) < 120 * 120) this.effects.exhaust(t.model.root.localToWorld(new THREE.Vector3(0.6, d.hullH + 0.2, -d.L * 0.47)), Math.abs(t.input.throttle));
       }
     }
-    this.assist.preCamera();
+    this.assist.preCamera(dt);
     this.updateCamera(dt);
-    this.computeAim(); this.assist.postAim(dt);
+    this.computeAim();
+    if (this.assist.postAim()) {
+      // Acquire, track and begin magnifying in the very frame the outline appears.
+      this.assist.preCamera(0);
+      this.updateCamera(dt);
+      this.computeAim();
+    }
     this.updateReticle();
     this.armorView.update();
     // player bush ghosting
