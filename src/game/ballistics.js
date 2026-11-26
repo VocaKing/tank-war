@@ -171,6 +171,7 @@ export class Ballistics {
       const top = (t.armorProfile || t.spec.armor).hull.top[0]; const dmg = s.spec.damage * 0.25 * (1 - Math.max(0, d) / R) * clamp(1 - top / (s.spec.caliber * 0.8), 0, 1);
       if (dmg > 1) { t.damage(dmg, s.owner, 'he'); if (t.spec.openTop) t.suppressedFor = Math.max(t.suppressedFor || 0, 1.4); if (s.owner?.isPlayer) g.hud.hitMarker('splash', Math.round(dmg)); if (t.isPlayer) g.hud.damageFrom(s.owner, Math.round(dmg)); }
       if (d < R * 0.5 && g.rng.next() < 0.35 && t.alive) {
+        g.resetControlContribution?.(t);
         const x = _blastLocal.copy(p).applyMatrix4(t.inv).x;
         t.breakTracks(Math.abs(x) < t.spec.dims.trackW / 2 ? 0 : Math.sign(x));
       }
@@ -207,6 +208,7 @@ export class Ballistics {
     }
     // tank impact
     const shooter = s.owner; const toPlayer = tank.isPlayer, fromPlayer = shooter && shooter.isPlayer;
+    if (tank.alive) g.resetControlContribution?.(tank);
     if (s.noDamage) { g.effects.sparks(p, 12); return true; }
     if (shooter && tank.alive && shooter.team !== tank.team) shooter.stats.hits++;
     if (hit.wheel) {

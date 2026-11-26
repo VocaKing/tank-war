@@ -538,6 +538,7 @@ export class Tank {
   }
   damage(amount, attacker, cause) {
     if (!this.alive || amount <= 0) return;
+    this.game.resetControlContribution?.(this);
     amount = Math.min(amount, this.hp); this.hp -= amount; this.stats.received += amount; this.lastDamagedAt = this.game.time;
     if (cause !== 'fire') this.game.hud?.recordDamage(this, amount);
     if (attacker && attacker !== this && attacker.team !== this.team) { attacker.stats.damage += amount; this.lastAttacker = attacker; }
@@ -545,6 +546,7 @@ export class Tank {
   }
   destroy(attacker, cause = 'destroyed') {
     if (!this.alive) return;
+    this.game.resetControlContribution?.(this);
     this.alive = false; this.hp = 0; this.burning = 0;
     const g = this.game; burnModel(this.model);
     if (cause === 'ammo') g.hud?.recordModuleLoss(this, '弹药架殉爆');

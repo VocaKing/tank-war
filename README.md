@@ -1,5 +1,5 @@
 # Steel Front — 3D Tank War (v4)
-Browser 3D tank battle (Three.js r170 + Vite). 27 vehicles in 4 tiers, 3 real-scale maps
+Browser 3D tank battle (Three.js r170 + Vite). 47 vehicles in 4 tiers, 3 real-scale maps
 (1.2 × 1.2 km playable, 1.4 km terrain), 7v7 team battle vs NPCs with base capture, bush concealment, tier matchmaking
 (mirrored lineups), graphics presets High/Medium/Low.
 - Dev: `npm install && npm run dev` · Build: `npm run build` (output in dist/) · Preview: `npm run preview`
@@ -30,3 +30,6 @@ Open the balance editor from the garage. Saved changes update the garage preview
 
 ## Mobile touch mode
 Mobile browsers automatically use touch controls and a responsive garage. Use landscape for battle, left joystick to drive, drag the battlefield to aim, and hold Fire to shoot. Scope, zoom, armor, lock, special ability, ammo, equipment, scoreboard and pause are available as touch actions. Force mobile mode via `?mobile=1`. The garage includes fullscreen 3D inspection and the balance editor. Low graphics is the initial mobile preset. Desktop settings remain available.
+
+## Central control point C
+C has a 25 m radius on all three maps. Solo capture takes 240 seconds (previously 150); original diminishing returns apply to additional tanks. Each vehicle keeps independent credit only while inside: leaving, death, damage or a direct shell hit resets that vehicle's entire contribution. Opposing occupants pause capture. A team wins at 100% total valid contribution. The C HUD displays personal contribution and estimated time. The two home bases retain their original rules.

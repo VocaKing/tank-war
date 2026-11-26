@@ -1,3 +1,4 @@
+import { insideControl, personalControlPercent, SOLO_CONTROL_CAPTURE_SECONDS, contributionRate } from '../game/controlCapture.js';
 // In-game HUD (DOM overlay)
 import * as THREE from 'three';
 import { ITEM_SLOTS } from '../game/items.js';
@@ -176,7 +177,11 @@ export class HUD {
     const label = this.$('h-control');
     const style = 'control-status' + (side ? ' ' + side : '');
     if (label.className !== style) label.className = style;
-    setText(this.$('h-control-text'), `据点 C · ${status} · ${Math.floor(control.points)}% · ${distance} m`);
+    const own = insideControl(G.player,G.world.controlPoint) ? ' · 个人 ' + personalControlPercent(control,G.player).toFixed(1) + '%' : '';
+    const count = control.team === null ? 0 : control.counts[control.team];
+    const speed = Array.from({length:count},(_,i)=>contributionRate(i)).reduce((a,b)=>a+b,0);
+    const eta = speed && !control.contested && control.points < 100 ? ' · ' + Math.ceil((100-control.points)/100*SOLO_CONTROL_CAPTURE_SECONDS/speed) + 's' : '';
+    setText(this.$('h-control-text'), `据点 C · ${status} · ${(Math.floor(control.points*10)/10).toFixed(1)}% · ${distance} m` + own + eta);
     this.$('h-control-progress').style.width = control.points + '%';
     const v = this.markerPosition.copy(point).project(camera);
     const marker = this.$('h-control-marker');

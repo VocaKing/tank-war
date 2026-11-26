@@ -22,6 +22,7 @@ import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, projectedSpreadRadius } from './combatMath.js';
+import { createControl, updateControl, resetControlCredit } from './controlCapture.js';
 function withinPathXZ(p, origin, dx, dz, radius) {
   const x = p.x - origin.x, z = p.z - origin.z;
   const lengthSquared = dx * dx + dz * dz;
@@ -33,9 +34,6 @@ function withinPathXZ(p, origin, dx, dz, radius) {
 const ALLY_NAMES = ['Sgt. Miller', 'Cpl. Novak', 'Lt. Hayes', 'Sgt. Dubois', 'Pvt. Kowalski', 'Cpt. Reyes', 'Sgt. Okafor', 'Lt. Varga'];
 const ENEMY_NAMES = ['Lt. Weber', 'Sgt. Volkov', 'Cpt. Brandt', 'Sgt. Petrov', 'Uffz. Krüger', 'Lt. Orlov', 'Sgt. Haas', 'Cpl. Zaitsev'];
 
-const SOLO_CONTROL_CAPTURE_SECONDS = 150;
-const CONTROL_CONTRIBUTION_STEP = 20;
-const MIN_CONTROL_CONTRIBUTION = 20;
 
 export class Game {
   static ZOOMS = [2, 4, 8, 16];
@@ -48,7 +46,7 @@ export class Game {
     this.effects = new Effects(this.scene, renderer, opts.mapId === 'desert' ? [0.78, 0.68, 0.52] : opts.mapId === 'forest' ? [0.45, 0.42, 0.36] : [0.58, 0.54, 0.46], this.quality);
     this.ballistics = new Ballistics(this); this.spotting = new Spotting(this); this.nav = new NavGrid(this.world);
     this.capture = [{ points: 0 }, { points: 0 }]; this.smokes = [];
-    this.control = { team: null, points: 0, contested: false, occupied: false };
+    this.control = createControl();
     this.tanks = []; this.ai = [];
     this.spawnTeams(opts.tankId);
     this.player = this.tanks[0];
@@ -282,7 +280,7 @@ export class Game {
     const a0 = this.tanks.some((t) => t.team === 0 && t.alive), a1 = this.tanks.some((t) => t.team === 1 && t.alive);
     if (!a1) this.end('win', 'All enemy tanks destroyed.'); else if (!a0) this.end('lose', 'Your platoon was wiped out.');
     else if (this.capture[1].points >= 100) this.end('win', 'Enemy base captured!'); else if (this.capture[0].points >= 100) this.end('lose', 'The enemy captured your base.');
-    else if (this.control.points >= 100) {
+    else if (!this.control.contested && this.control.points >= 100) {
       const won = this.control.team === this.player.team;
       this.end(won ? 'win' : 'lose', won ? '我方占领据点 C' : '敌方占领据点 C');
     }
@@ -315,6 +313,12 @@ export class Game {
     }
     if (this.mouseDown || this.touch?.firing) p.tryFire(this.time);
   }
+  resetControlContribution(tank) {
+    if (this.ended) return;
+    const previous = this.control.team;
+    resetControlCredit(this.control, tank, this.time);
+    if (this.control.team !== previous) this.world.setControlTeam(this.control.team);
+  }
   updateCapture(dt) {
     for (let i = 0; i < 2; i++) {
       const b = this.world.bases[i]; const cap = this.capture[i];
@@ -326,35 +330,9 @@ export class Game {
       } else if (!att.length) cap.points = Math.max(0, cap.points - dt * 6);
     }
     if (this.ended) return;
-    const point = this.world.controlPoint, control = this.control;
-    let allies = 0, enemies = 0;
-    for (const tank of this.tanks) {
-      if (!tank.alive || tank.airborne || tank.afloat) continue;
-      const dx = tank.pos.x - point.x, dz = tank.pos.z - point.z;
-      if (dx * dx + dz * dz > point.r * point.r) continue;
-      if (tank.team === 0) allies++;
-      else enemies++;
-    }
-    control.contested = allies > 0 && enemies > 0;
-    control.occupied = allies + enemies > 0;
-    if (control.contested) return;
-    const previousTeam = control.team;
-    if (control.occupied) {
-      const signed = control.team === 1 ? -control.points : control.points;
-      let totalContribution = 0;
-      for (let i = 0; i < allies + enemies; i++) {
-        totalContribution += Math.max(MIN_CONTROL_CONTRIBUTION, 100 - CONTROL_CONTRIBUTION_STEP * i);
-      }
-      // Unopposed vehicles first reverse enemy progress, then secure the point.
-      const direction = allies > 0 ? 1 : -1;
-      const next = clamp(signed + direction * totalContribution * dt / SOLO_CONTROL_CAPTURE_SECONDS, -100, 100);
-      control.points = Math.abs(next);
-      control.team = next > 0 ? 0 : next < 0 ? 1 : null;
-    } else {
-      control.points = Math.max(0, control.points - 4 * dt);
-      if (!control.points) control.team = null;
-    }
-    if (control.team !== previousTeam) this.world.setControlTeam(control.team);
+    const previousTeam = this.control.team;
+    updateControl(this.control, this.world.controlPoint, this.tanks, dt, this.time);
+    if (this.control.team !== previousTeam) this.world.setControlTeam(this.control.team);
   }
   traceAim(origin, direction, tanksOnly = false) {
     const range = 2000;

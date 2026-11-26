@@ -6,15 +6,22 @@ const vite = await createServer({ appType: 'custom', server: { middlewareMode: t
 try {
   const { Game } = await vite.ssrLoadModule('/src/game/game.js');
   const { World } = await vite.ssrLoadModule('/src/world/world.js');
+  const { createControl, CONTROL_RADIUS, SOLO_CONTROL_CAPTURE_SECONDS, contributionRate } = await vite.ssrLoadModule('/src/game/controlCapture.js');
+  const { TANKS } = await vite.ssrLoadModule('/src/game/tankData.js');
+  const { MAPS } = await vite.ssrLoadModule('/src/world/maps.js');
+  assert.equal(TANKS.length,47,'Full production roster must not regress');
+  assert.equal(new Set(TANKS.map(t=>t.id)).size,47);
+  for (const id of ['t14','strv103','fv4005s1','m50ontos','centauro2','sprutsd','archer','bmpt','2s38','xm8ags','mauseng','pzh2000','aegis140']) assert.ok(TANKS.some(t=>t.id===id),id+' missing');
+  assert.ok(MAPS.every(m=>m.controlPoint.r===CONTROL_RADIUS));
 
   const vehicle = (team = 0) => ({ team, pos: { x: 0, z: 0 }, alive: true, lastDamagedAt: -100 });
   function battlefield(tanks) {
     return Object.assign(Object.create(Game.prototype), {
       tanks, time: 0, ended: false, capture: [{ points: 0 }, { points: 0 }],
-      control: { team: null, points: 0, occupied: false, contested: false },
+      control: createControl(),
       world: {
         bases: [{ x: -200, z: 0, r: 35 }, { x: 200, z: 0, r: 35 }],
-        controlPoint: { x: 0, z: 0, r: 38 },
+        controlPoint: { x: 0, z: 0, r: CONTROL_RADIUS },
         setControlTeam(team) { this.markerTeam = team; },
       },
     });
@@ -23,7 +30,7 @@ try {
   for (const [index, strength] of [1, 1.8, 2.4, 2.8, 3, 3.2, 3.4].entries()) {
     for (const team of [0, 1]) {
       const game = battlefield(Array.from({ length: index + 1 }, () => vehicle(team)));
-      const time = 150 / strength;
+      const time = SOLO_CONTROL_CAPTURE_SECONDS / strength;
       const ticks = Math.floor((time - 0.001) / dt);
       for (let i = 0; i < ticks; i++) game.updateCapture(dt);
       assert.ok(game.control.points < 100, 'the point must not be taken early');
@@ -40,19 +47,25 @@ try {
     ally, { ...vehicle(), airborne: true }, { ...vehicle(), afloat: true }, { ...vehicle(), alive: false },
   ]);
   game.updateCapture(30);
-  assert.equal(game.control.points, 20, 'only the grounded, living occupant contributes');
+  assert.equal(game.control.points, 12.5, 'only the grounded, living occupant contributes');
   game.tanks.push(enemy);
   game.updateCapture(30);
   assert.equal(game.control.contested, true);
-  assert.equal(game.control.points, 20, 'opposing tanks pause capture');
+  assert.equal(game.control.points, 12.5, 'opposing tanks pause capture');
   ally.pos.x = 50;
   game.updateCapture(45);
   assert.equal(game.control.team, 1);
-  assert.equal(game.control.points, 10, 'the enemy first clears the old progress');
+  assert.equal(game.control.points, 18.75, 'departed enemy credit is removed and new occupants accumulate from zero');
   enemy.pos.x = 50;
   game.updateCapture(2.5);
   assert.equal(game.control.team, null);
-  assert.equal(game.control.points, 0, 'the empty point returns to neutral');
+  assert.equal(game.control.points, 0, 'the empty point immediately returns to neutral');
+  const a = vehicle(), b = vehicle(), reset = battlefield([a,b]);
+  reset.updateCapture(60); assert.equal(reset.control.points,45);
+  reset.resetControlContribution(a); assert.equal(reset.control.points,20);
+  reset.time += 1; reset.updateCapture(24); assert.ok(Math.abs(reset.control.points-38)<1e-8);
+  a.pos.x=CONTROL_RADIUS; reset.updateCapture(1); assert.ok(!reset.control.contributions.has(a));
+  b.pos.x=CONTROL_RADIUS; reset.updateCapture(1); assert.equal(reset.control.points,0);
 
   const world = Object.assign(Object.create(World.prototype), {
     sun: new THREE.DirectionalLight(),
@@ -89,7 +102,7 @@ try {
   root.position.x += 1;
   assert.equal(refresh(9 * dt), false, 'a vehicle outside the shadow map does not trigger an extra refresh');
 
-  console.log('Verified diminishing control-point capture and motion-aware vehicle shadows.');
+  console.log('Verified full roster, independent control-point capture and motion-aware vehicle shadows.');
 } finally {
   await vite.close();
 }
