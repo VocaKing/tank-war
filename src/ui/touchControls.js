@@ -42,7 +42,7 @@ export class TouchControls {
    if(a==='score'){this.clear();const board=game.hud.$('h-board');const open=board.style.display!=='flex';game.hud.scoreboard(open);if(open){const box=board.querySelector('.box');if(box){const close=document.createElement('button');close.textContent='关闭战况';close.type='button';close.onpointerdown=e=>{e.preventDefault();e.stopPropagation();game.hud.scoreboard(false);};close.onclick=()=>game.hud.scoreboard(false);box.append(close);}}return;}
    if(!ready())return;
    if(a==='scope')game.toggleSniper();
-   if(a==='zoom'){if(!game.cam.sniper)game.toggleSniper();else {const z=game.constructor.ZOOMS;game.cam.zoom=z[(z.indexOf(game.cam.zoom)+1)%z.length];}}
+   if(a==='zoom'){if(!game.cam.sniper)game.toggleSniper();else game.stepScopeZoom(1,true);}
    if(a==='armor')game.armorView.toggle();
    if(a==='lock')game.toggleLock();
    if(a==='ability')p.tryAbility();

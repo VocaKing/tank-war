@@ -76,7 +76,7 @@ export class HUD {
         <div id="h-veh-info"></div></div>
       <div class="combat-deck"><div class="status" id="h-status"></div><div class="panel items" id="h-items"></div><div class="panel ammo" id="h-ammo"></div></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · aim assist: hold the crosshair on an enemy to soft-lock, pull away to break<br>G vehicle ability · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · Move the crosshair onto another enemy to switch targets<br>G vehicle ability · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
@@ -374,8 +374,7 @@ export class HUD {
     // aim-assist lock marker (just under the crosshair centre)
     const A = G.assist; const ah = this.$('h-assist'); let aTxt = '', aCls = 'assist';
     if (p.alive && G.lock) { aTxt = 'GUN LOCK · ' + G.lock.spec.short; aCls += ' gun'; }
-    else if (p.alive && A.target) { aTxt = '◆ LOCK · ' + A.target.spec.short + (A.offPx() > 4 ? ` <small>${Math.round(A.offPx() / 110 * 100)}%</small>` : ''); aCls += ' on'; }
-    else if (p.alive && !A.enabled) { aTxt = ''; }
+    else if (p.alive && A.target) { aTxt = '◆ LOCK · ' + A.target.spec.short; aCls += ' on'; }
     if (ah._t !== aTxt) { ah.innerHTML = aTxt; ah._t = aTxt; } if (ah.className !== aCls) ah.className = aCls; ah.style.display = aTxt ? 'block' : 'none';
     const av = G.armorView; const avh = this.$('h-av');
     const avTxt = G.cam.sniper ? (av.enabled ? `<b>ARMOR VIEW ON</b> [X]<br><small>${G.player.shell.name}</small> <span class="lg g">will pen</span><span class="lg y">may pen</span><span class="lg r">no pen / ricochet</span><span class="lg n">no armor</span>` : '<b>ARMOR VIEW OFF</b><br>press [X] to show penetration zones') : '';
