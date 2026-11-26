@@ -5,6 +5,7 @@ import { Game } from './game/game.js';
 import { Audio } from './game/audio.js';
 import { setMaxAniso } from './world/textures.js';
 import { isMobile } from './ui/touchControls.js';
+import { FramePacing } from './render/framePacing.js';
 import './ui/mobile.css';
 
 const canvas = document.getElementById('gl'); const ui = document.getElementById('ui');
@@ -17,13 +18,14 @@ catch(e) {
   document.getElementById('fallback-balance').onclick=()=>import('./ui/balanceEditor.js');
   throw e;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 0.85 : params.get('q') === 'low' ? 1 : 1.5));
+const maxRatio = (quality) => Math.min(devicePixelRatio, mobile ? 0.85 : quality === 'low' ? 1 : quality === 'medium' ? 1.25 : 1.5);
+renderer.setPixelRatio(maxRatio(params.get('q') || 'high'));
 renderer.setSize(innerWidth, innerHeight); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.9; renderer.outputColorSpace = THREE.SRGBColorSpace;
 setMaxAniso(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
 const audio = new Audio();
 const garage = new Garage(renderer); garage.resize(innerWidth, innerHeight);
-let game = null; let mode = 'menu';
+let game = null; let mode = 'menu'; let pacing = null, warmup = 0;
 const loading = document.createElement('div'); loading.className = 'loading'; loading.innerHTML = '<div><h2>Generating battlefield…</h2><p>Sculpting 1.4 km of terrain, planting forests, building villages</p><div class="spin"></div></div>'; ui.appendChild(loading);
 const menu = new Menu(ui, garage, start, openBalance);
 if (mobile) { if (!localStorage.getItem('tw_mobile_q_init')) { menu.quality='low'; menu.root.querySelector('#m-q').value='low'; localStorage.setItem('tw_q','low'); localStorage.setItem('tw_mobile_q_init','1'); } const hint=document.createElement('div');hint.className='mobile-garage-hint';hint.textContent='手机版 v2 · 滑动查看全部功能 · 战斗建议横屏';menu.root.prepend(hint);
@@ -43,8 +45,10 @@ function start(opts, gesture = true) {
   menu.show(false); loading.style.display = 'flex'; mode = 'loading';
   setTimeout(() => {
     try {
-      game = new Game(renderer, ui, audio, { ...opts, seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; mode = 'menu'; menu.show(true); } });
-      window.__game = game; renderer.render(game.scene, game.camera);
+      renderer.setPixelRatio(maxRatio(opts.quality));
+      pacing = new FramePacing(renderer.getPixelRatio(), mobile ? 0.55 : 0.7); warmup = 3;
+      game = new Game(renderer, ui, audio, { ...opts, seed: params.get('seed') ? +params.get('seed') : undefined, onExit: () => { game = null; pacing = null; renderer.setPixelRatio(maxRatio(menu.quality)); mode = 'menu'; menu.show(true); } });
+      window.__game = game;
       if (game.world.exposure) renderer.toneMappingExposure = game.world.exposure; else if (game.world.def.exposure) renderer.toneMappingExposure = game.world.def.exposure * 1.5;
       mode = 'game';
     } catch (e) { console.error(e); loading.innerHTML = '<div><h2>Failed to start</h2><pre>' + (e.stack || e) + '</pre></div>'; return; }
@@ -53,13 +57,27 @@ function start(opts, gesture = true) {
 }
 window.__start = start; window.__menu = menu;
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); garage.resize(innerWidth, innerHeight); });
-let last = performance.now(); let fpsAcc = 0, fpsN = 0; window.__fps = 0;
-function loop() {
-  requestAnimationFrame(loop); const now = performance.now(); const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  fpsAcc += dt; fpsN++; if (fpsAcc > 1) { window.__fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
+let last = null, fpsAcc = 0, fpsN = 0; window.__fps = 0;
+addEventListener('visibilitychange', () => { last = null; pacing?.resetWindow(); if (pacing) pacing.goodWindows = 0; });
+function loop(now) {
+  requestAnimationFrame(loop);
+  const realDt = last === null ? 1 / 60 : Math.max(0, (now - last) / 1000); last = now;
+  if (document.hidden) return;
+  const dt = Math.min(0.1, realDt);
+  fpsAcc += realDt; fpsN++; if (fpsAcc > 1) { window.__fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
   if (mode === 'menu') { renderer.toneMappingExposure = 0.9; garage.render(dt); }
-  else if (mode === 'game' && game) { if (game.debugPaused) game.updateCamera(1 / 60); else game.update(dt); game.render(); }
+  else if (mode === 'game' && game) {
+    if (!game.paused && !game.debugPaused && pacing && params.get('adaptive') !== '0') {
+      warmup -= dt;
+      if (warmup <= 0) {
+        const ratio = pacing.sample(realDt);
+        if (ratio !== null) { renderer.setPixelRatio(ratio); game.resize(); }
+      }
+    }
+    if (game.debugPaused) game.updateCamera(dt); else game.update(dt);
+    game.render();
+  }
 }
-loop();
+requestAnimationFrame(loop);
 window.__ready = true;
 if (params.get('autostart')) start({ tankId: params.get('tank') || 'sherman', mapId: params.get('map') || 'village', quality: params.get('q') || (mobile?'low':'high'), loadout: params.get('loadout') ? params.get('loadout').split(',').map(Number) : undefined, items: params.get('items') ? params.get('items').split(',') : undefined, aimAssist: params.get('aa') !== '0' && localStorage.getItem('tw_aa') !== '0' }, false);

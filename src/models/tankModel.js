@@ -685,6 +685,8 @@ function updateLinks(model) {
 }
 // distL / distR: distance travelled by each track this frame (m)
 export function updateRunningGear(model, distL, distR) {
+  if (model._gearInitialized && distL === 0 && distR === 0) return;
+  model._gearInitialized = true;
   const tp = model.pitch || 0.17; model.trackOffset[0] -= distL / tp; model.trackOffset[1] -= distR / tp;
   model.trackTex[0].offset.x = model.trackOffset[0]; model.trackTex[1].offset.x = model.trackOffset[1];
   model.spinL = (model.spinL || 0) + distL; model.spinR = (model.spinR || 0) + distR;

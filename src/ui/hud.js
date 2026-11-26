@@ -192,9 +192,13 @@ export class HUD {
   }
   update(dt, camera) {
     const G = this.g, p = G.player;
-    const alive = (team) => G.tanks.filter((t) => t.team === team && t.alive).length; const tot = (team) => G.tanks.filter((t) => t.team === team).length;
-    const pips = (team, cls) => G.tanks.filter((t) => t.team === team).map((t) => `<i class="${t.alive ? cls : 'dead'}" title="${t.name}"></i>`).join('');
-    this.$('h-ally').innerHTML = `<b>${alive(0)}</b>${pips(0, 'a')}`; this.$('h-enemy').innerHTML = `${pips(1, 'e')}<b>${alive(1)}</b>`; void tot;
+    const aliveKey = G.tanks.map(t => t.alive ? '1' : '0').join('');
+    if (this._aliveKey !== aliveKey) {
+      this._aliveKey = aliveKey;
+      const alive = (team) => G.tanks.filter((t) => t.team === team && t.alive).length;
+      const pips = (team, cls) => G.tanks.filter((t) => t.team === team).map((t) => `<i class="${t.alive ? cls : 'dead'}" title="${t.name}"></i>`).join('');
+      this.$('h-ally').innerHTML = `<b>${alive(0)}</b>${pips(0, 'a')}`; this.$('h-enemy').innerHTML = `${pips(1, 'e')}<b>${alive(1)}</b>`;
+    }
     const tl = Math.max(0, G.timeLimit - G.time); this.$('h-timer').textContent = `${Math.floor(tl / 60)}:${String(Math.floor(tl % 60)).padStart(2, '0')}`;
     for (let i = 0; i < 2; i++) {
       const cap = G.capture[i];

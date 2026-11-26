@@ -20,6 +20,7 @@ import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, dispersionPixels } from './combatMath.js';
 import { createCaptureState, resetCaptureContribution, updateCaptureState } from './capture.js';
+import { simulationSteps, smoothingAlpha } from '../render/framePacing.js';
 const _sd = new THREE.Vector3(), _sd2 = new THREE.Vector3();
 function _segDist(p, a, b) { _sd.subVectors(b, a); const l2 = _sd.lengthSq(); const t = l2 > 0 ? Math.max(0, Math.min(1, _sd2.subVectors(p, a).dot(_sd) / l2)) : 0; return _sd2.copy(a).addScaledVector(_sd, t).distanceTo(p); }
 
@@ -337,18 +338,26 @@ export class Game {
     hud.setReticle(sx, sy, radPx, state, text);
   }
   updateCamera(dt) {
-    if (this.camOverride) { const o = this.camOverride; this.camera.position.set(o[0], o[1], o[2]); this.camera.fov = o[6] || 60; this.camera.updateProjectionMatrix(); this.camera.lookAt(o[3], o[4], o[5]); this.camera.updateMatrixWorld(); this.effects.setScale(innerHeight, this.camera.fov); for (const t of this.tanks) t.model.root.visible = t.team === 0 || !t.alive || t.spotted[0]; this.updateLOD(); return; }
+    if (this.camOverride) { this._camAnchor = null; this._camInit = false; const o = this.camOverride; this.camera.position.set(o[0], o[1], o[2]); this.camera.fov = o[6] || 60; this.camera.updateProjectionMatrix(); this.camera.lookAt(o[3], o[4], o[5]); this.camera.updateMatrixWorld(); this.effects.setScale(innerHeight, this.camera.fov); for (const t of this.tanks) t.model.root.visible = t.team === 0 || !t.alive || t.spotted[0]; this.updateLOD(); return; }
     const c = this.cam; const f = c.follow && c.follow.alive ? c.follow : this.player.alive ? this.player : (this.tanks.find((t) => t.team === 0 && t.alive) || this.player); c.follow = f;
     const m = f.model; const T = this.world.terrain;
     const dir = new THREE.Vector3(Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), Math.cos(c.yaw) * Math.cos(c.pitch));
     const sn = c.sniper && f === this.player && f.alive;
     m.root.visible = !sn;
+    const anchor = this._camAnchor;
+    const sameFollow = anchor && this._camFollow === f && anchor.distanceToSquared(f.pos) < 625;
+    if (!sn && !this._wasSn && this._camInit && sameFollow) {
+      // Carry the camera with the hull's translation immediately; smooth only the relative offset.
+      this.camera.position.add(f.pos).sub(anchor);
+    }
+    if (!this._camAnchor) this._camAnchor = new THREE.Vector3();
+    this._camAnchor.copy(f.pos); this._camFollow = f;
     if (sn) {
-      this.camera.position.copy(this.camPosFor(dir, true, m)); c.fov += (zoomFov(c.zoom) - c.fov) * Math.min(1, dt * 12); if (!this._wasSn) c.fov = zoomFov(c.zoom); this.camera.fov = c.fov;
+      this.camera.position.copy(this.camPosFor(dir, true, m)); c.fov += (zoomFov(c.zoom) - c.fov) * smoothingAlpha(12, dt); if (!this._wasSn) c.fov = zoomFov(c.zoom); this.camera.fov = c.fov;
     } else {
       const focus = m.turret.getWorldPosition(new THREE.Vector3()); focus.y += 2.2; const pos = this.camPosFor(dir, false, m);
       const pullIn = pos.distanceTo(focus) < this.camera.position.distanceTo(focus);
-      this.camera.position.lerp(pos, Math.min(1, dt * (pullIn ? 30 : 10) + (this._camInit ? 0 : 1))); this._camInit = true; c.fov = 60; this.camera.fov = 60;
+      this.camera.position.lerp(pos, !this._camInit || !sameFollow || this._wasSn || pullIn ? 1 : smoothingAlpha(14, dt)); this._camInit = true; c.fov = 60; this.camera.fov = 60;
     }
     this._wasSn = sn;
     this.camera.updateProjectionMatrix();
@@ -360,30 +369,52 @@ export class Game {
   // running-gear LOD: individual track links + detailed wheels only when the tank covers enough screen
   updateLOD() {
     const cp = this.camera.position; const k = this.camera.fov / 60; const near = this.quality === 'low' ? 22 : this.quality === 'high' ? 60 : 40;
-    for (const t of this.tanks) { if (!t.model.links) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
+    for (const t of this.tanks) {
+      if (!t.model.links) continue;
+      const d = t.pos.distanceTo(cp) * k;
+      const threshold = near * (t.model.linksOn ? 1.15 : 0.90);
+      setTrackLOD(t.model, t.alive && t.model.root.visible && (t === this.cam.follow || d < threshold));
+    }
   }
   update(dt) {
     this.touch?.update();
     if (this.paused) return;
-    dt = Math.min(dt, 0.05); this.time += dt; setWindTime(this.time);
+    const steps = simulationSteps(dt);
+    if (!steps.length) return;
+    for (const step of steps) { this.simulateStep(step); if (this.ended) break; }
+    this.updatePresentation(steps.reduce((a, b) => a + b, 0));
+  }
+  simulateStep(dt) {
+    this.time += dt; setWindTime(this.time);
     this.updatePlayerInput();
     for (const ai of this.ai) if (!this.freezeAI) ai.update(dt);
     this.smokes = this.smokes.filter((c) => c.until > this.time);
-    for (const t of this.tanks) if (!t.isPlayer && t.alive && !this.freezeAI) this.npcItems(t);
+    for (const t of this.tanks) if (!t.isPlayer && t.alive && !this.freezeAI) this.npcItems(t, dt);
     for (const t of this.tanks) t.update(dt, this.time);
     this.resolveCollisions();
     for (const t of this.tanks) { if (t.alive) t.updateGround(dt); t.syncModel(); }
     this.ballistics.update(dt); this.spotting.update(dt, this.time);
     // render visibility: enemies only if spotted by our team
     for (const t of this.tanks) { if (t.team !== this.player.team && t.alive) t.model.root.visible = t.spotted[this.player.team]; }
-    // emitters (dust, exhaust)
-    for (const t of this.tanks) {
-      if (!t.alive) continue; const d = t.spec.dims; if (Math.abs(t.speed) > 1.5) { const back = t.model.root.localToWorld(new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * d.W * 0.4, 0.2, -d.L * 0.5)); this.effects.trackDust(back, t.speed, t.inWater); }
-      if (t.pos.distanceTo(this.camera.position) < 120) this.effects.exhaust(t.model.root.localToWorld(new THREE.Vector3(0.6, d.hullH + 0.2, -d.L * 0.47)), Math.abs(t.input.throttle));
-    }
-    for (let i = this.flying.length - 1; i >= 0; i--) { const f = this.flying[i]; f.t += dt; if (f.rest) continue; f.v.y -= 9.81 * dt; f.obj.position.addScaledVector(f.v, dt); f.obj.rotation.x += f.w.x * dt; f.obj.rotation.z += f.w.z * dt;
+     for (let i = this.flying.length - 1; i >= 0; i--) { const f = this.flying[i]; f.t += dt; if (f.rest) continue; f.v.y -= 9.81 * dt; f.obj.position.addScaledVector(f.v, dt); f.obj.rotation.x += f.w.x * dt; f.obj.rotation.z += f.w.z * dt;
       const gy = this.world.terrain.height(f.obj.position.x, f.obj.position.z); if (f.obj.position.y < gy && f.v.y < 0) { f.obj.position.y = gy; f.rest = true; } }
     this.updateCapture(dt); this.checkEnd();
+  }
+  updatePresentation(dt) {
+    // Particle emission is time-based, not proportional to the monitor refresh rate.
+    this._emitterTime = (this._emitterTime || 0) + dt;
+    if (this._emitterTime >= 1 / 30) {
+      this._emitterTime %= 1 / 30;
+      for (const t of this.tanks) {
+        if (!t.alive || t.pos.distanceToSquared(this.camera.position) > 250 * 250) continue;
+        const d = t.spec.dims;
+        if (Math.abs(t.speed) > 1.5) {
+          const back = t.model.root.localToWorld(new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * d.W * 0.4, 0.2, -d.L * 0.5));
+          this.effects.trackDust(back, t.speed, t.inWater);
+        }
+        if (t.pos.distanceToSquared(this.camera.position) < 120 * 120) this.effects.exhaust(t.model.root.localToWorld(new THREE.Vector3(0.6, d.hullH + 0.2, -d.L * 0.47)), Math.abs(t.input.throttle));
+      }
+    }
     this.assist.preCamera();
     this.updateCamera(dt);
     this.computeAim(); this.assist.postAim(dt);
@@ -408,9 +439,9 @@ export class Game {
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly
-  npcItems(t) {
+  npcItems(t, dt) {
     const E = t.equip; const tryUse = (id) => { const i = E.find(id); if (i >= 0 && E.slots[i].charges > 0 && E.slots[i].cd <= 0) return this.useItem(i, t); return false; };
-    t._itemT = (t._itemT || 0) - 1 / 30; if (t._itemT > 0) return; t._itemT = 0.8 + Math.random() * 0.8; // human-like reaction delay
+    t._itemT = (t._itemT || 0) - dt; if (t._itemT > 0) return; t._itemT = 0.8 + Math.random() * 0.8; // human-like reaction delay
     if (t.burning > 0 && tryUse('extinguisher')) return;
     if ((t.modules.tracks < 1 || (t.modules.engine < 1 && t.modules.gun < 1) || (t.modules.gun < 1 && this.time - t.lastDamagedAt < 20)) && tryUse('repair')) return;
     if (t.crew.some((c) => !c.alive) && tryUse('medkit')) return;

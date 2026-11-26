@@ -30,3 +30,6 @@ Mobile browsers automatically use touch controls and a responsive garage. Use la
 - Leaving the circle, being hit (including ricochets and non-penetrations), taking damage or being destroyed immediately erases only that tank's contribution. Re-entering or recovering from a hit starts from zero; teammates retain their valid credit.
 - Defenders in the circle pause accrual, but do not erase the credit of attackers who stay inside. Capture succeeds when the sum of current attackers' valid contributions reaches 100%. The HUD displays this sum, including any loss of credit.
 - Run `node tools_capture.mjs` for capture regression tests.
+
+## Motion smoothness
+The battle renderer now uses bounded simulation substeps, translation-locked chase camera, non-accumulating AO, shadow updates once per displayed frame, hysteresis for tank/vegetation LOD, and staged grass uploads. Adaptive rendering resolution reduces GPU load when frames are consistently slow without modifying tank speed or game rules. Use `?adaptive=0` to lock the selected preset's initial resolution for comparisons. The high preset retains bloom, AO and spatial anti-aliasing.

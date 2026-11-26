@@ -47,19 +47,43 @@ export class Grass {
       foliageShading(sh, 0.06, 0.6, 'vMapUv.y');
     };
     mat.customProgramCacheKey = () => 'grass5';
-    const max = Math.ceil((Math.PI * R * R) / (this.spacing * this.spacing) * 1.05);
+    this.bufferRadius = R + 16;
+    const max = Math.ceil((Math.PI * this.bufferRadius ** 2) / (this.spacing * this.spacing) * 1.05);
     this.mesh = new THREE.InstancedMesh(geo, mat, max); this.mesh.count = 0; this.mesh.frustumCulled = false; this.mesh.receiveShadow = true; this.mesh.castShadow = false;
     this.colors = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3); this.mesh.instanceColor = this.colors;
-    scene.add(this.mesh); this.last = null;
+    scene.add(this.mesh); this.last = null; this.pending = null;
+    this.matrixStaging = new Float32Array(max * 16); this.colorStaging = new Float32Array(max * 3);
   }
   update(camPos) {
     if (!this.mesh) return;
-    if (this.last && Math.hypot(camPos.x - this.last.x, camPos.z - this.last.z) < 5) return;
-    this.last = { x: camPos.x, z: camPos.z };
-    const t = this.t, mb = this.mb, p = this.p, s = this.spacing, R = this.radius; const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+    const jump = this.last && Math.hypot(camPos.x - this.last.x, camPos.z - this.last.z) > this.radius * 0.6;
+    const first = !this.last || jump;
+    if (first) this.pending = null;
+    if (!this.pending) {
+      if (!first && Math.hypot(camPos.x - this.last.x, camPos.z - this.last.z) < 6) return;
+      this.last = { x: camPos.x, z: camPos.z };
+      this.pending = this.buildRows(this.last);
+    }
+    // Keep the previous complete grass buffer visible while preparing the next one.
+    // A rolling time budget prevents a full grass rebuild from blocking a moving frame.
+    const start = performance.now();
+    for (let rows = 0; first || rows < 24; rows++) {
+      const step = this.pending.next();
+      if (step.done) {
+        this.mesh.instanceMatrix.array.set(this.matrixStaging.subarray(0, step.value * 16));
+        this.colors.array.set(this.colorStaging.subarray(0, step.value * 3));
+        this.mesh.count = step.value; this.mesh.instanceMatrix.needsUpdate = true; this.colors.needsUpdate = true;
+        this.pending = null; break;
+      }
+      if (!first && rows >= 3 && performance.now() - start > 1.5) break;
+    }
+  }
+  *buildRows(camPos) {
+    const t = this.t, mb = this.mb, p = this.p, s = this.spacing, R = this.bufferRadius; const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
     const i0 = Math.floor((camPos.x - R) / s), i1 = Math.ceil((camPos.x + R) / s), j0 = Math.floor((camPos.z - R) / s), j1 = Math.ceil((camPos.z + R) / s);
     let n = 0; const max = this.mesh.instanceMatrix.count; const c1 = p.col, c2 = p.col2;
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
       const h1 = hash(i, j); const x = (i + hash(j, i + 7)) * s, z = (j + hash(i + 3, j - 5)) * s;
       if ((x - camPos.x) ** 2 + (z - camPos.z) ** 2 > R * R) continue;
       const gi = t.x2i(x), gj = t.x2i(z); if (!t.inside(gi, gj)) continue; const k = t.idx(gi, gj);
@@ -67,11 +91,16 @@ export class Grass {
       if (t.occ[k] === OCC.ROAD || t.occ[k] === OCC.BUILDING || t.occ[k] === OCC.WATER) continue;
       const y = t.height(x, z); if (t.water[k] > -1e8 && y < t.water[k] + 0.1) continue;
       const hs = p.h * (0.6 + hash(i * 3, j * 7) * 0.9) * (0.7 + w * 0.5);
-      e.set(0, h1 * 6.28, 0); q.setFromEuler(e); m.compose(v.set(x, y - 0.05, z), q, sc.set(hs * 1.6, hs, hs * 1.6)); this.mesh.setMatrixAt(n, m);
-      const f = hash(i + 11, j + 13); this.colors.setXYZ(n, (c1[0] + (c2[0] - c1[0]) * f) / p.col[0], (c1[1] + (c2[1] - c1[1]) * f) / p.col[1], (c1[2] + (c2[2] - c1[2]) * f) / p.col[2]);
-      if (++n >= max) break;
+      e.set(0, h1 * 6.28, 0); q.setFromEuler(e); m.compose(v.set(x, y - 0.05, z), q, sc.set(hs * 1.6, hs, hs * 1.6)); m.toArray(this.matrixStaging, n * 16);
+      const f = hash(i + 11, j + 13), k3 = n * 3;
+      this.colorStaging[k3] = (c1[0] + (c2[0] - c1[0]) * f) / p.col[0];
+      this.colorStaging[k3 + 1] = (c1[1] + (c2[1] - c1[1]) * f) / p.col[1];
+      this.colorStaging[k3 + 2] = (c1[2] + (c2[2] - c1[2]) * f) / p.col[2];
+      if (++n >= max) return n;
+      }
+      yield;
     }
-    this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true; this.colors.needsUpdate = true;
+    return n;
   }
   dispose() { if (this.mesh) { this.mesh.geometry.dispose(); this.mesh.material.map.dispose(); this.mesh.material.dispose(); this.mesh.parent && this.mesh.parent.remove(this.mesh); } }
 }

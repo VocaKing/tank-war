@@ -26,6 +26,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node tools_capture.mjs
+      - run: node tools_frame_pacing.mjs
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
       - run: npm run build

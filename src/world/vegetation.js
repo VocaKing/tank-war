@@ -193,7 +193,8 @@ export class Vegetation {
   }
   updateLOD(camPos) {
     for (const ch of this.chunks.values()) {
-      const d = Math.hypot(ch.cx - camPos.x, ch.cz - camPos.z) - this.chunkSize * 0.7; const near = d < this.lodDist;
+      const d = Math.hypot(ch.cx - camPos.x, ch.cz - camPos.z) - this.chunkSize * 0.7; const near = d < this.lodDist * (ch.near === true ? 1.08 : ch.near === false ? 0.92 : 1);
+      if (ch.near === near) continue; ch.near = near;
       for (const pair of Object.values(ch.meshes)) { pair[0].visible = near; pair[1].visible = !near; }
     }
   }
