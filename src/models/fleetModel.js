@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
 import { makeTrackBelt } from './trackBelt.js';
+import { refineTankDestroyer } from './destroyerModels.js';
 
 const detailedExteriorIds = new Set([
   '2s38', 'archer', 'bmpt', 'centauro2', 'fv4005s1', 'm50ontos', 'sprutsd', 'strv103', 't14', 'xm8ags',
@@ -68,11 +69,12 @@ export function loadFleetModel(spec) {
       gunHullBoxes: spec.fixedGun ? [] : (root.userData.deckClearance || []),
     };
     root.userData.importedFleet = true;
+    refineTankDestroyer(root, spec, { body, turret, gun, barrel, muzzle });
     root.traverse(node => {
       if (!node.isMesh) return;
       node.castShadow = true;
       node.receiveShadow = true;
-      if (/paint|armor|armour/i.test(node.material.name)) node.userData.matKey = 'paint';
+      if (node.userData.matKey === undefined && /paint|armor|armour/i.test(node.material.name)) node.userData.matKey = 'paint';
       if (node.material.map) node.material.map.anisotropy = 8;
       if (node.material.normalMap) node.material.normalMap.anisotropy = 8;
     });
@@ -162,10 +164,12 @@ export function createFleetModel(spec, { battle = false } = {}) {
   const stabilizers = [];
   const wheels = [];
   const steerAxles = [];
+  const detailGroups = [];
   root.updateMatrixWorld(true);
   const tracks = template.tracks.map((layout, side) => trackInstance(root, side, layout));
   const meshes = [];
   root.traverse(node => {
+    if (node.userData.close_detail) detailGroups.push(node);
     if (node.isMesh) {
       meshes.push(node);
       const original = node.material;
@@ -202,6 +206,7 @@ export function createFleetModel(spec, { battle = false } = {}) {
     },
     setRunningGearNear(value) {
       near = value;
+      for (const detail of detailGroups) detail.visible = value;
       for (const [side, track] of tracks.entries()) {
         if (!track) continue;
         track.track.visible = value;

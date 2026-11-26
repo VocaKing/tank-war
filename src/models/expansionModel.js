@@ -4,6 +4,7 @@ import { hasExpansionModel, expansionGunClearance } from './expansionFallback.js
 import geometry from './expansionGeometry.json';
 import { MAX_RECOIL } from './gunClearance.js';
 import { makeTrackBelt } from './trackBelt.js';
+import { refineTankDestroyer } from './destroyerModels.js';
 
 const templates = new Map();
 const requests = new Map();
@@ -86,19 +87,20 @@ function prepare(scene, spec) {
   const root = find(scene, 'VEHICLE_ROOT');
   const body = find(root, 'HULL');
   const gun = find(body, 'GUN_PIVOT');
+  let turret;
   if (spec.casemate) {
     // This anchor drives aiming and the upper armor volume. The fighting
     // compartment itself stays attached to the hull.
     const traverse = find(body, 'GUN_TRAVERSE');
-    const pivot = new THREE.Group();
-    pivot.name = 'CASEMATE_ANCHOR';
-    pivot.position.set(0, spec.dims.hullH, spec.dims.turretZ);
-    body.add(pivot);
-    pivot.attach(gun);
+    turret = new THREE.Group();
+    turret.name = 'CASEMATE_ANCHOR';
+    turret.position.set(0, spec.dims.hullH, spec.dims.turretZ);
+    body.add(turret);
+    turret.attach(gun);
     traverse.removeFromParent();
-  } else find(body, 'TURRET_PIVOT');
-  find(gun, 'RECOIL_SLIDE');
-  find(gun, 'MUZZLE_SOCKET');
+  } else turret = find(body, 'TURRET_PIVOT');
+  const barrel = find(gun, 'RECOIL_SLIDE');
+  const muzzle = find(gun, 'MUZZLE_SOCKET');
   root.name = spec.id;
   root.userData.importedExpansion = true;
   const sight = new THREE.Object3D();
@@ -119,6 +121,7 @@ function prepare(scene, spec) {
     }
   }
   const tracks = sides.map(side => prepareSide(body, side, spec));
+  refineTankDestroyer(root, spec, { body, turret, gun, barrel, muzzle });
   return { root, tracks, clearance: expansionGunClearance(spec) };
 }
 
@@ -240,7 +243,7 @@ export function createExpansionModel(spec, near) {
   root.traverse(node => {
     if (node.userData.close_detail) { detailGroups.push(node); node.visible = near; }
     if (!node.isMesh) return;
-    if (/^(Armor|Fittings)/.test(node.material.name)) node.userData.matKey = 'paint';
+    if (node.userData.matKey === undefined && /^(Armor|Fittings)/.test(node.material.name)) node.userData.matKey = 'paint';
     node.castShadow = node.receiveShadow = true;
     meshes.push(node);
   });
