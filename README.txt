@@ -24,3 +24,6 @@ Defenders pause accrual; capture succeeds when valid credit from attackers still
 
 Aim assist: red outline means instant camera lock; automatic 1.4x third-person zoom.
 Small mouse movements are damped; flick or pull firmly to release. Manual scope zoom and E gun lock remain independent.
+
+Capture zones: 25 m radius on all maps. Follow the A/B minimap markers and colored ground rings.
+The top HUD displays current capture progress, attacker count, contested status and remaining time.
