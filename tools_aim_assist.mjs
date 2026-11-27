@@ -17,6 +17,7 @@ const game = {
   time: 0, viewportHeight: 600, player: { alive: true, team: 0 }, tanks: [b, a, ally],
   camera: { position: origin, fov: 32, getWorldDirection(out) { return out.copy(game.camDir()); } },
   cam: { yaw: 0, pitch: 0, sniper: true }, cursorPoint: new Vector3(),
+  world: { losBlocked() { return false; } }, smokeBlocks() { return false; }, traceCalls: 0,
   camDir(yaw = this.cam.yaw, pitch = this.cam.pitch) {
     return new Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
   },
