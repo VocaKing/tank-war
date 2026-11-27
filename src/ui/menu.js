@@ -48,7 +48,7 @@ export class Menu {
       <div class="stats" id="m-stats"></div>
       <div class="bottom">
         <div class="go"><label>Graphics <select id="m-q"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label><label class="aa-opt" title="Hold the crosshair on a spotted enemy to lock. Aim freely across its armor, drag past the edge to release, or move onto another enemy to switch targets."><input type="checkbox" id="m-aa"> Aim assist (target lock + red outline)</label>
-        <div class="mode">Team Battle · 7 vs 7 · Base capture · tier-matched</div><div class="losum" id="m-losum"></div><button class="tbl-btn lo-btn" id="m-lo-btn">Ammo &amp; equipment</button><button class="battle" id="m-battle">BATTLE!</button></div>
+        <div class="mode" id="m-match-mode">7 vs 7 · 分级匹配</div><div class="losum" id="m-losum"></div><button class="tbl-btn lo-btn" id="m-lo-btn">Ammo &amp; equipment</button><button class="battle" id="m-battle">BATTLE!</button></div>
       </div>
       <button class="mobile-deploy" id="m-mobile-deploy" aria-label="进入战斗">进入战斗 · BATTLE</button>
       <div class="overlay" id="m-tbl"></div><div class="overlay" id="m-lo"></div><div class="overlay" id="m-maps"></div>`;
@@ -114,6 +114,7 @@ export class Menu {
       b.setAttribute('aria-pressed', String(selected));
     });
     this.summary();
+    this.root.querySelector('#m-match-mode').textContent='7 vs 7 · Tier '+['I','II','III','IV'][t.tier-1]+' · 每队至少5辆同级车 · 相邻级最多2辆';
     const skills = skillDetails(t, this.mobile);
     if (this.mobile) {
       const panel = this.root.querySelector('#m-mobile-skills');

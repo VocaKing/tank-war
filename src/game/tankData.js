@@ -121,7 +121,7 @@ export const TANKS = [
   },
   // ---------------- v2 additions ----------------
   {
-    id: 'panther', tier: 2, cls: 'Medium', name: 'Panzerkampfwagen V Panther Ausf. G', short: 'Panther', nation: 'Germany', era: 'WWII', year: 1944,
+    id: 'panther', tier: 1, cls: 'Medium', name: 'Panzerkampfwagen V Panther Ausf. G', short: 'Panther', nation: 'Germany', era: 'WWII', year: 1944,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
     mass: 44.8, power: 700, maxSpeed: 36, reverseSpeed: 7, hullTraverse: 24, turretTraverse: 18, gunSpeed: 5,
     gunDepression: 8, gunElevation: 18, hp: 1150, viewRange: 400, reload: 7.0, aimTime: 2.3, dispersion: 0.65, maxDispersion: 1.57, stabilizer: 1.0,
@@ -182,7 +182,7 @@ export const TANKS = [
     desc: 'The first US heavy tank to see combat: 90 mm M3 gun, torsion-bar suspension and a thick cast turret. Underpowered but well balanced.',
   },
   {
-    id: 'centurion', tier: 3, cls: 'Medium', name: 'Centurion Mk 3', short: 'Centurion', nation: 'UK', era: 'Cold War', year: 1948,
+    id: 'centurion', tier: 2, cls: 'Medium', name: 'Centurion Mk 3', short: 'Centurion', nation: 'UK', era: 'Cold War', year: 1948,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 49, power: 650, maxSpeed: 30, reverseSpeed: 7, hullTraverse: 24, turretTraverse: 30, gunSpeed: 5,
     gunDepression: 10, gunElevation: 20, hp: 1350, viewRange: 410, reload: 6.0, aimTime: 2, dispersion: 0.64, maxDispersion: 1.55, stabilizer: 0.5,
@@ -384,7 +384,7 @@ export function penAtRange(shell, dist) {
 
 // Penetration RNG (uniform ±): a roll of pen × (1 ± PEN_RNG) is compared with effective armour.
 export const PEN_RNG = 0.08;
-export const TIER_NAMES = ['', 'Lights', 'Heavies', 'Mediums', 'Modern mediums'];
+export const TIER_NAMES = ['', 'Early armour · 早期装甲', 'Heavy / early Cold War · 重装与早期冷战', 'Transitional armour · 过渡装甲', 'Modern armour · 现代装甲'];
 // Effective armour model shared by hit resolution, AI, HUD and the armour-view shader.
 // part: 'hull'|'turret', face: 'front'|'side'|'rear'|'top'|'bottom', local: hit point in part space.
 export function armorZone(spec, part, face, local, mantlet = false) {

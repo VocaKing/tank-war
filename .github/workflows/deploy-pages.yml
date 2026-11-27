@@ -34,6 +34,7 @@ jobs:
       - run: node tools_balance.mjs
       - run: node tools_battlefield_timing.mjs
       - run: node tools_vehicle_skills.mjs
+      - run: node tools_matchmaking.mjs
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
       - run: npm run build

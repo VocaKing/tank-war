@@ -1,7 +1,7 @@
 // Dimensions match the Blender assets. Combat values are starting points for Steel Front's balance editor.
 export const EXPANSION_TANKS = [
   {
-    id: 'su100', tier: 2, cls: 'Tank Destroyer', name: 'SU-100', short: 'SU-100', nation: 'USSR', era: 'WWII', year: 1944,
+    id: 'su100', tier: 1, cls: 'Tank Destroyer', name: 'SU-100', short: 'SU-100', nation: 'USSR', era: 'WWII', year: 1944,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 31.6, power: 500, maxSpeed: 48, reverseSpeed: 8, hullTraverse: 36, turretTraverse: 0, gunSpeed: 7,
     gunDepression: 3, gunElevation: 20, hp: 1050, viewRange: 370, reload: 8.2, aimTime: 2.5, dispersion: 0.38, maxDispersion: 1.25, stabilizer: 1,
@@ -61,7 +61,7 @@ export const EXPANSION_TANKS = [
     desc: 'Heavy Soviet casemate with the original plain muzzle. A powerful shot, followed by a long reload.',
   },
   {
-    id: 'jagdtiger', tier: 3, cls: 'Tank Destroyer', name: 'Jagdtiger (Henschel)', short: 'Jagdtiger', nation: 'Germany', era: 'WWII', year: 1944,
+    id: 'jagdtiger', tier: 2, cls: 'Tank Destroyer', name: 'Jagdtiger (Henschel)', short: 'Jagdtiger', nation: 'Germany', era: 'WWII', year: 1944,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator', 'Assistant loader'], autoloader: false,
     mass: 71.7, power: 700, maxSpeed: 34, reverseSpeed: 9, hullTraverse: 22, turretTraverse: 0, gunSpeed: 5,
     gunDepression: 7, gunElevation: 15, hp: 1850, viewRange: 410, reload: 12.6, aimTime: 3.0, dispersion: 0.30, maxDispersion: 1.18, stabilizer: 1,
@@ -81,7 +81,7 @@ export const EXPANSION_TANKS = [
     desc: 'The heavy Henschel-suspension variant, with a tall armored casemate and a slow, hard-hitting gun.',
   },
   {
-    id: 'amxfoch', tier: 3, cls: 'Tank Destroyer', name: 'AMX 50 Foch (120 mm)', short: 'AMX 50 Foch', nation: 'France', era: 'Cold War', year: 1950,
+    id: 'amxfoch', tier: 2, cls: 'Tank Destroyer', name: 'AMX 50 Foch (120 mm)', short: 'AMX 50 Foch', nation: 'France', era: 'Cold War', year: 1950,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 50, power: 850, maxSpeed: 50, reverseSpeed: 16, hullTraverse: 33, turretTraverse: 0, gunSpeed: 7,
     gunDepression: 6, gunElevation: 18, hp: 1560, viewRange: 435, reload: 9.9, aimTime: 2.6, dispersion: 0.32, maxDispersion: 1.21, stabilizer: 1,

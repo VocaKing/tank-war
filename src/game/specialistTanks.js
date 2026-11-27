@@ -23,7 +23,7 @@ export const SPECIALIST_TANKS = [
     desc: 'Fictional super-heavy engineering variant with a full-width armored blade and limited field earthworks.',
   },
   {
-    id: 'm6a1', tier: 2, cls: 'Heavy', name: 'M6A1 Heavy Tank', short: 'M6A1', nation: 'USA', era: 'WWII', year: 1942,
+    id: 'm6a1', tier: 1, cls: 'Heavy', name: 'M6A1 Heavy Tank', short: 'M6A1', nation: 'USA', era: 'WWII', year: 1942,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Bow gunner', 'Radio operator'], autoloader: false,
     mass: 57, power: 825, maxSpeed: 34, reverseSpeed: 9, hullTraverse: 23, turretTraverse: 19, gunSpeed: 6,
     gunDepression: 8, gunElevation: 20, hp: 1500, viewRange: 380, reload: 8.8, aimTime: 2.5, dispersion: 0.79, maxDispersion: 1.74, stabilizer: 0.9,
@@ -68,7 +68,7 @@ export const SPECIALIST_TANKS = [
     desc: 'Fictional tracked scout with separate driving stations facing forward and aft, built to disengage without turning.',
   },
   {
-    id: 'at52', tier: 3, cls: 'Medium', name: 'AT-52 Tidewater', short: 'AT-52', nation: 'Prototype', era: 'Cold War', year: 1952,
+    id: 'at52', tier: 1, cls: 'Medium', name: 'AT-52 Tidewater', short: 'AT-52', nation: 'Prototype', era: 'Cold War', year: 1952,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 29, power: 575, maxSpeed: 48, reverseSpeed: 14, hullTraverse: 39, turretTraverse: 33, gunSpeed: 7,
     gunDepression: 7, gunElevation: 20, hp: 1200, viewRange: 420, reload: 7.8, aimTime: 2.3, dispersion: 0.70, maxDispersion: 1.61, stabilizer: 0.55,
@@ -133,7 +133,7 @@ export const SPECIALIST_TANKS = [
     desc: 'Turretless Swedish S-tank. The fixed 105 mm gun is aimed by pivoting the hull and pitching the entire vehicle with its hydropneumatic suspension.',
   },
   {
-    id: 'fv4005s1', tier: 3, cls: 'Tank Destroyer', name: 'FV4005 Stage I', short: 'FV4005 S1', nation: 'UK', era: 'Cold War', year: 1955,
+    id: 'fv4005s1', tier: 2, cls: 'Tank Destroyer', name: 'FV4005 Stage I', short: 'FV4005 S1', nation: 'UK', era: 'Cold War', year: 1955,
     crew: ['Commander', 'Gunner', 'Loader', 'Loader', 'Driver'], autoloader: false, openTop: true, fireArc: 38,
     mass: 50.8, power: 650, maxSpeed: 32, reverseSpeed: 8, hullTraverse: 18, turretTraverse: 12, gunSpeed: 2.8,
     gunDepression: 5, gunElevation: 10, hp: 1250, viewRange: 430, reload: 30, aimTime: 6.5, dispersion: 0.49, maxDispersion: 1.37, stabilizer: 0,
@@ -240,7 +240,7 @@ export const SPECIALIST_TANKS = [
     desc: 'Fully automated 8×8 wheeled artillery system. Protected crew cabin, rapid automatic firing-position deployment, three-round fire mission and automatic shoot-and-scoot packing cycle.',
   },
   {
-    id: 'bmpt', tier: 4, cls: 'Fire Support', name: 'BMPT Terminator', short: 'BMPT', nation: 'Russia', era: 'Modern', year: 2013,
+    id: 'bmpt', tier: 3, cls: 'Fire Support', name: 'BMPT Terminator', short: 'BMPT', nation: 'Russia', era: 'Modern', year: 2013,
     crew: ['Commander', 'Gunner', 'Driver', 'Gunner', 'Grenadier'], autoloader: true,
     mass: 48, power: 1000, maxSpeed: 65, reverseSpeed: 25, hullTraverse: 35, turretTraverse: 42, gunSpeed: 24,
     gunDepression: 5, gunElevation: 45, hp: 1450, viewRange: 500, reload: 4.5, aimTime: 1.8, dispersion: 0.72, maxDispersion: 1.67, stabilizer: 0.9,
@@ -262,7 +262,7 @@ export const SPECIALIST_TANKS = [
     desc: 'Tank-support combat vehicle with twin 30 mm autocannons, four ready anti-tank guided missiles and heavy modular protection. The autocannons fire controlled bursts.',
   },
   {
-    id: '2s38', tier: 4, cls: 'Air Defence', name: '2S38 Derivatsiya-PVO', short: '2S38', nation: 'Russia', era: 'Modern', year: 2024,
+    id: '2s38', tier: 3, cls: 'Air Defence', name: '2S38 Derivatsiya-PVO', short: '2S38', nation: 'Russia', era: 'Modern', year: 2024,
     crew: ['Commander', 'Gunner', 'Driver'], autoloader: true, scan: { cooldown: 20, maxTargets: 6, range: 900 }, burst: { shellIndices: [0, 1], count: 4, interval: 0.09, offsets: [[-0.18,0,0],[0.18,0,0]] },
     mass: 21.5, power: 500, maxSpeed: 70, reverseSpeed: 20, hullTraverse: 48, turretTraverse: 48, gunSpeed: 30,
     gunDepression: 5, gunElevation: 75, hp: 850, viewRange: 650, reload: 0.65, aimTime: 1.4, dispersion: 0.85, maxDispersion: 1.79, stabilizer: 0.85,

@@ -340,7 +340,7 @@ export class HUD {
     const tubeStatus=p.tubeReload ? '炮管 '+p.tubeReload.timers.filter(t=>t<=0).length+'/'+p.tubeReload.timers.length+' · '+s.multiTube.modes[p.weaponModeIndex].name : '';
     const movementStatus = p.afloat ? '浮航 · 主炮锁定' : [dozerStatus, specialStatus, kitStatus, tubeStatus].filter(Boolean).join(' · ');
     const trackStatus = mobilityStatus;
-    this.setPanelHtml('h-veh-name', `${s.short} <small>${s.nation} · ${s.era}</small>`);
+    this.setPanelHtml('h-veh-name', `${s.short} <small>Tier ${['I','II','III','IV'][s.tier-1]} · ${s.nation} · ${s.era}</small>`);
     this.setPanelHtml('h-veh-magazine', p.tubeReload ? p.tubeReload.timers.map((time,i)=>`<i title="炮管 ${i+1} · ${time>0?time.toFixed(1)+'s':'就绪'}" class="${time<=0?'on':''}"></i>`).join('') : ability.magazine ? Array.from({ length: ability.magazine.size }, (_, i) => `<i class="${i < ability.magLeft ? 'on' : ''}"></i>`).join('') : '');
     this.setPanelHtml('h-veh-info', `<div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       ${movementStatus ? `<div class="crew"><span>${movementStatus}</span></div>` : ''}
@@ -412,7 +412,7 @@ export class HUD {
   }
   scoreboard(show) {
     const b = this.$('h-board'); if (!show) { b.style.display = 'none'; return; }
-    const row = (t) => `<tr class="${t.alive ? '' : 'dead'} ${t.isPlayer ? 'me' : ''}"><td>${t.name}</td><td>${t.spec.short}</td><td>${Math.round(t.stats.damage)}</td><td>${t.stats.kills}</td><td>${t.alive ? Math.ceil(t.hp) : '✖'}</td></tr>`;
+    const row = (t) => `<tr class="${t.alive ? '' : 'dead'} ${t.isPlayer ? 'me' : ''}"><td>${t.name}</td><td>${['I','II','III','IV'][t.spec.tier-1]} · ${t.spec.short}</td><td>${Math.round(t.stats.damage)}</td><td>${t.stats.kills}</td><td>${t.alive ? Math.ceil(t.hp) : '✖'}</td></tr>`;
     const tbl = (team, title) => `<div><h3>${title}</h3><table><tr><th>Name</th><th>Tank</th><th>Damage</th><th>Kills</th><th>HP</th></tr>${this.g.tanks.filter((t) => t.team === team).map(row).join('')}</table></div>`;
     b.innerHTML = `<div class="box wide">${tbl(0, 'Allies')}${tbl(1, 'Enemies')}</div>`; b.style.display = 'flex';
   }

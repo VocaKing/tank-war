@@ -29,6 +29,7 @@ function vehicle(id,name,short,cls,config) {
 }
 export const CONCEPT_VEHICLES = [
   vehicle('aegis140','Aegis-140 Heavy MBT','Aegis-140','Heavy',{
+    tier:4,
     crew:['Commander','Gunner','Driver'],autoloader:true,
     mass:79,power:1600,maxSpeed:40,reverseSpeed:19,hullTraverse:28,turretTraverse:30,
     gunDepression:11,gunElevation:20,hp:2400,viewRange:490,reload:9.6,aimTime:1.8,dispersion:0.52, maxDispersion: 1.42,
@@ -42,6 +43,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Rear-mounted wedge turret, individually expendable ERA tiles and a one-charge APS that recharges after cooldown.',
   }),
   vehicle('bastion125','Bastion-125 Defensive MBT','Bastion-125','Heavy',{
+    tier:4,
     mass:73,power:1250,maxSpeed:37,reverseSpeed:13,hullTraverse:24,turretTraverse:26,
     hp:2550,viewRange:450,reload:8.5,dispersion:0.60, maxDispersion: 1.53,
     dims:dims(7.85,3.90,1.69,3.8,3.55,0.87,5.65,{turretZ:-0.38}),
@@ -54,6 +56,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Defensive strongpoint with ERA-covered turret cheeks, a rear slat cage and vented ammunition compartment.',
   }),
   vehicle('harrier105','Harrier-105 Fast Assault Tank','Harrier-105','Light',{
+    tier:3,
     openTop:true,mass:29,power:980,maxSpeed:74,reverseSpeed:30,hullTraverse:54,turretTraverse:64,
     hp:910,viewRange:560,reload:4.6,aimTime:1.5,dispersion:0.68, maxDispersion: 1.62,stabilizer:0.65,
     dims:dims(6.45,3.06,1.34,2.80,2.45,0.66,5.0,{turretZ:0.38,trackW:0.44}),
@@ -63,6 +66,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Rapid flanking tank with exposed crew compartment, a tall open shield and quick loading.',
   }),
   vehicle('warden130','Warden-130 Heavy Tank Destroyer','Warden-130','Tank Destroyer',{
+    tier:4,
     casemate:{hullAimRate:26,hydroRate:4.8},
     siegeMode:{settleSeconds:2.0,dispersionMult:0.48,recoilMult:0.58},
     mass:69,power:920,maxSpeed:29,reverseSpeed:11,hullTraverse:22,turretTraverse:0,gunSpeed:3.5,
@@ -75,6 +79,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Turretless low-profile wedge hunter. Standing still for two seconds engages high-precision siege fire.',
   }),
   vehicle('lancer120','Lancer-120 Medium Tank Destroyer','Lancer-120','Tank Destroyer',{
+    tier:4,
     firstShot:{settleSeconds:2.6,dispersionMult:0.52,recoverySeconds:6},
     mass:43,power:1120,maxSpeed:62,reverseSpeed:25,hullTraverse:42,turretTraverse:24,
     hp:1300,viewRange:520,reload:10,aimTime:1.65,dispersion:0.26, maxDispersion: 1.14,
@@ -86,6 +91,7 @@ export const CONCEPT_VEHICLES = [
     desc:'A low sniper destroyer whose first shot receives an accuracy bonus after remaining stationary.',
   }),
   vehicle('leviathan160','Leviathan-160 Breakthrough Assault Gun','Leviathan-160','Heavy',{
+    tier:4,
     mass:91,power:1160,maxSpeed:23,reverseSpeed:9,hullTraverse:19,turretTraverse:12,
     gunElevation:35,hp:2750,viewRange:370,reload:20,aimTime:2.9,dispersion:0.95, maxDispersion: 1.87,
     dozerAssist:0.38,
@@ -100,6 +106,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Short, large-calibre assault gun carrying a powered dozer blade. Heavy blast, poor rate of fire.',
   }),
   vehicle('thunderclad155','Thunderclad-155 Heavy SPG','Thunderclad-155','Artillery',{
+    tier:4,
     artillery:{highArc:true,spade:true,spadeDeploySeconds:2.7,spadeRetractSeconds:1.8,recoilDistance:1.1,recoilRecovery:2.6,maxFlightSeconds:48,aiEngageRange:1050},
     mass:65,power:1020,maxSpeed:39,reverseSpeed:14,hullTraverse:23,turretTraverse:12,gunSpeed:4.5,
     gunDepression:4,gunElevation:83,hp:1390,viewRange:390,reload:19,aimTime:3.2,dispersion:0.88, maxDispersion: 1.80,
@@ -114,6 +121,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Enclosed heavy howitzer with a large rear stabiliser, high-arc fire and large HE splash.',
   }),
   vehicle('tempest155','Tempest-155 Mobile SPG','Tempest-155','Artillery',{
+    tier:4,
     artillery:{highArc:true,spade:true,spadeDeploySeconds:1.1,spadeRetractSeconds:0.9,recoilDistance:0.78,recoilRecovery:2.1,maxFlightSeconds:48,aiEngageRange:1080},
     mrsi:{rounds:2,secondDelaySeconds:2.0},
     mass:42,power:1190,maxSpeed:66,reverseSpeed:24,hullTraverse:38,turretTraverse:17,gunSpeed:6,
@@ -129,6 +137,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Fast tracked artillery platform. Simplified two-round MRSI fires different trajectories for near-simultaneous arrival.',
   }),
   vehicle('cerberus135','Cerberus-135 Dual-purpose Heavy Tank','Cerberus-135','Heavy',{
+    tier:4,
     unmannedTurret:true,crewCapsule:true,turretElectronicsWeakness:1.9,
     crew:['Commander','Gunner','Driver'],autoloader:true,
     mass:70,power:1450,maxSpeed:45,reverseSpeed:22,hullTraverse:31,turretTraverse:43,
@@ -141,6 +150,7 @@ export const CONCEPT_VEHICLES = [
     desc:'Advanced fire control and protected crew. Damaged turret electronics sharply reduce aim performance.',
   }),
   vehicle('raptor90','Raptor-90 Recon Fire-support Vehicle','Raptor-90','Light',{
+    tier:3,
     openTop:true,mass:20,power:850,maxSpeed:87,reverseSpeed:34,hullTraverse:65,turretTraverse:68,
     hp:670,viewRange:610,reload:3.7,aimTime:1.1,dispersion:0.72, maxDispersion: 1.65,stabilizer:0.75,
     dims:dims(5.65,2.76,1.23,2.35,1.96,0.55,4.25,{turretZ:0.46,trackW:0.39}),

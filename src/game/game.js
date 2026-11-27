@@ -24,6 +24,7 @@ import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, projectedSpreadRadius } from './combatMath.js';
 import { createControl, updateControl, resetControlCredit } from './controlCapture.js';
 import { skillKey } from './vehicleSkills.js';
+import { makeMatch } from './matchmaking.js';
 function withinPathXZ(p, origin, dx, dz, radius) {
   const x = p.x - origin.x, z = p.z - origin.z;
   const lengthSquared = dx * dx + dz * dz;
@@ -69,22 +70,11 @@ export class Game {
     this.resize();
     this.debug = this.makeDebug();
   }
-  // tier matchmaking: the player's tier weighs 3, adjacent tiers 1; max 2 copies of a tank per team
-  static matchmake(playerTankId, r) {
-    const me = TANK_BY_ID[playerTankId]; const team = [playerTankId]; const count = { [playerTankId]: 1 };
-    const pool = TANKS.filter((t) => Math.abs(t.tier - me.tier) <= 1).map((t) => ({ id: t.id, w: t.tier === me.tier ? 3 : 1 }));
-    while (team.length < 7) {
-      const cand = pool.filter((p) => (count[p.id] || 0) < 2); const tot = cand.reduce((a, p) => a + p.w, 0); let x = r.next() * tot; let pick = cand[0];
-      for (const p of cand) { x -= p.w; if (x <= 0) { pick = p; break; } }
-      team.push(pick.id); count[pick.id] = (count[pick.id] || 0) + 1;
-    }
-    return team;
-  }
+  static matchmake(playerTankId,r) { return makeMatch(TANKS,playerTankId,r).team0; }
   spawnTeams(playerTankId) {
-    const team0 = Game.matchmake(playerTankId, this.rng); const r = this.rng;
-    // mirrored matchmaking: the enemy gets the same multiset of tanks (shuffled), so both teams are equal on paper
-    const team1 = team0.slice().sort(() => r.next() - 0.5);
-    this.lineup = { team0, team1 };
+    const r=this.rng;
+    this.lineup=makeMatch(TANKS,playerTankId,r);
+    const {team0,team1}=this.lineup;
     const roles = ['assault', 'sniper', 'assault', 'defender', 'assault', 'sniper', 'assault'];
     const lanes = [1, 0, 2, 1, 0, 2, 1];
     for (let team = 0; team < 2; team++) {
@@ -289,7 +279,7 @@ export class Game {
     }
     else if (this.time >= this.timeLimit) this.end('draw', 'Time expired.');
   }
-  end(result, reason) { this.ended = true; this.result = result; this.hud.showEnd(result, reason); if (document.pointerLockElement) document.exitPointerLock(); this.audio.stopEngine(); }
+  end(result, reason) { this.ended = true; this.result = result; this.matchResult = { result, reason, vehicleId:this.player.spec.id, tier:this.player.spec.tier, duration:this.time, survived:this.player.alive, stats:{...this.player.stats} }; this.hud.showEnd(result, reason); if (document.pointerLockElement) document.exitPointerLock(); this.audio.stopEngine(); }
   // ---------- per-frame ----------
   updatePlayerInput() {
     const p = this.player; const k = this.keys;

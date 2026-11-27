@@ -1,7 +1,7 @@
 # Steel Front — 3D Tank War (v4)
 Browser 3D tank battle (Three.js r170 + Vite). 47 vehicles in 4 tiers, 3 real-scale maps
 (1.2 × 1.2 km playable, 1.4 km terrain), 7v7 team battle vs NPCs with base capture, bush concealment, tier matchmaking
-(mirrored lineups), graphics presets High/Medium/Low.
+(independent lineups, matching tier composition, diversity-first), graphics presets High/Medium/Low.
 - Dev: `npm install && npm run dev` · Build: `npm run build` (output in dist/) · Preview: `npm run preview`
 - Play the build: serve dist/ with any static server (see dist/README.txt).
   URL params: `?autostart=1&map=village|forest|desert&tank=<id>&q=low|medium|high`
@@ -39,3 +39,6 @@ C has a 25 m radius on all three maps. Solo capture takes 240 seconds (previousl
 
 ### Stock dispersion rebalance
 All 47 vehicles now have explicit minimum/maximum dispersion radii (m at 100 m): stock minima 0.20–0.95, maxima 1.10–1.87. Tank destroyers use the lower 0.20–0.49 / 1.10–1.37 ranges. These are defaults, not new validation bounds; legacy and custom balance profiles remain supported. Existing skill multipliers and aiming dynamics are unchanged.
+
+## Tier matchmaking and future progression
+Four game-balance tiers contain 7/11/8/21 vehicles. Each 7v7 side has at least five vehicles at the player's tier and at most two from one adjacent tier. No same-team repeats with the current roster. Cross-team repeats are permitted only if the eligible tier slots exceed the number of distinct vehicles. Teams have identical tier counts and approximate class/game-stat parity, not mirrored rosters. The match records a transient result with vehicle ID, tier, result, duration, survival and combat stats; no progression lock, points or persistent profile is enabled yet.
