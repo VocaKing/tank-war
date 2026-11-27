@@ -6,6 +6,7 @@ function vehicle(left, right, team = 1) {
   const root = new Group(), body = new Group(), turret = new Group();
   root.add(body);
   body.add(turret);
+  const yaw = (left + right) * 0.5; root.position.set(Math.sin(yaw) * 100, 0, Math.cos(yaw) * 100);
   return { left, right, team, alive: true, spotted: [true], model: { root, body, turret },
     spec: { dims: { L: 6, W: 3, hullH: 1.4, turretH: .7 } } };
 }
@@ -26,12 +27,25 @@ const game = {
     this.cam.pitch = this.limitCameraPitch(Math.atan2(point.y, Math.hypot(point.x, point.z)) + pitchOffset);
   },
   traceAim(position, direction) {
+    this.traceCalls++;
     const yaw = Math.atan2(direction.x, direction.z);
     const tank = this.tanks.find(v => v.alive && (v.team === 0 || v.spotted[0]) && yaw >= v.left && yaw <= v.right);
     return tank ? { tank, hit: { part: direction.y > .025 ? 'turret' : 'hull' }, point: direction.clone().multiplyScalar(25) } : null;
   },
 };
 const assist = new AimAssist(game);
+
+function tickWith(instance, frames = 1) {
+  for (let i = 0; i < frames; i++) {
+    game.time += 1 / 60;
+    instance.preCamera(1 / 60);
+    const hit = game.traceAim(origin, game.camDir());
+    game.aimTank = hit?.tank ?? null;
+    game.aimHit = hit?.hit ?? null;
+    if (hit) game.cursorPoint.copy(hit.point);
+    instance.postAim(1 / 60);
+  }
+}
 
 function tick(frames = 1) {
   for (let i = 0; i < frames; i++) {
@@ -57,14 +71,19 @@ assert.equal(assist.target, null, 'No stationary acquisition');
 move(-.20);
 tick(16);
 assert.equal(assist.target, a);
+let probes = 0; const originalProbe = assist.probe.bind(assist);
+assist.probe = (...args) => { probes++; return originalProbe(...args); };
 move(.204, .042);
+assert.ok(probes <= 1, 'Movement within the locked target should need only one probe');
 assert.equal(assist.target, a);
 assert.equal(assist.part, 'turret');
 assert.equal(assist.dragFactor(), 1, 'Fast motion between two points on one vehicle has full sensitivity');
 tick(10);
 assert.ok(Math.abs(game.cam.yaw - .204) < 1e-9, 'An off-center selected point must stay selected');
 
+probes = 0;
 move(.24);
+assert.ok(probes <= 6, 'Crossing a target edge should use a bounded number of probes');
 assert.equal(assist.target, a);
 assert.equal(assist.dragFactor(), AIM_ASSIST.EDGE_DRAG);
 assert.ok(game.cam.yaw > .22 && game.cam.yaw < .24, 'Only the part of the move beyond the edge is resisted');
@@ -104,4 +123,35 @@ assert.equal(assist.toggleManual(), 'locked');
 a.spotted[0] = false;
 tick(15);
 assert.equal(assist.target, null, 'A concealed target loses its lock without passively switching');
+
+const near = vehicle(.10, .14);
+game.tanks = [near];
+game.cam.yaw = .08;
+game.cam.pitch = 0;
+game.aimTank = null;
+game.aimHit = null;
+game.time = 10;
+const quick = new AimAssist(game, true);
+const [nearTurn, nearTilt] = quick.look(-1, 0, .001);
+game.cam.yaw += nearTurn;
+game.cam.pitch += nearTilt;
+tickWith(quick, 3);
+assert.equal(quick.target, null, 'Acquisition still has a short debounce');
+tickWith(quick, 1);
+assert.equal(quick.target, near, 'A near-miss within the screen-space envelope should acquire quickly');
+
+game.cam.yaw = .08;
+game.aimTank = null;
+game.aimHit = null;
+const manualNear = new AimAssist(game, true);
+assert.equal(manualNear.toggleManual(), 'locked', 'E-lock should accept a clear near-miss target');
+assert.equal(manualNear.target, near);
+
+game.world.losBlocked = () => true;
+const blocked = new AimAssist(game, true);
+assert.equal(blocked.toggleManual(), null, 'A target behind terrain or structure must not be acquired');
+game.world.losBlocked = () => false;
+assert.ok(AIM_ASSIST.ACQUIRE_TIME <= .06, 'Automatic acquisition debounce stays responsive');
+assert.ok(AIM_ASSIST.RELOCK_COOLDOWN <= .12, 'Re-locking the same target must not be blocked for a long cooldown');
+console.log('Verified fast near-miss acquisition, manual E-lock fallback, line-of-sight rejection and bounded lock probes.');
 console.log('Verified aim acquisition, free aiming on armor, silhouette resistance, and deliberate soft and E-lock handoffs.');

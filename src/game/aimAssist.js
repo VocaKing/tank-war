@@ -3,14 +3,16 @@ import { clamp, DEG } from '../util.js';
 
 export const AIM_ASSIST = {
   FOCUS_TOL_PX: 14,
-  ACQUIRE_TIME: 0.18,
+  ACQUIRE_TOL_PX: 32,
+  ACQUIRE_TIME: 0.06,
   MANUAL_WINDOW: 1.5,
   EDGE_DRAG: 0.62,
   BREAK_PX: 30,
-  RELOCK_COOLDOWN: 1.2,
+  RELOCK_COOLDOWN: 0.12,
 };
 
 const _point = new THREE.Vector3(), _direction = new THREE.Vector3();
+const _candidateCenter = new THREE.Vector3(), _candidateDelta = new THREE.Vector3();
 
 export class AimAssist {
   constructor(game, enabled = true) {
@@ -105,11 +107,72 @@ export class AimAssist {
 
   toggleManual() {
     if (this.manual) { this.release('manual'); return 'released'; }
-    const g = this.g;
-    if (g.aimHit && this.validTarget(g.aimTank)) this.setAnchor(g.aimTank, g.cursorPoint, g.aimHit.part);
+    const candidate = this.resolveAimCandidate();
+    if (candidate) this.setAnchor(candidate.tank, candidate.point, candidate.part);
     if (!this.validTarget(this.target)) return null;
     this.manual = true;
     return 'locked';
+  }
+
+  // Resolve a target from the exact camera ray first. If the reticle narrowly
+  // misses the model silhouette, use a screen-space vehicle envelope and cast
+  // one confirmation ray through that vehicle's centre. This avoids the old
+  // all-or-nothing dependency on a single triangle intersection.
+  screenCandidate() {
+    const g = this.g, cam = g.camera, ppr = this.pxPerRad();
+    cam.getWorldDirection(_direction);
+    let best = null, sticky = null;
+    for (const tank of g.tanks) {
+      if (!this.validTarget(tank) || !this.manual && tank.vehicleSkill?.jammed) continue;
+      const { W, hullH, turretH } = tank.spec.dims;
+      _candidateCenter.set(0, (hullH + turretH) * 0.5, 0);
+      tank.model.root.localToWorld(_candidateCenter);
+      _candidateDelta.copy(_candidateCenter).sub(cam.position);
+      const distance = _candidateDelta.length();
+      if (distance < 1) continue;
+      const cos = clamp(_candidateDelta.dot(_direction) / distance, -1, 1);
+      if (cos <= 0) continue;
+      const radius = Math.max(W, hullH + turretH) * 0.5;
+      const px = (Math.acos(cos) - Math.atan(radius / distance)) * ppr;
+      if (px > AIM_ASSIST.ACQUIRE_TOL_PX) continue;
+      const item = { tank, point: _candidateCenter.clone(), px };
+      if (!best || px < best.px) best = item;
+      if (tank === this.target || tank === this.candidate) sticky = item;
+    }
+    // Retain the current candidate through small overlaps between silhouettes;
+    // a clearly better or directly-hit target can still replace it immediately.
+    if (sticky && best && sticky.tank !== best.tank && sticky.px <= best.px + 8) return sticky;
+    return best;
+  }
+
+  resolveAimCandidate() {
+    const g = this.g;
+    if (g.aimTank && g.aimHit) {
+      if (!this.validTarget(g.aimTank) || !this.manual && g.aimTank.vehicleSkill?.jammed) return null;
+      return { tank: g.aimTank, point: g.cursorPoint, part: g.aimHit.part };
+    }
+    // Do not acquire a target through a friendly vehicle, wreck or other direct
+    // ray hit. A nearby silhouette is only a fallback for a genuine near miss.
+    if (g.aimTank) return null;
+    const candidate = this.screenCandidate();
+    if (!candidate) return null;
+    const origin = g.camera.position;
+    const direction = candidate.point.clone().sub(origin);
+    const distance = direction.length();
+    if (distance < 1) return null;
+    direction.multiplyScalar(1 / distance);
+    const ray = g.traceAim(origin, direction, true);
+    if (ray?.tank && ray.tank !== candidate.tank) return null;
+    if (g.world?.losBlocked?.(origin.x, origin.y, origin.z,
+      candidate.point.x, candidate.point.y, candidate.point.z)) return null;
+    if (g.smokeBlocks?.(origin.x, origin.y, origin.z,
+      candidate.point.x, candidate.point.y, candidate.point.z)) return null;
+    if (ray?.tank === candidate.tank) {
+      return { tank: candidate.tank, point: ray.point, part: ray.hit?.part || 'hull' };
+    }
+    // A ray can pass through a small gap in detailed geometry. When the centre
+    // line is otherwise unobstructed, anchor to the vehicle's geometric centre.
+    return { tank: candidate.tank, point: candidate.point, part: 'hull' };
   }
 
   probe(yaw, pitch, dt) {
@@ -148,7 +211,7 @@ export class AimAssist {
     if (onTarget) {
       // Keep the entire part of the movement that is still on the target.
       let lo = 0, hi = 1, edge = start;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 4; i++) {
         const mid = (lo + hi) / 2;
         const hit = this.probe(THREE.MathUtils.lerp(c.yaw, yaw, mid), THREE.MathUtils.lerp(c.pitch, pitch, mid), dt);
         if (hit?.tank === this.target) { lo = mid; edge = hit; }
@@ -186,16 +249,22 @@ export class AimAssist {
       this.clearLook();
       return;
     }
-    const tank = this.validTarget(g.aimTank) && (this.manual || !g.aimTank.vehicleSkill?.jammed) ? g.aimTank : null;
+    const resolved = this.resolveAimCandidate();
+    const tank = resolved?.tank || null;
     if (tank !== this.candidate) {
       this.candidate = tank;
       this.candidateTime = 0;
       this.candidateAimed = false;
     }
-    this.candidateAimed ||= this.moved;
-    this.candidateTime += dt;
+    if (tank) {
+      this.candidateAimed ||= this.moved;
+      this.candidateTime += dt;
+    } else {
+      this.candidateTime = 0;
+      this.candidateAimed = false;
+    }
     if (tank && this.target && this.moved) {
-      this.setAnchor(tank, g.cursorPoint, g.aimHit.part);
+      this.setAnchor(tank, resolved.point, resolved.part);
     } else if (tank && !this.target) {
       const released = this.released;
       const handoff = this.moved && released?.handoff && (this.enabled || released.manual) && tank !== released.tank &&
@@ -205,7 +274,7 @@ export class AimAssist {
         !(released?.tank === tank && g.time - released.time < AIM_ASSIST.RELOCK_COOLDOWN);
       if (handoff || canAcquire) {
         this.manual = !!(handoff && released.manual);
-        this.setAnchor(tank, g.cursorPoint, g.aimHit.part);
+        this.setAnchor(tank, resolved.point, resolved.part);
       }
     }
     this.focus = this.target || tank || this.toleranceFocus();
