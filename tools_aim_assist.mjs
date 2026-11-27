@@ -135,8 +135,8 @@ const quick = new AimAssist(game, true);
 const [nearTurn, nearTilt] = quick.look(-1, 0, .001);
 game.cam.yaw += nearTurn;
 game.cam.pitch += nearTilt;
-tickWith(quick, 3);
-assert.equal(quick.target, null, 'Acquisition still has a short debounce');
+tickWith(quick, 2);
+assert.equal(quick.target, null, 'Near-miss acquisition has only a two-frame debounce');
 tickWith(quick, 1);
 assert.equal(quick.target, near, 'A near-miss within the screen-space envelope should acquire quickly');
 

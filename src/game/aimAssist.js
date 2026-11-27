@@ -207,6 +207,7 @@ export class AimAssist {
     if (!turn && !tilt) return;
 
     const yaw = c.yaw + turn, pitch = g.limitCameraPitch(c.pitch + tilt);
+    this.recordLook();
     if (this.target && this.resistExit(yaw, pitch, dt)) return;
     c.yaw = yaw;
     c.pitch = pitch;
