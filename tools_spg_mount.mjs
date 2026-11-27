@@ -15,7 +15,7 @@ try{
   const root=new Group(),body=new Group(),turret=new Group(),gun=new Group(),barrel=new Group(),muzzle=new Object3D();
   root.add(body);body.add(turret);turret.position.set(0,2,0);turret.add(gun);gun.position.set(0,.4,1);
   gun.add(barrel);barrel.add(muzzle);muzzle.position.z=4;
-  const model={root,body,turret,gun,barrel,muzzle,gunPitchFloor:(_yaw,min)=>min};
+  const model={root,body,turret,gun,barrel,muzzle,maxRecoil:.15,gunPitchFloor:(_yaw,min)=>min};
   const tank=Object.assign(Object.create(Tank.prototype),{
    spec,pos:new Vector3(),quat:new Quaternion(),heading:0,pitch:0,roll:0,turretYaw:0,gunPitch:0,yawRate:0,
    shellIdx:0,abilities:{usingSecondary:false},modules:{turret:1},crew:[],
