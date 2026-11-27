@@ -22,11 +22,11 @@ function skillDetails(tank, mobile) {
   if (!abilities.length) return '';
   const activation = mobile ? '战斗中点「技能」' : '战斗中按 <kbd>G</kbd> 键';
   return `<h3>${mobile ? tank.short + ' · ' : ''}车辆技能</h3>
-    <ul>${abilities.map(({ type, name, effect, timing }) => `
+    <ul>${abilities.map(({ type, name, effect, timing, key }) => `
       <li class="${type}">
         <div class="ability-title">${typeBadge(type)} <strong>${name}</strong></div>
         <p>${effect}</p>
-        <div class="ability-use">${type === 'active' ? activation : '自动生效'}${timing ? ' · ' + timing : ''}</div>
+        <div class="ability-use">${type === 'active' ? key === 'K' ? (mobile ? '战斗中点「专属技能」' : '战斗中按 <kbd>K</kbd> 键') : activation : '自动生效'}${timing ? ' · ' + timing : ''}</div>
       </li>`).join('')}</ul>`;
 }
 

@@ -210,7 +210,7 @@ export class Ballistics {
     const shooter = s.owner; const toPlayer = tank.isPlayer, fromPlayer = shooter && shooter.isPlayer;
     if (tank.alive) g.resetControlContribution?.(tank);
     if (s.noDamage) { g.effects.sparks(p, 12); return true; }
-    if (shooter && tank.alive && shooter.team !== tank.team) shooter.stats.hits++;
+    if (shooter && tank.alive && shooter.team !== tank.team) { shooter.stats.hits++; if (s.spec.vehicleShock || s.spec.vehicleSuppression) shooter.vehicleSkill?.hit(tank,s.spec); }
     if (hit.wheel) {
       if (artillery) this.artilleryImpact(s, p, kind, hit.normalW);
       else { g.effects.sparks(p, 22); g.audio.impact(p, 'metal'); }
@@ -239,6 +239,7 @@ export class Ballistics {
       const mult = s.type.he ? 1.0 : 1.0; const dmg = s.spec.damage * mult * g.rng.range(0.85, 1.15);
       if (!artillery) { g.effects.penetration(p); g.audio.impact(p, 'metal'); }
       const msgs = tank.applyPenetration(hit, s.spec, shooter, dmg, ev.tracks);
+      shooter?.vehicleSkill?.hit(tank,s.spec);
       if (shooter && shooter.team !== tank.team) shooter.stats.pens++;
       if (fromPlayer) g.hud.hitMarker('pen', Math.round(dmg), msgs, tank); if (toPlayer) g.hud.damageFrom(shooter, Math.round(dmg), msgs.join(', '));
       if (he) this.heBlast(s, p);

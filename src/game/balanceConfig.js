@@ -64,6 +64,7 @@ export function fields(t){
  if (t.multiTube?.modes) for (let i=0;i<t.multiTube.modes.length;i++) for (const [k,label,unit,min,max,step] of [['count','齐射炮管数','管',1,12,1],['reloadMult','装填倍率','×',0.1,10,0.1]]) if (k in t.multiTube.modes[i]) out.push(def('multiTube.modes.'+i+'.'+k,t.multiTube.modes[i].name+' · '+label,unit,min,max,step,'多管武器'));
  if (t.burst) for (const [k,label,unit,min,max,step] of [['count','点射发数','发',1,30,1],['interval','点射间隔','s',0.02,5,0.01]]) if (k in t.burst) out.push(def('burst.'+k,label,unit,min,max,step,'连发系统'));
  if (t.eraLayout) for (let i=0;i<t.eraLayout.length;i++) for (const [k,label] of [['heat','HEAT 单块防护','mm'],['ke','动能单块防护','mm']]) if (k in t.eraLayout[i]) out.push(def('eraLayout.'+i+'.'+k,'ERA '+(i+1)+' · '+label,'mm',0,1000,1,'模块化反应装甲'));
+ if(t.skill)for(const [k,label,unit,min,max,step] of [['prepare','准备时间','s',0.5,30,0.1],['duration','持续时间','s',0.5,60,0.1],['cooldown','冷却时间','s',1,180,0.1],['mult','效果倍率','×',0.05,2,0.01],['speedMult','速度倍率','×',0.1,2,0.01],['reloadMult','装填倍率','×',0.1,3,0.01],['turnMult','转向倍率','×',0.1,2,0.01],['repairMult','维修倍率','×',0.1,3,0.01],['damageMult','承伤倍率','×',0.1,3,0.01],['threshold','触发生命比例','×',0.05,0.5,0.01],['charges','使用次数','次',1,5,1],['range','范围','m',10,1000,1],['stacks','最大层数','层',1,5,1],['heatPerRound','每发热量','%',1,50,1],['coolRate','每秒冷却','%/s',1,50,1]])if(k in t.skill)out.push(def('skill.'+k,t.skill.name+' · '+label,unit,min,max,step,'专属技能'));
  if (t.dozerAssist !== undefined) out.push(def('dozerAssist','推土铲爬坡辅助','×',0,1,0.01,'推土铲辅助'));
  return out;
 }

@@ -376,7 +376,7 @@ export class BattlefieldPhysics {
       ? (road > 0.12 ? (0.88 + 0.34 * Math.min(1, road)) * (s.roadSpeedMult || 1) : (s.offRoadSpeedMult || 0.72))
       : 0.78 + 0.22 * Math.min(1, road * 1.5);
     let speedLimit = (throttle < 0 ? reverse / 3.6 : fullSpeed) * engine * driver * loadFactor *
-      water * terrainSpeed * (overdrive ? 1.2 : 1) * (tank.abilities?.speedMult ?? 1);
+      water * terrainSpeed * (overdrive ? 1.2 : 1) * (tank.abilities?.speedMult ?? 1) * (tank.vehicleSkill?.speedMult ?? 1);
     if (floating) speedLimit = (s.amphibious.speed || s.maxSpeed * 0.22) / 3.6 * engine * driver * (throttle < 0 ? 0.52 : 1);
     const uphill = Math.max(0, _tangent.y * Math.sign(throttle));
     if (s.dozerAssist) speedLimit *= 1 + Math.min(0.28, uphill * s.dozerAssist);
@@ -386,13 +386,13 @@ export class BattlefieldPhysics {
     const lowGear = 4.3 * Math.max(0, 1 - Math.abs(tank.speed) / 9) ** 2;
     const driveAcceleration = lowGear + clamp(s.power / s.mass * 0.075, 0.6, 2.2) * (s.cls === 'Light' ? 2.4 : 1);
     const driveLimit = (crawl ? Math.max(driveAcceleration, 9) : driveAcceleration) *
-      engine * loadFactor * (overdrive ? 1.35 : 1);
+      engine * loadFactor * (overdrive ? 1.35 : 1) * (tank.vehicleSkill?.accelMult ?? 1);
     _forward.set(0, 0, 1).applyQuaternion(tank.quat);
     _tangent.copy(_forward).addScaledVector(_normal, -_forward.dot(_normal)).normalize();
     _side.crossVectors(_normal, _tangent).normalize();
     const longitudinal = tank.vel.dot(_tangent), sideways = tank.vel.dot(_side);
     const turnMax = s.hullTraverse * DEG * driver * (1 - 0.45 * Math.min(1, Math.abs(tank.speed) / fullSpeed)) *
-      (floating ? 0.48 : tank.inWater ? 0.6 : 1);
+      (floating ? 0.48 : tank.inWater ? 0.6 : 1) * (tank.vehicleSkill?.turnMult ?? 1);
     // A damaged track can serve as a pivot after the hull slows down. The intact track supplies the grip.
     const pivotMax = canPivot ? turnMax * 0.25 * engine * clamp((2 - Math.abs(longitudinal)) / 1.55, 0, 1) : 0;
     const turnLimit = mobile ? turnMax : pivotMax;

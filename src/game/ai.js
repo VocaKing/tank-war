@@ -53,7 +53,7 @@ export class AIController {
     } else if (this.state === 'defendBase') { this.state = 'advance'; if (this.hold) this.setGoal(this.hold); }
     if (this.state === 'retreat') { if (g.time > this.retreatUntil) { this.state = 'advance'; this.path = []; } return; }
     const point = g.world.controlPoint;
-    if (this.state !== 'controlPoint' && !this.target && g.time - this.lastContact >= this.controlDelay) {
+    if (this.state !== 'controlPoint' && !this.target && g.time - this.lastContact >= this.controlDelay * (t.spec.casemate && t.spec.cls==='Tank Destroyer' ? 3 : 1)) {
       const radius = point.r * 0.52;
       const cell = g.nav.nearestWalkable(...g.nav.toCell(
         point.x + Math.cos(this.controlAngle) * radius,
@@ -161,6 +161,7 @@ export class AIController {
       }
       this.think = 0.25 + Math.random() * 0.1;
       this.chooseTarget();
+      t.vehicleSkill?.ai(this.target);
       if (this.target) this.lastContact = g.time;
       this.strategicGoal();
       if (this.target) this.planShot();

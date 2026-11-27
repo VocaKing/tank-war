@@ -77,7 +77,7 @@ export class HUD {
         <div id="h-veh-info"></div></div>
       <div class="combat-deck"><div class="status" id="h-status"></div><div class="panel items" id="h-items"></div><div class="panel ammo" id="h-ammo"></div></div>
       <div class="panel map"><canvas id="h-mini" width="260" height="260"></canvas></div>
-      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · Move the crosshair onto another enemy to switch targets<br>G vehicle ability · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
+      <div class="help" id="h-help"><b>Controls</b><br>W/S throttle · A/D steer · Mouse aim · LMB fire<br>RMB / Shift sniper · Wheel zoom ×2/×4/×8/×16 · 1/2/3 ammo<br>X armor view (sniper) · E gun lock · Move the crosshair onto another enemy to switch targets<br>G vehicle ability · K extra skill · B firing brace / artillery deploy · V weapon mode · N armour kit · H suspension · 4/5/6 equipment (R repair · F extinguisher) · Tab scores · Esc menu<br><i>Bushes add camouflage – firing reduces it; anyone within 50 m sees you.</i></div>
       <div class="overlay" id="h-board"></div>
       <div class="overlay" id="h-pause"><div class="box"><h2>Paused</h2><button id="h-resume">Resume</button><button id="h-aa"></button><button id="h-quit">Quit to menu</button></div></div>
       <div class="overlay" id="h-end"></div>`;
@@ -155,11 +155,13 @@ export class HUD {
     g.strokeStyle = color; g.lineWidth = 2; g.stroke();
     g.fillStyle = color; g.font = 'bold 12px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('C', cx, cyPoint);
     g.restore();
+    G.skillDecoys = (G.skillDecoys || []).filter(d=>G.time<d.until);
+    for(const d of G.skillDecoys){if(d.team===p.team)continue;const [x,y]=this.toM(d.x,d.z);g.save();g.translate(x,y);g.fillStyle='#ff4a3a';g.strokeStyle='#000';g.beginPath();g.moveTo(0,-6);g.lineTo(4.5,5);g.lineTo(-4.5,5);g.closePath();g.fill();g.stroke();g.restore();}
     for (const t of G.tanks) {
       if (t === p && t.alive) continue;
       const ally = t.team === p.team; const vis = ally || t.spotted[p.team] || !t.alive;
       let pos = t.pos; let alpha = 1;
-      if (!vis) { const lp = t.lastSeenPos[p.team]; if (!lp || G.time - (t.lastSeenTime || 0) > 20) continue; pos = lp; alpha = 0.35; }
+      if (!vis) { const lp = t.lastSeenPos[p.team]; if (!lp || G.time - (t.lastSeenTime || 0) > 20 && G.time >= (t.skillTrackUntil?.[p.team] || 0)) continue; pos = lp; alpha = 0.35; }
       const [mx, my] = this.toM(pos.x, pos.z);
       g.save(); g.translate(mx, my); g.rotate(-t.heading + Math.PI); g.globalAlpha = alpha;
       g.fillStyle = !t.alive ? '#555' : ally ? '#6fe37f' : '#ff4a3a'; g.strokeStyle = '#000'; g.lineWidth = 1;
@@ -341,6 +343,7 @@ export class HUD {
     this.setPanelHtml('h-veh-magazine', ability.magazine ? Array.from({ length: ability.magazine.size }, (_, i) => `<i class="${i < ability.magLeft ? 'on' : ''}"></i>`).join('') : '');
     this.setPanelHtml('h-veh-info', `<div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       ${movementStatus ? `<div class="crew"><span>${movementStatus}</span></div>` : ''}
+      ${p.vehicleSkill?.cfg ? `<div class="crew"><span class="ok">${p.vehicleSkill.status()}</span></div>` : ''}
       <div class="crew">${p.crew.map((c) => `<span class="${c.alive ? 'ok' : 'dead'}">${c.role}</span>`).join('')}</div>
       ${p.burning > 0 ? '<div class="kits"><span class="fire">🔥 FIRE</span></div>' : ''}`);
     // equipment slots (keys 4/5/6)

@@ -1,3 +1,4 @@
+import { describeVehicleSkill } from './vehicleSkills.js';
 const SCAN_DURATION = 10;
 const ABILITY_DEFAULTS = {
   scan: { range: 400, maxTargets: 3, cooldown: 24 },
@@ -92,6 +93,7 @@ export function describeTankAbilities(spec) {
       effect: '炮塔后部被击穿时，泄压板将弹药爆燃向外排出，各类炮弹保留原数量的 40%（向下取整）。',
     });
   }
+  const skill = describeVehicleSkill(spec); if (skill) abilities.push(skill);
   return abilities;
 }
 

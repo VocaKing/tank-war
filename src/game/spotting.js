@@ -17,7 +17,8 @@ export class Spotting {
     let c = baseCamo(t.spec); if (Math.abs(t.speed) > 1) c *= 0.5;
     if (t.inBush) c += BUSH_CAMO;
     if (t.equip && t.equip.has('camonet') && time - (t.lastMoving ?? time) > 3) c += 0.12;
-    if (time - t.lastFired < REVEAL_TIME) c *= 0.25;
+    c *= t.vehicleSkill?.camoMult ?? 1;
+    if (time - t.lastFired < REVEAL_TIME) c *= t.vehicleSkill?.fireCamoFactor ?? 0.25;
     return Math.min(0.9, c);
   }
   spotRange(obs, tgt, time) { return Math.max(MIN_SPOT, obs.viewRange * (1 - this.camo(tgt, time))); }
@@ -42,7 +43,7 @@ export class Spotting {
       for (let team = 0; team < 2; team++) {
         if (team === tgt.team) { tgt.visibleUntil[team] = time + 10; continue; }
         let seen = false;
-        for (const obs of g.tanks) if (obs.team === team && obs.alive && this.canSee(obs, tgt, time)) { seen = true; break; }
+        for (const obs of g.tanks) if (obs.team === team && obs.alive && this.canSee(obs, tgt, time)) { seen = true; if (obs.vehicleSkill?.id === 'tracking') { (tgt.skillTrackUntil ??= [0,0])[team] = time + 20 + obs.vehicleSkill.cfg.duration; } }
         if (seen) { tgt.visibleUntil[team] = time + LINGER; tgt.lastSeenPos[team] = tgt.pos.clone(); tgt.lastSeenTime = time; }
       }
     }

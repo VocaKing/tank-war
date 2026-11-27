@@ -1,4 +1,5 @@
 import { SPECIALIST_TANKS } from './specialistTanks.js';
+import { VEHICLE_SKILLS } from './vehicleSkills.js';
 import { CONCEPT_VEHICLES } from './conceptVehicles.js';
 import { EXPANSION_TANKS } from './expansionTanks.js';
 import publishedBalance from './balanceDefaults.json';
@@ -334,6 +335,9 @@ TANKS.sort((a, b) => a.tier - b.tier || a.year - b.year);
 for (const t of TANKS) {
   // The casemate classification also enables hull aiming for this vehicle.
   t.fixedGun = Boolean(t.casemate);
+  if (VEHICLE_SKILLS[t.id]) t.skill = { ...VEHICLE_SKILLS[t.id] };
+  if (t.id === 'warden130') delete t.siegeMode;
+  if (t.id === 'lancer120') delete t.firstShot;
   t.maxDispersion = legacyMaxDispersion(t.dispersion);
   const s0 = t.shells[0]; const D0 = s0.baseDamage ?? s0.damage;
   t.ammoCap = t.shells.reduce((a, s) => a + s.count, 0); t.defaultLoadout = t.shells.map((s) => s.count);

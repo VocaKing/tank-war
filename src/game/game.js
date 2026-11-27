@@ -23,6 +23,7 @@ import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
 import { zoomFov, projectedSpreadRadius } from './combatMath.js';
 import { createControl, updateControl, resetControlCredit } from './controlCapture.js';
+import { skillKey } from './vehicleSkills.js';
 function withinPathXZ(p, origin, dx, dz, radius) {
   const x = p.x - origin.x, z = p.z - origin.z;
   const lengthSquared = dx * dx + dz * dz;
@@ -100,7 +101,7 @@ export class Game {
         const [ci, cj] = this.nav.nearestWalkable(...this.nav.toCell(x, z)); [x, z] = this.nav.center(ci, cj);
         t.placeAt(x, z, Math.atan2(fx, fz)); t.input.aim.set(x + fx * 300, t.pos.y + 2, z + fz * 300);
         this.tanks.push(t);
-        if (!isPlayer) this.ai.push(new AIController(this, t, roles[i], lanes[i], 0.8 + r.next() * 0.5));
+        if (!isPlayer) this.ai.push(new AIController(this, t, spec.casemate && spec.cls==='Tank Destroyer' ? 'sniper' : roles[i], lanes[i], 0.8 + r.next() * 0.5));
       });
     }
   }
@@ -116,7 +117,8 @@ export class Game {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.toggleSniper();
       if (e.code === 'KeyX') { const on = this.armorView.toggle(); this.hud.message('Armor view ' + (on ? 'ON' : 'OFF') + ' (sniper mode)', on ? '#9fd39f' : '#c8c8c8'); }
       if (e.code === 'KeyE' && !e.repeat) this.toggleLock();
-      if (e.code === 'KeyG' && !e.repeat) { if (p.tryAbility && p.tryAbility()) { /* ok */ } else if (p.abilities && p.abilities.kind) this.hud.message(p.abilities.kind + ' not ready', '#c8c8c8'); }
+      if (e.code === 'KeyG' && !e.repeat) { const ok = skillKey(p.spec)==='G' ? p.vehicleSkill.activate() : p.tryAbility(); if (!ok) this.hud.message('技能未就绪或条件不足', '#c8c8c8'); }
+      if (e.code === 'KeyK' && !e.repeat && skillKey(p.spec)==='K') { if (!p.vehicleSkill.activate()) this.hud.message('专属技能未就绪或条件不足','#c8c8c8'); }
       if (e.code === 'KeyB' && !e.repeat) {
         if (p.usesSpade?.()) p.toggleSpade();
         else if (p.spec.artillery?.autoDeploy) {
@@ -272,6 +274,7 @@ export class Game {
   }
   onKill(attacker, victim, cause) {
     this.hud.kill(attacker, victim, cause);
+    attacker?.vehicleSkill?.killed(victim);
     if (victim.isPlayer) { this.cam.sniper = false; const a = this.tanks.find((t) => t.team === 0 && t.alive); if (a) this.cam.follow = a; }
     this.checkEnd();
   }

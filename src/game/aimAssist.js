@@ -123,7 +123,7 @@ export class AimAssist {
     const turn = this.pending.x, tilt = this.pending.y;
     this.pending.set(0, 0);
     this.lastFactor = 1;
-    if (this.target && (!g.player.alive || g.ended || !this.validTarget(this.target))) this.release('lost');
+    if (this.target && (!g.player.alive || g.ended || !this.validTarget(this.target) || !this.manual && this.target.vehicleSkill?.jammed)) this.release('lost');
     if (g.debugAim || g.camOverride) return;
     if (this.target) g.alignCamTo(this.anchorWorld(_point), dt, this.offset.x, this.offset.y);
     if (!turn && !tilt) return;
@@ -185,7 +185,7 @@ export class AimAssist {
       this.clearLook();
       return;
     }
-    const tank = this.validTarget(g.aimTank) ? g.aimTank : null;
+    const tank = this.validTarget(g.aimTank) && (this.manual || !g.aimTank.vehicleSkill?.jammed) ? g.aimTank : null;
     if (tank !== this.candidate) {
       this.candidate = tank;
       this.candidateTime = 0;
@@ -216,7 +216,7 @@ export class AimAssist {
     cam.getWorldDirection(_direction);
     let best = null, bestPx = AIM_ASSIST.FOCUS_TOL_PX;
     for (const tank of g.tanks) {
-      if (!this.validTarget(tank)) continue;
+      if (!this.validTarget(tank) || tank.vehicleSkill?.jammed) continue;
       const { W, hullH, turretH } = tank.spec.dims;
       _point.set(0, (hullH + turretH) * 0.5, 0);
       tank.model.root.localToWorld(_point).sub(cam.position);

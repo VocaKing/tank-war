@@ -6,6 +6,7 @@ import { armorZone, zoneLowerSideY } from './tankData.js';
 import { intersectArmor } from './armorGeometry.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 import { Abilities } from './abilities.js';
+import { VehicleSkill } from './vehicleSkills.js';
 import { Equipment } from './items.js';
 import { findEraTile } from './eraMechanics.js';
 import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
@@ -30,6 +31,7 @@ export class Tank {
   constructor(game, spec, team, name, isPlayer = false, loadout = null, items = null) {
     this.id = NEXT_ID++; this.game = game; this.spec = spec; this.team = team; this.name = name; this.isPlayer = isPlayer;
     this.abilities = new Abilities(this);
+    this.vehicleSkill = new VehicleSkill(this);
     this.abilities.resetForBattle();
     if (this.abilities.magazine) this.reloadLeft = 0;
     this.model = createTankModel(spec, { battle: true }); game.scene.add(this.model.root);
@@ -71,12 +73,12 @@ export class Tank {
   get mobilityLabel() { return this.mobilityModule === 'wheels' ? 'WHEELS' : 'TRACKS'; }
   usesSpade() { return !!(this.spec.artillery?.spade || this.spec.recoilBrace); }
   get viewRange() { return this.spec.viewRange * (this.crewAlive('Commander') ? 1 : 0.8) * (this.equip.active('optics') ? 1.1 : 1); }
-  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r; }
-  aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; if (this.suppressedFor > 0) a *= this.spec.openTop ? 1.9 : 1.28; if (this.spec.turretElectronicsWeakness && this.modules.turret < 1) a *= this.spec.turretElectronicsWeakness; return a; }
+  reloadTime() { const s = this.spec; let r = s.reload; if (!s.autoloader && !this.crewAlive('Loader')) r *= 1.4; if (this.modules.gun < 1) r *= 1.3; if (this.equip.active('reload')) r *= 0.7; return r * (this.vehicleSkill?.reloadMult ?? 1); }
+  aimTime() { let a = this.spec.aimTime; if (!this.crewAlive('Gunner')) a *= 1.5; if (this.suppressedFor > 0) a *= this.spec.openTop ? 1.9 : 1.28; if (this.spec.turretElectronicsWeakness && this.modules.turret < 1) a *= this.spec.turretElectronicsWeakness; return a * (this.vehicleSkill?.aimMult ?? 1); }
   // Balance values are cone radii in metres at 100 m.
   dispersion() {
     const radius = lerp(this.spec.dispersion, this.spec.maxDispersion, this.dispersionProgress);
-    return Math.atan(radius / 100) * precisionMultiplier(this) * (this.suppressedFor > 0 ? (this.spec.openTop ? 1.55 : 1.2) : 1);
+    return Math.atan(radius / 100) * precisionMultiplier(this) * (this.vehicleSkill?.dispersionMult ?? 1) * (this.game.time < (this.skillShockUntil || 0) ? this.skillShockMult || 1 : 1) * (this.suppressedFor > 0 ? (this.spec.openTop ? 1.55 : 1.2) : 1);
   }
   updateDispersion(dt) {
     if (this.spec.dispersion === this.spec.maxDispersion) {
@@ -117,13 +119,14 @@ export class Tank {
   update(dt, time) {
     if (!this.alive) return;
     this.equip.update(dt);
+    this.vehicleSkill?.update(dt);
     if (this.apsCooldown > 0) this.apsCooldown = Math.max(0, this.apsCooldown - dt);
     updateConceptTimers(this, dt);
     if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
     if (this.trackRepairs[0] > 0 || this.trackRepairs[1] > 0) {
       const previous = this.modules[this.mobilityModule];
-      this.trackRepairs[0] = Math.max(0, this.trackRepairs[0] - dt);
-      this.trackRepairs[1] = Math.max(0, this.trackRepairs[1] - dt);
+      this.trackRepairs[0] = Math.max(0, this.trackRepairs[0] - dt * (this.vehicleSkill?.repairMult ?? 1));
+      this.trackRepairs[1] = Math.max(0, this.trackRepairs[1] - dt * (this.vehicleSkill?.repairMult ?? 1));
       this.updateTrackCondition();
       if (this.isPlayer && this.modules[this.mobilityModule] > previous) {
         this.game.hud.message(this.mobilityLabel + ' repaired', '#9fd39f');
@@ -150,6 +153,7 @@ export class Tank {
   updateAfterMotion(dt) {
     if (this.alive) {
       this.abilities.updateDozer(dt);
+      this.vehicleSkill?.motion(dt);
       const half = trackCenterOffset(this.spec.dims);
       updateRunningGear(this.model,
         this.trackRepairs[0] > 0 ? 0 : (this.speed + this.turnRate * half) * dt,
@@ -295,7 +299,7 @@ export class Tank {
     return { origin, shell, velocity };
   }
   tryFire(time) {
-    if (!this.alive || this.afloat || this.fireReloadLeft > 0) return false;
+    if (!this.alive || this.afloat || this.fireReloadLeft > 0 || this.vehicleSkill?.canFire === false) return false;
     if (!this.abilities.usingSecondary && this.usesSpade() && this.spadeState !== 'deployed') {
       if (!this.setSpade(true)) return false;
       this.pendingFire = true;
@@ -321,6 +325,7 @@ export class Tank {
       const mult = this.abilities.consumeOverpen();
       fireShell = { ...fireShell, pen: Math.round(sh.pen * mult) };
     }
+    if (!secondary && this.vehicleSkill) fireShell = this.vehicleSkill.onShot(fireShell);
     g.ballistics.spawn(this, fireShell, origin, vel, sh.guided ? this.input.aim.clone() : undefined);
     this.lastFired = time; this.stats.shots++;
     if (secondary) {
@@ -328,7 +333,7 @@ export class Tank {
       this.secondaryReloadLeft = this.spec.secondary.reload * (this.modules.gun < 1 ? 1.3 : 1);
     } else {
       this.ammo[this.shellIdx]--;
-      this.reloadLeft = this.reloadTime();
+      this.reloadLeft = this.vehicleSkill?.afterReload(this.reloadTime()) ?? this.reloadTime();
       this.abilities.onFire();
       this.recoil = 1;
       if (this.ammo[this.shellIdx] <= 0) {
@@ -444,12 +449,13 @@ export class Tank {
       const mult = this.abilities.consumeOverpen();
       fireShell = { ...fireShell, pen: Math.round(fireShell.pen * mult) };
     }
+    if (this.vehicleSkill) fireShell = this.vehicleSkill.onShot(fireShell);
     this.game.ballistics.spawn(this, fireShell, muzzle, velocity, shell.guided ? this.input.aim.clone() : undefined);
     return { muzzle, dir, caliber: shell.caliber };
   }
   fireBurstRound(time) {
     const cfg = this.spec.burst, index = this.burstShellIdx;
-    if (!cfg || this.ammo[index] <= 0 || this.burstLeft <= 0) { this.burstLeft = 0; return; }
+    if (!cfg || this.ammo[index] <= 0 || this.burstLeft <= 0 || this.vehicleSkill?.canFire === false) { this.burstLeft = 0; return; }
     const offsets = cfg.offsets || [];
     const shot = this.spawnRound(index, offsets.length ? offsets[this.burstOffsetIndex % offsets.length] : null, this.burstOffsetIndex);
     this.burstOffsetIndex++; this.ammo[index]--; this.stats.shots++; this.lastFired = time; this.recoil = 0.35;
@@ -457,7 +463,7 @@ export class Tank {
     this.game.physics?.recoil(this, shot.muzzle, shot.dir, shot.caliber);
     this.burstLeft--;
     if (this.burstLeft > 0 && this.ammo[index] > 0) {
-      this.reloadLeft = cfg.interval; this.burstTimer = cfg.interval;
+      this.reloadLeft = cfg.interval * (this.vehicleSkill?.burstIntervalMult ?? 1); this.burstTimer = this.reloadLeft;
     } else {
       this.burstLeft = 0; this.reloadLeft = this.reloadTime();
       if (this.ammo[index] <= 0) { const next = this.ammo.findIndex(n => n > 0); if (next >= 0) this.shellIdx = next; }
@@ -481,8 +487,8 @@ export class Tank {
     if (first) this.game.audio.gun(first.muzzle, first.caliber, this.isPlayer);
     if (this.spec.burst && this.spec.burst.shellIndices.includes(index)) {
       this.burstLeft = Math.max(0, this.spec.burst.count - 1); this.burstShellIdx = index;
-      this.burstTimer = this.spec.burst.interval; this.burstOffsetIndex = this.model.muzzles ? 1 : 0;
-      if (this.burstLeft > 0) this.reloadLeft = this.spec.burst.interval;
+      this.burstTimer = this.spec.burst.interval * (this.vehicleSkill?.burstIntervalMult ?? 1); this.burstOffsetIndex = this.model.muzzles ? 1 : 0;
+      if (this.burstLeft > 0) this.reloadLeft = this.burstTimer;
     }
     if (this.spec.artillery?.autoDeploy) {
       this.autoArtilleryShots++;
@@ -539,6 +545,7 @@ export class Tank {
   damage(amount, attacker, cause) {
     if (!this.alive || amount <= 0) return;
     this.game.resetControlContribution?.(this);
+    if (!['ammo','crew','fire','drown','explosion'].includes(cause)) { amount *= this.vehicleSkill?.damageMult ?? 1; this.vehicleSkill?.damaged(); }
     amount = Math.min(amount, this.hp); this.hp -= amount; this.stats.received += amount; this.lastDamagedAt = this.game.time;
     if (cause !== 'fire') this.game.hud?.recordDamage(this, amount);
     if (attacker && attacker !== this && attacker.team !== this.team) { attacker.stats.damage += amount; this.lastAttacker = attacker; }
@@ -570,6 +577,7 @@ export class Tank {
   }
   damageModule(module) {
     if (this.modules[module] !== 1) return false;
+    if ((this.vehicleSkill?.moduleMult ?? 1) < 1 && this.game.rng.next() > this.vehicleSkill.moduleMult) return false;
     this.modules[module] = 0.5;
     const label = {
       engine: '发动机受损',

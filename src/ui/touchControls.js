@@ -1,3 +1,4 @@
+import { skillKey } from '../game/vehicleSkills.js';
 // Touch controls use the same vehicle inputs, aiming and firing logic as desktop.
 import { equipmentIcon, equipmentStatus } from './equipment.js';
 
@@ -19,7 +20,7 @@ export class TouchControls {
  constructor(game){
   this.g=game;this.throttle=0;this.steer=0;this.driveHeld=false;this.firing=false;this.listeners=[];
   const root=document.createElement('div');root.className='touch-controls';this.root=root;
-  root.innerHTML='<div class="touch-drive" aria-label="驾驶摇杆"><span>驾驶</span><i></i></div><div class="touch-actions"><button data-action="scope">开镜</button><button data-action="zoom">倍率</button><button data-action="armor">装甲视图</button><button data-action="lock">锁定</button><button data-action="ability">技能</button><button data-action="brace">驻锄</button><button data-action="mode">武器模式</button><button data-action="kit">装甲套件</button><button data-action="suspension">悬挂</button><button data-action="fire" class="touch-fire">开火</button></div><div class="touch-ammo"><button data-action="ammo0">弹 1</button><button data-action="ammo1">弹 2</button><button data-action="ammo2">弹 3</button><button data-action="item0">装备 1</button><button data-action="item1">装备 2</button><button data-action="item2">装备 3</button></div><div class="touch-top"><button data-action="score">战况</button><button data-action="pause">暂停</button></div><div class="touch-hint">左手驾驶 · 右手滑动战场瞄准 · 建议横屏</div>';
+  root.innerHTML='<div class="touch-drive" aria-label="驾驶摇杆"><span>驾驶</span><i></i></div><div class="touch-actions"><button data-action="scope">开镜</button><button data-action="zoom">倍率</button><button data-action="armor">装甲视图</button><button data-action="lock">锁定</button><button data-action="ability">技能</button><button data-action="extraSkill" hidden>专属技能</button><button data-action="brace">驻锄</button><button data-action="mode">武器模式</button><button data-action="kit">装甲套件</button><button data-action="suspension">悬挂</button><button data-action="fire" class="touch-fire">开火</button></div><div class="touch-ammo"><button data-action="ammo0">弹 1</button><button data-action="ammo1">弹 2</button><button data-action="ammo2">弹 3</button><button data-action="item0">装备 1</button><button data-action="item1">装备 2</button><button data-action="item2">装备 3</button></div><div class="touch-top"><button data-action="score">战况</button><button data-action="pause">暂停</button></div><div class="touch-hint">左手驾驶 · 右手滑动战场瞄准 · 建议横屏</div>';
   game.hud.root.append(root);game.hud.root.classList.add('touch-hud');
   const canvas=game.renderer.domElement,drive=root.querySelector('.touch-drive'),knob=drive.querySelector('i');
   const on=(target,event,fn,opts)=>{target.addEventListener(event,fn,opts);this.listeners.push(()=>target.removeEventListener(event,fn,opts));};
@@ -45,7 +46,8 @@ export class TouchControls {
    if(a==='zoom'){if(!game.cam.sniper)game.toggleSniper();else game.stepScopeZoom(1,true);}
    if(a==='armor')game.armorView.toggle();
    if(a==='lock')game.toggleLock();
-   if(a==='ability')p.tryAbility();
+   if(a==='ability'){if(skillKey(p.spec)==='G')p.vehicleSkill.activate();else p.tryAbility();}
+   if(a==='extraSkill'&&skillKey(p.spec)==='K')p.vehicleSkill.activate();
    if(a==='brace'){if(p.usesSpade?.())p.toggleSpade();else if(p.spec.artillery?.autoDeploy){if(p.autoArtilleryState==='stowed'&&Math.abs(p.speed)<.3){p.autoArtilleryState='deploying';p.autoArtilleryTimer=p.spec.artillery.deploySeconds||1;}else if(p.autoArtilleryState==='deployed'){p.autoArtilleryState='packing';p.autoArtilleryTimer=p.spec.artillery.packSeconds||1;p.pendingFire=false;}}}
    if(a==='mode')p.cycleWeaponMode?.();
    if(a==='kit')p.cycleArmorPackage?.();
@@ -71,6 +73,8 @@ export class TouchControls {
   for(const b of this.root.querySelectorAll('button')){const a=b.dataset.action;if(a==='scope')label(b,g.cam.sniper?'退出开镜':'开镜');if(a==='zoom')label(b,g.cam.sniper?'×'+g.cam.zoom:'倍率');if(a==='armor')b.classList.toggle('active',g.armorView.enabled);if(a==='lock')b.classList.toggle('active',!!g.lock);
    if(a.startsWith('ammo')){const i=+a.slice(4);label(b,'弹 '+(i+1)+' · '+(p.ammo[i]??0));b.classList.toggle('active',!p.abilities.usingSecondary&&p.shellIdx===i);}
    if(a.startsWith('item'))updateEquipmentButton(b,p.equip.slots[+a.slice(4)]);
+   if(a==='extraSkill'){b.hidden=skillKey(p.spec)!=='K';if(!b.hidden)label(b,p.vehicleSkill.cfg.name);}
+   if(a==='ability'&&skillKey(p.spec)==='G')label(b,p.vehicleSkill.cfg.name);
    if(a==='ability'&&p.spec.secondary){label(b,p.abilities.usingSecondary?'副炮 · '+p.secondaryRounds:'切副炮');b.classList.toggle('active',p.abilities.usingSecondary);}
    if(a==='ability'&&p.spec.dozer){label(b,p.abilities.dozerActive?'收起推土铲':'推土铲');b.classList.toggle('active',p.abilities.dozerActive);}
    if(a==='brace')label(b,p.usesSpade?.()?'驻锄 · '+p.spadeState:p.spec.artillery?.autoDeploy?'部署 · '+p.autoArtilleryState:'驻锄');
