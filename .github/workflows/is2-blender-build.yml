@@ -1,0 +1,80 @@
+name: IS-2 Blender asset build
+
+on:
+  push:
+    branches:
+      - blender/is2-model1944-level2
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/is2-blender-build.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/is2-blender-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-is2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
+      - name: Validate Python script syntax
+        run: python3 -m py_compile tools/blender/is2_model1944_blockout.py
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+          blender --version
+
+      - name: Generate IS-2 GLB and review renders
+        run: |
+          mkdir -p public/models artifacts
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background --python tools/blender/is2_model1944_blockout.py
+
+      - name: Verify exported asset
+        run: |
+          test -s public/models/is2_model1944_blockout.glb
+          test -s artifacts/is2-model1944/is2_model1944_first_pass.blend
+          test -s artifacts/is2-model1944/01_front_three_quarter.png
+          test -s artifacts/is2-model1944/02_left_side.png
+          test -s artifacts/is2-model1944/03_front.png
+          test -s artifacts/is2-model1944/04_rear.png
+          test -s artifacts/is2-model1944/05_top.png
+          ls -lh public/models/is2_model1944_blockout.glb artifacts/is2-model1944/
+
+      - name: Commit generated GLB to the feature branch
+        if: github.event_name == 'push'
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/models/is2_model1944_blockout.glb
+          if git diff --cached --quiet; then
+            echo "Generated GLB is already current."
+          else
+            git commit -m "Add generated IS-2 Model 1944 Blender GLB"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
+
+      - name: Upload model and visual review package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: is2-model1944-blender-first-pass
+          if-no-files-found: warn
+          path: |
+            public/models/is2_model1944_blockout.glb
+            artifacts/is2-model1944/is2_model1944_first_pass.blend
+            artifacts/is2-model1944/*.png
