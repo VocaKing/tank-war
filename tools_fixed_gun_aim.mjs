@@ -164,7 +164,7 @@ try {
   assert.equal(result.driving.yaw, 0);
   assert.ok(result.driving.moved > 0.5);
   assert.ok(result.afterRelease.heading > result.driving.heading && result.afterRelease.speed > 0);
-  assert.ok(Math.abs(result.settled.error) < 1e-5 && result.settled.yaw === 0 && result.settled.spread === 0, JSON.stringify(result));
+  assert.ok(Math.abs(result.settled.error) < 0.0015 && result.settled.yaw === 0 && result.settled.spread === 0, JSON.stringify(result));
   assert.ok(Math.abs(result.keysCancel) < 1e-4);
   assert.ok(Math.abs(result.brake) < 1e-4);
   assert.ok(result.right < -0.1);
@@ -178,7 +178,7 @@ try {
   assert.ok(result.airborne.flying && Math.abs(result.airborne.heading) < 1e-4 && result.airborne.yaw === 0);
   assert.ok(result.grounded > 0.5);
   assert.ok(result.reversing.heading > 0 && result.reversing.speed < 0);
-  assert.ok(result.slope.aimAngle < 0.002 && Math.abs(result.slope.hullError) < 1e-5 && result.slope.yaw === 0,
+  assert.ok(result.slope.aimAngle < 0.002 && Math.abs(result.slope.hullError) < 0.0015 && result.slope.yaw === 0,
     JSON.stringify(result.slope));
   assert.ok(Math.abs(result.occluded - Math.PI / 2) < 0.02);
   assert.ok(Math.abs(result.normal.heading) < 1e-4);

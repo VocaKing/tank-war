@@ -8,6 +8,7 @@ import { trackCenterOffset } from './vehicleDimensions.js';
 import { Abilities } from './abilities.js';
 import { VehicleSkill } from './vehicleSkills.js';
 import { TubeReload } from './tubeReload.js';
+import { limitedYaw } from './fixedGunControl.js';
 import { Equipment } from './items.js';
 import { findEraTile } from './eraMechanics.js';
 import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
@@ -216,11 +217,11 @@ export class Tank {
     _v2.set(dx / (horizontal || 1) * Math.cos(th), Math.sin(th), dz / (horizontal || 1) * Math.cos(th));
     _q.copy(pose).invert(); _v2.applyQuaternion(_q);
     const rawYawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
-    const yawT = s.fireArc ? clamp(wrapAngle(rawYawT), -s.fireArc * DEG, s.fireArc * DEG) : rawYawT;
+    const yawT = rawYawT;
     const prev = this.turretYaw;
     if (!s.fixedGun) {
       const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
-      this.turretYaw = wrapAngle(approachAngle(prev, yawT, rate * dt));
+      this.turretYaw = s.fireArc ? limitedYaw(prev,yawT,s.fireArc*DEG,rate*dt) : wrapAngle(approachAngle(prev,yawT,rate*dt));
     }
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
     const minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
@@ -232,6 +233,8 @@ export class Tank {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
     const stance = this.vehicleSkill?.id==='siege' && this.vehicleSkill.toggled ? (this.spec.hydroSuspension?.lowOffset||0)*this.vehicleSkill.fraction : this.suspensionOffset||0;
     m.body.position.y = stance;
+    // The casemate geometry is attached to the hull; never rotate it as a turret.
+    if(this.spec.fixedGun)this.turretYaw=0;
     m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
     let support = this.spadeProgress;
     if (this.spec.artillery?.autoDeploy) {

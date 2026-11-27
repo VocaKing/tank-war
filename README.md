@@ -48,3 +48,6 @@ Four game-balance tiers contain 7/11/8/21 vehicles. Each 7v7 side has at least f
 
 ### Distributed and randomized spawning
 Each side starts in two or three map-specific spawn clusters (4+3 or 3+2+2), with nominal center separations around 300–700 m. Side ownership is randomly exchanged per match, including base colors, minimap, capture ownership and AI lane direction. Spawn placement searches dry, traversable, connected ground with slope, obstacle and hull-clearance checks; no blocked-cell fallback. Friendly spawn areas are indicated on the minimap but are not capture points.
+
+### Fixed-gun control stability
+Casemate meshes are held at zero turret yaw; hull aiming is available only when the driver is not commanding motion, grounded, alive and unbraced. A damped yaw servo settles instead of chasing oscillating sight errors. Nearby non-target camera-ray hits use a stable view bearing; explicit enemy/lock/debug aim remains exact. NPC fixed guns stop their idle scan from rotating the hull, and navigation has priority over gunnery. Limited-traverse mounts use bounded, non-wrapping yaw motion with rear-seam hysteresis.

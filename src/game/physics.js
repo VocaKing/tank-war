@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mayHullAim, hullYawCommand } from './fixedGunControl.js';
 import { DEG, clamp, lerp } from '../util.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 
@@ -396,9 +397,9 @@ export class BattlefieldPhysics {
     // A damaged track can serve as a pivot after the hull slows down. The intact track supplies the grip.
     const pivotMax = canPivot ? turnMax * 0.25 * engine * clamp((2 - Math.abs(longitudinal)) / 1.55, 0, 1) : 0;
     const turnLimit = mobile ? turnMax : pivotMax;
-    tank.hullAiming = !!(s.fixedGun && turnLimit > 0 && !input.driveHeld && !throttle && !steer);
-    const aimError = tank.hullAiming ? tank.fixedGunHeadingError() : 0;
-    const commanded = tank.hullAiming ? clamp(aimError / 0.12, -turnLimit, turnLimit) :
+    tank.hullAiming=mayHullAim(tank,{turnLimit,braced,floating,crawl});
+    const aimError=tank.hullAiming?tank.fixedGunHeadingError():0;
+    const commanded=tank.hullAiming?hullYawCommand(aimError,_angular.dot(_normal),turnLimit):
       steer * turnLimit * (mobile && longitudinal < -0.3 ? -1 : 1);
     // Keep the disabled side nearly stationary as the hull swings around it.
     const pivotSpeed = brokenSide ? commanded * brokenSide * trackCenterOffset(s.dims) : 0;

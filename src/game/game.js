@@ -26,6 +26,7 @@ import { createControl, updateControl, resetControlCredit } from './controlCaptu
 import { skillKey } from './vehicleSkills.js';
 import { makeMatch } from './matchmaking.js';
 import { chooseSpawnLayout, planSpawnPositions } from './spawnLayout.js';
+import { stableSightPoint } from './fixedGunControl.js';
 function withinPathXZ(p, origin, dx, dz, radius) {
   const x = p.x - origin.x, z = p.z - origin.z;
   const lengthSquared = dx * dx + dz * dz;
@@ -297,15 +298,9 @@ export class Game {
     p.input.brake = !!k.Space;
     if (p.input.brake) p.input.throttle = 0;
     p.input.aim.copy(this.aimPoint);
-    if (p.spec.fixedGun && !this.debugAim && !this.lock) {
-      const dir = this.camDir();
-      const forward = (p.input.aim.x - p.pos.x) * dir.x + (p.input.aim.z - p.pos.z) * dir.z;
-      // A chase camera can hit a wall behind the vehicle. Keep following
-      // the sight direction there so the hull cannot turn away from the view.
-      if (forward <= 0.1) {
-        p.input.aim.copy(p.pos).addScaledVector(dir, 100);
-        p.input.aim.y += p.model.turret.position.y + p.model.gun.position.y;
-      }
+    if(p.spec.fixedGun&&!this.debugAim&&!this.lock){
+      const stable=stableSightPoint(p.pos,p.input.aim,this.camDir(),p.model.turret.position.y+p.model.gun.position.y,!!this.aimTank);
+      if(stable)p.input.aim.set(stable.x,stable.y,stable.z);
     }
     if (this.mouseDown || this.touch?.firing) p.tryFire(this.time);
   }

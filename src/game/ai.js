@@ -175,14 +175,16 @@ export class AIController {
     // ---- movement ----
     const tgt = this.target; const dTgt = tgt ? t.pos.distanceTo(tgt.pos) : 1e9;
     let moving = true;
+    // AI navigation and hull aiming must never issue competing turn commands.
+    t.input.driveHeld=true;
     if (this.reverseT > 0) { this.reverseT -= dt; t.input.throttle = -0.8; t.input.steer = this.revSteer; if (this.reverseT <= 0) this.setGoal(this.goal || [this.enemyBase.x, this.enemyBase.z]); }
     else {
       const atHold = this.hold && Math.hypot(t.pos.x - this.hold[0], t.pos.z - this.hold[1]) < 3.5;
-      const engageStop = tgt && ((t.spec.artillery && dTgt < (t.spec.artillery.aiEngageRange || 980)) || (this.role === 'assault' && dTgt < 380 && this.bestRatio > 0.7) || this.state === 'capture' || atHold || (this.state === 'retreat' && t.inBush));
+      const engageStop = tgt && ((t.spec.fixedGun && dTgt < 550 && this.bestRatio > .65 && this.state !== 'retreat') || (t.spec.artillery && dTgt < (t.spec.artillery.aiEngageRange || 980)) || (this.role === 'assault' && dTgt < 380 && this.bestRatio > 0.7) || this.state === 'capture' || atHold || (this.state === 'retreat' && t.inBush));
       if (atHold || engageStop) {
         moving = false;
         if (tgt && !t.spec.fixedGun) this.faceHeading(Math.atan2(tgt.pos.x - t.pos.x, tgt.pos.z - t.pos.z) + this.angleOff);
-        else if (!tgt && this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);
+        else if (!tgt && !t.spec.fixedGun && this.holdHeading !== null && atHold) this.faceHeading(this.holdHeading);
         else { t.input.throttle = 0; t.input.steer = 0; }
         if (this.state === 'capture' && !tgt) { const b = this.enemyBase; if (Math.hypot(t.pos.x - b.x, t.pos.z - b.z) > b.r * 0.7) { moving = true; this.steerTo(b.x, b.z, 0.6); } }
       } else if (this.path.length && this.pi < this.path.length) {
@@ -195,6 +197,9 @@ export class AIController {
     // stuck detection
     this.stuckT += dt;
     if (this.stuckT > 2.5) { const moved = t.pos.distanceTo(this.lastPos); if (moving && Math.abs(t.input.throttle) > 0.3 && moved < 1.5 && this.reverseT <= 0) { const h = t.heading; this.g.nav.penalize(t.pos.x + Math.sin(h) * 5, t.pos.z + Math.cos(h) * 5); this.g.nav.penalize(t.pos.x, t.pos.z, 4); this.reverseT = 1.8; this.revSteer = Math.random() < 0.5 ? -1 : 1; } this.lastPos.copy(t.pos); this.stuckT = 0; }
+    // A stationary fixed gun follows a real target, or holds a stable watch
+    // bearing. While navigating (even a pure pivot), the driver owns yaw.
+    if(t.spec.fixedGun)t.input.driveHeld=moving||this.reverseT>0;
     // ---- gunnery ----
     if (tgt) {
       const w = tgt.model.root.localToWorld(_q.copy(this.aimLocal));
@@ -212,7 +217,8 @@ export class AIController {
       const concealOK = t.spec.artillery || !t.inBush || this.bestRatio > 1.0 || dTgt < 250 || this.role !== 'sniper';
       if (ready && worth && concealOK && (t.spec.artillery || !this.allyInLine(tgt))) { if (t.tryFire(g.time)) this.resampleError(); }
     } else {
-      this.idleScan += dt * 0.25; const base = this.enemyBase; const h = Math.atan2(base.x - t.pos.x, base.z - t.pos.z) + Math.sin(this.idleScan) * 0.6;
+      this.idleScan += dt * 0.25; const base=this.enemyBase;
+      const h=t.spec.fixedGun?(moving?t.heading:this.holdHeading??Math.atan2(base.x-t.pos.x,base.z-t.pos.z)):Math.atan2(base.x-t.pos.x,base.z-t.pos.z)+Math.sin(this.idleScan)*.6;
       t.input.aim.set(t.pos.x + Math.sin(h) * 300, t.pos.y + 2, t.pos.z + Math.cos(h) * 300);
       if (t.abilities.usingSecondary) t.tryAbility();
       // keep a reasonable round loaded
