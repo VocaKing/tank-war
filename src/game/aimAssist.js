@@ -139,7 +139,8 @@ export class AimAssist {
   resistExit(yaw, pitch, dt) {
     const c = this.g.cam;
     // Let the normal aim pass re-anchor or switch after applying the full movement.
-    if (this.validTarget(this.probe(yaw, pitch, dt)?.tank)) return false;
+    const probed=this.probe(yaw,pitch,dt)?.tank;
+    if (this.validTarget(probed) && (this.manual || !probed.vehicleSkill?.jammed)) return false;
 
     let edgeYaw = c.yaw - this.offset.x, edgePitch = c.pitch - this.offset.y;
     const start = this.probe(c.yaw, c.pitch, dt);

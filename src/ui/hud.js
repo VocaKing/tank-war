@@ -337,10 +337,11 @@ export class HUD {
     const mobilityStatus = p.trackRepairs.map((time, i) => time > 0 ? `${i === 0 ? 'L' : 'R'} ${Math.ceil(time)}s` : '').filter(Boolean).join(' · ');
     const specialStatus = p.usesSpade?.() ? `驻锄 · ${p.spadeState}` : s.artillery?.autoDeploy ? `自动部署 · ${p.autoArtilleryState}` : '';
     const kitStatus = s.armorPackages ? `装甲套件 · ${s.armorPackages[p.armorPackageIndex]?.name || '基础'}` : '';
-    const movementStatus = p.afloat ? '浮航 · 主炮锁定' : [dozerStatus, specialStatus, kitStatus].filter(Boolean).join(' · ');
+    const tubeStatus=p.tubeReload ? '炮管 '+p.tubeReload.timers.filter(t=>t<=0).length+'/'+p.tubeReload.timers.length+' · '+s.multiTube.modes[p.weaponModeIndex].name : '';
+    const movementStatus = p.afloat ? '浮航 · 主炮锁定' : [dozerStatus, specialStatus, kitStatus, tubeStatus].filter(Boolean).join(' · ');
     const trackStatus = mobilityStatus;
     this.setPanelHtml('h-veh-name', `${s.short} <small>${s.nation} · ${s.era}</small>`);
-    this.setPanelHtml('h-veh-magazine', ability.magazine ? Array.from({ length: ability.magazine.size }, (_, i) => `<i class="${i < ability.magLeft ? 'on' : ''}"></i>`).join('') : '');
+    this.setPanelHtml('h-veh-magazine', p.tubeReload ? p.tubeReload.timers.map((time,i)=>`<i title="炮管 ${i+1} · ${time>0?time.toFixed(1)+'s':'就绪'}" class="${time<=0?'on':''}"></i>`).join('') : ability.magazine ? Array.from({ length: ability.magazine.size }, (_, i) => `<i class="${i < ability.magLeft ? 'on' : ''}"></i>`).join('') : '');
     this.setPanelHtml('h-veh-info', `<div class="row"><span class="spd">${Math.round(Math.abs(p.speed) * 3.6)}<small> km/h</small></span>${mod('engine', 'ENGINE')}${mod(p.mobilityModule || 'tracks', trackStatus || p.mobilityLabel || 'TRACKS')}${mod('gun', 'GUN')}${mod('turret', 'TURRET')}</div>
       ${movementStatus ? `<div class="crew"><span>${movementStatus}</span></div>` : ''}
       ${p.vehicleSkill?.cfg ? `<div class="crew"><span class="ok">${p.vehicleSkill.status()}</span></div>` : ''}
@@ -358,7 +359,7 @@ export class HUD {
     // ammo
     this.setPanelHtml('h-ammo', s.shells.map((sh, i) => `<div class="slot ${!ability.usingSecondary && i === p.shellIdx ? 'sel' : ''} ${p.ammo[i] ? '' : 'empty'}"><b>${i + 1}</b><div>${sh.name}<small>${sh.type} · ${sh.pen} mm · ${sh.damage} dmg · ${sh.velocity} m/s</small></div><span>${p.ammo[i]}</span></div>`).join('') +
       (s.secondary ? `<div class="slot ${ability.usingSecondary ? 'sel' : ''} ${p.secondaryRounds ? '' : 'empty'}"><b>G</b><div>${s.secondary.shell.name}<small>副炮 · ${p.secondaryReloadLeft > 0 ? p.secondaryReloadLeft.toFixed(1) + 's' : '就绪'}</small></div><span>${p.secondaryRounds}</span></div>` : '') +
-      `<div class="reload"><i style="width:${Math.max(0, 1 - p.fireReloadLeft / (ability.usingSecondary ? s.secondary.reload : p.reloadTime())) * 100}%"></i><span>${p.afloat ? '浮航中' : p.fireReloadLeft > 0 ? 'RELOADING ' + p.fireReloadLeft.toFixed(1) + 's' : 'READY'}</span></div>`);
+      `<div class="reload"><i style="width:${Math.max(0, 1 - p.fireReloadLeft / (ability.usingSecondary ? s.secondary.reload : p.reloadTime())) * 100}%"></i><span>${p.vehicleSkill?.canFire===false ? 'OVERHEATED · 冷却中' : p.afloat ? '浮航中' : p.fireReloadLeft > 0 ? 'RELOADING ' + p.fireReloadLeft.toFixed(1) + 's' : 'READY'}</span></div>`);
     }
     // concealment
     const st = this.$('h-status'); const sinceFire = G.time - p.lastFired;

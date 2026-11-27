@@ -33,6 +33,7 @@ jobs:
       - run: node tools_wreck_vfx.mjs
       - run: node tools_balance.mjs
       - run: node tools_battlefield_timing.mjs
+      - run: node tools_vehicle_skills.mjs
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
       - run: npm run build
@@ -48,6 +49,7 @@ jobs:
           done
           curl -fsS http://127.0.0.1:4173/tank-war/ >/dev/null || { cat /tmp/tank-war-preview.log; exit 1; }
           node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "t72,pzh2000,aegis140" "village,forest,desert"
+          node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "strv103,m50ontos,2s38" "village"
       - name: Remove QA-only path mapping
         run: rm -f dist/tank-war
       - name: Deploy to gh-pages

@@ -93,6 +93,7 @@ export function describeTankAbilities(spec) {
       effect: '炮塔后部被击穿时，泄压板将弹药爆燃向外排出，各类炮弹保留原数量的 40%（向下取整）。',
     });
   }
+  if(spec.id==='m50ontos')abilities.push({type:'active',name:'独立六炮',effect:'切换单发、双发、六炮齐射；每根炮管单独装填，消耗实际弹药。',timing:'发射后短暂稳定间隔',key:'V'});
   const skill = describeVehicleSkill(spec); if (skill) abilities.push(skill);
   return abilities;
 }

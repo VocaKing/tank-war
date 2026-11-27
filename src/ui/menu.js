@@ -26,7 +26,7 @@ function skillDetails(tank, mobile) {
       <li class="${type}">
         <div class="ability-title">${typeBadge(type)} <strong>${name}</strong></div>
         <p>${effect}</p>
-        <div class="ability-use">${type === 'active' ? key === 'K' ? (mobile ? '战斗中点「专属技能」' : '战斗中按 <kbd>K</kbd> 键') : activation : '自动生效'}${timing ? ' · ' + timing : ''}</div>
+        <div class="ability-use">${type === 'active' ? key === 'V' ? (mobile ? '战斗中点「武器模式」' : '战斗中按 <kbd>V</kbd> 键') : key === 'K' ? (mobile ? '战斗中点「专属技能」' : '战斗中按 <kbd>K</kbd> 键') : activation : '自动生效'}${timing ? ' · ' + timing : ''}</div>
       </li>`).join('')}</ul>`;
 }
 

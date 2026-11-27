@@ -238,10 +238,12 @@ export class Ballistics {
     if (roll >= ev.eff) {
       const mult = s.type.he ? 1.0 : 1.0; const dmg = s.spec.damage * mult * g.rng.range(0.85, 1.15);
       if (!artillery) { g.effects.penetration(p); g.audio.impact(p, 'metal'); }
+      const beforeHp=tank.hp;
       const msgs = tank.applyPenetration(hit, s.spec, shooter, dmg, ev.tracks);
-      shooter?.vehicleSkill?.hit(tank,s.spec);
+      if(s.spec.vehicleSerial) shooter?.vehicleSkill?.hit(tank,s.spec);
+      const applied=Math.max(0,beforeHp-tank.hp);
       if (shooter && shooter.team !== tank.team) shooter.stats.pens++;
-      if (fromPlayer) g.hud.hitMarker('pen', Math.round(dmg), msgs, tank); if (toPlayer) g.hud.damageFrom(shooter, Math.round(dmg), msgs.join(', '));
+      if (fromPlayer) g.hud.hitMarker('pen', Math.round(applied), msgs, tank); if (toPlayer) g.hud.damageFrom(shooter, Math.round(applied), msgs.join(', '));
       if (he) this.heBlast(s, p);
       return true;
     }

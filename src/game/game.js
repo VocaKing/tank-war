@@ -554,7 +554,7 @@ export class Game {
       simulate: (sec, dt = 1 / 30) => { const t0 = performance.now(); const n = Math.round(sec / dt); for (let i = 0; i < n && !this.ended; i++) this.update(dt); return { ms: Math.round(performance.now() - t0), perFrame: +((performance.now() - t0) / n).toFixed(2), ended: this.ended, result: this.result }; },
       look: (dx, dy) => this.mouseLook(dx, dy),
       assist: () => { const a = this.assist; return { enabled: a.enabled, locked: !!a.target, target: a.target ? this.tanks.indexOf(a.target) : -1, focus: a.focus ? this.tanks.indexOf(a.focus) : -1, outline: this.outline && this.outline.lastDrawn ? this.tanks.indexOf(this.outline.lastDrawn) : -1, offPx: +a.offPx().toFixed(1), drag: +a.dragFactor().toFixed(3), lastBreak: a.lastBreak, stats: { ...a.stats }, yaw: this.cam.yaw, pitch: this.cam.pitch, aimTank: this.aimTank ? this.tanks.indexOf(this.aimTank) : -1 }; },
-      fire: () => { this.player.reloadLeft = this.player.secondaryReloadLeft = 0; return this.player.tryFire(this.time); },
+      fire: () => { this.player.reloadLeft = this.player.secondaryReloadLeft = 0; this.player.tubeReload?.timers.fill(0); return this.player.tryFire(this.time); },
       aim: (x, y, z) => { if (x === null) { this.debugAim = null; return; } this.debugAim = new THREE.Vector3(x, y, z); this.cursorPoint.copy(this.debugAim); this.aimPoint.copy(this.debugAim); this.player.input.aim.copy(this.debugAim); },
       tank: (i) => this.tanks[i],
       camAt: (a) => { this.camOverride = a; for (const id of ['h-markers', 'h-ret', 'h-cross']) { const e = document.getElementById(id); if (e) e.style.visibility = a ? 'hidden' : ''; } },

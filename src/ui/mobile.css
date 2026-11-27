@@ -115,3 +115,5 @@ html.mobile-device .touch-hud .touch-top{pointer-events:none}
 html.mobile-device .touch-hud .overlay{z-index:100;pointer-events:auto}
 html.mobile-device .touch-hud .overlay button{touch-action:manipulation}
 html.mobile-device .touch-hud .panel,html.mobile-device .touch-hud .scope,html.mobile-device .touch-hud .markers{pointer-events:none}
+
+.touch-actions button[hidden]{display:none!important}

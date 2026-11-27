@@ -54,12 +54,12 @@ export class VehicleSkill {
  get fraction(){return clamp(this.prep/(this.cfg?.prepare||1),0,1);}
  get prepared(){return this.fraction>=1;}
  get running(){return this.left>0||this.toggled;}
- get ready(){return !!this.cfg?.active&&this.t.alive&&this.cd<=0&&this.left<=0&&!this.armed;}
+ get ready(){return !!this.cfg?.active&&this.t.alive&&this.cd<=0&&this.left<=0&&!this.armed&&(!this.cfg.charges||this.charges>0);}
  msg(s){if(this.t.isPlayer)this.t.game.hud?.message(s,'#9fd39f');}
  activate(){
   const t=this.t,s=this.cfg;if(!s?.active||!t.alive||t.game.ended)return false;
   if(this.id==='siege'){
-   if(this.toggled){this.toggled=false;this.prep=0;return true;}
+   if(this.toggled){this.exitSiege();return true;}
    if(Math.abs(t.speed)>0.3||Math.abs(t.input.throttle)>0.1||t.afloat||t.airborne)return false;
    this.toggled=true;this.prep=0;this.msg(s.name+' · 准备中');return true;
   }
@@ -81,6 +81,7 @@ export class VehicleSkill {
   if(!this.armed&&!this.toggled)this.cd=s.cooldown||0;
   this.msg(s.name+' · 已启动');return true;
  }
+ exitSiege(){this.toggled=false;this.prep=0;}
  update(dt){
   const t=this.t,s=this.cfg;if(!s)return;
   this.cd=Math.max(0,this.cd-dt);this.left=Math.max(0,this.left-dt);
@@ -93,7 +94,7 @@ export class VehicleSkill {
   const moving=Math.abs(t.speed)>0.55||Math.abs(t.input.throttle||0)>0.12||t.airborne||t.afloat;
   const turn=Math.abs(t.turnRate||0);
   if(STATIONARY_SKILLS.has(this.id)){
-   if(moving){this.prep=0;this.stacks=0;if(this.id==='siege')this.toggled=false;this.silentUntil=-Infinity;}
+   if(moving){this.prep=0;this.stacks=0;if(this.id==='siege')this.exitSiege();this.silentUntil=-Infinity;}
    else if(this.id!=='siege'||this.toggled){
     if(turn<0.025)this.prep=Math.min(s.prepare,this.prep+dt);
     else this.prep=Math.max(0,this.prep-dt*(turn<0.14?0.25:2.5));
@@ -135,7 +136,7 @@ export class VehicleSkill {
   if(this.id==='ambush'){this.silentUntil=this.prepared?this.t.game.time+5:-Infinity;this.prep=0;}
   if(this.id==='heavyshot'&&this.armed){next={...next,damage:next.damage*s.mult};this.armed=false;this.cd=s.cooldown;this.lastShotPrepared=true;}
   if(this.id==='shock'&&this.armed){next={...next,vehicleShock:s.duration,vehicleShockMult:s.mult};this.armed=false;this.cd=s.cooldown;}
-  if(this.id==='serial')next={...next,vehicleSerial:!!this.prepared};
+  if(this.id==='serial'){if(this.serialPending&&!this.serialHit)this.stacks=0;this.serialPending=true;this.serialHit=false;next={...next,vehicleSerial:!!this.prepared,vehicleSerialIndex:(this.serialIndex=(this.serialIndex||0)+1)};}
   if(this.id==='suppress')next={...next,vehicleSuppression:s.duration,vehicleShockMult:s.mult};
   if(this.id==='heat'){this.heat=Math.min(100,this.heat+s.heatPerRound);if(this.heat>=100){this.overheated=true;this.left=0;this.msg('炮管过热 · 等待冷却');}}
   return next;
@@ -143,7 +144,7 @@ export class VehicleSkill {
  afterReload(base){if(!this.lastShotPrepared)return base;this.lastShotPrepared=false;return base*this.cfg.reloadMult;}
  hit(target,shell){
   if(!target?.alive||target.team===this.t.team)return;
-  if(this.id==='serial'&&shell.vehicleSerial&&this.prepared)this.stacks=Math.min(this.cfg.stacks,this.stacks+1);
+  if(this.id==='serial'&&shell.vehicleSerial&&this.prepared&&shell.vehicleSerialIndex===this.serialIndex&&!this.serialHit){this.serialHit=true;this.stacks=Math.min(this.cfg.stacks,this.stacks+1);}
   if(shell.vehicleShock||shell.vehicleSuppression){
    target.skillShockUntil=Math.max(target.skillShockUntil||0,this.t.game.time+(shell.vehicleShock||shell.vehicleSuppression));
    target.skillShockMult=shell.vehicleShockMult||1.2;

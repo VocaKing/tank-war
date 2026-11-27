@@ -7,6 +7,7 @@ import { intersectArmor } from './armorGeometry.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 import { Abilities } from './abilities.js';
 import { VehicleSkill } from './vehicleSkills.js';
+import { TubeReload } from './tubeReload.js';
 import { Equipment } from './items.js';
 import { findEraTile } from './eraMechanics.js';
 import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
@@ -47,7 +48,7 @@ export class Tank {
     this.stationarySeconds = 0; this.suppressedFor = 0; this.mrsiQueue = null;
     this.spadeProgress = 0; this.spadeState = 'stowed'; this.pendingFire = false;
     this.autoArtilleryState = 'stowed'; this.autoArtilleryTimer = 0; this.autoArtilleryShots = 0;
-    this.weaponModeIndex = 0; this.burstLeft = 0; this.burstTimer = 0; this.burstShellIdx = 0; this.burstOffsetIndex = 0;
+    this.weaponModeIndex = 0; this.tubeReload = spec.id==='m50ontos' ? new TubeReload(spec.multiTube.offsets.length) : null; this.burstLeft = 0; this.burstTimer = 0; this.burstShellIdx = 0; this.burstOffsetIndex = 0;
     this.suspensionMode = 'normal'; this.suspensionOffset = 0;
     this.secondaryRounds = spec.secondary?.rounds ?? 0;
     this.secondaryReloadLeft = 0;
@@ -61,7 +62,7 @@ export class Tank {
     this.inv = new THREE.Matrix4(); this.equip = new Equipment(this, items);
   }
   get shell() { return this.abilities.usingSecondary ? this.spec.secondary.shell : this.spec.shells[this.shellIdx]; }
-  get fireReloadLeft() { return this.abilities.usingSecondary ? this.secondaryReloadLeft : this.reloadLeft; }
+  get fireReloadLeft() { return this.abilities.usingSecondary ? this.secondaryReloadLeft : this.tubeReload ? Math.max(this.reloadLeft,this.tubeReload.readyIn(this.spec.multiTube.modes[this.weaponModeIndex].count,this.ammo[this.shellIdx])) : this.reloadLeft; }
   get gunMount() { return this.abilities.usingSecondary ? this.model.secondaryGun : this.model.gun; }
   get muzzleNode() { return this.abilities.usingSecondary ? this.model.secondaryMuzzle : this.model.muzzle; }
   get previewShell() {
@@ -120,6 +121,7 @@ export class Tank {
     if (!this.alive) return;
     this.equip.update(dt);
     this.vehicleSkill?.update(dt);
+    this.tubeReload?.update(dt);
     if (this.apsCooldown > 0) this.apsCooldown = Math.max(0, this.apsCooldown - dt);
     updateConceptTimers(this, dt);
     if (Math.abs(this.speed) > 0.5 || this.lastMoving === undefined) this.lastMoving = time;
@@ -228,7 +230,8 @@ export class Tank {
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
-    m.body.position.y = this.suspensionOffset || 0;
+    const stance = this.vehicleSkill?.id==='siege' && this.vehicleSkill.toggled ? (this.spec.hydroSuspension?.lowOffset||0)*this.vehicleSkill.fraction : this.suspensionOffset||0;
+    m.body.position.y = stance;
     m.turret.rotation.y = this.turretYaw; m.gun.rotation.x = -this.gunPitch; m.barrel.position.z = -this.recoil * m.maxRecoil;
     let support = this.spadeProgress;
     if (this.spec.artillery?.autoDeploy) {
@@ -289,7 +292,7 @@ export class Tank {
   previewLaunch(aim) {
     const multi = !this.abilities.usingSecondary && (this.spec.multiTube || this.spec.burst || this.spec.mrsi);
     const muzzles = multi && (this.burstLeft > 0 ? this.spec.burst?.offsets : this.spec.multiTube?.offsets);
-    const index = multi && this.burstLeft > 0 ? this.burstOffsetIndex : 0;
+    const index = this.tubeReload ? (this.tubeReload.available(this.spec.multiTube.modes[this.weaponModeIndex].count,this.ammo[this.shellIdx])[0] ?? this.tubeReload.cursor) : multi && this.burstLeft > 0 ? this.burstOffsetIndex : 0;
     const muzzle = multi ? this.roundMuzzle(muzzles?.length ? muzzles[index % muzzles.length] : null, index)
       : this.muzzleNode.getWorldPosition(new THREE.Vector3());
     const origin = this.shotOrigin(muzzle);
@@ -471,6 +474,8 @@ export class Tank {
   }
   tryFireSpecial(time) {
     const index = this.shellIdx, shell = this.spec.shells[index];
+    if (this.tubeReload) return this.fireIndependentTubes(time);
+    if (this.ammo[index]<=0) return false;
     if (this.spec.mrsi && this.ammo[index] >= 2) return fireConceptMRSI(this, time);
     const mode = this.spec.multiTube?.modes?.[this.weaponModeIndex] || { count: 1, reloadMult: 1 };
     const count = Math.min(mode.count || 1, this.ammo[index]);
@@ -500,11 +505,30 @@ export class Tank {
     if (this.ammo[index] <= 0) { const next = this.ammo.findIndex(n => n > 0); if (next >= 0) this.shellIdx = next; }
     return true;
   }
+  fireIndependentTubes(time) {
+    const index=this.shellIdx, mode=this.spec.multiTube.modes[this.weaponModeIndex];
+    const tubes=this.tubeReload.available(mode.count,this.ammo[index]);
+    if(!tubes.length||this.reloadLeft>0)return false;
+    let first=null;
+    for(const i of tubes){
+      const shot=this.spawnRound(index,this.spec.multiTube.offsets[i],i);
+      first??=shot;
+      this.game.effects.muzzle(shot.muzzle,shot.dir,shot.caliber);
+      this.game.physics?.recoil(this,shot.muzzle,shot.dir,shot.caliber);
+    }
+    this.tubeReload.fire(tubes,this.reloadTime()*(mode.reloadMult||1));
+    this.ammo[index]-=tubes.length;this.reloadLeft=0.45;this.recoil=1;
+    this.lastFired=time;this.stats.shots+=tubes.length;
+    if(first)this.game.audio.gun(first.muzzle,first.caliber,this.isPlayer);
+    if(this.ammo[index]<=0){const next=this.ammo.findIndex(n=>n>0);if(next>=0){this.shellIdx=next;this.tubeReload.changeAmmo(this.reloadTime()*0.85);}}
+    return true;
+  }
   tryAbility() { return this.abilities ? this.abilities.tryActivate() : false; }
   selectShell(i) {
     this.abilities.usingSecondary = false;
     if (i === this.shellIdx || !this.spec.shells[i] || this.ammo[i] <= 0) return;
     this.shellIdx = i; this.reloadLeft = Math.max(this.reloadLeft, this.reloadTime() * (this.reloadLeft > 0 ? 1 : 0.85));
+    this.tubeReload?.changeAmmo(this.reloadLeft);
   }
   // Segment hit on the armor geometry at its current pose.
   rayTest(a, b) {

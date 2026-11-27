@@ -33,3 +33,6 @@ Mobile browsers automatically use touch controls and a responsive garage. Use la
 
 ## Central control point C
 C has a 25 m radius on all three maps. Solo capture takes 240 seconds (previously 150); original diminishing returns apply to additional tanks. Each vehicle keeps independent credit only while inside: leaving, death, damage or a direct shell hit resets that vehicle's entire contribution. Opposing occupants pause capture. A team wins at 100% total valid contribution. The C HUD displays personal contribution and estimated time. The two home bases retain their original rules.
+
+## Role-specific vehicle skills
+34 vehicle-specific additions plus independent Ontos tube loading. G activates a new skill on vehicles without a legacy active ability; K activates it when G is already occupied. V switches Ontos single/pair/six modes; B/H retain existing brace/suspension controls. All seven stationary skill profiles belong to casemate TDs. Light tanks retain mobile reconnaissance, heavy tanks defensive/advance skills, MBTs fire-control and motion effects. Skills use match time, appear in garage and HUD, and configurable numeric parameters are available in the balance editor. Existing assets and systems are retained. NPC casemate TDs start in sniper roles. The skill tests are part of the deployment gate.
