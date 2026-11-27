@@ -54,3 +54,5 @@ Casemate meshes are held at zero turret yaw; hull aiming is available only when 
 
 ### Short-barrel and high-arc gun laying
 Leviathan-160 and high-arc SPGs preserve the target bearing when near-vertical or unreachable elevation solutions would cause azimuth flips. Nearby non-target camera intersections use a stable sight bearing without replacing target range or explicit enemy aim. Normal feasible ballistic solutions and turret traverse rates remain unchanged. These vehicles no longer sweep their idle turret aim back and forth.
+
+High-arc SPG azimuth is independently controlled by horizontal sight bearing rather than the elevation solution (Thunderclad-155, Tempest-155, PzH 2000 and Archer). Added a production-controller regression with pitch/roll disturbance and near-self cursor hit cases, plus browser smoke coverage for all high-arc vehicles. Existing elevation limits and traverse speeds are preserved; slope correction is a game approximation.

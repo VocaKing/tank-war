@@ -9,7 +9,7 @@ import { Abilities } from './abilities.js';
 import { VehicleSkill } from './vehicleSkills.js';
 import { TubeReload } from './tubeReload.js';
 import { limitedYaw } from './fixedGunControl.js';
-import { stabilizedMount, mountAngles } from './mortarAim.js';
+import { stabilizedMount, mountAngles, highArcMountYaw } from './mortarAim.js';
 import { Equipment } from './items.js';
 import { findEraTile } from './eraMechanics.js';
 import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
@@ -210,6 +210,18 @@ export class Tank {
       _v2.copy(this.input.aimBearing).applyQuaternion(_q.copy(pose).invert());
       if(Math.hypot(_v2.x,_v2.z)>1e-5)yaw=Math.atan2(_v2.x,_v2.z);
     }
+    // Separate azimuth from the steep elevation vector for indirect-fire
+    // vehicles. Chassis pitch/roll must not turn a nearly vertical barrel
+    // direction into a different horizontal turret target.
+    if(s.artillery?.highArc){
+      if(this.input.aimBearing){
+        const b=this.input.aimBearing;
+        yaw=highArcMountYaw(b.x*100,b.z*100,this.heading,this.turretYaw);
+      }else{
+        _v2.copy(m.turret.position).applyQuaternion(pose).add(this.pos);
+        yaw=highArcMountYaw(this.input.aim.x-_v2.x,this.input.aim.z-_v2.z,this.heading,this.turretYaw,mount.x);
+      }
+    }
     const sin = Math.sin(yaw), cos = Math.cos(yaw);
     const rise = aim.y - mount.y;
     const forward = stabilize&&this.input.aimBearing ? Math.max(.01,range-mount.z) : aim.x * sin + aim.z * cos - mount.z;
@@ -223,7 +235,7 @@ export class Tank {
     _v2.set(dx / (horizontal || 1) * Math.cos(th), Math.sin(th), dz / (horizontal || 1) * Math.cos(th));
     _q.copy(pose).invert(); _v2.applyQuaternion(_q);
     const angles=stabilize?mountAngles(_v2,yaw,s.gunElevation*DEG):null;
-    const rawYawT=angles?angles.yaw:Math.atan2(_v2.x,_v2.z),pitchT=angles?angles.pitch:Math.asin(clamp(_v2.y,-1,1));
+    const rawYawT=s.artillery?.highArc?yaw:angles?angles.yaw:Math.atan2(_v2.x,_v2.z),pitchT=angles?angles.pitch:Math.asin(clamp(_v2.y,-1,1));
     const yawT = rawYawT;
     const prev = this.turretYaw;
     if (!s.fixedGun) {

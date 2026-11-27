@@ -22,3 +22,11 @@ export function mountAngles(vector,bearing,maxPitch){
  }
  return {yaw,pitch};
 }
+
+// High-arc game mounts use independent azimuth and elevation servos.
+// Retain the previous yaw when the cursor is directly above the pivot.
+export function highArcMountYaw(dx,dz,heading,previous,mountOffset=0){
+ const range=Math.hypot(dx,dz);
+ if(!Number.isFinite(range+heading+mountOffset)||range<Math.max(.75,Math.abs(mountOffset)+.25))return previous;
+ return wrap(Math.atan2(dx,dz)-heading-Math.asin(Math.max(-1,Math.min(1,mountOffset/range))));
+}
