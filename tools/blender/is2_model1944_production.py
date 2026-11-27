@@ -27,7 +27,14 @@ if not os.path.isfile(BASE_SCRIPT):
 # Build the dimensioned source scene. This also produces the original blockout
 # outputs, which are deliberately retained as a fallback/reference.
 os.environ.setdefault("IS2_FAST_PREVIEW", "1")
-source_ns = runpy.run_path(BASE_SCRIPT)
+with open(BASE_SCRIPT, "r", encoding="utf-8") as source_handle:
+    source_text = source_handle.read()
+source_render_call = 'render_view("01_front_three_quarter", (8.5, 9.0, 5.8), (0, 0.4, 1.25), 11.0)'
+if source_render_call not in source_text:
+    raise RuntimeError("The expected source preview call changed; review the base script before continuing")
+source_text = source_text.replace(source_render_call, 'print("Skipping duplicate blockout render; production views are rendered below.")')
+source_ns = {}
+exec(compile(source_text, BASE_SCRIPT, "exec"), source_ns)
 globals().update(source_ns)
 
 PROD_DIR = os.path.join(ART_DIR, "production")
