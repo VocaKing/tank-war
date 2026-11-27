@@ -546,14 +546,14 @@ def create_final_pbr_material():
     return mat
 
 final_mat = create_final_pbr_material()
-for image in (base_img, normal_img, rough_img, metal_img, ao_img):
-    save_bake_image(image, {
-        base_img: "basecolor.png",
-        normal_img: "normal.png",
-        rough_img: "roughness.png",
-        metal_img: "metallic.png",
-        ao_img: "ao.png",
-    }[image])
+for image, filename in (
+    (base_img, "basecolor.png"),
+    (normal_img, "normal.png"),
+    (rough_img, "roughness.png"),
+    (metal_img, "metallic.png"),
+    (ao_img, "ao.png"),
+):
+    save_bake_image(image, filename)
 
 # ---- Split atlas target back into animated assemblies ----------------------------
 deselect_all()
