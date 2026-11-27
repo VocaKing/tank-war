@@ -21,6 +21,8 @@ try{
   for(let i=0;i<240;i++){
    // Repeated pitch/roll changes, with a fixed world azimuth.
    tank.quat.setFromEuler(new Euler(.15*Math.sin(i*.1),0,.13*Math.cos(i*.13),'YXZ'));
+   const pivot=tank.model.turret.position.clone().applyQuaternion(tank.quat).add(tank.pos);
+   tank.input.aim.set(pivot.x,0,pivot.z+300);
    tank.updateTurret(dt);
    assert.ok(Math.abs(tank.turretYaw)<1e-7,id+' yaw changed when pitch/roll varied');
    assert.ok(Number.isFinite(tank.gunPitch));
