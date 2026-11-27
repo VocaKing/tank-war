@@ -28,6 +28,11 @@ jobs:
 
       - name: Install Blender and bake dependencies
         run: |
+          # The hosted runner may include a Microsoft apt source that returns 403.
+          # Blender and its dependencies come from Ubuntu; disable only that failing source.
+          for source in $(grep -rl "packages.microsoft.com" /etc/apt/sources.list.d || true); do
+            sudo mv "$source" "$source.disabled"
+          done
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
           blender --version
