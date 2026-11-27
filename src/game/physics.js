@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mayHullAim, hullYawCommand } from './fixedGunControl.js';
 import { DEG, clamp, lerp } from '../util.js';
+import { steeringTravelDirection, remainingTraction, longitudinalBrakeMode } from './vehicleHandling.js';
 import { trackCenterOffset } from './vehicleDimensions.js';
 
 export const GRAVITY = 9.81;
@@ -14,7 +15,11 @@ const SPRING_FREQUENCY = 9;
 const SPRING_REST = ANCHOR_HEIGHT + GRAVITY / (SPRING_FREQUENCY ** 2);
 const REBOUND_TRAVEL = 0.105;
 const RECOVERY_DELAY = 0.4;
-const OFF_ROAD_GRIP = 0.92;
+const OFF_ROAD_GRIP = 1.0;
+const ROAD_GRIP_BONUS = 0.18;
+const SERVICE_BRAKE_DECELERATION = 9.2;
+const COUNTER_THROTTLE_DECELERATION = 8.4;
+const LATERAL_RESPONSE = 0.055;
 const PARK_SPEED = 0.28;
 const AUTO_BRAKE_BUILDUP = 0.075;
 const AUTO_BRAKE_REFERENCE_MASS = 33700; // Standard Sherman's mass in kg.
@@ -61,7 +66,7 @@ export class BattlefieldPhysics {
   buildScene() {
     const { ColliderDesc, HeightFieldFlags, TriMeshFlags } = this.engine;
     const B = this.battlefield, terrain = B.terrain;
-    const fixed = (shape, group) => this.world.createCollider(shape.setFriction(0.72)
+    const fixed = (shape, group) => this.world.createCollider(shape.setFriction(0.86)
       .setCollisionGroups(groups(group, VEHICLE)));
     // Rapier's columns advance along X and its rows along Z.
     const heights = new Float32Array(terrain.h.length);
@@ -106,7 +111,7 @@ export class BattlefieldPhysics {
     _rotation.setFromEuler(_yaw.set(0, c.rot, 0));
     return this.world.createCollider(this.engine.ColliderDesc.cuboid(c.hx, half, c.hz)
       .setTranslation(c.x, c.y0 + half, c.z).setRotation(_rotation)
-      .setFriction(0.72).setCollisionGroups(groups(OBSTACLE, VEHICLE)));
+      .setFriction(0.84).setCollisionGroups(groups(OBSTACLE, VEHICLE)));
   }
 
   attach(tank) {
@@ -127,10 +132,10 @@ export class BattlefieldPhysics {
       [d.hullH, halfWidth, halfLength],
     ]) for (const x of [-w, w]) for (const z of [-l, l]) hullPoints.push(x, y, z);
     const hull = this.world.createCollider(ColliderDesc.convexHull(new Float32Array(hullPoints)).setMass(mass)
-      .setFriction(0.6).setContactSkin(0.012).setCollisionGroups(filter), body);
+      .setFriction(0.78).setContactSkin(0.012).setCollisionGroups(filter), body);
     const turret = this.world.createCollider(ColliderDesc.cuboid(d.turretW * 0.46, d.turretH / 2, d.turretL * 0.45)
       .setTranslation(0, d.hullH + d.turretH / 2, (d.turretZ ?? 0) + (d.turretBoxZ ?? 0)).setMass(0)
-      .setFriction(0.6).setCollisionGroups(filter), body);
+      .setFriction(0.76).setCollisionGroups(filter), body);
     const vehicle = { tank, body, hull, turret, mass, contact: 0, unsupported: 0, recoveryTime: 0, righting: false, autoBrake: 0,
       parked: false, parkAnchor: new THREE.Vector3(),
       inertiaYaw: mass * (d.L * d.L + d.W * d.W) / 12 };
@@ -369,7 +374,10 @@ export class BattlefieldPhysics {
     const fullSpeed = (tank.activeMaxSpeed || s.maxSpeed) / 3.6, water = s.amphibious ? 1 : clamp(1 - Math.max(0, waterDepth) * 0.38, 0.2, 1);
     const i = T.x2i(tank.pos.x), j = T.x2i(tank.pos.z);
     const road = T.inside(i, j) ? T.road[T.idx(i, j)] : 0;
-    const grip = OFF_ROAD_GRIP + road * 0.21;
+    // Firm dry ground is modelled near 1g; paved surfaces provide a little
+    // more track bite. Standing water progressively reduces available grip.
+    const wetGrip = clamp(1 - Math.max(0, waterDepth) * 0.22, 0.52, 1);
+    const grip = (OFF_ROAD_GRIP + road * ROAD_GRIP_BONUS) * wetGrip;
     const overdrive = tank.equip.active('overdrive'), loadFactor = tank.equip.factor;
     const engine = tank.modules.engine < 1 ? 0.5 : 1;
     const reverse = rearDriving ? s.rearDriver.maxSpeed : s.reverseSpeed;
@@ -392,15 +400,18 @@ export class BattlefieldPhysics {
     _tangent.copy(_forward).addScaledVector(_normal, -_forward.dot(_normal)).normalize();
     _side.crossVectors(_normal, _tangent).normalize();
     const longitudinal = tank.vel.dot(_tangent), sideways = tank.vel.dot(_side);
-    const turnMax = s.hullTraverse * DEG * driver * (1 - 0.45 * Math.min(1, Math.abs(tank.speed) / fullSpeed)) *
+    const turnMax = s.hullTraverse * DEG * driver * (1 - 0.58 * Math.min(1, Math.abs(tank.speed) / fullSpeed)) *
       (floating ? 0.48 : tank.inWater ? 0.6 : 1) * (tank.vehicleSkill?.turnMult ?? 1);
     // A damaged track can serve as a pivot after the hull slows down. The intact track supplies the grip.
     const pivotMax = canPivot ? turnMax * 0.25 * engine * clamp((2 - Math.abs(longitudinal)) / 1.55, 0, 1) : 0;
     const turnLimit = mobile ? turnMax : pivotMax;
     tank.hullAiming=mayHullAim(tank,{turnLimit,braced,floating,crawl});
     const aimError=tank.hullAiming?tank.fixedGunHeadingError():0;
+    // Steering follows the selected travel direction as soon as the driver
+    // changes gear/input. Residual reverse momentum must not invert new input.
+    const travelDirection=steeringTravelDirection(throttle,longitudinal);
     const commanded=tank.hullAiming?hullYawCommand(aimError,_angular.dot(_normal),turnLimit):
-      steer * turnLimit * (mobile && longitudinal < -0.3 ? -1 : 1);
+      steer * turnLimit * travelDirection;
     // Keep the disabled side nearly stationary as the hull swings around it.
     const pivotSpeed = brokenSide ? commanded * brokenSide * trackCenterOffset(s.dims) : 0;
     const holding = !throttle && Math.abs(longitudinal) < 0.45;
@@ -412,8 +423,9 @@ export class BattlefieldPhysics {
     const autoBrake = mobile && !floating ? vehicle.autoBrake : 0;
     const autoBrakeLimit = Math.max(coastBrake, AUTO_BRAKE_DECELERATION * massScale + downhillAcceleration);
     const neutralBrake = lerp(coastBrake, autoBrakeLimit, autoBrake);
-    const driveBrake = throttle * longitudinal < 0 ? 5 : 3.2;
-    const brake = input.brake || !mobile ? 7 : (throttle ? driveBrake : neutralBrake);
+    const brakeMode=longitudinalBrakeMode(throttle,longitudinal,input.brake);
+    const brake=input.brake||!mobile?SERVICE_BRAKE_DECELERATION:
+      brakeMode==='counter'?COUNTER_THROTTLE_DECELERATION:throttle?3.2:neutralBrake;
     // Hold the low-speed contact patch on uneven ground. Position feedback
     // only changes the bounded friction impulse; the rigid body remains free
     // to move when hit, when driving or when the surface runs out of grip.
@@ -429,11 +441,14 @@ export class BattlefieldPhysics {
       parkSide = clamp(_scrub.dot(_side) * 8, -0.24, 0.24);
     }
     const speedError = throttle * speedLimit + pivotSpeed + parkForward - longitudinal;
+    // Opposite throttle is a brake command first. Only after longitudinal
+    // speed reaches the deadband may the engine accelerate in the new gear.
     const acceleration = pivotSpeed ? intactLoad * grip * 0.35 / (mass * dt) :
+      brakeMode==='service'||brakeMode==='counter'||!mobile ? brake :
       throttle && Math.sign(speedError) === Math.sign(throttle) ? driveLimit : brake;
     const parkAssist = holding ? -gradeAcceleration : 0;
     const drive = clamp(speedError / dt + parkAssist, -acceleration, acceleration) * mass * dt;
-    const lateral = ((parkSide - sideways) / (park ? dt : 0.075) + GRAVITY * _side.y) * mass * dt;
+    const lateral = ((parkSide - sideways) / (park ? dt : LATERAL_RESPONSE) + GRAVITY * _side.y) * mass * dt;
     const maxTraction = load * grip * (park ? 1.12 : 1);
     // The tuned brake can use extra track grip along the hull's travel axis.
     const brakeGrip = !park && autoBrake > 0 ? Math.max(1, neutralBrake / (GRAVITY * OFF_ROAD_GRIP)) : 1;
@@ -444,8 +459,13 @@ export class BattlefieldPhysics {
     body.applyImpulse(_scrub, true);
 
     const angularSpeed = _angular.dot(_normal);
-    const turnTraction = commanded && !mobile ? intactLoad * grip : maxTraction;
-    const torqueLimit = turnTraction * s.dims.W * (mobile && !crawl ? 0.53 : 0.82);
+    // Differential-track turning shares the contact-patch friction circle
+    // with propulsion and lateral grip, preventing full drive and yaw forces
+    // from being applied independently and producing arcade-like drift.
+    const usedLongitudinal=drive*gripScale,usedLateral=lateral*gripScale;
+    const yawTraction=remainingTraction(maxTraction,usedLongitudinal,usedLateral);
+    const turnTraction = commanded && !mobile ? intactLoad * grip : yawTraction;
+    const torqueLimit = turnTraction * s.dims.W * (mobile && !crawl ? 0.50 : 0.78);
     const response = tank.hullAiming ? 0.085 : steer ? 0.105 : 0.065;
     const torque = clamp((commanded - angularSpeed) * dt / response * inertiaYaw, -torqueLimit, torqueLimit);
     body.applyTorqueImpulse(_impulse.copy(_normal).multiplyScalar(torque), true);

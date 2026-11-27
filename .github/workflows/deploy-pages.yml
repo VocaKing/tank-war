@@ -39,6 +39,7 @@ jobs:
       - run: node tools_spawn_layout.mjs
       - run: node tools_fixed_gun_control.mjs
       - run: node tools_mortar_aim.mjs
+      - run: node tools_vehicle_handling.mjs
       - run: node tools_spg_mount.mjs
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
