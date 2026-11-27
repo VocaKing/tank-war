@@ -15,7 +15,7 @@ This branch adds a real Blender production pipeline on top of the existing dimen
 
 ## Implemented stages
 
-1. Rebuild the existing dimensioned Model 1944 source scene.
+1. Rebuild the existing dimensioned Model 1944 source scene (skip the redundant blockout preview render; render the production candidate once).
 2. Preserve the source meshes as editable high-poly bake sources.
 3. Add restrained high-poly-only weld-bead detail and a detailed track-link bake source.
 4. Create separate low-poly copies with reduced bevel segmentation.
