@@ -45,7 +45,7 @@ jobs:
 
       - name: Build low-poly asset and bake PBR maps
         run: |
-          mkdir -p public/models artifacts
+          mkdir -p public/models artifacts/is2-model1944/production
           set -o pipefail
           PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 IS2_FAST_PREVIEW=1 IS2_ATLAS_SIZE=2048 blender --background --python-exit-code 1 --python tools/blender/is2_model1944_production.py > artifacts/is2-model1944/production/blender-build.log 2>&1 || { tail -n 180 artifacts/is2-model1944/production/blender-build.log; exit 1; }
 
