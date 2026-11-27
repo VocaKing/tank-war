@@ -36,3 +36,6 @@ C has a 25 m radius on all three maps. Solo capture takes 240 seconds (previousl
 
 ## Role-specific vehicle skills
 34 vehicle-specific additions plus independent Ontos tube loading. G activates a new skill on vehicles without a legacy active ability; K activates it when G is already occupied. V switches Ontos single/pair/six modes; B/H retain existing brace/suspension controls. All seven stationary skill profiles belong to casemate TDs. Light tanks retain mobile reconnaissance, heavy tanks defensive/advance skills, MBTs fire-control and motion effects. Skills use match time, appear in garage and HUD, and configurable numeric parameters are available in the balance editor. Existing assets and systems are retained. NPC casemate TDs start in sniper roles. The skill tests are part of the deployment gate.
+
+### Stock dispersion rebalance
+All 47 vehicles now have explicit minimum/maximum dispersion radii (m at 100 m): stock minima 0.20–0.95, maxima 1.10–1.87. Tank destroyers use the lower 0.20–0.49 / 1.10–1.37 ranges. These are defaults, not new validation bounds; legacy and custom balance profiles remain supported. Existing skill multipliers and aiming dynamics are unchanged.

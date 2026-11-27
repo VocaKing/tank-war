@@ -4,7 +4,7 @@ export const EXPANSION_TANKS = [
     id: 'su100', tier: 2, cls: 'Tank Destroyer', name: 'SU-100', short: 'SU-100', nation: 'USSR', era: 'WWII', year: 1944,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 31.6, power: 500, maxSpeed: 48, reverseSpeed: 8, hullTraverse: 36, turretTraverse: 0, gunSpeed: 7,
-    gunDepression: 3, gunElevation: 20, hp: 1050, viewRange: 370, reload: 8.2, aimTime: 2.5, dispersion: 1.65, stabilizer: 1,
+    gunDepression: 3, gunElevation: 20, hp: 1050, viewRange: 370, reload: 8.2, aimTime: 2.5, dispersion: 0.38, maxDispersion: 1.25, stabilizer: 1,
     dims: { L: 5.92, W: 3, hullH: 1.46, clearance: 0.40, trackW: 0.50, trackGauge: 2.45,
       turretZ: 1.02, turretL: 3.28, turretW: 2.54, turretH: 0.525, gunLen: 3.816, gunForwardL: 9.45 },
     armor: {
@@ -24,7 +24,7 @@ export const EXPANSION_TANKS = [
     id: 'jagdpanther', tier: 2, cls: 'Tank Destroyer', name: 'Jagdpanther G1', short: 'Jagdpanther', nation: 'Germany', era: 'WWII', year: 1944,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator'], autoloader: false,
     mass: 45.5, power: 700, maxSpeed: 46, reverseSpeed: 8, hullTraverse: 33, turretTraverse: 0, gunSpeed: 7,
-    gunDepression: 7, gunElevation: 15, hp: 1320, viewRange: 410, reload: 8.6, aimTime: 2.7, dispersion: 1.35, stabilizer: 1,
+    gunDepression: 7, gunElevation: 15, hp: 1320, viewRange: 410, reload: 8.6, aimTime: 2.7, dispersion: 0.28, maxDispersion: 1.15, stabilizer: 1,
     dims: { L: 6.87, W: 3.42, hullH: 1.67, clearance: 0.55, trackW: 0.66, trackGauge: 2.61,
       turretZ: 0.67, turretL: 3.94, turretW: 2.90, turretH: 0.882, gunLen: 3.845, gunForwardL: 9.87 },
     armor: {
@@ -44,7 +44,7 @@ export const EXPANSION_TANKS = [
     id: 'isu122', tier: 2, cls: 'Tank Destroyer', name: 'ISU-122', short: 'ISU-122', nation: 'USSR', era: 'WWII', year: 1944,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Assistant loader'], autoloader: false,
     mass: 46, power: 520, maxSpeed: 37, reverseSpeed: 10, hullTraverse: 26, turretTraverse: 0, gunSpeed: 5,
-    gunDepression: 3, gunElevation: 22, hp: 1450, viewRange: 380, reload: 11.4, aimTime: 3.2, dispersion: 1.90, stabilizer: 1,
+    gunDepression: 3, gunElevation: 22, hp: 1450, viewRange: 380, reload: 11.4, aimTime: 3.2, dispersion: 0.43, maxDispersion: 1.31, stabilizer: 1,
     dims: { L: 6.77, W: 3.07, hullH: 1.47, clearance: 0.42, trackW: 0.65, trackGauge: 2.38,
       turretZ: 1.20, turretL: 3.76, turretW: 2.72, turretH: 0.876, gunLen: 3.546, gunForwardL: 9.85 },
     armor: {
@@ -64,7 +64,7 @@ export const EXPANSION_TANKS = [
     id: 'jagdtiger', tier: 3, cls: 'Tank Destroyer', name: 'Jagdtiger (Henschel)', short: 'Jagdtiger', nation: 'Germany', era: 'WWII', year: 1944,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Radio operator', 'Assistant loader'], autoloader: false,
     mass: 71.7, power: 700, maxSpeed: 34, reverseSpeed: 9, hullTraverse: 22, turretTraverse: 0, gunSpeed: 5,
-    gunDepression: 7, gunElevation: 15, hp: 1850, viewRange: 410, reload: 12.6, aimTime: 3.0, dispersion: 1.48, stabilizer: 1,
+    gunDepression: 7, gunElevation: 15, hp: 1850, viewRange: 410, reload: 12.6, aimTime: 3.0, dispersion: 0.30, maxDispersion: 1.18, stabilizer: 1,
     dims: { L: 7.79, W: 3.63, hullH: 1.77, clearance: 0.50, trackW: 0.80, trackGauge: 2.75,
       turretZ: 0.28, turretL: 4.15, turretW: 3.11, turretH: 0.975, gunLen: 4.563, gunForwardL: 10.65 },
     armor: {
@@ -84,7 +84,7 @@ export const EXPANSION_TANKS = [
     id: 'amxfoch', tier: 3, cls: 'Tank Destroyer', name: 'AMX 50 Foch (120 mm)', short: 'AMX 50 Foch', nation: 'France', era: 'Cold War', year: 1950,
     casemate: true, crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 50, power: 850, maxSpeed: 50, reverseSpeed: 16, hullTraverse: 33, turretTraverse: 0, gunSpeed: 7,
-    gunDepression: 6, gunElevation: 18, hp: 1560, viewRange: 435, reload: 9.9, aimTime: 2.6, dispersion: 1.55, stabilizer: 1,
+    gunDepression: 6, gunElevation: 18, hp: 1560, viewRange: 435, reload: 9.9, aimTime: 2.6, dispersion: 0.32, maxDispersion: 1.21, stabilizer: 1,
     dims: { L: 7.15, W: 3.40, hullH: 1.60, clearance: 0.46, trackW: 0.65, trackGauge: 2.65,
       turretZ: 0.70, turretL: 4.79, turretW: 3.02, turretH: 0.786, gunLen: 4.322, gunForwardL: 10.43 },
     armor: {
@@ -105,7 +105,7 @@ export const EXPANSION_TANKS = [
     crew: ['Commander', 'Gunner', 'Loader', 'Driver', 'Assistant loader'], autoloader: true,
     artillery: { highArc: true, spade: true, spadeDeploySeconds: 2.2, spadeRetractSeconds: 1.5, recoilDistance: 0.9, recoilRecovery: 2.2, maxFlightSeconds: 42 },
     mass: 55.3, power: 1000, maxSpeed: 54, reverseSpeed: 14, hullTraverse: 28, turretTraverse: 14, gunSpeed: 6,
-    gunDepression: 3, gunElevation: 65, hp: 1320, viewRange: 425, reload: 15.5, aimTime: 4.2, dispersion: 2.45, stabilizer: 1,
+    gunDepression: 3, gunElevation: 65, hp: 1320, viewRange: 425, reload: 15.5, aimTime: 4.2, dispersion: 0.79, maxDispersion: 1.70, stabilizer: 1,
     dims: { L: 7.88, W: 3.58, hullH: 1.71, clearance: 0.45, trackW: 0.58, trackGauge: 2.92,
       turretZ: -0.97, turretL: 3.988, turretW: 3.106, turretH: 1.304, gunLen: 6.864, gunForwardL: 11.70 },
     armor: {
@@ -124,7 +124,7 @@ export const EXPANSION_TANKS = [
     id: 'atlas', tier: 4, cls: 'Heavy', name: 'Atlas Rear-Turret Heavy', short: 'Atlas', nation: 'Fictional', era: 'Modern', year: 2008,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 73, power: 1320, maxSpeed: 41, reverseSpeed: 15, hullTraverse: 26, turretTraverse: 23, gunSpeed: 7,
-    gunDepression: 7, gunElevation: 20, hp: 2030, viewRange: 465, reload: 9.9, aimTime: 2.8, dispersion: 1.48, stabilizer: 0.35,
+    gunDepression: 7, gunElevation: 20, hp: 2030, viewRange: 465, reload: 9.9, aimTime: 2.8, dispersion: 0.58, maxDispersion: 1.49, stabilizer: 0.35,
     dims: { L: 8.10, W: 3.85, hullH: 1.83, clearance: 0.49, trackW: 0.69, trackGauge: 3.02,
       turretZ: -1.34, turretBoxZ: -0.10, turretL: 3.23, turretW: 3.14, turretH: 1.045, gunLen: 7.485, gunForwardL: 11.62 },
     armor: {
@@ -144,7 +144,7 @@ export const EXPANSION_TANKS = [
     id: 'basilisk', tier: 4, cls: 'Heavy', name: 'Basilisk Rear-Turret Assault Tank', short: 'Basilisk', nation: 'Fictional', era: 'Modern', year: 2014,
     crew: ['Commander', 'Gunner', 'Loader', 'Driver'], autoloader: false,
     mass: 68, power: 1500, maxSpeed: 49, reverseSpeed: 20, hullTraverse: 33, turretTraverse: 27, gunSpeed: 8,
-    gunDepression: 6, gunElevation: 20, hp: 1810, viewRange: 485, reload: 8.7, aimTime: 2.3, dispersion: 1.58, stabilizer: 0.25,
+    gunDepression: 6, gunElevation: 20, hp: 1810, viewRange: 485, reload: 8.7, aimTime: 2.3, dispersion: 0.60, maxDispersion: 1.51, stabilizer: 0.25,
     dims: { L: 8.60, W: 3.95, hullH: 1.73, clearance: 0.50, trackW: 0.72, trackGauge: 3.11,
       turretZ: -1.46, turretBoxZ: -0.06, turretL: 3.47, turretW: 3.18, turretH: 1.045, gunLen: 7.68, gunForwardL: 12.05 },
     armor: {

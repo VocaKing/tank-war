@@ -31,7 +31,7 @@ export const CONCEPT_VEHICLES = [
   vehicle('aegis140','Aegis-140 Heavy MBT','Aegis-140','Heavy',{
     crew:['Commander','Gunner','Driver'],autoloader:true,
     mass:79,power:1600,maxSpeed:40,reverseSpeed:19,hullTraverse:28,turretTraverse:30,
-    gunDepression:11,gunElevation:20,hp:2400,viewRange:490,reload:9.6,aimTime:1.8,dispersion:1.32,
+    gunDepression:11,gunElevation:20,hp:2400,viewRange:490,reload:9.6,aimTime:1.8,dispersion:0.52, maxDispersion: 1.42,
     dims:dims(8.3,4.05,1.72,4.25,3.75,0.82,6.7,{turretZ:-1.12}),
     armor:armor(480,170,95,520,240,100,38),
     eraLayout:[{part:'hull',face:'front',cols:7,rows:2,heat:280,ke:90},{part:'hull',face:'side',cols:6,rows:2,heat:220,ke:65},{part:'turret',face:'side',cols:5,rows:2,heat:260,ke:78}],
@@ -43,7 +43,7 @@ export const CONCEPT_VEHICLES = [
   }),
   vehicle('bastion125','Bastion-125 Defensive MBT','Bastion-125','Heavy',{
     mass:73,power:1250,maxSpeed:37,reverseSpeed:13,hullTraverse:24,turretTraverse:26,
-    hp:2550,viewRange:450,reload:8.5,dispersion:1.55,
+    hp:2550,viewRange:450,reload:8.5,dispersion:0.60, maxDispersion: 1.53,
     dims:dims(7.85,3.90,1.69,3.8,3.55,0.87,5.65,{turretZ:-0.38}),
     armor:armor(510,200,120,560,270,150,38),
     eraLayout:[{part:'turret',face:'front',cols:7,rows:3,heat:330,ke:105},{part:'turret',face:'side',cols:5,rows:2,heat:260,ke:80}],
@@ -55,7 +55,7 @@ export const CONCEPT_VEHICLES = [
   }),
   vehicle('harrier105','Harrier-105 Fast Assault Tank','Harrier-105','Light',{
     openTop:true,mass:29,power:980,maxSpeed:74,reverseSpeed:30,hullTraverse:54,turretTraverse:64,
-    hp:910,viewRange:560,reload:4.6,aimTime:1.5,dispersion:1.85,stabilizer:0.65,
+    hp:910,viewRange:560,reload:4.6,aimTime:1.5,dispersion:0.68, maxDispersion: 1.62,stabilizer:0.65,
     dims:dims(6.45,3.06,1.34,2.80,2.45,0.66,5.0,{turretZ:0.38,trackW:0.44}),
     armor:armor(90,45,26,100,42,25,12),
     shells:ammo(105,350,340,105,[28,12,10],1480),
@@ -66,7 +66,7 @@ export const CONCEPT_VEHICLES = [
     casemate:{hullAimRate:26,hydroRate:4.8},
     siegeMode:{settleSeconds:2.0,dispersionMult:0.48,recoilMult:0.58},
     mass:69,power:920,maxSpeed:29,reverseSpeed:11,hullTraverse:22,turretTraverse:0,gunSpeed:3.5,
-    gunDepression:6,gunElevation:15,hp:2100,viewRange:460,reload:13.4,aimTime:2.4,dispersion:1.32,
+    gunDepression:6,gunElevation:15,hp:2100,viewRange:460,reload:13.4,aimTime:2.4,dispersion:0.20, maxDispersion: 1.10,
     dims:dims(8.05,3.95,1.64,3.38,3.20,0.48,7.4,{turretZ:0.74}),
     armor:armor(610,125,60,520,110,50,33),
     eraLayout:[{part:'hull',face:'front',cols:8,rows:3,heat:280,ke:90}],
@@ -77,7 +77,7 @@ export const CONCEPT_VEHICLES = [
   vehicle('lancer120','Lancer-120 Medium Tank Destroyer','Lancer-120','Tank Destroyer',{
     firstShot:{settleSeconds:2.6,dispersionMult:0.52,recoverySeconds:6},
     mass:43,power:1120,maxSpeed:62,reverseSpeed:25,hullTraverse:42,turretTraverse:24,
-    hp:1300,viewRange:520,reload:10,aimTime:1.65,dispersion:1.10,
+    hp:1300,viewRange:520,reload:10,aimTime:1.65,dispersion:0.26, maxDispersion: 1.14,
     dims:dims(7.6,3.35,1.40,3.4,2.8,0.62,7.5,{turretZ:0.24,trackW:0.51}),
     armor:armor(250,85,40,290,105,55,19),
     eraLayout:[{part:'hull',face:'side',cols:7,rows:2,heat:180,ke:42}],
@@ -87,7 +87,7 @@ export const CONCEPT_VEHICLES = [
   }),
   vehicle('leviathan160','Leviathan-160 Breakthrough Assault Gun','Leviathan-160','Heavy',{
     mass:91,power:1160,maxSpeed:23,reverseSpeed:9,hullTraverse:19,turretTraverse:12,
-    gunElevation:35,hp:2750,viewRange:370,reload:20,aimTime:2.9,dispersion:2.35,
+    gunElevation:35,hp:2750,viewRange:370,reload:20,aimTime:2.9,dispersion:0.95, maxDispersion: 1.87,
     dozerAssist:0.38,
     dims:dims(8.6,4.26,1.96,3.65,3.56,0.80,3.9,{turretZ:0.55}),
     armor:armor(670,255,125,590,245,115,43),
@@ -102,7 +102,7 @@ export const CONCEPT_VEHICLES = [
   vehicle('thunderclad155','Thunderclad-155 Heavy SPG','Thunderclad-155','Artillery',{
     artillery:{highArc:true,spade:true,spadeDeploySeconds:2.7,spadeRetractSeconds:1.8,recoilDistance:1.1,recoilRecovery:2.6,maxFlightSeconds:48,aiEngageRange:1050},
     mass:65,power:1020,maxSpeed:39,reverseSpeed:14,hullTraverse:23,turretTraverse:12,gunSpeed:4.5,
-    gunDepression:4,gunElevation:83,hp:1390,viewRange:390,reload:19,aimTime:3.2,dispersion:2.3,
+    gunDepression:4,gunElevation:83,hp:1390,viewRange:390,reload:19,aimTime:3.2,dispersion:0.88, maxDispersion: 1.80,
     dims:dims(8.0,3.72,1.64,4.7,3.42,1.50,7.3,{turretZ:-0.7}),
     armor:armor(195,75,35,135,65,40,28),
     shells:[
@@ -117,7 +117,7 @@ export const CONCEPT_VEHICLES = [
     artillery:{highArc:true,spade:true,spadeDeploySeconds:1.1,spadeRetractSeconds:0.9,recoilDistance:0.78,recoilRecovery:2.1,maxFlightSeconds:48,aiEngageRange:1080},
     mrsi:{rounds:2,secondDelaySeconds:2.0},
     mass:42,power:1190,maxSpeed:66,reverseSpeed:24,hullTraverse:38,turretTraverse:17,gunSpeed:6,
-    gunDepression:3,gunElevation:82,hp:1120,viewRange:440,reload:16.5,aimTime:2.7,dispersion:2.65,
+    gunDepression:3,gunElevation:82,hp:1120,viewRange:440,reload:16.5,aimTime:2.7,dispersion:0.83, maxDispersion: 1.76,
     dims:dims(7.1,3.4,1.45,4.25,3.05,1.25,7.2,{turretZ:-0.75,trackW:0.48}),
     armor:armor(140,65,30,105,40,25,20),
     shells:[
@@ -132,7 +132,7 @@ export const CONCEPT_VEHICLES = [
     unmannedTurret:true,crewCapsule:true,turretElectronicsWeakness:1.9,
     crew:['Commander','Gunner','Driver'],autoloader:true,
     mass:70,power:1450,maxSpeed:45,reverseSpeed:22,hullTraverse:31,turretTraverse:43,
-    hp:2220,viewRange:525,reload:8.4,aimTime:1.45,dispersion:1.20,
+    hp:2220,viewRange:525,reload:8.4,aimTime:1.45,dispersion:0.50, maxDispersion: 1.39,
     dims:dims(8.15,4.02,1.69,3.62,3.20,0.66,6.4,{turretZ:0.18}),
     armor:armor(445,165,85,435,170,75,38),
     eraLayout:[{part:'hull',face:'side',cols:8,rows:2,heat:245,ke:75}],
@@ -142,7 +142,7 @@ export const CONCEPT_VEHICLES = [
   }),
   vehicle('raptor90','Raptor-90 Recon Fire-support Vehicle','Raptor-90','Light',{
     openTop:true,mass:20,power:850,maxSpeed:87,reverseSpeed:34,hullTraverse:65,turretTraverse:68,
-    hp:670,viewRange:610,reload:3.7,aimTime:1.1,dispersion:1.66,stabilizer:0.75,
+    hp:670,viewRange:610,reload:3.7,aimTime:1.1,dispersion:0.72, maxDispersion: 1.65,stabilizer:0.75,
     dims:dims(5.65,2.76,1.23,2.35,1.96,0.55,4.25,{turretZ:0.46,trackW:0.39}),
     armor:armor(64,26,18,80,28,18,10),
     shells:ammo(90,280,265,90,[34,14,12],1440),

@@ -16,6 +16,23 @@ function load(published=api.EMPTY()){
 }
 const stock=load().STOCK_TANKS,cfg=api.EMPTY();
 const stockTiger=stock.find(t=>t.id==='tiger');
+assert.equal(stock.length,47);
+assert.equal(new Set(stock.map(t=>t.id)).size,47);
+const td=stock.filter(t=>t.cls==='Tank Destroyer');
+const others=stock.filter(t=>t.cls!=='Tank Destroyer');
+assert.equal(td.length,11);
+for(const tank of stock){
+ assert.ok(tank.dispersion>=0.2&&tank.dispersion<=0.95,tank.id+' stock minimum');
+ assert.ok(tank.maxDispersion>=1.1&&tank.maxDispersion<=1.87,tank.id+' stock maximum');
+ assert.ok(tank.dispersion<tank.maxDispersion,tank.id+' independent radii');
+}
+assert.ok(Math.max(...td.map(t=>t.dispersion))<Math.min(...others.map(t=>t.dispersion)));
+assert.ok(Math.max(...td.map(t=>t.maxDispersion))<Math.min(...others.map(t=>t.maxDispersion)));
+for(const tank of stock) {
+ const published=load().TANK_BY_ID[tank.id];
+ assert.equal(published.dispersion,tank.dispersion);
+ assert.equal(published.maxDispersion,tank.maxDispersion);
+}
 cfg.tanks.tiger={hp:2222,maxSpeed:31,reload:6.5,aimTime:1.3,dispersion:0.35,maxDispersion:stockTiger.maxDispersion,'armor.hull.front.0':123,'armor.hull.front.1':25,'shells.0.damage':555,'shells.0.pen':444,'shells.0.count':60};
 env.localStorage.setItem(api.STORAGE_KEY,JSON.stringify(cfg));
 const game=load(),t=game.TANK_BY_ID.tiger;
@@ -83,4 +100,12 @@ assert.equal(skillAdjusted.TANK_BY_ID.warden130.skill.prepare,10);
 assert.equal(skillAdjusted.TANK_BY_ID.chally2.skill.duration,12);
 assert.deepEqual(api.diff(stock,skillAdjusted.TANKS),skillBalance);
 assert.throws(()=>api.saveLocal({version:1,tanks:{warden130:{'skill.prepare':0}}},stock));
-console.log('Balance integration checks passed.');
+// The requested ranges are stock values only, not editor limits.
+const unrestricted={version:1,tanks:{warden130:{dispersion:0.05,maxDispersion:3.5},sherman:{dispersion:1.2,maxDispersion:5}}};
+api.saveLocal(unrestricted,stock);
+assert.equal(load().TANK_BY_ID.warden130.dispersion,0.05);
+assert.equal(load().TANK_BY_ID.warden130.maxDispersion,3.5);
+assert.equal(load().TANK_BY_ID.sherman.dispersion,1.2);
+assert.equal(load().TANK_BY_ID.sherman.maxDispersion,5);
+assert.deepEqual(api.diff(stock,load().TANKS),unrestricted);
+console.log('Balance integration checks passed, including all 47 stock dispersion pairs and unrestricted custom ranges.');
