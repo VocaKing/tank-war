@@ -21,7 +21,7 @@ import { TrackMarks } from '../render/trackMarks.js';
 import { Outline } from '../render/outline.js';
 import { AimAssist } from './aimAssist.js';
 import { TouchControls, isMobile } from '../ui/touchControls.js';
-import { zoomFov, projectedSpreadRadius } from './combatMath.js';
+import { zoomFov, dispersionPixels } from './combatMath.js';
 import { createControl, updateControl, resetControlCredit } from './controlCapture.js';
 import { skillKey } from './vehicleSkills.js';
 import { makeMatch } from './matchmaking.js';
@@ -399,12 +399,15 @@ export class Game {
     const { pos, dist, tank, hit, kind } = predicted;
     const cameraPoint = pos.clone().applyMatrix4(this.camera.matrixWorldInverse);
     const depth = -cameraPoint.z;
-    const radius = 2 * shot.shell.velocity * predicted.time * Math.sin(p.dispersion() * 0.5);
+    // Dispersion is an angular gun-handling cone. At a fixed zoom its screen
+    // radius must not jump when the camera ray moves from a near point to a far
+    // point; only vehicle/gun motion changes p.dispersion().
+    const coneHalfAngle = p.dispersion() * 0.5;
+    const radius = 2 * shot.shell.velocity * predicted.time * Math.sin(coneHalfAngle);
     this.reticleRadiusWorld = radius;
     this.reticleWorld = pos; this.reticleDist = dist;
     if (depth <= this.camera.near) { hud.setReticle(-100, -100, 0, '', ''); return; }
-    const radPx = projectedSpreadRadius(radius, Math.hypot(cameraPoint.x, cameraPoint.y),
-      depth, this.camera.projectionMatrix.elements[5], this.viewportHeight);
+    const radPx = dispersionPixels(coneHalfAngle, this.camera.projectionMatrix.elements[5], this.viewportHeight);
     const screen = cameraPoint.applyMatrix4(this.camera.projectionMatrix);
     const sx = (screen.x * 0.5 + 0.5) * this.viewportWidth, sy = (-screen.y * 0.5 + 0.5) * this.viewportHeight;
     if (!Number.isFinite(sx + sy + radPx)) { hud.setReticle(-100, -100, 0, '', ''); return; }

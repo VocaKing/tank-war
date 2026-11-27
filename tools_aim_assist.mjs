@@ -84,12 +84,11 @@ assert.ok(Math.abs(game.cam.yaw - .204) < 1e-9, 'An off-center selected point mu
 
 probes = 0;
 move(.24);
-assert.ok(probes <= 6, 'Crossing a target edge should use a bounded number of probes');
-assert.equal(assist.target, a);
-assert.equal(assist.dragFactor(), AIM_ASSIST.EDGE_DRAG);
-assert.ok(game.cam.yaw > .22 && game.cam.yaw < .24, 'Only the part of the move beyond the edge is resisted');
-move(.21, 0);
+assert.ok(probes <= 1, 'Leaving a target should use a single bounded ray probe');
+assert.equal(assist.target, null, 'A deliberate move into empty space releases the lock');
 assert.equal(assist.dragFactor(), 1);
+move(.21, 0);
+assert.equal(assist.target, a, 'Re-entering the target reacquires it immediately');
 assert.equal(assist.part, 'hull');
 move(.51);
 assert.equal(assist.target, b, 'Another enemy can take over on the first motion');

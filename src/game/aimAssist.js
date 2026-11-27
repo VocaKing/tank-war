@@ -3,12 +3,14 @@ import { clamp, DEG } from '../util.js';
 
 export const AIM_ASSIST = {
   FOCUS_TOL_PX: 14,
-  ACQUIRE_TOL_PX: 32,
-  ACQUIRE_TIME: 0.06,
+  ACQUIRE_TOL_PX: 22,
+  RETAIN_TOL_PX: 40,
+  TARGET_SWITCH_HYSTERESIS_PX: 10,
+  ACQUIRE_TIME: 0.035,
   MANUAL_WINDOW: 1.5,
-  EDGE_DRAG: 0.62,
-  BREAK_PX: 30,
-  RELOCK_COOLDOWN: 0.12,
+  EDGE_DRAG: 0.72,
+  BREAK_PX: 44,
+  RELOCK_COOLDOWN: 0.08,
 };
 
 const _point = new THREE.Vector3(), _direction = new THREE.Vector3();
@@ -50,7 +52,7 @@ export class AimAssist {
   look(dx, dy, sensitivity) {
     const yaw = -dx * sensitivity, pitch = -dy * sensitivity;
     if (this.target && !this.g.camOverride && !this.g.debugAim) {
-      // Coalesce device events so a high polling-rate mouse only probes once per frame.
+      // Coalesce high-polling-rate mouse events; target tracking is evaluated once per frame.
       this.pending.x += yaw;
       this.pending.y += pitch;
       return [0, 0];
@@ -105,6 +107,15 @@ export class AimAssist {
     return !!(tank?.alive && tank.team !== this.g.player.team && tank.spotted[this.g.player.team] && tank.model.root.visible);
   }
 
+  targetVisible(dt) {
+    if (!this.validTarget(this.target)) return false;
+    const g = this.g, point = this.anchorWorld(_point), dir = g.camDir();
+    const origin = dt === undefined ? g.camera.position : g.cameraPositionFor(dir, g.cam.sniper, dt);
+    if (g.world?.losBlocked?.(origin.x, origin.y, origin.z, point.x, point.y, point.z)) return false;
+    if (g.smokeBlocks?.(origin.x, origin.y, origin.z, point.x, point.y, point.z)) return false;
+    return true;
+  }
+
   toggleManual() {
     if (this.manual) { this.release('manual'); return 'released'; }
     const candidate = this.resolveAimCandidate();
@@ -114,45 +125,51 @@ export class AimAssist {
     return 'locked';
   }
 
-  // Resolve a target from the exact camera ray first. If the reticle narrowly
-  // misses the model silhouette, use a screen-space vehicle envelope and cast
-  // one confirmation ray through that vehicle's centre. This avoids the old
-  // all-or-nothing dependency on a single triangle intersection.
-  screenCandidate() {
-    const g = this.g, cam = g.camera, ppr = this.pxPerRad();
-    cam.getWorldDirection(_direction);
+  // Screen-space target envelope. Acquisition and retention use the same geometry
+  // but different tolerances, creating hysteresis and preventing target flicker.
+  screenCandidateAt(yaw, pitch, dt, tolerancePx, onlyTank = null) {
+    const g = this.g, dir = g.camDir(yaw, pitch);
+    const origin = dt === undefined ? g.camera.position : g.cameraPositionFor(dir, g.cam.sniper, dt);
+    const ppr = this.pxPerRad();
     let best = null, sticky = null;
     for (const tank of g.tanks) {
-      if (!this.validTarget(tank) || !this.manual && tank.vehicleSkill?.jammed) continue;
-      const { W, hullH, turretH } = tank.spec.dims;
-      _candidateCenter.set(0, (hullH + turretH) * 0.5, 0);
+      if (onlyTank && tank !== onlyTank) continue;
+      if (!this.validTarget(tank) || (!this.manual && tank.vehicleSkill?.jammed)) continue;
+      const d = tank.spec.dims;
+      _candidateCenter.set(0, (d.hullH + d.turretH) * 0.5, 0);
       tank.model.root.localToWorld(_candidateCenter);
-      _candidateDelta.copy(_candidateCenter).sub(cam.position);
+      _candidateDelta.copy(_candidateCenter).sub(origin);
       const distance = _candidateDelta.length();
       if (distance < 1) continue;
-      const cos = clamp(_candidateDelta.dot(_direction) / distance, -1, 1);
+      const cos = clamp(_candidateDelta.dot(dir) / distance, -1, 1);
       if (cos <= 0) continue;
-      const radius = Math.max(W, hullH + turretH) * 0.5;
-      const px = (Math.acos(cos) - Math.atan(radius / distance)) * ppr;
-      if (px > AIM_ASSIST.ACQUIRE_TOL_PX) continue;
-      const item = { tank, point: _candidateCenter.clone(), px };
-      if (!best || px < best.px) best = item;
+      const radius = Math.hypot(d.L * 0.5, d.W * 0.5, (d.hullH + d.turretH) * 0.5);
+      const gapPx = (Math.acos(cos) - Math.atan(radius / distance)) * ppr;
+      if (gapPx > tolerancePx) continue;
+      if (g.world?.losBlocked?.(origin.x, origin.y, origin.z,
+        _candidateCenter.x, _candidateCenter.y, _candidateCenter.z)) continue;
+      if (g.smokeBlocks?.(origin.x, origin.y, origin.z,
+        _candidateCenter.x, _candidateCenter.y, _candidateCenter.z)) continue;
+      const item = { tank, point: _candidateCenter.clone(), part: 'hull', gapPx: Math.max(0, gapPx) };
+      if (!best || item.gapPx < best.gapPx) best = item;
       if (tank === this.target || tank === this.candidate) sticky = item;
     }
-    // Retain the current candidate through small overlaps between silhouettes;
-    // a clearly better or directly-hit target can still replace it immediately.
-    if (sticky && best && sticky.tank !== best.tank && sticky.px <= best.px + 8) return sticky;
+    if (sticky && best && sticky.tank !== best.tank &&
+      sticky.gapPx <= best.gapPx + AIM_ASSIST.TARGET_SWITCH_HYSTERESIS_PX) return sticky;
     return best;
+  }
+
+  screenCandidate() {
+    return this.screenCandidateAt(this.g.cam.yaw, this.g.cam.pitch, undefined, AIM_ASSIST.ACQUIRE_TOL_PX);
   }
 
   resolveAimCandidate() {
     const g = this.g;
     if (g.aimTank && g.aimHit) {
-      if (!this.validTarget(g.aimTank) || !this.manual && g.aimTank.vehicleSkill?.jammed) return null;
-      return { tank: g.aimTank, point: g.cursorPoint, part: g.aimHit.part };
+      if (!this.validTarget(g.aimTank) || (!this.manual && g.aimTank.vehicleSkill?.jammed)) return null;
+      return { tank: g.aimTank, point: g.cursorPoint, part: g.aimHit.part, direct: true };
     }
-    // Do not acquire a target through a friendly vehicle, wreck or other direct
-    // ray hit. A nearby silhouette is only a fallback for a genuine near miss.
+    // A friendly tank or another direct hit blocks fallback acquisition.
     if (g.aimTank) return null;
     const candidate = this.screenCandidate();
     if (!candidate) return null;
@@ -168,16 +185,13 @@ export class AimAssist {
     if (g.smokeBlocks?.(origin.x, origin.y, origin.z,
       candidate.point.x, candidate.point.y, candidate.point.z)) return null;
     if (ray?.tank === candidate.tank) {
-      return { tank: candidate.tank, point: ray.point, part: ray.hit?.part || 'hull' };
+      return { tank: candidate.tank, point: ray.point, part: ray.hit?.part || 'hull', direct: false };
     }
-    // A ray can pass through a small gap in detailed geometry. When the centre
-    // line is otherwise unobstructed, anchor to the vehicle's geometric centre.
-    return { tank: candidate.tank, point: candidate.point, part: 'hull' };
+    return { tank: candidate.tank, point: candidate.point, part: 'hull', direct: false };
   }
 
   probe(yaw, pitch, dt) {
-    const g = this.g;
-    const dir = g.camDir(yaw, pitch);
+    const g = this.g, dir = g.camDir(yaw, pitch);
     return g.traceAim(g.cameraPositionFor(dir, g.cam.sniper, dt), dir, true);
   }
 
@@ -186,60 +200,53 @@ export class AimAssist {
     const turn = this.pending.x, tilt = this.pending.y;
     this.pending.set(0, 0);
     this.lastFactor = 1;
-    if (this.target && (!g.player.alive || g.ended || !this.validTarget(this.target) || !this.manual && this.target.vehicleSkill?.jammed)) this.release('lost');
+    if (this.target && (!g.player.alive || g.ended || !this.validTarget(this.target) ||
+      (!this.manual && this.target.vehicleSkill?.jammed) || !this.targetVisible(dt))) this.release('lost');
     if (g.debugAim || g.camOverride) return;
     if (this.target) g.alignCamTo(this.anchorWorld(_point), dt, this.offset.x, this.offset.y);
     if (!turn && !tilt) return;
 
     const yaw = c.yaw + turn, pitch = g.limitCameraPitch(c.pitch + tilt);
-    if (yaw === c.yaw && pitch === c.pitch) return;
-    this.recordLook();
     if (this.target && this.resistExit(yaw, pitch, dt)) return;
     c.yaw = yaw;
     c.pitch = pitch;
   }
 
+  // Blitz-like lock behavior: track the current vehicle while the reticle remains
+  // on it, switch when the reticle reaches another vehicle, and release over empty
+  // space. A small edge drag prevents jitter without doing repeated binary raycasts.
   resistExit(yaw, pitch, dt) {
-    const c = this.g.cam;
-    // Let the normal aim pass re-anchor or switch after applying the full movement.
-    const probed=this.probe(yaw,pitch,dt)?.tank;
-    if (this.validTarget(probed) && (this.manual || !probed.vehicleSkill?.jammed)) return false;
-
-    let edgeYaw = c.yaw - this.offset.x, edgePitch = c.pitch - this.offset.y;
-    const start = this.probe(c.yaw, c.pitch, dt);
-    const onTarget = start?.tank === this.target;
-    if (onTarget) {
-      // Keep the entire part of the movement that is still on the target.
-      let lo = 0, hi = 1, edge = start;
-      for (let i = 0; i < 4; i++) {
-        const mid = (lo + hi) / 2;
-        const hit = this.probe(THREE.MathUtils.lerp(c.yaw, yaw, mid), THREE.MathUtils.lerp(c.pitch, pitch, mid), dt);
-        if (hit?.tank === this.target) { lo = mid; edge = hit; }
-        else hi = mid;
-      }
-      edgeYaw = THREE.MathUtils.lerp(c.yaw, yaw, lo);
-      edgePitch = THREE.MathUtils.lerp(c.pitch, pitch, lo);
-      this.setAnchor(this.target, edge.point, edge.hit.part);
-    }
-
-    const towardEdge = !onTarget &&
-      Math.hypot((yaw - edgeYaw) * Math.cos(pitch), pitch - edgePitch) <=
-      Math.hypot(this.offset.x * Math.cos(c.pitch), this.offset.y);
-    this.lastFactor = towardEdge ? 1 : AIM_ASSIST.EDGE_DRAG;
-    const fromYaw = onTarget ? edgeYaw : c.yaw;
-    const fromPitch = onTarget ? edgePitch : c.pitch;
-    const nextYaw = THREE.MathUtils.lerp(fromYaw, yaw, this.lastFactor);
-    const nextPitch = THREE.MathUtils.lerp(fromPitch, pitch, this.lastFactor);
-    this.offset.set(nextYaw - edgeYaw, nextPitch - edgePitch);
-    if (this.offPx() > AIM_ASSIST.BREAK_PX) {
+    const g = this.g, c = g.cam;
+    const hit = this.probe(yaw, pitch, dt);
+    if (hit?.tank) {
+      if (hit.tank === this.target && this.validTarget(hit.tank) &&
+        (this.manual || !hit.tank.vehicleSkill?.jammed)) return false;
       this.release('edge');
       this.recordLook();
-      this.lastFactor = 1;
       return false;
     }
-    c.yaw = nextYaw;
-    c.pitch = nextPitch;
-    return true;
+
+    const retained = this.screenCandidateAt(yaw, pitch, dt, AIM_ASSIST.RETAIN_TOL_PX, this.target);
+    if (retained?.tank === this.target) {
+      if (retained.gapPx <= AIM_ASSIST.ACQUIRE_TOL_PX) return false;
+      this.lastFactor = AIM_ASSIST.EDGE_DRAG;
+      const appliedYaw = turn * this.lastFactor;
+      const appliedPitch = (pitch - c.pitch) * this.lastFactor;
+      c.yaw += appliedYaw;
+      c.pitch += appliedPitch;
+      this.offset.x += appliedYaw;
+      this.offset.y += appliedPitch;
+      if (this.offPx() > AIM_ASSIST.BREAK_PX) {
+        this.release('edge');
+        this.recordLook();
+        return false;
+      }
+      return true;
+    }
+
+    this.release('edge');
+    this.recordLook();
+    return false;
   }
 
   postAim(dt) {
@@ -267,9 +274,10 @@ export class AimAssist {
       this.setAnchor(tank, resolved.point, resolved.part);
     } else if (tank && !this.target) {
       const released = this.released;
-      const handoff = this.moved && released?.handoff && (this.enabled || released.manual) && tank !== released.tank &&
-        g.time - released.time < AIM_ASSIST.MANUAL_WINDOW;
-      const canAcquire = this.enabled && this.candidateAimed && this.candidateTime >= AIM_ASSIST.ACQUIRE_TIME &&
+      const handoff = this.moved && released?.handoff && (this.enabled || released.manual) &&
+        tank !== released.tank && g.time - released.time < AIM_ASSIST.MANUAL_WINDOW;
+      const canAcquire = this.enabled && this.candidateAimed &&
+        (resolved.direct || this.candidateTime >= AIM_ASSIST.ACQUIRE_TIME) &&
         g.time - this.lastMouse < AIM_ASSIST.MANUAL_WINDOW &&
         !(released?.tank === tank && g.time - released.time < AIM_ASSIST.RELOCK_COOLDOWN);
       if (handoff || canAcquire) {
@@ -287,16 +295,16 @@ export class AimAssist {
     let best = null, bestPx = AIM_ASSIST.FOCUS_TOL_PX;
     for (const tank of g.tanks) {
       if (!this.validTarget(tank) || tank.vehicleSkill?.jammed) continue;
-      const { W, hullH, turretH } = tank.spec.dims;
-      _point.set(0, (hullH + turretH) * 0.5, 0);
+      const d = tank.spec.dims;
+      _point.set(0, (d.hullH + d.turretH) * 0.5, 0);
       tank.model.root.localToWorld(_point).sub(cam.position);
       const distance = _point.length();
       if (distance < 1) continue;
       const cos = clamp(_point.dot(_direction) / distance, -1, 1);
       if (cos <= 0) continue;
-      const radius = Math.max(W, hullH + turretH) * 0.5;
-      const px = (Math.acos(cos) - Math.atan(radius / distance)) * ppr;
-      if (px < bestPx) { bestPx = px; best = tank; }
+      const radius = Math.hypot(d.L * 0.5, d.W * 0.5, (d.hullH + d.turretH) * 0.5);
+      const gapPx = (Math.acos(cos) - Math.atan(radius / distance)) * ppr;
+      if (gapPx < bestPx) { bestPx = gapPx; best = tank; }
     }
     return best;
   }

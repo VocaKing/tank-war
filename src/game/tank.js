@@ -13,7 +13,7 @@ import { stabilizedMount, mountAngles, highArcMountYaw } from './mortarAim.js';
 import { Equipment } from './items.js';
 import { findEraTile } from './eraMechanics.js';
 import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
-import { advanceDispersion, impactDrop, incidence, sampleDispersionRadius } from './combatMath.js';
+import { advanceDispersion, dispersionMotionActive, impactDrop, incidence, sampleDispersionRadius } from './combatMath.js';
 
 import { GRAVITY } from './physics.js';
 
@@ -163,9 +163,11 @@ export class Tank {
       this.dispersionProgress = 0;
       return;
     }
-    // The active stabilizer slows widening while keeping the configured maximum reachable.
-    const stabilization = this.speed !== 0 && this.abilities.isStabilized ? 2 : 1;
-    this.dispersionProgress = advanceDispersion(this.dispersionProgress, this.speed, dt, this.aimTime() * stabilization);
+    // Motion bloom is driven by the vehicle and gun, never by camera aim distance.
+    // A stabilizer slows bloom while preserving the same configured maximum.
+    const moving = dispersionMotionActive(this.speed, this.turnRate, this.yawRate);
+    const stabilization = moving && this.abilities.isStabilized ? 2 : 1;
+    this.dispersionProgress = advanceDispersion(this.dispersionProgress, moving, dt, this.aimTime() * stabilization);
   }
   placeAt(x, z, heading, speed = 0) {
     const W = this.game.world, d = this.spec.dims;
@@ -238,8 +240,10 @@ export class Tank {
         this.trackRepairs[0] > 0 ? 0 : (this.speed + this.turnRate * half) * dt,
         this.trackRepairs[1] > 0 ? 0 : (this.speed - this.turnRate * half) * dt);
       this.moved += Math.abs(this.speed) * dt;
-      this.updateDispersion(dt);
       if (updateGun) this.updateTurret(dt);
+      // Update after the gun servo so this frame's turret traverse contributes
+      // to dispersion immediately rather than one frame late.
+      this.updateDispersion(dt);
       if (this.usesSpade()) this.updateSpade(dt, this.game.time);
       if (this.spec.artillery?.autoDeploy) this.updateAutoArtillery(dt, this.game.time);
       if (this.burstLeft > 0) { this.burstTimer -= dt; if (this.burstTimer <= 0 && this.reloadLeft <= 0) this.fireBurstRound(this.game.time); }

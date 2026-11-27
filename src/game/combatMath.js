@@ -6,8 +6,13 @@ export const DEG = Math.PI / 180;
 export const MIN_INCIDENCE_COS = 1e-6;
 // Keep the edge-to-centre density ratio close to the previous spread setting.
 const DISPERSION_FALLOFF = 2.4;
-export function advanceDispersion(current, speed, dt, aimTime) {
-  return approach(current, speed === 0 ? 0 : 1, Math.max(0, dt) / aimTime);
+// WoT Blitz-style gun handling: vehicle translation, hull traverse and turret
+// traverse all bloom the gun. Camera/crosshair distance is deliberately absent.
+export function dispersionMotionActive(speed, hullTurnRate, turretTurnRate) {
+  return Math.abs(speed) > 0.12 || Math.abs(hullTurnRate) > 0.008 || Math.abs(turretTurnRate) > 0.008;
+}
+export function advanceDispersion(current, moving, dt, aimTime) {
+  return approach(current, moving ? 1 : 0, Math.max(0, dt) / Math.max(0.05, aimTime));
 }
 export function zoomFov(zoom, baseFov = BASE_FOV) {
   return 2 * Math.atan(Math.tan(baseFov * DEG / 2) / zoom) / DEG;
