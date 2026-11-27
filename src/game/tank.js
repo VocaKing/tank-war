@@ -241,7 +241,7 @@ export class Tank {
     _v2.set(dx / (horizontal || 1) * Math.cos(th), Math.sin(th), dz / (horizontal || 1) * Math.cos(th));
     _q.copy(pose).invert(); _v2.applyQuaternion(_q);
     const angles=stabilize?mountAngles(_v2,yaw,s.gunElevation*DEG):null;
-    const rawYawT=s.artillery?.highArc?yaw:angles?angles.yaw:Math.atan2(_v2.x,_v2.z),pitchT=angles?angles.pitch:Math.asin(clamp(_v2.y,-1,1));
+    const rawYawT=angles?angles.yaw:Math.atan2(_v2.x,_v2.z),pitchT=angles?angles.pitch:Math.asin(clamp(_v2.y,-1,1));
     const yawT = rawYawT;
     const prev = this.turretYaw;
     if (!s.fixedGun) {
