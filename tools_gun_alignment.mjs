@@ -29,6 +29,9 @@ try {
     for (const id of ids) {
       const spec = TANKS.find(s => s.id === id);
       if (!spec) throw new Error('missing tank spec: ' + id);
+      // Casemate/fixed-gun vehicles cannot traverse independently; their hull-aim
+      // behavior is covered by the dedicated fixed-gun controller regression.
+      if (spec.fixedGun) continue;
       await loadDetailedTankModel(spec);
       const model = createTankModel(spec, { links: false, battle: true });
       const tank = Object.assign(Object.create(Tank.prototype), {
@@ -43,6 +46,8 @@ try {
       const scenarios = [
         { name: 'world-point', pos: [0, 0, 0], heading: 0.17, pitch: 0.08, roll: -0.06,
           bearing: new THREE.Vector3(0.34, 0, 0.94), range: 180, useBearing: false },
+        { name: 'translated-world-point', pos: [237, 0, -163], heading: 0.61, pitch: -0.09, roll: 0.12,
+          bearing: new THREE.Vector3(-0.72, 0, 0.69), range: 180, useBearing: false },
         { name: 'translated-near-bearing', pos: [237, 0, -163], heading: 0.61, pitch: -0.09, roll: 0.12,
           bearing: new THREE.Vector3(-0.72, 0, 0.69), range: 9, useBearing: true },
       ];
