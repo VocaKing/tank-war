@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Vector3,Quaternion,Euler,Group,Object3D} from 'three';
+import {Vector3,Quaternion,Euler,Group,Object3D,Matrix4} from 'three';
 import {createServer} from 'vite';
 const vite=await createServer({appType:'custom',server:{middlewareMode:true,ws:false}});
 try{
@@ -19,7 +19,7 @@ try{
   const tank=Object.assign(Object.create(Tank.prototype),{
    spec,pos:new Vector3(),quat:new Quaternion(),heading:0,pitch:0,roll:0,turretYaw:0,gunPitch:0,yawRate:0,
    shellIdx:0,abilities:{usingSecondary:false},modules:{turret:1},crew:[],
-   input:{aim:new Vector3(0,0,300),aimBearing:null},recoil:0,spadeProgress:0,suspensionOffset:0,
+   input:{aim:new Vector3(0,0,300),aimBearing:null},recoil:0,spadeProgress:0,suspensionOffset:0,inv:new Matrix4(),
    model
   });
   for(let i=0;i<240;i++){
