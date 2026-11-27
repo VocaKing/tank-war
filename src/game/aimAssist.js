@@ -10,7 +10,7 @@ export const AIM_ASSIST = {
   MANUAL_WINDOW: 1.5,
   EDGE_DRAG: 0.72,
   BREAK_PX: 44,
-  RELOCK_COOLDOWN: 0.08,
+  RELOCK_COOLDOWN: 0,
 };
 
 const _point = new THREE.Vector3(), _direction = new THREE.Vector3();
