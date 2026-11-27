@@ -42,3 +42,6 @@ All 47 vehicles now have explicit minimum/maximum dispersion radii (m at 100 m):
 
 ## Tier matchmaking and future progression
 Four game-balance tiers contain 7/11/8/21 vehicles. Each 7v7 side has at least five vehicles at the player's tier and at most two from one adjacent tier. No same-team repeats with the current roster. Cross-team repeats are permitted only if the eligible tier slots exceed the number of distinct vehicles. Teams have identical tier counts and approximate class/game-stat parity, not mirrored rosters. The match records a transient result with vehicle ID, tier, result, duration, survival and combat stats; no progression lock, points or persistent profile is enabled yet.
+
+### Procedural vehicle gun audio
+47 independently authored timbre presets, deterministic noise seeds and two sample variations per voice. Caliber controls pitch and gain, while guided/secondary/tube firing paths use their own variants. WebAudio caches samples, adds distance delay, distance filtering, stereo panning, bounded voices and master compression. These are artistic gameplay approximations, not real recordings. Burst, multi-tube and MRSI fire emit individual audio events.

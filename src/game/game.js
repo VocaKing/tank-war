@@ -510,7 +510,7 @@ export class Game {
     const pb = this.player.alive ? this.player.inBush : null; this.world.veg.setPlayerBush(pb && !this.cam.sniper ? pb : pb);
     this.world.update(dt, this.time, this.camera.position);
     this.effects.update(dt, (x, z) => this.world.terrain.height(x, z), this.camera);
-    this.audio.setListener(this.camera.position);
+    this.audio.setListener(this.camera.position,this.camera.getWorldDirection(new THREE.Vector3()));
     if (this.player.alive && !this.ended) this.audio.engine(Math.abs(this.player.input.throttle), this.player.speed); else this.audio.stopEngine();
     this.hud.update(dt, this.camera);
   }
@@ -523,7 +523,7 @@ export class Game {
   dispose() {
     this.touch?.dispose();
     for (const [ev, list] of Object.entries(this._h)) for (const [tgt, fn] of list) tgt.removeEventListener(ev, fn);
-    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.contactShadows.dispose(); this.trackMarks.dispose(); this.effects.dispose(); this.physics.free(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
+    this.armorView.dispose(); this.hud.destroy(); this.audio.stopEngine(); this.audio.clearGunVoices?.(); this.contactShadows.dispose(); this.trackMarks.dispose(); this.effects.dispose(); this.physics.free(); this.world.dispose(); if (this.post) this.post.dispose(); if (this.outline) this.outline.dispose();
     if (document.pointerLockElement) document.exitPointerLock();
   }
   // NPCs use their consumables sensibly
