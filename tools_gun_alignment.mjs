@@ -19,7 +19,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
   await page.goto('http://127.0.0.1:5173/tests/muzzle.html');
   const results = await page.evaluate(async () => {
-    const [{ Tank }, { createTankModel, THREE }, { TANKS }] = await Promise.all([
+    const [{ Tank, ballisticAngle }, { createTankModel, THREE }, { TANKS }] = await Promise.all([
       import('/src/game/tank.js'), import('/src/models/tankModel.js'), import('/src/game/tankData.js'),
     ]);
     const ids = ['t72', 'm1a2', 'leo2a6', 'tiger', '2s38', 'leviathan160', 'strv103'];
@@ -49,9 +49,16 @@ try {
       const targetBearing = Math.atan2(target.x - muzzle.x, target.z - muzzle.z);
       const barrelBearing = Math.atan2(dir.x, dir.z);
       const bearingError = Math.abs(wrap(barrelBearing - targetBearing));
+      const horizontal = Math.hypot(target.x - muzzle.x, target.z - muzzle.z);
+      const pitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
+      const flightTime = horizontal / Math.max(1, tank.shell.velocity * Math.cos(pitch));
+      const ballisticY = muzzle.y + tank.shell.velocity * Math.sin(pitch) * flightTime - 0.5 * 9.81 * flightTime * flightTime;
+      const verticalMissM = ballisticY - target.y;
+      const expectedPitch = ballisticAngle(tank.shell.velocity, horizontal, target.y - muzzle.y, !!spec.artillery?.highArc);
       const row = {
         id, fixedGun: !!spec.fixedGun, highArc: !!spec.artillery?.highArc,
         aimError: tank.aimError, bearingErrorDeg: bearingError * 180 / Math.PI,
+        pitchErrorDeg: Math.abs(pitch - expectedPitch) * 180 / Math.PI, verticalMissM,
         turretYawDeg: tank.turretYaw * 180 / Math.PI, gunPitchDeg: tank.gunPitch * 180 / Math.PI,
       };
       out.push(row);
@@ -67,8 +74,12 @@ try {
     assert.ok(Number.isFinite(row.aimError), row.id + ' has non-finite aim error');
     assert.ok(row.bearingErrorDeg < 0.35,
       row.id + ' barrel azimuth does not converge to the target: ' + JSON.stringify(row));
-    if (!row.fixedGun) assert.ok(row.aimError < 0.02,
-      row.id + ' turret/pitch servo does not settle: ' + JSON.stringify(row));
+    if (!row.fixedGun) {
+      assert.ok(row.aimError < 0.02,
+        row.id + ' turret/pitch servo does not settle: ' + JSON.stringify(row));
+      assert.ok(Math.abs(row.verticalMissM) < 1.5,
+        row.id + ' shell trajectory misses the crosshair target vertically: ' + JSON.stringify(row));
+    }
   }
 } finally {
   if (browser) await browser.close();
