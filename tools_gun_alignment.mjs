@@ -42,7 +42,7 @@ try {
         heading, pitch: hullPitch, roll: hullRoll, turretYaw: 0, gunPitch: 0, yawRate: 0,
         shellIdx: 0, abilities: { usingSecondary: false }, modules: { turret: 1, gun: 1 },
         crew: spec.crew.map(role => ({ role, alive: true })),
-        input: { aim, aimBearing: null },
+        input: { aim, aimBearing: id === 'pzh2000' ? new THREE.Vector3(Math.sin(bearing), 0, Math.cos(bearing)) : null },
         recoil: 0, spadeProgress: 0, autoArtilleryState: 'stowed', autoArtilleryTimer: 0,
         suspensionOffset: 0, turnRate: 0, inv: new THREE.Matrix4(), vehicleSkill: null,
       });

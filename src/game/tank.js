@@ -214,13 +214,19 @@ export class Tank {
     // vehicles. Chassis pitch/roll must not turn a nearly vertical barrel
     // direction into a different horizontal turret target.
     if(s.artillery?.highArc){
+      // Aim in the hull's local frame. Subtracting only the scalar hull heading
+      // loses the pitch/roll component of the turret axis on uneven ground,
+      // producing a visible left/right miss even when the servo reports settled.
+      let bearingX=aim.x,bearingZ=aim.z;
       if(this.input.aimBearing){
-        const b=this.input.aimBearing;
-        yaw=highArcMountYaw(b.x*100,b.z*100,this.heading,this.turretYaw);
-      }else{
-        _v2.copy(m.turret.position).applyQuaternion(pose).add(this.pos);
-        yaw=highArcMountYaw(this.input.aim.x-_v2.x,this.input.aim.z-_v2.z,this.heading,this.turretYaw,mount.x);
+        _v2.copy(this.input.aimBearing).applyQuaternion(_q.copy(pose).invert());
+        const bearingRange=Math.hypot(_v2.x,_v2.z);
+        if(bearingRange>1e-5){
+          const scale=range/bearingRange;
+          bearingX=_v2.x*scale;bearingZ=_v2.z*scale;
+        }
       }
+      yaw=highArcMountYaw(bearingX,bearingZ,0,this.turretYaw,mount.x);
     }
     const sin = Math.sin(yaw), cos = Math.cos(yaw);
     const rise = aim.y - mount.y;
