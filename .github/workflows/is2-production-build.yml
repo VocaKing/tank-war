@@ -7,6 +7,12 @@ on:
     paths:
       - "tools/blender/**"
       - ".github/workflows/is2-production-build.yml"
+  pull_request:
+    branches:
+      - blender/is2-model1944-level2
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/is2-production-build.yml"
   workflow_dispatch:
 
 permissions:
