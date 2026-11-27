@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IS-2 Model 1944 production asset pipeline.
+"""IS-2 Model 1944 production asset pipeline. This is an isolated review build.
 
 Runs the existing dimensioned Blender source, then builds:
 - high-poly source / low-poly game-mesh bake target
