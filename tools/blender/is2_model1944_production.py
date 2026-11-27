@@ -773,7 +773,7 @@ unique_meshes = len(set(obj.data.as_pointer() for obj in mesh_objects))
 triangles = sum(max(0, len(poly.vertices) - 2) for obj in mesh_objects for poly in obj.data.polygons)
 node_names = sorted(obj.name for obj in FINAL_COLL.objects)
 track_l = [name for name in node_names if re.match(r"TrackLink_L_\d{3}$", name)]
-track_r = [name for name in node_names if re.match(r"TrackLink_R_\d{3}$", name))
+track_r = [name for name in node_names if re.match(r"TrackLink_R_\d{3}$", name)]
 if len(track_l) != TRACK_LINKS or len(track_r) != TRACK_LINKS:
     raise RuntimeError("Track node count mismatch: L=%d R=%d" % (len(track_l), len(track_r)))
 
