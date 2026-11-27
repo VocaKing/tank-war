@@ -22,37 +22,66 @@ let NEXT_ID = 1;
 const TRACK_REPAIR_TIME = 9;
 const UP = new THREE.Vector3(0, 1, 0), AXIS_X = new THREE.Vector3(1, 0, 0);
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
-const _aimPivot = new THREE.Vector3(), _aimOffset = new THREE.Vector3(), _aimDirection = new THREE.Vector3();
-const _aimTarget = new THREE.Vector3(), _aimTargetBase = new THREE.Vector3(), _aimBodyOffset = new THREE.Vector3();
+const _aimPivot = new THREE.Vector3(), _aimMuzzle = new THREE.Vector3(), _aimMuzzleLocal = new THREE.Vector3();
+const _aimAxisLocal = new THREE.Vector3(), _aimTarget = new THREE.Vector3(), _aimWorldTarget = new THREE.Vector3();
+const _aimDirection = new THREE.Vector3(), _aimOffset = new THREE.Vector3(), _aimBearing = new THREE.Vector3();
+const _aimTurretQ = new THREE.Quaternion(), _aimMuzzleQ = new THREE.Quaternion(), _aimYawQ = new THREE.Quaternion();
 
-// Solve the turret azimuth against the actual world-space horizontal line of sight.
-// This keeps the barrel on the camera's bearing when the hull is pitched/rolled,
-// while leaving the elevation solution untouched.
-function solveHorizontalYaw(target, bearingDirection, pos, pose, body, turret, mount, pitch, initialYaw) {
-  _aimBodyOffset.copy(body?.position || _aimBodyOffset.set(0, 0, 0)).add(turret.position);
-  _aimPivot.copy(_aimBodyOffset).applyQuaternion(pose).add(pos);
+// Solve turret azimuth from the actual muzzle socket and its world-space bore axis.
+// The previous solver aimed from the trunnion and assumed every barrel was exactly
+// coaxial with the gun pivot. That leaves a visible horizontal error on short-range
+// shots and on imported models whose barrel/socket has a local transform.
+function solveHorizontalYaw(tank, target, bearingDirection, pitch, initialYaw) {
+  const m = tank.model, turret = m.turret, mount = tank.gunMount, muzzle = tank.muzzleNode;
+  if (!turret || !mount || !muzzle) return initialYaw;
+
+  // Rebuild the current hull pose before measuring the real muzzle transform.
+  m.root.position.copy(tank.pos);
+  m.root.quaternion.copy(tank.quat);
+  const stance = tank.vehicleSkill?.id === 'siege' && tank.vehicleSkill.toggled
+    ? (tank.spec.hydroSuspension?.lowOffset || 0) * tank.vehicleSkill.fraction
+    : tank.suspensionOffset || 0;
+  m.body.position.y = stance;
+  turret.rotation.y = tank.turretYaw;
+  mount.rotation.x = -pitch;
+  if (m.barrel) m.barrel.position.z = -tank.recoil * m.maxRecoil;
+  m.root.updateMatrixWorld(true);
+
+  turret.getWorldPosition(_aimPivot);
+  muzzle.getWorldPosition(_aimMuzzle);
+  turret.worldToLocal(_aimMuzzleLocal.copy(_aimMuzzle));
+  turret.getWorldQuaternion(_aimTurretQ);
+  muzzle.getWorldQuaternion(_aimMuzzleQ);
+  _aimAxisLocal.set(0, 0, 1).applyQuaternion(_aimMuzzleQ)
+    .applyQuaternion(_aimTurretQ.invert()).normalize();
+
   if (bearingDirection && Math.hypot(bearingDirection.x, bearingDirection.z) > 1e-5) {
-    _aimTargetBase.copy(bearingDirection).setY(0).normalize().multiplyScalar(1000);
+    _aimBearing.copy(bearingDirection).setY(0).normalize();
+    _aimWorldTarget.copy(_aimPivot).addScaledVector(_aimBearing, 1000);
   } else {
-    _aimTargetBase.copy(target).sub(_aimPivot);
+    _aimWorldTarget.copy(target);
   }
-  if (Math.hypot(_aimTargetBase.x, _aimTargetBase.z) < 0.75) return initialYaw;
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  if (Math.hypot(_aimWorldTarget.x - _aimPivot.x, _aimWorldTarget.z - _aimPivot.z) < 0.75) return initialYaw;
+  if (Math.hypot(_aimAxisLocal.x, _aimAxisLocal.z) < 1e-4) return initialYaw;
+
   const evaluate = yaw => {
-    const sn = Math.sin(yaw), cs = Math.cos(yaw);
-    _aimOffset.set(cs * mount.x + sn * mount.z, mount.y, -sn * mount.x + cs * mount.z).applyQuaternion(pose);
-    _aimDirection.set(sn * cp, sp, cs * cp).applyQuaternion(pose);
-    _aimTarget.copy(_aimTargetBase).sub(_aimOffset);
+    _aimYawQ.setFromAxisAngle(UP, yaw);
+    _aimOffset.copy(_aimMuzzleLocal).applyQuaternion(_aimYawQ).applyQuaternion(tank.quat);
+    _aimMuzzle.copy(_aimPivot).add(_aimOffset);
+    _aimDirection.copy(_aimAxisLocal).applyQuaternion(_aimYawQ).applyQuaternion(tank.quat);
+    _aimTarget.copy(_aimWorldTarget).sub(_aimMuzzle);
     return {
       cross: _aimDirection.x * _aimTarget.z - _aimDirection.z * _aimTarget.x,
       dot: _aimDirection.x * _aimTarget.x + _aimDirection.z * _aimTarget.z,
       range: Math.hypot(_aimTarget.x, _aimTarget.z),
+      axis: Math.hypot(_aimDirection.x, _aimDirection.z),
     };
   };
+
   let yaw = initialYaw;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) {
     const e = evaluate(yaw);
-    if (e.range < 0.75 || Math.abs(e.cross) < Math.max(1e-7, e.range * 1e-7)) break;
+    if (e.range < 0.75 || e.axis < 1e-4 || Math.abs(e.cross) < Math.max(1e-7, e.range * 1e-7)) break;
     const eps = 1e-4;
     const derivative = (evaluate(yaw + eps).cross - evaluate(yaw - eps).cross) / (2 * eps);
     if (!Number.isFinite(derivative) || Math.abs(derivative) < 1e-7) break;
@@ -288,8 +317,7 @@ export class Tank {
     let desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
     let nextPitch=clamp(approach(this.gunPitch,desiredPitch,s.gunSpeed*DEG*dt),minPitch,s.gunElevation*DEG);
     if (!s.fixedGun) {
-      const targetYaw = solveHorizontalYaw(this.input.aim, this.input.aimBearing, this.pos, pose,
-        m.body, m.turret, this.gunMount.position, nextPitch, yawT);
+      const targetYaw = solveHorizontalYaw(this, this.input.aim, this.input.aimBearing, nextPitch, yawT);
       yawT = targetYaw;
       // A model's gun-clearance floor can depend on azimuth. Re-evaluate it
       // after the horizontal solution, without changing the ballistic pitch target.
@@ -343,7 +371,9 @@ export class Tank {
     return first < 1 && reach > 0 ? pivot.lerp(muzzle, Math.max(0, first - 0.05 / reach)) : muzzle;
   }
   gunDirection() {
-    return new THREE.Vector3(0, 0, 1).applyQuaternion(this.gunMount.getWorldQuaternion(_q)).normalize();
+    // The muzzle socket carries the imported barrel's actual local axis; do not
+    // infer bore direction from the gun pivot and silently ignore barrel offsets.
+    return new THREE.Vector3(0, 0, 1).applyQuaternion(this.muzzleNode.getWorldQuaternion(_q)).normalize();
   }
   spreadDirection(dir) {
     const cone = Math.tan(this.dispersion());
