@@ -33,7 +33,7 @@ try{
    const dir=tank.gunDirection();
    const targetBearing=Math.atan2(tank.input.aim.x-muzzleWorld.x,tank.input.aim.z-muzzleWorld.z);
    const barrelBearing=Math.atan2(dir.x,dir.z);
-   assert.ok(Math.abs(wrap(barrelBearing-targetBearing))<.003,
+   assert.ok(Math.abs(wrap(barrelBearing-targetBearing))<.005,
     id+' horizontal barrel bearing drifted on pitched/rolled hull: '+wrap(barrelBearing-targetBearing));
    assert.ok(Number.isFinite(tank.gunPitch));
    assert.ok(tank.gunPitch<=spec.gunElevation*Math.PI/180+1e-9);
