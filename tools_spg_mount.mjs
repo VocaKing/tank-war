@@ -37,7 +37,7 @@ try{
    id+' horizontal barrel bearing drifted on pitched/rolled hull: '+wrap(barrelBearing-targetBearing));
   assert.ok(Number.isFinite(tank.gunPitch));
   assert.ok(tank.gunPitch<=spec.gunElevation*Math.PI/180+1e-9);
-  tank.quat.identity();
+  tank.quat.identity();tank.pitch=0;tank.roll=0;tank.syncModel();
   tank.input.aim.set(300,0,0);
   let previous=tank.turretYaw;
   for(let i=0;i<900;i++){
