@@ -36,6 +36,7 @@ jobs:
       - run: node tools_vehicle_skills.mjs
       - run: node tools_matchmaking.mjs
       - run: node tools_gun_audio.mjs
+      - run: node tools_spawn_layout.mjs
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
       - run: npm run build

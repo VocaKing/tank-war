@@ -2,13 +2,14 @@
 // team-shared spotting, target selection with weak-spot & ammo choice, hull angling, retreat.
 import * as THREE from 'three';
 import { clamp, wrapAngle, DEG } from '../util.js';
+import { spawnLane } from './spawnLayout.js';
 
 const _p = new THREE.Vector3(), _q = new THREE.Vector3();
 
 export class AIController {
   constructor(game, tank, role, laneIdx, skill = 1) {
     this.g = game; this.t = tank; this.role = role; this.laneIdx = laneIdx; this.skill = skill;
-    const lane = game.world.lanes[laneIdx].map((p) => p.slice()); this.lane = tank.team === 0 ? lane : lane.reverse();
+    this.lane = spawnLane(game.world.lanes[laneIdx],tank.team,tank.pos);
     this.wp = 1; this.path = []; this.pi = 0; this.repath = 0; this.goal = null; this.state = 'advance';
     this.target = null; this.reactUntil = 0; this.think = Math.random() * 0.3; this.hold = null; this.holdHeading = null;
     this.lastPos = tank.pos.clone(); this.stuckT = 0; this.reverseT = 0; this.revSteer = 1; this.aimErr = new THREE.Vector3(); this.bestRatio = 1; this.aimLocal = new THREE.Vector3();

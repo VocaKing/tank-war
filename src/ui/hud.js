@@ -137,6 +137,8 @@ export class HUD {
     for (const c2 of W.colliders) { if (c2.kind === 'prop') continue; g.save(); const [mx, my] = toM(c2.x, c2.z); g.translate(mx, my); g.rotate(-c2.rot); const sx = c2.hx / half * S / 2, sz = c2.hz / half * S / 2; g.fillRect(-sx, -sz, sx * 2, sz * 2); g.restore(); }
     g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 1; for (let i = 1; i < 10; i++) { g.beginPath(); g.moveTo(i * S / 10, 0); g.lineTo(i * S / 10, S); g.stroke(); g.beginPath(); g.moveTo(0, i * S / 10); g.lineTo(S, i * S / 10); g.stroke(); }
     W.bases.forEach((b, i) => { const [mx, my] = toM(b.x, b.z); g.strokeStyle = i === 0 ? '#5fd36f' : '#ff5a4a'; g.lineWidth = 2; g.beginPath(); g.arc(mx, my, b.r / half * S / 2, 0, 6.3); g.stroke(); });
+    // Friendly spawn zones only: persistent map reference, not extra capture bases.
+    for(const zone of this.g.spawnLayout?.teams[0].zones||[]){const [mx,my]=toM(zone.x,zone.z);g.save();g.strokeStyle='rgba(160,239,172,.8)';g.setLineDash([3,3]);g.beginPath();g.arc(mx,my,48/half*S/2,0,Math.PI*2);g.stroke();g.setLineDash([]);g.fillStyle='#b9efbf';g.font='bold 9px system-ui';g.textAlign='center';g.fillText('S'+(zone.lane+1),mx,my-13);g.restore();}
     this.miniBase = c; this.toM = toM;
   }
   drawMini() {

@@ -528,6 +528,18 @@ export class World {
       if (central) this.controlMarker = { ring, flag };
     }
   }
+  // Team indexes remain stable; only the physical sides are exchanged.
+  // Reverse routes once so AI team 0 always travels from its own base.
+  assignSpawnSides(swapped) {
+    if(this.sidesAssigned)return;
+    this.sidesAssigned=true;this.sidesSwapped=swapped;
+    if(!swapped)return;
+    this.bases=this.bases.slice().reverse();
+    this.lanes=this.lanes.map(lane=>lane.slice().reverse());
+    const first=this.baseMarkers[0],second=this.baseMarkers[1];
+    for(const [marker,color] of [[first,0xc0392b],[second,0x3fa34d]]){marker.ring.material.color.setHex(color);marker.flag.material.color.setHex(color);}
+    this.baseMarkers=[second,first,...this.baseMarkers.slice(2)];
+  }
   setControlTeam(team) {
     const color = team === 0 ? 0x3fa34d : team === 1 ? 0xc0392b : 0xe0b458;
     this.controlMarker.ring.material.color.setHex(color);

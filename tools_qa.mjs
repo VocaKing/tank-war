@@ -36,6 +36,7 @@ for (const m of maps) for (const t of tanks) {
   await page.goto(`${base}?autostart=1&map=${m}&tank=${t}&q=low&seed=7`);
   try {
     await page.waitForFunction(() => window.__game && window.__game.player, null, { timeout: 120000 });
+    const spawnOK=await page.evaluate(()=>{const g=window.__game,L=g.spawnLayout,P=g.spawnPositions;return [2,3].includes(L.groupCount)&&P.every((team,i)=>team.length===7&&new Set(team.map(t=>t.lane)).size===L.groupCount&&team.every((t,j)=>g.tanks[i*7+j].pos.x===t.x&&g.tanks[i*7+j].pos.z===t.z&&Number.isFinite(g.tanks[i*7+j].pos.y))&&team.every((a,j)=>team.slice(j+1).every(b=>Math.hypot(a.x-b.x,a.z-b.z)>=15.99)))&&g.world.sidesSwapped===L.swapped&&g.ai.every(a=>a.ownBase===g.world.bases[a.t.team]&&a.enemyBase===g.world.bases[1-a.t.team]);});
     // exercise: AI sim, then sniper + armor view on the nearest enemy, then render real frames (compiles every shader incl. armor view)
     await page.evaluate(() => { const g = window.__game; g.debug.simulate(5); const e = g.tanks.filter((x) => x.team === 1).sort((a, b) => a.pos.distanceTo(g.player.pos) - b.pos.distanceTo(g.player.pos))[0]; e.spotted[0] = true; g.cam.sniper = true; g.cam.zoom = 8; g.armorView.enabled = true; g.debug.aim(e.pos.x, e.pos.y + 1.2, e.pos.z); g.debug.simulate(0.5); window.__qaE = e; });
     await page.evaluate(() => {
@@ -46,7 +47,7 @@ for (const m of maps) for (const t of tanks) {
       }
     });
     const info = await page.evaluate(() => { const g = window.__game; const av = g.armorView; const cls = av.classify(window.__qaE, window.__qaE.pos.clone().setY(window.__qaE.pos.y + 1.2)); g.armorView.toggle(); g.debug.simulate(0.2); const tiers = g.tanks.map((x) => x.spec.tier); return { avClass: cls.cls, avOffOk: !g.armorView.enabled, tierSpread: Math.max(...tiers) - Math.min(...tiers), tierBalanced: [0,1].every(team=>g.tanks.filter(x=>x.team===team&&x.spec.tier===g.player.spec.tier).length===7-g.lineup.adjacentPerTeam)&&g.lineup.adjacentPerTeam<=2, uniqueTeams:[0,1].every(team=>new Set(g.tanks.filter(x=>x.team===team).map(x=>x.spec.id)).size===7), map: g.map?.id || g.mapId, player: g.player.spec.id, team0: g.tanks.filter((x) => x.team === 0).length, team1: g.tanks.filter((x) => x.team === 1).length, ok: g.tanks.every((x) => Number.isFinite(x.pos.y)), models: g.tanks.map((x) => x.spec.id).join(',') }; });
-    const good = info.player === t && info.team0 === 7 && info.team1 === 7 && info.ok && info.tierBalanced && info.uniqueTeams && info.tierSpread <= 1 && !errs.length; if (!good) fails++;
+    const good = info.player === t && info.team0 === 7 && info.team1 === 7 && info.ok && info.tierBalanced && info.uniqueTeams && info.tierSpread <= 1 && spawnOK && !errs.length; if (!good) fails++;
     console.log(m, t, good ? 'ok' : 'FAIL', JSON.stringify(info), errs.join(' | '));
   } catch (e) { fails++; console.log(m, t, 'FAIL', e.message, errs.join(' | ')); }
   await page.close();

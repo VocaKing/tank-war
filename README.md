@@ -45,3 +45,6 @@ Four game-balance tiers contain 7/11/8/21 vehicles. Each 7v7 side has at least f
 
 ### Procedural vehicle gun audio
 47 independently authored timbre presets, deterministic noise seeds and two sample variations per voice. Caliber controls pitch and gain, while guided/secondary/tube firing paths use their own variants. WebAudio caches samples, adds distance delay, distance filtering, stereo panning, bounded voices and master compression. These are artistic gameplay approximations, not real recordings. Burst, multi-tube and MRSI fire emit individual audio events.
+
+### Distributed and randomized spawning
+Each side starts in two or three map-specific spawn clusters (4+3 or 3+2+2), with nominal center separations around 300–700 m. Side ownership is randomly exchanged per match, including base colors, minimap, capture ownership and AI lane direction. Spawn placement searches dry, traversable, connected ground with slope, obstacle and hull-clearance checks; no blocked-cell fallback. Friendly spawn areas are indicated on the minimap but are not capture points.

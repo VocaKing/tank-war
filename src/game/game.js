@@ -25,6 +25,7 @@ import { zoomFov, projectedSpreadRadius } from './combatMath.js';
 import { createControl, updateControl, resetControlCredit } from './controlCapture.js';
 import { skillKey } from './vehicleSkills.js';
 import { makeMatch } from './matchmaking.js';
+import { chooseSpawnLayout, planSpawnPositions } from './spawnLayout.js';
 function withinPathXZ(p, origin, dx, dz, radius) {
   const x = p.x - origin.x, z = p.z - origin.z;
   const lengthSquared = dx * dx + dz * dz;
@@ -42,6 +43,8 @@ export class Game {
   constructor(renderer, uiRoot, audio, opts) {
     this.renderer = renderer; this.audio = audio; this.opts = opts; this.rng = new RNG(opts.seed || ((Math.random() * 1e9) | 0));
     this.quality = opts.quality || 'high'; this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
+    this.spawnLayout=chooseSpawnLayout(opts.mapId,this.rng);
+    this.world.assignSpawnSides(this.spawnLayout.swapped);
     this.physics = new BattlefieldPhysics(opts.physicsEngine, this.world);
     this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 6000);
     this.time = 0; this.timeLimit = 15 * 60; this.paused = false; this.ended = false; this.flying = [];
@@ -76,10 +79,10 @@ export class Game {
     this.lineup=makeMatch(TANKS,playerTankId,r);
     const {team0,team1}=this.lineup;
     const roles = ['assault', 'sniper', 'assault', 'defender', 'assault', 'sniper', 'assault'];
-    const lanes = [1, 0, 2, 1, 0, 2, 1];
+    const specs=[team0,team1].map(list=>list.map(id=>TANK_BY_ID[id]));
+    this.spawnPositions=planSpawnPositions(this.world,this.nav,this.spawnLayout,specs,r);
     for (let team = 0; team < 2; team++) {
-      const base = this.world.bases[team], other = this.world.bases[1 - team];
-      const dx = other.x - base.x, dz = other.z - base.z; const l = Math.hypot(dx, dz); const fx = dx / l, fz = dz / l; const px = -fz, pz = fx;
+      const other = this.world.bases[1-team];
       const list = team ? team1 : team0; const names = (team ? ENEMY_NAMES : ALLY_NAMES).slice().sort(() => r.next() - 0.5);
       list.forEach((id, i) => {
         const isPlayer = team === 0 && i === 0;
@@ -87,11 +90,11 @@ export class Game {
         const spec = isPlayer && this.opts.fixedGunTest ? { ...stock, fixedGun: true } : stock;
         const lo = isPlayer ? sanitizeLoadout(spec, this.opts.loadout) : npcLoadout(spec, r); const items = isPlayer ? sanitizeItems(this.opts.items || DEFAULT_ITEMS) : (r.next() < 0.5 ? ['repair', 'extinguisher', 'medkit'] : r.next() < 0.5 ? ['repair', 'medkit', 'reload'] : ['repair', 'extinguisher', 'smoke']);
         const t = new Tank(this, spec, team, isPlayer ? 'You' : names[i], isPlayer, lo, items);
-        let x = base.x + fx * (18 + (i % 3) * 16) + px * ((i - 3) * 22 + r.range(-6, 6)) + r.range(-8, 8), z = base.z + fz * (18 + (i % 3) * 16) + pz * ((i - 3) * 22 + r.range(-6, 6)) + r.range(-8, 8);
-        const [ci, cj] = this.nav.nearestWalkable(...this.nav.toCell(x, z)); [x, z] = this.nav.center(ci, cj);
-        t.placeAt(x, z, Math.atan2(fx, fz)); t.input.aim.set(x + fx * 300, t.pos.y + 2, z + fz * 300);
+        const spawn=this.spawnPositions[team][i],{x,z}=spawn;
+        const heading=Math.atan2(other.x-x,other.z-z),fx=Math.sin(heading),fz=Math.cos(heading);
+        t.spawnLane=spawn.lane;t.placeAt(x,z,heading); t.input.aim.set(x+fx*300,t.pos.y+2,z+fz*300);
         this.tanks.push(t);
-        if (!isPlayer) this.ai.push(new AIController(this, t, spec.casemate && spec.cls==='Tank Destroyer' ? 'sniper' : roles[i], lanes[i], 0.8 + r.next() * 0.5));
+        if (!isPlayer) this.ai.push(new AIController(this, t, spec.casemate && spec.cls==='Tank Destroyer' ? 'sniper' : roles[i], spawn.lane, 0.8 + r.next() * 0.5));
       });
     }
   }
