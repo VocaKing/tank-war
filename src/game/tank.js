@@ -257,9 +257,10 @@ export class Tank {
         ? Math.atan2(this.input.aimBearing.x,this.input.aimBearing.z)
         : Math.atan2(this.input.aim.x-_v3.x,this.input.aim.z-_v3.z);
       for(let i=0;i<3;i++){
-        yawT=hullYawForBearing(pose,desiredPitch,targetBearing,yawT);
+        const solved=hullYawForBearing(pose,desiredPitch,targetBearing,yawT,minPitch);
+        yawT=solved.yaw;
         minPitch=this.model.gunPitchFloor(yawT,-s.gunDepression*DEG,s.gunElevation*DEG);
-        desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
+        desiredPitch=clamp(solved.pitch,minPitch,s.gunElevation*DEG);
       }
     }
     if (!s.fixedGun) {

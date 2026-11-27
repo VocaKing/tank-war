@@ -42,25 +42,39 @@ const _worldZ = new Vector3();
 // Find the hull-local turret yaw whose barrel, at a fixed local elevation,
 // has the requested world-space horizontal bearing. Newton iteration keeps
 // the solution stable on pitched/rolled chassis and at the SPG elevation stops.
-export function hullYawForBearing(quat, pitch, bearing, initialYaw) {
-  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+export function hullYawForBearing(quat, desiredPitch, bearing, initialYaw, minPitch = 0) {
   const cb = Math.cos(bearing), sb = Math.sin(bearing);
   const x = _worldX.copy(_basisX).applyQuaternion(quat);
   const y = _worldY.copy(_basisY).applyQuaternion(quat);
   const z = _worldZ.copy(_basisZ).applyQuaternion(quat);
-  let yaw = initialYaw;
-  for (let i = 0; i < 8; i++) {
-    const sn = Math.sin(yaw), cs = Math.cos(yaw);
-    const wx = cp * (sn * x.x + cs * z.x) + sp * y.x;
-    const wz = cp * (sn * x.z + cs * z.z) + sp * y.z;
-    const f = wx * cb - wz * sb;
-    const dwx = cp * (cs * x.x - sn * z.x);
-    const dwz = cp * (cs * x.z - sn * z.z);
-    const df = dwx * cb - dwz * sb;
-    if (!Number.isFinite(f + df) || Math.abs(df) < 1e-6) break;
-    const step = Math.max(-0.5, Math.min(0.5, f / df));
-    yaw = wrap(yaw - step);
-    if (Math.abs(step) < 1e-7) break;
+  const solveAtPitch = pitch => {
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const a = cp * (x.x * cb - x.z * sb);
+    const b = cp * (z.x * cb - z.z * sb);
+    const c = sp * (y.x * cb - y.z * sb);
+    const radius = Math.hypot(a, b);
+    if (radius < 1e-7 || Math.abs(c) > radius + 1e-8) return null;
+    const phase = Math.atan2(b, a);
+    const offset = Math.asin(Math.max(-1, Math.min(1, -c / radius)));
+    const candidates = [wrap(offset - phase), wrap(Math.PI - offset - phase)];
+    let best = null, bestError = Infinity;
+    for (const yaw of candidates) {
+      const sn = Math.sin(yaw), cs = Math.cos(yaw);
+      const wx = cp * (sn * x.x + cs * z.x) + sp * y.x;
+      const wz = cp * (sn * x.z + cs * z.z) + sp * y.z;
+      const along = wx * sb + wz * cb;
+      if (along <= 0) continue;
+      const error = Math.abs(wrap(yaw - initialYaw));
+      if (error < bestError) { best = yaw; bestError = error; }
+    }
+    return best;
+  };
+  let pitch = Math.max(minPitch, desiredPitch);
+  for (let i = 0; i < 32; i++) {
+    const yaw = solveAtPitch(pitch);
+    if (yaw !== null) return { yaw, pitch };
+    if (pitch <= minPitch + 1e-7) break;
+    pitch = Math.max(minPitch, pitch - Math.PI / 360);
   }
-  return yaw;
+  return { yaw: initialYaw, pitch: minPitch };
 }
