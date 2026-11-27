@@ -44,6 +44,7 @@ jobs:
       - run: node tools_muzzle_geometry.mjs
       - run: node tools_balance_editor_layout.mjs
       - run: node tools_player_aim_sync.mjs
+      - run: node tools_gun_alignment.mjs
       - run: npm run build
       - name: Smoke-test representative vehicles on all maps
         run: |
