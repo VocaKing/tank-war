@@ -32,14 +32,14 @@ try {
       if (hasFleetModel(id)) await loadFleetModel(spec);
       const model = createTankModel(spec, { links: false });
       const heading = spec.artillery?.highArc ? 0.73 : 0;
-      const pitch = spec.artillery?.highArc ? 0.12 : 0;
-      const roll = spec.artillery?.highArc ? -0.08 : 0;
+      const hullPitch = spec.artillery?.highArc ? 0.12 : 0;
+      const hullRoll = spec.artillery?.highArc ? -0.08 : 0;
       const bearing = heading + (spec.artillery?.highArc ? 0.42 : Math.atan2(60, 300));
       const aim = new THREE.Vector3(Math.sin(bearing) * 300, 2.2, Math.cos(bearing) * 300);
-      const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, heading, roll, 'YXZ'));
+      const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(hullPitch, heading, hullRoll, 'YXZ'));
       const tank = Object.assign(Object.create(Tank.prototype), {
         spec, model, pos: new THREE.Vector3(0, 0, 0), quat,
-        heading, pitch, roll, turretYaw: 0, gunPitch: 0, yawRate: 0,
+        heading, pitch: hullPitch, roll: hullRoll, turretYaw: 0, gunPitch: 0, yawRate: 0,
         shellIdx: 0, abilities: { usingSecondary: false }, modules: { turret: 1, gun: 1 },
         crew: spec.crew.map(role => ({ role, alive: true })),
         input: { aim, aimBearing: null },
