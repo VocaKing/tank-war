@@ -154,7 +154,7 @@ export class Tank {
     this.recoil = Math.max(0, this.recoil - dt * (this.spec.artillery?.recoilRecovery || this.spec.recoilBrace?.recoilRecovery || 1.2));
   }
 
-  updateAfterMotion(dt) {
+  updateAfterMotion(dt, updateGun = true) {
     if (this.alive) {
       this.abilities.updateDozer(dt);
       this.vehicleSkill?.motion(dt);
@@ -164,7 +164,7 @@ export class Tank {
         this.trackRepairs[1] > 0 ? 0 : (this.speed - this.turnRate * half) * dt);
       this.moved += Math.abs(this.speed) * dt;
       this.updateDispersion(dt);
-      this.updateTurret(dt);
+      if (updateGun) this.updateTurret(dt);
       if (this.usesSpade()) this.updateSpade(dt, this.game.time);
       if (this.spec.artillery?.autoDeploy) this.updateAutoArtillery(dt, this.game.time);
       if (this.burstLeft > 0) { this.burstTimer -= dt; if (this.burstTimer <= 0 && this.reloadLeft <= 0) this.fireBurstRound(this.game.time); }

@@ -58,6 +58,7 @@ jobs:
           node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "t72,pzh2000,aegis140" "village,forest,desert"
           node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "strv103,m50ontos,2s38" "village"
           node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "thunderclad155,tempest155,archer" "village"
+          node tools_player_aim_sync.mjs http://127.0.0.1:4173/tank-war/
       - name: Remove QA-only path mapping
         run: rm -f dist/tank-war
       - name: Deploy to gh-pages

@@ -298,17 +298,25 @@ export class Game {
     if (this.touch) { p.input.throttle = clamp(p.input.throttle + this.touch.throttle, -1, 1); p.input.steer = clamp(p.input.steer + this.touch.steer, -1, 1); }
     p.input.brake = !!k.Space;
     if (p.input.brake) p.input.throttle = 0;
+    // Aim and firing are synchronized after this frame's camera ray is known.
+    // Keeping the previous frame's aim here creates visible turret lag.
+  }
+  updatePlayerGunAim(dt) {
+    const p = this.player;
+    if (!p?.alive) return;
     p.input.aim.copy(this.aimPoint);
-    p.input.aimBearing=null;
-    if(stabilizedMount(p.spec)&&!this.debugAim&&!this.lock){
-      const dir=this.camDir();
-      if(useSightBearing(p.pos,p.input.aim,dir,!!this.aimTank))p.input.aimBearing=dir.setY(0).normalize();
+    p.input.aimBearing = null;
+    if (stabilizedMount(p.spec) && !this.debugAim && !this.lock) {
+      const dir = this.camDir();
+      if (useSightBearing(p.pos, p.input.aim, dir, !!this.aimTank)) p.input.aimBearing = dir.setY(0).normalize();
     }
-    if(p.spec.fixedGun&&!this.debugAim&&!this.lock){
-      const stable=stableSightPoint(p.pos,p.input.aim,this.camDir(),p.model.turret.position.y+p.model.gun.position.y,!!this.aimTank);
-      if(stable)p.input.aim.set(stable.x,stable.y,stable.z);
+    if (p.spec.fixedGun && !this.debugAim && !this.lock) {
+      const stable = stableSightPoint(p.pos, p.input.aim, this.camDir(),
+        p.model.turret.position.y + p.model.gun.position.y, !!this.aimTank);
+      if (stable) p.input.aim.set(stable.x, stable.y, stable.z);
     }
-    if (this.mouseDown || this.touch?.firing) p.tryFire(this.time);
+    p.updateTurret(dt);
+    p.syncModel();
   }
   resetControlContribution(tank) {
     if (this.ended) return;
@@ -468,7 +476,7 @@ export class Game {
     for (const t of this.tanks) t.update(dt, this.time);
     this.physics.advance(dt);
     for (const t of this.tanks) {
-      t.updateAfterMotion(dt);
+      t.updateAfterMotion(dt, t !== this.player);
       if (!t.alive || t.airborne || t.afloat || Math.abs(t.speed) < 0.6) continue;
       const d = t.spec.dims, dir = Math.sign(t.speed);
       const fx = Math.sin(t.heading) * dir, fz = Math.cos(t.heading) * dir;
@@ -508,7 +516,13 @@ export class Game {
     this.updateCamera(dt);
     this.trackMarks.update(this.time, this.camera.position);
     this.computeAim(); this.assist.postAim(dt); this.applyGunLock();
+    // Update the player's gun against the current frame's final aim point,
+    // then build the impact reticle and process the shot from that same pose.
+    this.updatePlayerGunAim(dt);
     this.updateReticle();
+    if (this.player.alive && !this.ended && (this.mouseDown || this.touch?.firing)) {
+      if (this.player.tryFire(this.time)) this.player.syncModel();
+    }
     this.armorView.update();
     // player bush ghosting
     const pb = this.player.alive ? this.player.inBush : null; this.world.veg.setPlayerBush(pb && !this.cam.sniper ? pb : pb);
