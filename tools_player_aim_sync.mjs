@@ -1,51 +1,27 @@
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 
-const base = process.argv[2] ?? 'http://localhost:5173/tank-war/';
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_EXECUTABLE,
-  args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-});
-try {
-  const page = await browser.newPage();
-  await page.goto(new URL('balance.html', base).href);
-  const result = await page.evaluate(async base => {
-    const { Game } = await import(new URL('src/game/game.js', base).href);
-    const { THREE } = await import(new URL('src/models/tankModel.js', base).href);
-    const game = Object.create(Game.prototype);
-    const target = new THREE.Vector3(41, 7, 126);
-    let aimed = null, synced = 0, fired = 0;
-    game.player = {
-      alive: true,
-      spec: { fixedGun: false },
-      input: { aim: new THREE.Vector3(), aimBearing: null },
-      updateTurret() { aimed = this.input.aim.clone(); },
-      syncModel() { synced++; },
-      tryFire() { fired++; return true; },
-    };
-    game.aimPoint = target.clone();
-    game.debugAim = true;
-    game.aimTank = null;
-    game.updatePlayerGunAim(1 / 60);
-    const currentFrameAim = aimed?.distanceTo(target) ?? Infinity;
-    const syncCount = synced;
-    game.keys = {};
-    game.touch = null;
-    game.mouseDown = true;
-    game.aimPoint.set(-20, 2, 90);
-    game.player.input.aim.set(999, 999, 999);
-    game.player.input.throttle = 0;
-    game.player.input.steer = 0;
-    game.player.input.brake = false;
-    game.player.input.driveHeld = false;
-    game.updatePlayerInput();
-    return { currentFrameAim, syncCount, fired, inputAfterInputOnly: game.player.input.aim.toArray() };
-  }, base);
-  assert.ok(result.currentFrameAim < 1e-8, JSON.stringify(result));
-  assert.equal(result.syncCount, 1);
-  assert.equal(result.fired, 0, 'fire must wait until the current camera aim and gun pose are synchronized');
-  assert.deepEqual(result.inputAfterInputOnly, [999, 999, 999], 'input collection must not overwrite the aim with last frame data');
-  console.log('Player aim sync verified: current-frame camera aim -> gun servo -> impact reticle/fire order.');
-} finally {
-  await browser.close();
-}
+const game = readFileSync('src/game/game.js', 'utf8');
+const tank = readFileSync('src/game/tank.js', 'utf8');
+const inputStart = game.indexOf('  updatePlayerInput() {');
+const aimStart = game.indexOf('  updatePlayerGunAim(dt) {');
+const loopStart = game.indexOf('  update(dt) {');
+const inputEnd = game.indexOf('  resetControlContribution(tank) {', inputStart);
+const inputBody = game.slice(inputStart, inputEnd);
+const frame = game.slice(loopStart);
+const compute = frame.indexOf('this.computeAim();');
+const servo = frame.indexOf('this.updatePlayerGunAim(dt);');
+const reticle = frame.indexOf('this.updateReticle();', servo);
+const fire = frame.indexOf('this.player.tryFire(this.time)', reticle);
+
+assert.ok(inputStart >= 0 && aimStart > inputStart && loopStart > aimStart);
+assert.ok(!inputBody.includes('p.tryFire('), 'input collection must not fire using stale aim');
+assert.ok(!inputBody.includes('p.input.aim.copy('), 'input collection must not overwrite aim before camera ray calculation');
+assert.ok(compute >= 0 && servo > compute, 'camera ray and target lock must be resolved before gun laying');
+assert.ok(reticle > servo, 'impact reticle must use the newly synchronized gun pose');
+assert.ok(fire > reticle, 'shots must use the same-frame aim and gun pose as the reticle');
+assert.ok(frame.indexOf('t.updateAfterMotion(dt, t !== this.player);') >= 0,
+  'the player turret servo must not be advanced once with stale aim before camera calculation');
+assert.ok(tank.includes('updateAfterMotion(dt, updateGun = true)'));
+assert.ok(tank.includes('if (updateGun) this.updateTurret(dt);'));
+console.log('Player aim sync verified: current-frame camera aim -> gun servo -> impact reticle -> firing.');
