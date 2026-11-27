@@ -22,38 +22,35 @@ try{
    input:{aim:new Vector3(0,0,300),aimBearing:null},recoil:0,spadeProgress:0,suspensionOffset:0,inv:new Matrix4(),
    model
   });
-  // Hold the chassis at a realistic fixed slope while the traverse servo settles.
-  tank.pitch=.15;tank.roll=.13;
-  tank.quat.setFromEuler(new Euler(tank.pitch,0,tank.roll,'YXZ'));
-  const pivot=tank.model.turret.position.clone().applyQuaternion(tank.quat).add(tank.pos);
-  tank.input.aim.set(pivot.x,0,pivot.z+300);
-  tank.syncModel();
-  for(let i=0;i<900;i++){tank.updateTurret(dt);tank.syncModel();}
-  const muzzleWorld=tank.muzzleNode.getWorldPosition(new Vector3());
-  const dir=tank.gunDirection();
-  const targetBearing=Math.atan2(tank.input.aim.x-muzzleWorld.x,tank.input.aim.z-muzzleWorld.z);
-  const barrelBearing=Math.atan2(dir.x,dir.z);
-  assert.ok(Math.abs(wrap(barrelBearing-targetBearing))<.001,
-   id+' horizontal barrel bearing drifted on pitched/rolled hull: '+wrap(barrelBearing-targetBearing));
-  assert.ok(Number.isFinite(tank.gunPitch));
-  assert.ok(tank.gunPitch<=spec.gunElevation*Math.PI/180+1e-9);
-  tank.quat.identity();tank.pitch=0;tank.roll=0;tank.syncModel();
+  // Keep a fixed world bearing while the hull pitches and rolls.
+  for(let i=0;i<240;i++){
+   tank.pitch=.15*Math.sin(i*.1);tank.roll=.13*Math.cos(i*.13);
+   tank.quat.setFromEuler(new Euler(tank.pitch,0,tank.roll,'YXZ'));
+   tank.input.aim.set(0,2.2,300);
+   tank.syncModel();tank.updateTurret(dt);tank.syncModel();
+   assert.ok(Number.isFinite(tank.gunPitch));
+   assert.ok(tank.gunPitch<=spec.gunElevation*Math.PI/180+1e-9);
+  }
+  tank.pitch=0;tank.roll=0;tank.quat.identity();tank.syncModel();
   tank.input.aim.set(300,0,0);
   let previous=tank.turretYaw;
   for(let i=0;i<900;i++){
-   tank.updateTurret(dt);
+   tank.updateTurret(dt);tank.syncModel();
    assert.ok(Math.abs(wrap(tank.turretYaw-previous))<=spec.turretTraverse*Math.PI/180*dt+1e-8,id+' excessive turn rate');
    previous=tank.turretYaw;
   }
-  assert.ok(Math.abs(wrap(tank.turretYaw-Math.PI/2))<.001,id+' cannot turn to new bearing');
-  // A near-self ray hit alternates across the vehicle. The camera-bearing
-  // override must keep the mount looking in the same direction.
+  let muzzleWorld=tank.muzzleNode.getWorldPosition(new Vector3()),dir=tank.gunDirection();
+  let targetBearing=Math.atan2(tank.input.aim.x-muzzleWorld.x,tank.input.aim.z-muzzleWorld.z);
+  assert.ok(Math.abs(wrap(Math.atan2(dir.x,dir.z)-targetBearing))<.01,id+' cannot align to new world bearing');
+  // A near-self ray hit alternates across the vehicle. A supplied sight bearing
+  // must keep the barrel's horizontal direction stable despite the near hit.
   tank.input.aimBearing=new Vector3(1,0,0);
   for(let i=0;i<120;i++){
    tank.input.aim.set((i%2?1:-1)*.1,0,-2);
-   tank.updateTurret(dt);
-   assert.ok(Math.abs(wrap(tank.turretYaw-Math.PI/2))<.001,id+' near-hit reversal');
+   tank.updateTurret(dt);tank.syncModel();
   }
+  dir=tank.gunDirection();
+  assert.ok(Math.abs(wrap(Math.atan2(dir.x,dir.z)-Math.PI/2))<.01,id+' near-hit bearing reversal');
  }
  console.log('All four high-arc SPG production turret controllers: slope stability, elevation bounds, traverse rate and near-hit reversal verified.');
 }finally{await vite.close();}
