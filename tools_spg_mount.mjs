@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Vector3,Quaternion,Euler} from 'three';
+import {Vector3,Quaternion,Euler,Group,Object3D} from 'three';
 import {createServer} from 'vite';
 const vite=await createServer({appType:'custom',server:{middlewareMode:true,ws:false}});
 try{
@@ -12,19 +12,29 @@ try{
   const spec=TANKS.find(s=>s.id===id);
   // Invoke the real production turret update on a minimal vehicle state.
   // No renderer or physics needed to exercise the gun laying controller.
+  const root=new Group(),body=new Group(),turret=new Group(),gun=new Group(),barrel=new Group(),muzzle=new Object3D();
+  root.add(body);body.add(turret);turret.position.set(0,2,0);turret.add(gun);gun.position.set(0,.4,1);
+  gun.add(barrel);barrel.add(muzzle);muzzle.position.z=4;
+  const model={root,body,turret,gun,barrel,muzzle,gunPitchFloor:(_yaw,min)=>min};
   const tank=Object.assign(Object.create(Tank.prototype),{
-   spec,pos:new Vector3(),quat:new Quaternion(),heading:0,turretYaw:0,gunPitch:0,
+   spec,pos:new Vector3(),quat:new Quaternion(),heading:0,pitch:0,roll:0,turretYaw:0,gunPitch:0,yawRate:0,
    shellIdx:0,abilities:{usingSecondary:false},modules:{turret:1},crew:[],
-   input:{aim:new Vector3(0,0,300),aimBearing:null},
-   model:{turret:{position:new Vector3(0,2,0)},gun:{position:new Vector3(0,.4,1)},muzzle:{position:new Vector3(0,0,4)},gunPitchFloor:(_yaw,min)=>min}
+   input:{aim:new Vector3(0,0,300),aimBearing:null},recoil:0,spadeProgress:0,suspensionOffset:0,
+   model
   });
   for(let i=0;i<240;i++){
    // Repeated pitch/roll changes, with a fixed world azimuth.
-   tank.quat.setFromEuler(new Euler(.15*Math.sin(i*.1),0,.13*Math.cos(i*.13),'YXZ'));
+   tank.pitch=.15*Math.sin(i*.1);tank.roll=.13*Math.cos(i*.13);
+   tank.quat.setFromEuler(new Euler(tank.pitch,0,tank.roll,'YXZ'));
    const pivot=tank.model.turret.position.clone().applyQuaternion(tank.quat).add(tank.pos);
    tank.input.aim.set(pivot.x,0,pivot.z+300);
-   tank.updateTurret(dt);
-   assert.ok(Math.abs(tank.turretYaw)<1e-7,id+' yaw changed when pitch/roll varied');
+   tank.updateTurret(dt);tank.syncModel();
+   const muzzleWorld=tank.muzzleNode.getWorldPosition(new Vector3());
+   const dir=tank.gunDirection();
+   const targetBearing=Math.atan2(tank.input.aim.x-muzzleWorld.x,tank.input.aim.z-muzzleWorld.z);
+   const barrelBearing=Math.atan2(dir.x,dir.z);
+   assert.ok(Math.abs(wrap(barrelBearing-targetBearing))<.003,
+    id+' horizontal barrel bearing drifted on pitched/rolled hull: '+wrap(barrelBearing-targetBearing));
    assert.ok(Number.isFinite(tank.gunPitch));
    assert.ok(tank.gunPitch<=spec.gunElevation*Math.PI/180+1e-9);
   }
