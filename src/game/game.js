@@ -27,6 +27,7 @@ import { skillKey } from './vehicleSkills.js';
 import { makeMatch } from './matchmaking.js';
 import { chooseSpawnLayout, planSpawnPositions } from './spawnLayout.js';
 import { stableSightPoint } from './fixedGunControl.js';
+import { stabilizedMount, useSightBearing } from './mortarAim.js';
 function withinPathXZ(p, origin, dx, dz, radius) {
   const x = p.x - origin.x, z = p.z - origin.z;
   const lengthSquared = dx * dx + dz * dz;
@@ -298,6 +299,11 @@ export class Game {
     p.input.brake = !!k.Space;
     if (p.input.brake) p.input.throttle = 0;
     p.input.aim.copy(this.aimPoint);
+    p.input.aimBearing=null;
+    if(stabilizedMount(p.spec)&&!this.debugAim&&!this.lock){
+      const dir=this.camDir();
+      if(useSightBearing(p.pos,p.input.aim,dir,!!this.aimTank))p.input.aimBearing=dir.setY(0).normalize();
+    }
     if(p.spec.fixedGun&&!this.debugAim&&!this.lock){
       const stable=stableSightPoint(p.pos,p.input.aim,this.camDir(),p.model.turret.position.y+p.model.gun.position.y,!!this.aimTank);
       if(stable)p.input.aim.set(stable.x,stable.y,stable.z);

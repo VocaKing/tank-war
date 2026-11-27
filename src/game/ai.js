@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { clamp, wrapAngle, DEG } from '../util.js';
 import { spawnLane } from './spawnLayout.js';
+import { stabilizedMount } from './mortarAim.js';
 
 const _p = new THREE.Vector3(), _q = new THREE.Vector3();
 
@@ -218,7 +219,7 @@ export class AIController {
       if (ready && worth && concealOK && (t.spec.artillery || !this.allyInLine(tgt))) { if (t.tryFire(g.time)) this.resampleError(); }
     } else {
       this.idleScan += dt * 0.25; const base=this.enemyBase;
-      const h=t.spec.fixedGun?(moving?t.heading:this.holdHeading??Math.atan2(base.x-t.pos.x,base.z-t.pos.z)):Math.atan2(base.x-t.pos.x,base.z-t.pos.z)+Math.sin(this.idleScan)*.6;
+      const h=t.spec.fixedGun?(moving?t.heading:this.holdHeading??Math.atan2(base.x-t.pos.x,base.z-t.pos.z)):stabilizedMount(t.spec)?(this.holdHeading??Math.atan2(base.x-t.pos.x,base.z-t.pos.z)):Math.atan2(base.x-t.pos.x,base.z-t.pos.z)+Math.sin(this.idleScan)*.6;
       t.input.aim.set(t.pos.x + Math.sin(h) * 300, t.pos.y + 2, t.pos.z + Math.cos(h) * 300);
       if (t.abilities.usingSecondary) t.tryAbility();
       // keep a reasonable round loaded

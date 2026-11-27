@@ -9,6 +9,7 @@ import { Abilities } from './abilities.js';
 import { VehicleSkill } from './vehicleSkills.js';
 import { TubeReload } from './tubeReload.js';
 import { limitedYaw } from './fixedGunControl.js';
+import { stabilizedMount, mountAngles } from './mortarAim.js';
 import { Equipment } from './items.js';
 import { findEraTile } from './eraMechanics.js';
 import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
@@ -55,7 +56,7 @@ export class Tank {
     this.secondaryReloadLeft = 0;
     this.trackRepairs = [0, 0]; this.burning = 0;
     this.crew = spec.crew.map((role) => ({ role, alive: true }));
-    this.input = { throttle: 0, steer: 0, brake: false, driveHeld: false, aim: new THREE.Vector3() };
+    this.input = { throttle: 0, steer: 0, brake: false, driveHeld: false, aim: new THREE.Vector3(), aimBearing: null };
     this.hullAiming = false;
     this.lastFired = -100; this.inBush = null; this.visibleUntil = [0, 0]; this.spotted = [false, false]; this.lastSeenPos = [null, null];
     this.stats = { damage: 0, kills: 0, shots: 0, hits: 0, pens: 0, received: 0 };
@@ -201,12 +202,17 @@ export class Tank {
     // so aiming from its current position can oscillate at point-blank range.
     const range = Math.hypot(aim.x, aim.z);
     const mount = this.gunMount.position;
-    const yaw = range > 1e-4
+    const stabilize=stabilizedMount(s);
+    let yaw = range > (stabilize?Math.max(.6,Math.abs(mount.x)+.25):1e-4)
       ? Math.atan2(aim.x, aim.z) - Math.asin(clamp(mount.x / range, -1, 1))
       : this.turretYaw;
+    if(stabilize&&this.input.aimBearing){
+      _v2.copy(this.input.aimBearing).applyQuaternion(_q.copy(pose).invert());
+      if(Math.hypot(_v2.x,_v2.z)>1e-5)yaw=Math.atan2(_v2.x,_v2.z);
+    }
     const sin = Math.sin(yaw), cos = Math.cos(yaw);
     const rise = aim.y - mount.y;
-    const forward = aim.x * sin + aim.z * cos - mount.z;
+    const forward = stabilize&&this.input.aimBearing ? Math.max(.01,range-mount.z) : aim.x * sin + aim.z * cos - mount.z;
     // Converge upwards no closer than the muzzle. Nearby surfaces above the
     // gun pivot would otherwise demand steep angles for tiny height changes.
     const aimRange = Math.max(forward, rise > 0 ? this.muzzleNode.position.z : 0.01);
@@ -216,7 +222,8 @@ export class Tank {
     const th = ballisticAngle(this.shell.velocity, horizontal, dy, !!s.artillery?.highArc);
     _v2.set(dx / (horizontal || 1) * Math.cos(th), Math.sin(th), dz / (horizontal || 1) * Math.cos(th));
     _q.copy(pose).invert(); _v2.applyQuaternion(_q);
-    const rawYawT = Math.atan2(_v2.x, _v2.z), pitchT = Math.asin(clamp(_v2.y, -1, 1));
+    const angles=stabilize?mountAngles(_v2,yaw,s.gunElevation*DEG):null;
+    const rawYawT=angles?angles.yaw:Math.atan2(_v2.x,_v2.z),pitchT=angles?angles.pitch:Math.asin(clamp(_v2.y,-1,1));
     const yawT = rawYawT;
     const prev = this.turretYaw;
     if (!s.fixedGun) {

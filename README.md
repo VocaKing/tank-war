@@ -51,3 +51,6 @@ Each side starts in two or three map-specific spawn clusters (4+3 or 3+2+2), wit
 
 ### Fixed-gun control stability
 Casemate meshes are held at zero turret yaw; hull aiming is available only when the driver is not commanding motion, grounded, alive and unbraced. A damped yaw servo settles instead of chasing oscillating sight errors. Nearby non-target camera-ray hits use a stable view bearing; explicit enemy/lock/debug aim remains exact. NPC fixed guns stop their idle scan from rotating the hull, and navigation has priority over gunnery. Limited-traverse mounts use bounded, non-wrapping yaw motion with rear-seam hysteresis.
+
+### Short-barrel and high-arc gun laying
+Leviathan-160 and high-arc SPGs preserve the target bearing when near-vertical or unreachable elevation solutions would cause azimuth flips. Nearby non-target camera intersections use a stable sight bearing without replacing target range or explicit enemy aim. Normal feasible ballistic solutions and turret traverse rates remain unchanged. These vehicles no longer sweep their idle turret aim back and forth.
