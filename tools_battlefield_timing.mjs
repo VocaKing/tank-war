@@ -13,6 +13,11 @@ try {
   assert.equal(new Set(TANKS.map(t=>t.id)).size,47);
   for (const id of ['t14','strv103','fv4005s1','m50ontos','centauro2','sprutsd','archer','bmpt','2s38','xm8ags','mauseng','pzh2000','aegis140']) assert.ok(TANKS.some(t=>t.id===id),id+' missing');
   assert.ok(MAPS.every(m=>m.controlPoint.r===CONTROL_RADIUS));
+  const {STATIONARY_SKILLS}=await vite.ssrLoadModule('/src/game/vehicleSkills.js');
+  const stationary=TANKS.filter(t=>STATIONARY_SKILLS.has(t.skill?.id));
+  assert.equal(stationary.length,7);
+  assert.ok(stationary.every(t=>t.casemate&&t.cls==='Tank Destroyer'),'Stationary skills must remain exclusive to turretless TDs');
+  assert.equal(TANKS.filter(t=>t.skill).length,34);
 
   const vehicle = (team = 0) => ({ team, pos: { x: 0, z: 0 }, alive: true, lastDamagedAt: -100 });
   function battlefield(tanks) {
