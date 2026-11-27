@@ -24,3 +24,9 @@ assert.ok(frame.indexOf('t.updateAfterMotion(dt, t !== this.player);') >= 0,
 assert.ok(tank.includes('updateAfterMotion(dt, updateGun = true)'));
 assert.ok(tank.includes('if (updateGun) this.updateTurret(dt);'));
 console.log('Player aim sync verified: current-frame camera aim -> gun servo -> impact reticle -> firing.');
+
+const reticleStart = game.indexOf('  updateReticle() {');
+const reticleEnd = game.indexOf('  updateCamera(dt) {', reticleStart);
+const reticleBody = game.slice(reticleStart, reticleEnd);
+assert.ok(reticleBody.includes('p.previewLaunch(aim)'), 'impact preview must use the gun input aim point');
+assert.ok(reticleBody.includes('shot.shell.guided ? aim : undefined'), 'guided-shot preview must share the firing target');

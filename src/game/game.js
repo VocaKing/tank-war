@@ -391,8 +391,11 @@ export class Game {
   updateReticle() {
     const p = this.player, hud = this.hud;
     if (!p.alive) { hud.setReticle(-100, -100, 0, '', ''); return; }
-    const shot = p.previewLaunch(this.aimPoint);
-    const predicted = this.ballistics.predict(p, shot.shell, shot.origin, shot.velocity, shot.shell.guided ? this.aimPoint : undefined);
+    // Preview the exact target used by the gun servo and firing code. Fixed-gun
+    // sight stabilization may deliberately replace the raw camera-ray point.
+    const aim = p.input.aim;
+    const shot = p.previewLaunch(aim);
+    const predicted = this.ballistics.predict(p, shot.shell, shot.origin, shot.velocity, shot.shell.guided ? aim : undefined);
     const { pos, dist, tank, hit, kind } = predicted;
     const cameraPoint = pos.clone().applyMatrix4(this.camera.matrixWorldInverse);
     const depth = -cameraPoint.z;
