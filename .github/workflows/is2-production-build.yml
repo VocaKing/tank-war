@@ -1,0 +1,53 @@
+name: IS-2 production asset pipeline
+
+on:
+  push:
+    branches:
+      - blender/is2-model1944-production-2026-11-28
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/is2-production-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-is2-production:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+
+      - name: Install Blender and bake dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+          blender --version
+
+      - name: Validate Python syntax
+        run: |
+          python3 -m py_compile tools/blender/is2_model1944_blockout.py
+          python3 -m py_compile tools/blender/is2_model1944_production.py
+          python3 -m py_compile tools/blender/validate_is2_production.py
+
+      - name: Build low-poly asset and bake PBR maps
+        run: |
+          mkdir -p public/models artifacts
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 IS2_FAST_PREVIEW=1 IS2_ATLAS_SIZE=2048 blender --background --python-exit-code 1 --python tools/blender/is2_model1944_production.py
+
+      - name: Validate exported GLB and texture package
+        run: python3 tools/blender/validate_is2_production.py
+
+      - name: Upload review package
+        uses: actions/upload-artifact@v4
+        with:
+          name: is2-model1944-production-candidate
+          if-no-files-found: error
+          path: |
+            public/models/is2_model1944_production_candidate.glb
+            artifacts/is2-model1944/production/is2_model1944_production_candidate.blend
+            artifacts/is2-model1944/production/asset_manifest.json
+            artifacts/is2-model1944/production/*.png
+            artifacts/is2-model1944/production/pbr/*.png
