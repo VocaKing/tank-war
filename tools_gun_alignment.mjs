@@ -22,19 +22,23 @@ try {
     const [{ Tank, ballisticAngle }, { createTankModel, THREE }, { TANKS }] = await Promise.all([
       import('/src/game/tank.js'), import('/src/models/tankModel.js'), import('/src/game/tankData.js'),
     ]);
-    const ids = ['t72', 'm1a2', 'leo2a6', 'tiger', '2s38', 'leviathan160', 'strv103'];
+    const ids = ['t72', 'm1a2', 'leo2a6', 'tiger', '2s38', 'leviathan160', 'strv103', 'archer', 'pzh2000', 'thunderclad155', 'tempest155'];
     const out = [];
     const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
     for (const id of ids) {
       const spec = TANKS.find(s => s.id === id);
       if (!spec) throw new Error('missing tank spec: ' + id);
       const model = createTankModel(spec, { links: false });
+      const heading = spec.artillery?.highArc ? 0.73 : 0;
+      const bearing = heading + (spec.artillery?.highArc ? 0.42 : Math.atan2(60, 300));
+      const aim = new THREE.Vector3(Math.sin(bearing) * 300, 2.2, Math.cos(bearing) * 300);
+      const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, heading, 0, 'YXZ'));
       const tank = Object.assign(Object.create(Tank.prototype), {
-        spec, model, pos: new THREE.Vector3(0, 0, 0), quat: new THREE.Quaternion(),
-        heading: 0, pitch: 0, roll: 0, turretYaw: 0, gunPitch: 0, yawRate: 0,
+        spec, model, pos: new THREE.Vector3(0, 0, 0), quat,
+        heading, pitch: 0, roll: 0, turretYaw: 0, gunPitch: 0, yawRate: 0,
         shellIdx: 0, abilities: { usingSecondary: false }, modules: { turret: 1, gun: 1 },
         crew: spec.crew.map(role => ({ role, alive: true })),
-        input: { aim: new THREE.Vector3(spec.fixedGun ? 0 : 60, 2.2, 300), aimBearing: null },
+        input: { aim, aimBearing: null },
         recoil: 0, spadeProgress: 0, autoArtilleryState: 'stowed', autoArtilleryTimer: 0,
         suspensionOffset: 0, turnRate: 0, inv: new THREE.Matrix4(), vehicleSkill: null,
       });
@@ -57,6 +61,7 @@ try {
       const expectedPitch = ballisticAngle(tank.shell.velocity, horizontal, target.y - muzzle.y, !!spec.artillery?.highArc);
       const row = {
         id, fixedGun: !!spec.fixedGun, highArc: !!spec.artillery?.highArc,
+        mountX: tank.gunMount.position.x, mountZ: tank.gunMount.position.z,
         aimError: tank.aimError, bearingErrorDeg: bearingError * 180 / Math.PI,
         pitchErrorDeg: Math.abs(pitch - expectedPitch) * 180 / Math.PI, verticalMissM,
         turretYawDeg: tank.turretYaw * 180 / Math.PI, gunPitchDeg: tank.gunPitch * 180 / Math.PI,
