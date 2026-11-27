@@ -27,6 +27,7 @@ try{
   tank.quat.setFromEuler(new Euler(tank.pitch,0,tank.roll,'YXZ'));
   const pivot=tank.model.turret.position.clone().applyQuaternion(tank.quat).add(tank.pos);
   tank.input.aim.set(pivot.x,0,pivot.z+300);
+  tank.syncModel();
   for(let i=0;i<900;i++){tank.updateTurret(dt);tank.syncModel();}
   const muzzleWorld=tank.muzzleNode.getWorldPosition(new Vector3());
   const dir=tank.gunDirection();

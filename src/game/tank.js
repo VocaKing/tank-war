@@ -9,7 +9,7 @@ import { Abilities } from './abilities.js';
 import { VehicleSkill } from './vehicleSkills.js';
 import { TubeReload } from './tubeReload.js';
 import { limitedYaw } from './fixedGunControl.js';
-import { stabilizedMount, mountAngles, highArcMountYaw } from './mortarAim.js';
+import { stabilizedMount, mountAngles, highArcMountYaw, hullYawForBearing } from './mortarAim.js';
 import { Equipment } from './items.js';
 import { findEraTile } from './eraMechanics.js';
 import { updateConceptTimers, precisionMultiplier, fireConceptMRSI, updateConceptMRSI } from './conceptSystems.js';
@@ -21,7 +21,7 @@ export { GRAVITY };
 let NEXT_ID = 1;
 const TRACK_REPAIR_TIME = 9;
 const UP = new THREE.Vector3(0, 1, 0), AXIS_X = new THREE.Vector3(1, 0, 0);
-const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
 
 export function ballisticAngle(v, R, dy, highArc = false) {
   const g = GRAVITY; const v2 = v * v; const disc = v2 * v2 - g * (g * R * R + 2 * dy * v2);
@@ -243,19 +243,34 @@ export class Tank {
     const angles=stabilize?mountAngles(_v2,yaw,s.gunElevation*DEG):null;
     const localHorizontal=Math.hypot(_v2.x,_v2.z);
     const highArc=!!s.artillery?.highArc;
-    const rawYawT=highArc?(localHorizontal>.025?Math.atan2(_v2.x,_v2.z):yaw):angles?angles.yaw:Math.atan2(_v2.x,_v2.z);
     const pitchT=highArc?Math.atan2(_v2.y,localHorizontal):angles?angles.pitch:Math.asin(clamp(_v2.y,-1,1));
-    const yawT = rawYawT;
+    let yawT=highArc?(localHorizontal>.025?Math.atan2(_v2.x,_v2.z):yaw):angles?angles.yaw:Math.atan2(_v2.x,_v2.z);
     const prev = this.turretYaw;
+    let minPitch=this.model.gunPitchFloor(yawT,-s.gunDepression*DEG,s.gunElevation*DEG);
+    let desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
+    if(highArc){
+      // The high-arc trajectory can demand more elevation than the mount allows.
+      // Solve yaw again at the *reachable* elevation so hull pitch/roll cannot
+      // turn a clamped, near-vertical shot into a large left/right miss.
+      this.muzzleNode.getWorldPosition(_v3);
+      const targetBearing=this.input.aimBearing
+        ? Math.atan2(this.input.aimBearing.x,this.input.aimBearing.z)
+        : Math.atan2(this.input.aim.x-_v3.x,this.input.aim.z-_v3.z);
+      for(let i=0;i<3;i++){
+        yawT=hullYawForBearing(pose,desiredPitch,targetBearing,yawT);
+        minPitch=this.model.gunPitchFloor(yawT,-s.gunDepression*DEG,s.gunElevation*DEG);
+        desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
+      }
+    }
     if (!s.fixedGun) {
       const rate = s.turretTraverse * DEG * (this.modules.turret < 1 ? 0.5 : 1) * (this.crewAlive('Gunner') ? 1 : 0.7);
       this.turretYaw = s.fireArc ? limitedYaw(prev,yawT,s.fireArc*DEG,rate*dt) : wrapAngle(approachAngle(prev,yawT,rate*dt));
     }
     this.yawRate = Math.abs(wrapAngle(this.turretYaw - prev)) / Math.max(dt, 1e-4);
-    const minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
-    const desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
+    minPitch=this.model.gunPitchFloor(this.turretYaw,-s.gunDepression*DEG,s.gunElevation*DEG);
+    desiredPitch=clamp(pitchT,minPitch,s.gunElevation*DEG);
     this.gunPitch=clamp(approach(this.gunPitch,desiredPitch,s.gunSpeed*DEG*dt),minPitch,s.gunElevation*DEG);
-    this.aimError=Math.abs(wrapAngle(rawYawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
+    this.aimError=Math.abs(wrapAngle(yawT-this.turretYaw))+Math.abs(desiredPitch-this.gunPitch);
   }
   syncModel() {
     const m = this.model; m.root.position.copy(this.pos); m.root.quaternion.copy(this.quat);
