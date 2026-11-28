@@ -418,33 +418,38 @@ for side in (-1, 1):
         cylinder("Return_roller_%s_%d" % (side, i+1),
                  (side*1.36, y, 1.075), 0.09, 0.18, STEEL, "X", 32)
 
-# Rear drive sprockets: twin removable 14-tooth rims. Front idlers are plain.
-for side in (-1, 1):
-    sx = side*1.21
-    cylinder("Drive_sprocket_core_%s" % side, (sx, -2.72, 0.70), 0.32, 0.52, STEEL, "X", 48)
-    for rim_index, xoff in enumerate((-0.19, 0.19)):
-        cylinder("Drive_rim_%s_%d" % (side, rim_index), (sx+xoff, -2.72, 0.70),
-                 0.34, 0.095, CAST, "X", 48)
-        for tooth in range(14):
-            a = tooth*math.tau/14
-            yy = -2.72 + math.cos(a)*0.355
-            zz = 0.70 + math.sin(a)*0.355
-            box("Drive_tooth_%s_%d_%02d" % (side, rim_index, tooth),
-                (sx+xoff, yy, zz), (0.105, 0.12, 0.10), STEEL, 0.012,
-                (a, 0, 0))
-    cylinder("Front_idler_%s" % side, (sx, 2.72, 0.70), 0.275, 0.42, PAINT, "X", 48)
-    cylinder("Front_idler_hub_%s" % side, (sx+side*0.23, 2.72, 0.70), 0.11, 0.05, STEEL, "X", 32)
-
-# Continuous stadium path sampled into 86 individual track-link shapes per side.
-# Each link is a separate named mesh object; same dimensions and material.
+# Track geometry is locked to the documented 165.1 mm shoe pitch and 86 links.
+# Derive the straight-run half-length from the pitch and end-arc radius, rather
+# than shrinking the shoe pitch to fit an approximate hull length.
 TRACK_LINKS = 86
 TRACK_WIDTH = 0.65
 TRACK_CENTER_X = 1.21
 TRACK_Z = 0.70
 TRACK_RADIUS = 0.405
-TRACK_HALF_STRAIGHT = 2.72
-TRACK_PITCH = (2*TRACK_HALF_STRAIGHT + 2*math.pi*TRACK_RADIUS)/TRACK_LINKS
+TRACK_PITCH = 0.1651
+TRACK_HALF_STRAIGHT = (TRACK_LINKS*TRACK_PITCH - 2*math.pi*TRACK_RADIUS)/4.0
 
+# Rear drive sprockets: twin removable 14-tooth rims. Front idlers are plain.
+for side in (-1, 1):
+    sx = side*TRACK_CENTER_X
+    rear_y = -TRACK_HALF_STRAIGHT
+    front_y = TRACK_HALF_STRAIGHT
+    cylinder("Drive_sprocket_core_%s" % side, (sx, rear_y, TRACK_Z), 0.32, 0.52, STEEL, "X", 48)
+    for rim_index, xoff in enumerate((-0.19, 0.19)):
+        cylinder("Drive_rim_%s_%d" % (side, rim_index), (sx+xoff, rear_y, TRACK_Z),
+                 0.34, 0.095, CAST, "X", 48)
+        for tooth in range(14):
+            a = tooth*math.tau/14
+            yy = rear_y + math.cos(a)*0.355
+            zz = TRACK_Z + math.sin(a)*0.355
+            box("Drive_tooth_%s_%d_%02d" % (side, rim_index, tooth),
+                (sx+xoff, yy, zz), (0.105, 0.12, 0.10), STEEL, 0.012,
+                (a, 0, 0))
+    cylinder("Front_idler_%s" % side, (sx, front_y, TRACK_Z), 0.275, 0.42, PAINT, "X", 48)
+    cylinder("Front_idler_hub_%s" % side, (sx+side*0.23, front_y, TRACK_Z), 0.11, 0.05, STEEL, "X", 32)
+
+# Continuous stadium path sampled into 86 individual track-link shapes per side.
+# Each link is a separate named mesh object; same dimensions and material.
 def track_point(distance):
     straight = 2*TRACK_HALF_STRAIGHT
     arc = math.pi*TRACK_RADIUS
@@ -583,6 +588,7 @@ root["runtime_forward_axis"] = "+Z"
 root["road_wheel_stations_per_side"] = 6
 root["track_links_per_side"] = TRACK_LINKS
 root["track_width_m"] = TRACK_WIDTH
+root["track_pitch_m"] = TRACK_PITCH
 root["status"] = "FIRST BLENDER ASSET PASS — requires visual review"
 
 # Export only vehicle meshes/empties; render-only ground/cameras/lights are added after.
