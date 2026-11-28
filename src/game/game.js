@@ -42,10 +42,17 @@ const ENEMY_NAMES = ['Lt. Weber', 'Sgt. Volkov', 'Cpt. Brandt', 'Sgt. Petrov', '
 
 export class Game {
   static ZOOMS = [2, 4, 8, 16];
+  static prepareMatch(mapId, tankId, seed) {
+    const rng = new RNG(seed);
+    const spawnLayout = chooseSpawnLayout(mapId, rng);
+    const lineup = makeMatch(TANKS, tankId, rng);
+    return { rng, spawnLayout, lineup };
+  }
   constructor(renderer, uiRoot, audio, opts) {
-    this.renderer = renderer; this.audio = audio; this.opts = opts; this.rng = new RNG(opts.seed || ((Math.random() * 1e9) | 0));
+    this.renderer = renderer; this.audio = audio; this.opts = opts;
+    const match = opts.match || Game.prepareMatch(opts.mapId, opts.tankId, opts.seed ?? ((Math.random() * 1e9) | 0));
+    this.rng = match.rng; this.spawnLayout = match.spawnLayout; this.lineup = match.lineup;
     this.quality = opts.quality || 'high'; this.world = new World(renderer, opts.mapId, opts.quality); this.scene = this.world.scene;
-    this.spawnLayout=chooseSpawnLayout(opts.mapId,this.rng);
     this.world.assignSpawnSides(this.spawnLayout.swapped);
     this.physics = new BattlefieldPhysics(opts.physicsEngine, this.world);
     this.camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.3, 6000);
@@ -55,7 +62,7 @@ export class Game {
     this.capture = [{ points: 0 }, { points: 0 }]; this.smokes = [];
     this.control = createControl();
     this.tanks = []; this.ai = [];
-    this.spawnTeams(opts.tankId);
+    this.spawnTeams();
     this.player = this.tanks[0];
     this.contactShadows = new ContactShadows(this.world, this.tanks);
     this.trackMarks = new TrackMarks(this.world, this.tanks, this.quality);
@@ -75,10 +82,8 @@ export class Game {
     this.resize();
     this.debug = this.makeDebug();
   }
-  static matchmake(playerTankId,r) { return makeMatch(TANKS,playerTankId,r).team0; }
-  spawnTeams(playerTankId) {
+  spawnTeams() {
     const r=this.rng;
-    this.lineup=makeMatch(TANKS,playerTankId,r);
     const {team0,team1}=this.lineup;
     const roles = ['assault', 'sniper', 'assault', 'defender', 'assault', 'sniper', 'assault'];
     const specs=[team0,team1].map(list=>list.map(id=>TANK_BY_ID[id]));
@@ -456,12 +461,24 @@ export class Game {
     this.effects.setScale(innerHeight, this.camera.fov);
     this.updateLOD();
   }
-  // running-gear LOD: individual track links + detailed wheels only when the tank covers enough screen
+  // Exterior fittings remain visible at smaller screen sizes than individual track links.
   updateLOD() {
     this.world.updateTerrainLOD(this.camera);
     this.contactShadows.update(this.camera.position);
-    const cp = this.camera.position; const k = this.camera.fov / 60; const near = this.quality === 'low' ? 22 : this.quality === 'high' ? 60 : 40;
-    for (const t of this.tanks) { if (!t.model.links && !t.model.setRunningGearNear) continue; const d = t.pos.distanceTo(cp) * k; setTrackLOD(t.model, t.alive && d < near); }
+    const focalPixels = this.camera.projectionMatrix.elements[5] * this.viewportHeight / 2;
+    const gearThreshold = this.quality === 'low' ? 36 : this.quality === 'high' ? 24 : 30;
+    const exteriorThreshold = this.quality === 'low' ? 15 : this.quality === 'high' ? 9 : 12;
+    for (const { model, pos, spec, alive } of this.tanks) {
+      const widthPixels = model.root.visible ? spec.dims.W * focalPixels / Math.max(1, pos.distanceTo(this.camera.position)) : 0;
+      // Hysteresis keeps the geometry from flickering as the camera or suspension moves.
+      if (model.setExteriorDetail) {
+        const detailed = widthPixels >= exteriorThreshold * (model.exteriorDetailOn ? 0.85 : 1);
+        if (detailed !== model.exteriorDetailOn) model.setExteriorDetail(detailed);
+      }
+      if (model.links || model.setRunningGearNear) {
+        setTrackLOD(model, alive && widthPixels >= gearThreshold * (model.linksOn ? 0.85 : 1));
+      }
+    }
   }
   buildEarthwork(tank) {
     const shape = this.world.addEarthwork(tank, this.tanks);

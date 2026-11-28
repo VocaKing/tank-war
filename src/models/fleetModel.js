@@ -199,14 +199,18 @@ export function createFleetModel(spec, { battle = false } = {}) {
   const distance = [0, 0];
   return {
     root, body, turret, gun, barrel, muzzle, muzzles, sight, spade, trim, stabilizers, meshes,
+    linksOn: near, exteriorDetailOn: true,
     maxRecoil: spec.recoilBrace?.recoilDistance ?? spec.artillery?.recoilDistance ?? MAX_RECOIL,
     gunPitchFloor: (yaw, min, max) => hullPitchFloor(template.clearance, yaw, min, max),
     steerWheels(angle) {
       for (const axle of steerAxles) axle.rotation.y = angle;
     },
+    setExteriorDetail(value) {
+      this.exteriorDetailOn = value;
+      for (const detail of detailGroups) detail.visible = value;
+    },
     setRunningGearNear(value) {
       near = value;
-      for (const detail of detailGroups) detail.visible = value;
       for (const [side, track] of tracks.entries()) {
         if (!track) continue;
         track.track.visible = value;

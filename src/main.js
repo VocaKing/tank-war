@@ -6,7 +6,6 @@ import { Game } from './game/game.js';
 import { TANK_BY_ID, refreshLocalBalance } from './game/tankData.js';
 import { STORAGE_KEY } from './game/balanceConfig.js';
 import { loadDetailedTankModel } from './models/tankModel.js';
-import { RNG } from './util.js';
 import { Audio } from './game/audio.js';
 import { setMaxAniso } from './world/textures.js';
 import { isMobile } from './ui/touchControls.js';
@@ -68,13 +67,14 @@ function start(opts, gesture = true) {
   setTimeout(async () => {
     try {
       const seed = Number(params.get('seed')) || ((Math.random() * 1e9) | 0) || 1;
-      // Preview the seeded lineup so only assets used in this battle are requested.
-      const lineup = new Set(Game.matchmake(opts.tankId, new RNG(seed)));
+      const match = Game.prepareMatch(opts.mapId, opts.tankId, seed);
+      const { team0, team1 } = match.lineup;
+      const lineup = new Set([...team0, ...team1]);
       const [physicsEngine] = await Promise.all([
         initPhysics(), ...Array.from(lineup, id => loadDetailedTankModel(TANK_BY_ID[id])),
       ]);
       resizeRenderer(opts.quality);
-      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, onExit: () => {
+      game = new Game(renderer, ui, audio, { ...opts, physicsEngine, fixedGunTest: params.get('fixedGunTest') === '1', seed, match, onExit: () => {
         game = null; window.__game = null; mode = 'menu';
         resizeRenderer('menu'); syncGarageBalance(); menu.show(true); garage.resize(innerWidth, innerHeight);
       } });

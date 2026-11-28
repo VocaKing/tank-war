@@ -243,7 +243,7 @@ export function createExpansionModel(spec, near) {
   const meshes = [];
   const detailGroups = [];
   root.traverse(node => {
-    if (node.userData.close_detail) { detailGroups.push(node); node.visible = near; }
+    if (node.userData.close_detail) detailGroups.push(node);
     if (!node.isMesh) return;
     if (node.userData.matKey === undefined && /^(Armor|Fittings)/.test(node.material.name)) node.userData.matKey = 'paint';
     node.castShadow = node.receiveShadow = true;
@@ -252,10 +252,13 @@ export function createExpansionModel(spec, near) {
   return {
     root, body, meshes, gun, turret: find(body, spec.casemate ? 'CASEMATE_ANCHOR' : 'TURRET_PIVOT'),
     barrel: find(gun, 'RECOIL_SLIDE'), muzzle: find(gun, 'MUZZLE_SOCKET'), sight: find(gun, 'GUN_SIGHT'),
-    maxRecoil: MAX_RECOIL, gunPitchFloor: template.clearance, linksOn: near,
+    maxRecoil: MAX_RECOIL, gunPitchFloor: template.clearance, linksOn: near, exteriorDetailOn: true,
+    setExteriorDetail(value) {
+      this.exteriorDetailOn = value;
+      for (const detail of detailGroups) detail.visible = value;
+    },
     setRunningGearNear(value) {
       for (const track of tracks) track.setNear(value);
-      for (const detail of detailGroups) detail.visible = value;
     },
     moveRunningGear(left, right) { tracks[0].move(left); tracks[1].move(right); },
   };
