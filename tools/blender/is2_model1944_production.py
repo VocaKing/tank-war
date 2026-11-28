@@ -245,6 +245,8 @@ def set_bake_image_on_materials(target, image):
         for node in nodes:
             if node.type == "TEX_IMAGE" and node.name.startswith("IS2_BAKE_TARGET"):
                 nodes.remove(node)
+        for existing in nodes:
+            existing.select = False
         node = nodes.new("ShaderNodeTexImage")
         node.name = "IS2_BAKE_TARGET_" + image.name
         node.label = "Bake target: " + image.name
@@ -291,8 +293,34 @@ def bake_selected_to_active(target, sources, image, bake_type, pass_filter=None)
         kwargs["pass_filter"] = pass_filter
     if bake_type == "NORMAL":
         kwargs["normal_space"] = "TANGENT"
-    bpy.ops.object.bake(**kwargs)
+    # Set BakeSettings explicitly as well as passing operator arguments. This
+    # avoids Blender background-mode defaults silently disabling selected-to-active
+    # projection or the diffuse color contribution.
+    scene.render.bake.use_selected_to_active = True
+    scene.render.bake.cage_extrusion = 0.025
+    scene.render.bake.max_ray_distance = 0.16
+    scene.render.bake.use_clear = True
+    if bake_type == "DIFFUSE":
+        scene.render.bake.use_pass_color = True
+        scene.render.bake.use_pass_direct = False
+        scene.render.bake.use_pass_indirect = False
+    bpy.context.view_layer.update()
+    result = bpy.ops.object.bake(**kwargs)
+    print("BAKE_RESULT", bake_type, result)
+    if "FINISHED" not in result:
+        raise RuntimeError("Bake operator did not finish: " + bake_type)
     save_bake_image(image, image.name.lower() + ".png")
+    pixels = image.pixels
+    sample_count = image.size[0] * image.size[1]
+    stride = max(1, sample_count // 4096)
+    rgb = []
+    for pixel_index in range(0, sample_count, stride):
+        offset = pixel_index * 4
+        rgb.extend((float(pixels[offset]), float(pixels[offset+1]), float(pixels[offset+2])))
+    stats = (min(rgb), max(rgb), sum(rgb) / len(rgb)) if rgb else (0.0, 0.0, 0.0)
+    print("BAKE_PIXEL_STATS", image.name, stats)
+    if bake_type == "DIFFUSE" and stats[1] < 0.01:
+        raise RuntimeError("Diffuse Base Color bake is empty; refusing to export a black atlas")
 
 def bake_scalar_selected_to_active(target, sources, image, socket_name, fallback):
     originals = {}
@@ -495,7 +523,11 @@ set_bake_image_on_materials(target, ao_img)
 deselect_all()
 target.select_set(True)
 bpy.context.view_layer.objects.active = target
-bpy.ops.object.bake(type="AO", margin=16, use_clear=True)
+scene.render.bake.use_selected_to_active = False
+scene.render.bake.use_pass_color = False
+bpy.context.view_layer.update()
+ao_result = bpy.ops.object.bake(type="AO", margin=16, use_clear=True)
+print("BAKE_RESULT AO", ao_result)
 save_bake_image(ao_img, "ao.png")
 for source in hp_sources:
     source.hide_set(False)
