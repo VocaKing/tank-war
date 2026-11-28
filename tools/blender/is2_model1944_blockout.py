@@ -158,18 +158,26 @@ stations = [
     ( 1.45,  2.52, 0.46, 1.62),
     ( 2.10,  2.50, 0.48, 1.54),
     ( 2.78,  2.43, 0.54, 1.12),
-    ( 3.385, 2.34, 0.62, 0.88),
+    # Integrated sloped bow: the final station is a six-point casting profile,
+    # not a vertical end wall. The upper face runs back 1.58 m as it rises.
+    ( 3.15,  2.40, 0.48, 1.62),
 ]
 verts = []
 ring_n = 6
-for y, width, bottom, top in stations:
+for station_i, (y, width, bottom, top) in enumerate(stations):
     wb = width * 0.96
     wt = width * 0.90
     zshoulder = bottom + 0.22
+    if station_i == len(stations) - 1:
+        # Lower bow remains near-vertical; upper 120 mm glacis is a continuous
+        # 30-degree-from-horizontal slope. No square vertical slab behind it.
+        ring_y = (y, y, y, y-1.58, y-1.58, y)
+    else:
+        ring_y = (y,)*6
     verts.extend([
-        (-wb/2, y, bottom), (wb/2, y, bottom),
-        (width/2, y, zshoulder), (wt/2, y, top),
-        (-wt/2, y, top), (-width/2, y, zshoulder),
+        (-wb/2, ring_y[0], bottom), (wb/2, ring_y[1], bottom),
+        (width/2, ring_y[2], zshoulder), (wt/2, ring_y[3], top),
+        (-wt/2, ring_y[4], top), (-width/2, ring_y[5], zshoulder),
     ])
 faces = [tuple(range(ring_n-1, -1, -1))]
 for j in range(len(stations)-1):
@@ -180,12 +188,27 @@ for j in range(len(stations)-1):
 faces.append(tuple((len(stations)-1)*ring_n+i for i in range(ring_n)))
 mesh_object("Hull_welded_trapezoidal_shell", verts, [tuple(reversed(f)) for f in faces], PAINT)
 
-# Upper 120 mm glacis: 60 degrees from vertical (=30 degrees from horizontal).
-box("Upper_glacis_120mm_60deg", (0, 2.40, 1.34), (2.78, 1.48, 0.14),
-    PAINT, 0.035, (math.radians(-30), 0, 0))
-# Lower front plate is steeper and visibly distinct from the upper glacis.
-box("Lower_nose_plate", (0, 3.20, 0.75), (2.72, 0.22, 0.50),
-    PAINT, 0.025, (math.radians(-60), 0, 0))
+# Thick, integrated six-sided bow casting fitted to the shaped hull end profile.
+# Its stepped lower nose and single sloped upper glacis are one continuous plate.
+last_y, last_w, last_bottom, last_top = stations[-1]
+wb, wt = last_w*0.96, last_w*0.90
+zshoulder = last_bottom + 0.22
+bow_front = [
+    (-wb/2, last_y+0.035, last_bottom),
+    ( wb/2, last_y+0.035, last_bottom),
+    ( last_w/2, last_y+0.035, zshoulder),
+    ( wt/2, last_y-1.58+0.035, last_top),
+    (-wt/2, last_y-1.58+0.035, last_top),
+    (-last_w/2, last_y+0.035, zshoulder),
+]
+bow_back = [(x, y-0.13, z) for x,y,z in bow_front]
+bow_verts = bow_front + bow_back
+bow_faces = [tuple(reversed(range(6))), tuple(range(6,12))]
+for i in range(6):
+    j=(i+1)%6
+    bow_faces.append((i,j,j+6,i+6))
+bow_plate = mesh_object("Hull_front_cast_bow_120mm", bow_verts, bow_faces, PAINT)
+add_bevel(bow_plate, 0.022, 3)
 # Engine deck and rear plate details.
 box("Engine_deck_main", (0, -2.20, 1.64), (2.62, 1.52, 0.13), PAINT, 0.035)
 # Close the rear-deck gap between the main engine deck and rear plate.
@@ -208,17 +231,16 @@ for side in (-1, 1):
     cylinder("Rear_exhaust_%s" % side, (side*0.88, -3.43, 1.12), 0.105, 0.20, STEEL, "Y", 32)
     cylinder("Rear_exhaust_dark_%s" % side, (side*0.88, -3.545, 1.12), 0.070, 0.012, DARK, "Y", 24, 0.0)
 
-# Front driver's hatch, rectangular vision port and roof periscopes.
-box("Driver_hatch", (-0.43, 2.02, 1.67), (0.58, 0.63, 0.075), CAST, 0.045)
-box("Driver_vision_port_frame", (-0.43, 3.05, 1.16), (0.34, 0.10, 0.20), CAST, 0.025)
-box("Driver_vision_slit", (-0.43, 3.108, 1.17), (0.22, 0.018, 0.045), DARK, 0.006)
+# Model 1944 driver access is on the roof; do not add the early stepped-bow
+# direct-vision slit to the late sloped-glacis hull.
+box("Driver_hatch", (-0.43, 1.18, 1.69), (0.58, 0.63, 0.075), CAST, 0.045)
 for x in (-0.79, -0.23):
-    box("Driver_roof_periscope_%s" % x, (x, 1.77, 1.70), (0.13, 0.16, 0.13), CAST, 0.018)
-    box("Driver_periscope_glass_%s" % x, (x, 1.80, 1.77), (0.075, 0.07, 0.012), GLASS, 0.004)
+    box("Driver_roof_periscope_%s" % x, (x, 1.03, 1.70), (0.13, 0.16, 0.13), CAST, 0.018)
+    box("Driver_periscope_glass_%s" % x, (x, 1.06, 1.77), (0.075, 0.07, 0.012), GLASS, 0.004)
 
-# Front DT bow ball mount, tow eyes, fenders and headlight guards.
-add_uv_sphere("Bow_DT_ball_mount", (0.62, 3.16, 1.13), (0.14, 0.10, 0.13), CAST)
-cylinder("Bow_DT_barrel", (0.62, 3.27, 1.13), 0.022, 0.30, STEEL, "Y", 16)
+# Front DT bow ball mount sits on the glacis, not floating ahead of the bow.
+add_uv_sphere("Bow_DT_ball_mount", (0.62, 2.43, 1.12), (0.14, 0.075, 0.13), CAST)
+cylinder("Bow_DT_barrel", (0.62, 2.50, 1.12), 0.022, 0.18, STEEL, "Y", 16)
 for side in (-1, 1):
     x = side * 1.35
     box("Full_length_fender_%s" % side, (x, 0.0, 0.83), (0.30, 5.70, 0.07), PAINT, 0.025)
@@ -228,12 +250,15 @@ for side in (-1, 1):
     for support_i, support_y in enumerate((-2.55, -1.70, -0.85, 0.0, 0.85, 1.70, 2.55)):
         box("Fender_support_%s_%02d" % (side, support_i),
             (side*1.42, support_y, 0.77), (0.09, 0.12, 0.20), STEEL, 0.012)
-    cylinder("Headlight_body_%s" % side, (side*1.18, 2.90, 1.48), 0.095, 0.13, STEEL, "X", 32)
-    cylinder("Headlight_lens_%s" % side, (side*1.18, 2.90, 1.48), 0.068, 0.014, GLASS, "X", 32, 0.0)
-    # Protective headlight hoops and front towing shackles.
-    torus("Headlight_guard_%s" % side, (side*1.18, 2.90, 1.48), 0.12, 0.012, STEEL, "X")
-    torus("Front_tow_eye_%s" % side, (side*1.12, 3.34, 0.69), 0.105, 0.025, STEEL, "X")
-    box("Tow_eye_mount_%s" % side, (side*1.12, 3.27, 0.68), (0.30, 0.20, 0.12), PAINT, 0.025)
+    # Forward-facing headlamps are normal to the glacis, not sideways along X.
+    lamp_x, lamp_z = side*1.08, 1.16
+    lamp_y = 3.15 - (lamp_z-0.70)*1.72
+    cylinder("Headlight_body_%s" % side, (lamp_x, lamp_y+0.015, lamp_z), 0.095, 0.13, STEEL, "Y", 32)
+    cylinder("Headlight_lens_%s" % side, (lamp_x, lamp_y+0.090, lamp_z), 0.068, 0.014, GLASS, "Y", 32, 0.0)
+    torus("Headlight_guard_%s" % side, (lamp_x, lamp_y+0.045, lamp_z), 0.12, 0.012, STEEL, "Y")
+    # Front tow eyes face forward and sit low on the nose.
+    torus("Front_tow_eye_%s" % side, (side*1.12, 3.20, 0.61), 0.105, 0.025, STEEL, "Y")
+    box("Tow_eye_mount_%s" % side, (side*1.12, 3.16, 0.61), (0.30, 0.18, 0.12), PAINT, 0.025)
 
 # Cast turret: a rounded superelliptic loft, with a slight left/right asymmetry
 # and the Model 1944 enlarged/bulged forward casting. This replaces the crude
@@ -243,14 +268,15 @@ turret_sections = [
     # The late 1944 cast turret has broad, almost vertical lower side walls,
     # a relatively level roof, a sloped/flattened frontal casting and a full
     # rear bustle. The high exponent keeps the side walls from reading as an egg.
-    (1.62, 1.17, 1.22,  0.00,  0.02, 3.7),
-    (1.72, 1.27, 1.34,  0.00,  0.03, 4.0),
-    (1.91, 1.31, 1.37, -0.01,  0.00, 4.0),
-    (2.10, 1.31, 1.34, -0.02, -0.03, 3.8),
-    (2.26, 1.28, 1.27, -0.04, -0.07, 3.5),
-    (2.39, 1.23, 1.17, -0.06, -0.10, 3.2),
-    (2.48, 1.16, 1.08, -0.07, -0.12, 3.0),
-    (2.53, 1.12, 1.02, -0.07, -0.14, 2.8),
+    (1.62, 1.15, 1.20,  0.00,  0.02, 3.4),
+    (1.72, 1.25, 1.34,  0.00,  0.03, 3.8),
+    (1.90, 1.30, 1.38, -0.01,  0.00, 4.0),
+    (2.05, 1.31, 1.35, -0.02, -0.03, 4.0),
+    (2.18, 1.29, 1.30, -0.04, -0.05, 3.8),
+    (2.30, 1.25, 1.22, -0.05, -0.07, 3.4),
+    (2.40, 1.19, 1.13, -0.06, -0.10, 3.0),
+    (2.48, 1.10, 1.04, -0.07, -0.12, 2.8),
+    (2.53, 1.04, 0.98, -0.07, -0.14, 2.6),
 ]
 N = 80
 tv = []
@@ -263,8 +289,8 @@ for z, rx, ry, cx, cy, expn in turret_sections:
         # Flatten the forward arc into a broad cast front face. Its forward
         # edge recedes as the roof rises, giving the characteristic sloped
         # front profile instead of a capsule-shaped nose.
-        if sa > 0.62:
-            front_flat = min(1.0, max(0.0, (sa - 0.62) / 0.38))
+        if sa > 0.42:
+            front_flat = min(1.0, max(0.0, (sa - 0.42) / 0.58))
             front_flat = front_flat * front_flat * (3.0 - 2.0 * front_flat)
             y = (1.0 - front_flat) * y + front_flat * (cy + ry * 0.985)
         # Keep a fuller but slightly flattened rear bustle.
@@ -274,7 +300,7 @@ for z, rx, ry, cx, cy, expn in turret_sections:
         # Cast cheeks are strongest below the gun line and taper toward roof.
         if sa > 0.48:
             cheek = max(0.0, 1.0 - abs(z - 1.94) / 0.48)
-            x += 0.085 * cheek * (sa - 0.48) / 0.52 * (1 if ca >= 0 else -1)
+            x += 0.105 * cheek * (sa - 0.48) / 0.52 * (1 if ca >= 0 else -1)
         tv.append((x, y, z))
 tf = []
 for j in range(len(turret_sections)-1):
@@ -291,51 +317,47 @@ for polygon in turret_body.data.polygons:
     else:
         polygon.use_smooth = True
 
-# D-25T mantlet: a broad, thick cast shield with a flattened forward face.
-# It is built as a short superelliptic loft rather than a smooth UV sphere.
-mantlet_sections = [
-    # y, half-width, half-height, vertical centre, exponent
-    (1.235, 0.57, 0.225, 2.145, 3.0),
-    (1.345, 0.70, 0.295, 2.155, 3.2),
-    (1.465, 0.745, 0.305, 2.155, 3.2),
-    (1.565, 0.675, 0.270, 2.155, 3.0),
+# Late Model 1944 wide D-25T mantlet. The front outline is deliberately
+# irregular: broad shoulders, tapered lower edge and the characteristic
+# asymmetric lower-right relief. Three depth stations create a cast bulge.
+mantlet_outline = [
+    (-0.66, 2.405), (0.59, 2.405), (0.73, 2.325),
+    (0.75, 2.165), (0.64, 2.055), (0.48, 2.005),
+    (0.34, 2.035), (0.23, 1.975), (0.12, 2.005),
+    (-0.53, 1.985), (-0.70, 2.095), (-0.76, 2.285),
 ]
-MN = 64
+mantlet_layers = [(1.30, 0.86), (1.48, 1.00), (1.66, 0.96)]
 mv, mf = [], []
-for y, rx, rz, cz, expn in mantlet_sections:
-    for i in range(MN):
-        a = math.tau * i / MN
-        ca, sa = math.cos(a), math.sin(a)
-        x = rx * math.copysign(abs(ca) ** (2.0 / expn), ca)
-        z = cz + rz * math.copysign(abs(sa) ** (2.0 / expn), sa)
-        mv.append((x, y, z))
-for j in range(len(mantlet_sections) - 1):
-    for i in range(MN):
-        a = j * MN + i
-        b = j * MN + (i + 1) % MN
-        mf.append((a, a + MN, b + MN, b))
-mf.append(tuple(range(MN)))
-mf.append(tuple((len(mantlet_sections) - 1) * MN + i for i in reversed(range(MN))))
-mantlet = mesh_object("D25T_cast_mantlet", mv, mf, CAST, True)
-for polygon in mantlet.data.polygons:
-    if abs(polygon.normal.y) > 0.80:
-        polygon.use_smooth = False
-# Concentric steel seat and recessed aperture around the 122 mm tube.
-cylinder("Main_gun_recess", (0.0, 1.625, 2.17), 0.19, 0.025, DARK, "Y", 40, 0.0)
-torus("Main_gun_mantlet_collar", (0.0, 1.64, 2.17), 0.19, 0.035, STEEL, "Y")
-torus("Main_gun_mantlet_outer_lip", (0.0, 1.605, 2.17), 0.255, 0.022, CAST, "Y")
-cylinder("Coaxial_DT_aperture", (-0.43, 1.62, 2.11), 0.055, 0.03, DARK, "Y", 24, 0.0)
-cylinder("Coaxial_DT_barrel_stub", (-0.43, 1.70, 2.11), 0.025, 0.18, STEEL, "Y", 16)
-cylinder("Telescope_sight_aperture", (0.43, 1.62, 2.18), 0.045, 0.03, DARK, "Y", 24, 0.0)
-cylinder("Telescope_sight_glass", (0.43, 1.645, 2.18), 0.028, 0.012, GLASS, "Y", 20, 0.0)
+for y, scale in mantlet_layers:
+    for x, z in mantlet_outline:
+        mv.append((x*scale, y, 2.17 + (z-2.17)*scale))
+ML = len(mantlet_outline)
+for layer in range(len(mantlet_layers)-1):
+    for i in range(ML):
+        a=layer*ML+i
+        b=layer*ML+(i+1)%ML
+        mf.append((a,b,b+ML,a+ML))
+mf.append(tuple(reversed(range(ML))))
+mf.append(tuple((len(mantlet_layers)-1)*ML+i for i in range(ML)))
+mantlet = mesh_object("D25T_cast_mantlet", mv, mf, CAST, False)
+add_bevel(mantlet, 0.025, 3)
+# Recessed gun seat and a restrained cast-metal outer lip; avoid oversized
+# polished concentric rings that make the gun look bolted onto a toy turret.
+cylinder("Main_gun_recess", (0.0, 1.735, 2.17), 0.145, 0.025, DARK, "Y", 48, 0.0)
+torus("Main_gun_mantlet_collar", (0.0, 1.755, 2.17), 0.145, 0.022, DARK, "Y")
+torus("Main_gun_mantlet_outer_lip", (0.0, 1.705, 2.17), 0.205, 0.018, CAST, "Y")
+cylinder("Coaxial_DT_aperture", (-0.43, 1.72, 2.11), 0.055, 0.03, DARK, "Y", 24, 0.0)
+cylinder("Coaxial_DT_barrel_stub", (-0.43, 1.78, 2.11), 0.025, 0.14, STEEL, "Y", 16)
+cylinder("Telescope_sight_aperture", (0.43, 1.72, 2.18), 0.045, 0.03, DARK, "Y", 24, 0.0)
+cylinder("Telescope_sight_glass", (0.43, 1.745, 2.18), 0.028, 0.012, GLASS, "Y", 20, 0.0)
 
 # Elevation pivot and stepped D-25T barrel. The pivot is independent so the game
 # can animate elevation without moving the mantlet or turret shell.
 gun_pivot = bpy.data.objects.new("Gun_Elevation_Pivot", None)
 bpy.context.collection.objects.link(gun_pivot)
 gun_pivot.location = (0.0, 1.48, 2.17)
-barrel = cylinder("D25T_barrel_main", (0.0, 3.77, 2.17), 0.112, 4.58, STEEL, "Y", 48, 0.012)
-breech_collar = cylinder("D25T_barrel_breech_collar", (0.0, 1.78, 2.17), 0.155, 0.38, STEEL, "Y", 40)
+barrel = cylinder("D25T_barrel_main", (0.0, 3.77, 2.17), 0.082, 4.58, STEEL, "Y", 48, 0.010)
+breech_collar = cylinder("D25T_barrel_breech_collar", (0.0, 1.78, 2.17), 0.125, 0.32, STEEL, "Y", 40)
 barrel_world = barrel.matrix_world.copy()
 barrel.parent = gun_pivot
 barrel.matrix_world = barrel_world
