@@ -32,6 +32,16 @@ Use meters, with the vehicle centerline at X=0, ground at Z=0 and bow toward +Y 
 
 Some published sources differ slightly on width, height, overall length and armor conventions. Keep the dimension table editable and record source/measurement confidence rather than forcing all sources into one false precision.
 
+## Cross-check against the current game specification
+
+The current main-branch IS-2 data in `src/game/tankData.js` and geometry in
+`src/models/tanksV2.js` provide an additional consistency check for the Blender source:
+hull length 6.77 m, overall width 3.07 m, hull height 1.60 m, track width 0.65 m,
+turret envelope approximately 2.65 × 2.80 × 0.87 m, and main-gun length approximately
+4.97 m. These are project implementation dimensions, not a substitute for museum
+measurements; any discrepancy should be recorded and resolved against the preserved
+Model 1944 reference vehicle.
+
 ## Level-2 modeling standard
 - Correct silhouette and proportions from front, side, rear and top orthographic references.
 - Separate named objects for hull, turret, mantlet, gun, muzzle brake, cupola, hatches, optics, machine guns, wheels, sprockets, idlers, return rollers, track runs, fuel drums, exhausts and tow fittings.
