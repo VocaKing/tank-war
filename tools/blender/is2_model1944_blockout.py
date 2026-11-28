@@ -178,7 +178,7 @@ for j in range(len(stations)-1):
         b = j*ring_n+(i+1)%ring_n
         faces.append((a, b, b+ring_n, a+ring_n))
 faces.append(tuple((len(stations)-1)*ring_n+i for i in range(ring_n)))
-mesh_object("Hull_welded_trapezoidal_shell", verts, faces, PAINT)
+mesh_object("Hull_welded_trapezoidal_shell", verts, [tuple(reversed(f)) for f in faces], PAINT)
 
 # Upper 120 mm glacis: 60 degrees from vertical (=30 degrees from horizontal).
 box("Upper_glacis_120mm_60deg", (0, 2.40, 1.34), (2.78, 1.48, 0.14),
@@ -395,7 +395,11 @@ TRACK_LINKS = 86
 TRACK_WIDTH = 0.65
 TRACK_CENTER_X = 1.21
 TRACK_RADIUS = 0.34
-TRACK_Z = TRACK_RADIUS + 0.0375
+TRACK_SHOE_HALF = 0.0375
+TRACK_GROUSER_OUTER = 0.0625
+TRACK_Z = TRACK_RADIUS + TRACK_GROUSER_OUTER
+ROADWHEEL_Z = TRACK_Z - TRACK_RADIUS + TRACK_SHOE_HALF + 0.275
+RETURN_ROLLER_Z = TRACK_Z + TRACK_RADIUS - TRACK_SHOE_HALF - 0.09
 TRACK_PITCH = 0.1651
 TRACK_HALF_STRAIGHT = (TRACK_LINKS*TRACK_PITCH - 2*math.pi*TRACK_RADIUS)/4.0
 
@@ -407,34 +411,34 @@ for side in (-1, 1):
         for pair, xabs in enumerate((1.04, 1.25)):
             x = side*xabs
             cylinder("Roadwheel_%s_%02d_%d" % (side, i+1, pair+1),
-                     (x, y, TRACK_Z), 0.275, 0.155, PAINT, "X", 48)
+                     (x, y, ROADWHEEL_Z), 0.275, 0.155, PAINT, "X", 48)
             torus("Roadwheel_rim_%s_%02d_%d" % (side, i+1, pair+1),
-                  (x + side*0.073, y, TRACK_Z), 0.235, 0.018, STEEL, "X")
+                  (x + side*0.073, y, ROADWHEEL_Z), 0.235, 0.018, STEEL, "X")
             cylinder("Roadwheel_hub_%s_%02d_%d" % (side, i+1, pair+1),
-                     (x + side*0.09, y, TRACK_Z), 0.095, 0.045, CAST, "X", 32)
+                     (x + side*0.09, y, ROADWHEEL_Z), 0.095, 0.045, CAST, "X", 32)
             cylinder("Roadwheel_hub_cap_%s_%02d_%d" % (side, i+1, pair+1),
-                     (x + side*0.116, y, TRACK_Z), 0.052, 0.022, STEEL, "X", 24)
+                     (x + side*0.116, y, ROADWHEEL_Z), 0.052, 0.022, STEEL, "X", 24)
             # Rubber contact band around each cast wheel. The steel dish and
             # retaining lip remain visible on the outer face.
             torus("Roadwheel_rubber_tire_%s_%02d_%d" % (side, i+1, pair+1),
-                  (x + side*0.078, y, TRACK_Z), 0.253, 0.024, RUBBER, "X")
+                  (x + side*0.078, y, ROADWHEEL_Z), 0.253, 0.024, RUBBER, "X")
             # Six shallow cast reliefs plus eight small hub fasteners.
             for k in range(6):
                 a = k*math.tau/6
                 yy = y + math.cos(a)*0.17
-                zz = TRACK_Z + math.sin(a)*0.17
+                zz = ROADWHEEL_Z + math.sin(a)*0.17
                 cylinder("Roadwheel_relief_%s_%02d_%d_%d" % (side, i+1, pair+1, k),
                          (x + side*0.083, yy, zz), 0.022, 0.012, DARK, "X", 12, 0.0)
             for k in range(8):
                 a = k*math.tau/8
                 yy = y + math.cos(a)*0.135
-                zz = TRACK_Z + math.sin(a)*0.135
+                zz = ROADWHEEL_Z + math.sin(a)*0.135
                 cylinder("Roadwheel_hub_bolt_%s_%02d_%d_%d" % (side, i+1, pair+1, k),
                          (x + side*0.087, yy, zz), 0.013, 0.014, STEEL, "X", 10, 0.0)
     # Three return rollers per side.
     for i, y in enumerate((-1.48, 0.0, 1.48)):
         cylinder("Return_roller_%s_%d" % (side, i+1),
-                 (side*1.36, y, TRACK_Z + TRACK_RADIUS - 0.0375 - 0.09), 0.09, 0.18, STEEL, "X", 32)
+                 (side*1.36, y, RETURN_ROLLER_Z), 0.09, 0.18, STEEL, "X", 32)
 
 # Rear drive sprockets: twin removable 14-tooth rims. Front idlers are plain.
 for side in (-1, 1):
@@ -518,10 +522,11 @@ for side in (-1, 1):
         # Link shoe plus raised transverse grouser; each is geometrically distinct.
         append_box(tv, tf, (side*TRACK_CENTER_X, y, z),
                    (TRACK_WIDTH, TRACK_PITCH*0.91, 0.075), angle)
-        append_box(tv, tf, (side*TRACK_CENTER_X, y, z+0.047),
+        # Local +Z points outward throughout the clockwise track loop.
+        append_box(tv, tf, (side*TRACK_CENTER_X, y-math.sin(angle)*0.050, z+math.cos(angle)*0.050),
                    (TRACK_WIDTH*0.94, 0.035, 0.025), angle)
-        # Inner guide horn points toward the vehicle centerline.
-        append_box(tv, tf, (side*(TRACK_CENTER_X-0.22), y, z+0.058),
+        # Guide horn points into the loop; rotate its offset with the shoe.
+        append_box(tv, tf, (side*(TRACK_CENTER_X-0.22), y+math.sin(angle)*0.058, z-math.cos(angle)*0.058),
                    (0.12, TRACK_PITCH*0.38, 0.10), angle)
     track_label = "L" if side < 0 else "R"
     track_mesh = mesh_object("Track_run_86_links_%s" % track_label, tv, tf, TRACK)
@@ -596,7 +601,7 @@ root["road_wheel_stations_per_side"] = 6
 root["track_links_per_side"] = TRACK_LINKS
 root["track_width_m"] = TRACK_WIDTH
 root["track_pitch_m"] = TRACK_PITCH
-root["track_ground_z_m"] = TRACK_Z - TRACK_RADIUS - 0.0375
+root["track_ground_z_m"] = TRACK_Z - TRACK_RADIUS - TRACK_GROUSER_OUTER
 root["hull_ground_clearance_m"] = 0.46
 root["status"] = "FIRST BLENDER ASSET PASS — requires visual review"
 

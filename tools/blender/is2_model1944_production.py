@@ -228,7 +228,7 @@ def build_track_link_template(side, material, bevel_segments, name, collection):
     ))
     parts.append(add_track_piece_box(
         name + "_GuideHorn",
-        (centre[0] - side * 0.22, centre[1], centre[2] + 0.058),
+        (centre[0] - side * 0.22, centre[1], centre[2] - 0.058),
         (0.12, pitch * 0.38, 0.10), material, 0.008, bevel_segments
     ))
     for sign in (-1, 1):
@@ -356,7 +356,22 @@ def rasterize_material_atlas(target, channel, filepath):
     elif channel == "Metallic":
         variation = high * 1.0 + low * 1.0
         pixels[mask] = np.clip(pixels[mask] + variation[mask], 0, 255)
-    image = Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8), mode=mode)
+    # Extend island edge colors into the surrounding gutter before filtering.
+    # Without padding, bilinear sampling and mipmaps mix black background into
+    # the vehicle's surface, particularly along the many small UV islands.
+    pixels = np.clip(pixels, 0, 255).astype(np.uint8)
+    filled = mask.copy()
+    for _ in range(8):
+        previous = filled.copy()
+        for dy, dx in ((-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)):
+            dst_y = slice(max(0,dy), ATLAS_SIZE+min(0,dy))
+            dst_x = slice(max(0,dx), ATLAS_SIZE+min(0,dx))
+            src_y = slice(max(0,-dy), ATLAS_SIZE+min(0,-dy))
+            src_x = slice(max(0,-dx), ATLAS_SIZE+min(0,-dx))
+            take = previous[src_y,src_x] & ~filled[dst_y,dst_x]
+            pixels[dst_y,dst_x][take] = pixels[src_y,src_x][take]
+            filled[dst_y,dst_x][take] = True
+    image = Image.fromarray(pixels, mode=mode)
     image.save(filepath, format="PNG", optimize=True)
     bpy_image = bpy.data.images.load(filepath, check_existing=False)
     bpy_image.name = "IS2_" + channel + "_Atlas"
@@ -745,41 +760,32 @@ ao_img = new_bake_image("IS2_AO_Atlas", "Non-Color")
 print("ATLAS: Base Color from UV triangles and source material IDs")
 base_img = rasterize_material_atlas(target, "BaseColor", os.path.join(PBR_DIR, "basecolor.png"))
 
-print("BAKE: Tangent-space Normal (high-poly to low-poly)")
-normal_img = new_bake_image("IS2_TangentNormal_Atlas", "Non-Color")
-bake_selected_to_active(target, hp_sources, normal_img, "NORMAL")
-normal_source = "high_poly_selected_to_active"
-if image_rgb_stats(normal_img)[1] < 0.01:
+# Run 79's 27-minute CPU projection returned constant X/Y channels. For
+# review builds, use a deterministic micro-normal instead of a broken bake.
+# The high-to-low projection remains explicitly opt-in for material R&D.
+normal_source = "procedural_uv_micro_normal_review"
+if os.environ.get("IS2_PROJECT_NORMALS", "0") == "1":
+    print("BAKE: Tangent-space Normal (high-poly to low-poly)")
+    try:
+        bake_selected_to_active(target, hp_sources, normal_img, "NORMAL")
+        sample = np.asarray(Image.open(normal_img.filepath_raw).convert("RGB"), dtype=np.float32)
+        if max(float(sample[...,0].std()), float(sample[...,1].std())) < 0.25:
+            raise RuntimeError("Projected normal has no meaningful tangent detail")
+        normal_source = "high_poly_selected_to_active"
+    except (RuntimeError, OSError) as exc:
+        print("NORMAL_PROJECTION_REJECTED", str(exc))
+if normal_source != "high_poly_selected_to_active":
     normal_img = create_procedural_normal_atlas(target, os.path.join(PBR_DIR, "normal.png"))
-    normal_source = "procedural_uv_micro_normal_fallback"
 
 print("ATLAS: Roughness from UV triangles and source material IDs")
 rough_img = rasterize_material_atlas(target, "Roughness", os.path.join(PBR_DIR, "roughness.png"))
 print("ATLAS: Metallic from UV triangles and source material IDs")
 metal_img = rasterize_material_atlas(target, "Metallic", os.path.join(PBR_DIR, "metallic.png"))
 
-print("BAKE: Ambient Occlusion")
-for source in hp_sources:
-    source.hide_set(True)
-    source.hide_render = True
-set_bake_image_on_materials(target, ao_img)
-deselect_all()
-target.select_set(True)
-bpy.context.view_layer.objects.active = target
-scene.render.bake.use_selected_to_active = False
-scene.render.bake.use_pass_color = False
-bpy.context.view_layer.update()
-ao_result = bpy.ops.object.bake(type="AO", margin=16, use_clear=True)
-print("BAKE_RESULT AO", ao_result)
-save_bake_image(ao_img, "ao.png")
-ao_source = "ambient_occlusion_bake"
-ao_stats = image_rgb_stats(ao_img)
-if ao_stats[1] < 0.01 or (ao_stats[1] - ao_stats[0]) < 0.001:
-    ao_img = create_neutral_ao_atlas(os.path.join(PBR_DIR, "ao.png"))
-    ao_source = "neutral_white_fallback_not_wired"
-for source in hp_sources:
-    source.hide_set(False)
-    source.hide_render = False
+# AO is not wired into the GLB yet. Do not spend review build time on
+# a CPU bake that is unused by the material; label the neutral map honestly.
+ao_img = create_neutral_ao_atlas(os.path.join(PBR_DIR, "ao.png"))
+ao_source = "neutral_white_review_not_wired"
 
 # ---- Final game PBR material ------------------------------------------------------
 def create_final_pbr_material():
@@ -947,14 +953,14 @@ def attach_part(group, obj):
         _, side, index = group.split("_")
         station_y = wheel_y[int(index) - 1]
         side_sign = -1 if side == "L" else 1
-        location = (side_sign * 1.145, station_y, TRACK_Z)
+        location = (side_sign * 1.145, station_y, ROADWHEEL_Z)
         parent = create_empty(group + "_Pivot", location, hull)
         parent["animated_axis"] = "Blender X wheel rotation"
     elif group.startswith("ReturnRoller_"):
         _, side, index = group.split("_")
         side_sign = -1 if side == "L" else 1
         roller_y = (-1.48, 0.0, 1.48)[int(index) - 1]
-        location = (side_sign * 1.36, roller_y, TRACK_Z + TRACK_RADIUS - 0.0375 - 0.09)
+        location = (side_sign * 1.36, roller_y, RETURN_ROLLER_Z)
         parent = create_empty(group + "_Pivot", location, hull)
         parent["animated_axis"] = "Blender X roller rotation"
     elif group.startswith("DriveSprocket_"):
@@ -1026,6 +1032,34 @@ for old in (source_ns.get("root"), source_ns.get("turret_root"), source_ns.get("
         old.hide_set(True)
         old.hide_render = True
 
+# ---- Geometry gate before expensive export and renders --------------------------
+bpy.context.view_layer.update()
+mesh_objects = [obj for obj in FINAL_COLL.objects if obj.type == "MESH"]
+track_l = [obj.name for obj in mesh_objects if re.fullmatch(r"TrackLink_L_\d{3}", obj.name)]
+track_r = [obj.name for obj in mesh_objects if re.fullmatch(r"TrackLink_R_\d{3}", obj.name)]
+def exact_world_min_z(objects):
+    values = [
+        (obj.matrix_world @ Vector(vertex.co)).z
+        for obj in objects
+        if obj.type == "MESH"
+        for vertex in obj.data.vertices
+    ]
+    if not values:
+        raise RuntimeError("Cannot measure vertical bounds of an empty mesh group")
+    return min(values)
+
+track_link_objects = [bpy.data.objects[name] for name in track_l + track_r]
+hull_mesh_objects = [obj for obj in mesh_objects if obj.parent == hull]
+track_min_z = exact_world_min_z(track_link_objects)
+hull_min_z = exact_world_min_z(hull_mesh_objects)
+measured_clearance = hull_min_z - track_min_z
+if abs(track_min_z) > 0.010:
+    raise RuntimeError("Track shoes do not sit within 10 mm of the ground plane: min Z %.4f m" % track_min_z)
+if abs(measured_clearance - 0.46) > 0.025:
+    raise RuntimeError("Hull ground clearance mismatch: measured %.4f m, expected 0.46 m" % measured_clearance)
+
+print("GEOMETRY_GATE", track_min_z, measured_clearance, flush=True)
+
 # ---- Export the candidate GLB -----------------------------------------------------
 os.makedirs(os.path.dirname(GLB_OUT), exist_ok=True)
 deselect_all()
@@ -1082,10 +1116,10 @@ def render_production_view(name, location, target_point, ortho):
     bpy.ops.render.render(write_still=True)
 
 render_production_view("01_front_three_quarter", (8.5, 9.0, 5.8), (0.0, 0.4, 1.25), 11.0)
-render_production_view("02_left_side", (-10.5, 0.0, 3.0), (0.0, 0.0, 1.25), 10.8)
+render_production_view("02_left_side", (-12.0, 1.45, 1.50), (0.0, 1.45, 1.50), 12.0)
 render_production_view("03_front", (0.0, 11.0, 3.0), (0.0, 0.0, 1.25), 8.0)
 render_production_view("04_rear", (0.0, -11.0, 3.0), (0.0, 0.0, 1.25), 8.0)
-render_production_view("05_top", (0.0, 0.0, 12.0), (0.0, 0.0, 0.7), 8.0)
+render_production_view("05_top", (0.0, 1.45, 13.0), (0.0, 1.45, 0.7), 15.0)
 
 # ---- Manifest and in-process GLB structure validation ----------------------------
 mesh_objects = [obj for obj in FINAL_COLL.objects if obj.type == "MESH"]
@@ -1097,26 +1131,6 @@ track_r = [name for name in node_names if re.match(r"TrackLink_R_\d{3}$", name)]
 if len(track_l) != TRACK_LINKS or len(track_r) != TRACK_LINKS:
     raise RuntimeError("Track node count mismatch: L=%d R=%d" % (len(track_l), len(track_r)))
 
-def exact_world_min_z(objects):
-    values = [
-        (obj.matrix_world @ Vector(vertex.co)).z
-        for obj in objects
-        if obj.type == "MESH"
-        for vertex in obj.data.vertices
-    ]
-    if not values:
-        raise RuntimeError("Cannot measure vertical bounds of an empty mesh group")
-    return min(values)
-
-track_link_objects = [bpy.data.objects[name] for name in track_l + track_r]
-hull_mesh_objects = [obj for obj in mesh_objects if obj.parent == hull]
-track_min_z = exact_world_min_z(track_link_objects)
-hull_min_z = exact_world_min_z(hull_mesh_objects)
-measured_clearance = hull_min_z - track_min_z
-if abs(track_min_z) > 0.010:
-    raise RuntimeError("Track shoes do not sit within 10 mm of the ground plane: min Z %.4f m" % track_min_z)
-if abs(measured_clearance - 0.46) > 0.025:
-    raise RuntimeError("Hull ground clearance mismatch: measured %.4f m, expected 0.46 m" % measured_clearance)
 
 manifest = {
     "vehicle": "IS-2 Model 1944",

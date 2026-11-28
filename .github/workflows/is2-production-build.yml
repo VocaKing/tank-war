@@ -1,12 +1,6 @@
 name: IS-2 production asset pipeline
 
 on:
-  push:
-    branches:
-      - blender/is2-model1944-production-clean-2026-11-28
-    paths:
-      - "tools/blender/**"
-      - ".github/workflows/is2-production-build.yml"
   pull_request:
     branches:
       - main
@@ -51,7 +45,7 @@ jobs:
         run: |
           mkdir -p public/models artifacts/is2-model1944/production
           set -o pipefail
-          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 IS2_FAST_PREVIEW=1 IS2_ATLAS_SIZE=2048 blender --background --python-exit-code 1 --python tools/blender/is2_model1944_production.py > artifacts/is2-model1944/production/blender-build.log 2>&1 || { tail -n 180 artifacts/is2-model1944/production/blender-build.log; exit 1; }
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 IS2_FAST_PREVIEW=1 IS2_ATLAS_SIZE=2048 blender --background --python-exit-code 1 --python tools/blender/is2_model1944_production.py 2>&1 | tee artifacts/is2-model1944/production/blender-build.log
 
       - name: Validate exported GLB and texture package
         run: python3 tools/blender/validate_is2_production.py
