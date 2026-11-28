@@ -25,6 +25,16 @@ This branch adds a real Blender production pipeline on top of the existing dimen
 8. Split the atlas target back into independently animated hull, turret, mantlet, recoil barrel, road-wheel stations, return rollers, drive sprockets, idlers and track links.
 9. Export and validate a GLB with 86 individually named track-link nodes per side.
 
+## Current fidelity ceiling
+
+The current automated high-poly source is a bake source, not a hand-sculpted high-poly tank:
+it preserves the dimensioned source meshes at their higher bevel segmentation, adds
+high-poly-only weld beads, and uses a five-part detailed track-link template. The low-poly
+copy reduces bevel segmentation and is packed into the game atlas. This is a useful
+repeatable production foundation, but it is not yet a sculpted turret casting, a complete
+artist retopology, or a multi-LOD asset. Those remain explicit future stages; no WoT-level
+visual-quality claim is made.
+
 ## Runtime node contract
 
 - \`IS2_Model1944_Root\`
