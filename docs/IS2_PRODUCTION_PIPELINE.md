@@ -42,6 +42,8 @@ visual-quality claim is made.
 - \`Turret_Root\` — yaw
 - \`Gun_Elevation_Pivot\` — elevation
 - \`Gun_Recoil_Pivot\` — barrel recoil
+- \`Muzzle\` — projectile spawn / barrel-forward anchor, parented to recoil
+- \`Gun_Sight\` — aiming reference, parented to elevation
 - \`Track_L_Root\` / \`Track_R_Root\`
 - \`RoadWheel_L_01_Pivot\` … \`RoadWheel_R_06_Pivot\`
 - \`TrackLink_L_000\` … \`TrackLink_L_085\`
