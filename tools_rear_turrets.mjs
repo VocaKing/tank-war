@@ -17,7 +17,7 @@ function ring(plan, width, length, height, shift = 0, rake = 0) {
   return plan.map(([x, z]) => [x * width, height + z * rake, z * length + shift]);
 }
 
-function loft(rings, smooth = false) {
+function loft(rings, smooth = false, topOpening) {
   const positions = [], indices = [];
   const size = rings[0].length;
   for (const row of rings) for (const point of row) positions.push(...point);
@@ -27,10 +27,13 @@ function loft(rings, smooth = false) {
   }
   for (const [side, row] of [rings[0], rings.at(-1)].entries()) {
     const start = positions.length / 3;
-    for (const point of row) positions.push(...point);
-    const triangles = ShapeUtils.triangulateShape(row.map(([x, , z]) => new Vector2(x, z)), []);
+    const opening = side && topOpening ? topOpening : [];
+    const cap = [...row, ...opening];
+    for (const point of cap) positions.push(...point);
+    const outline2D = points => points.map(([x, , z]) => new Vector2(x, z));
+    const triangles = ShapeUtils.triangulateShape(outline2D(row), opening.length ? [outline2D(opening)] : []);
     for (const [a, b, c] of triangles) {
-      const [ax, , az] = row[a], [bx, , bz] = row[b], [cx, , cz] = row[c];
+      const [ax, , az] = cap[a], [bx, , bz] = cap[b], [cx, , cz] = cap[c];
       const up = (bz - az) * (cx - ax) - (bx - ax) * (cz - az) > 0;
       indices.push(start + a, start + (up === Boolean(side) ? b : c), start + (up === Boolean(side) ? c : b));
     }
@@ -43,13 +46,14 @@ function loft(rings, smooth = false) {
 }
 
 // Chamfer and taper a panel around its own centre, preserving a narrow bevel.
-function plate(plan, low, high, inset = 0.13, rake = 0) {
+function plate(plan, low, high, inset = 0.13, rake = 0, opening) {
   let cx = 0, cz = 0;
   for (const [x, z] of plan) { cx += x / plan.length; cz += z / plan.length; }
   const lift = (y, scale) => plan.map(([x, z]) =>
     [cx + (x - cx) * scale, y + (z - cz) * rake, cz + (z - cz) * scale]);
   const edge = Math.min(0.045, (high - low) / 3);
-  return loft([lift(low, 1 - inset), lift(low + edge, 1), lift(high - edge, 1), lift(high, 1 - inset)]);
+  const hole = opening?.map(([x, z]) => [x, high + (z - cz) * rake, z]);
+  return loft([lift(low, 1 - inset), lift(low + edge, 1), lift(high - edge, 1), lift(high, 1 - inset)], false, hole);
 }
 
 function plateOutline(x, z, w, l, chamfer) {

@@ -4,6 +4,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { Ray, Vector3 } from 'three';
 import { hasFleetModel } from './src/models/fleetModel.js';
+import { VX9 } from './src/models/vx9Design.js';
 
 const root = new URL('./public/models/fleet/', import.meta.url);
 const files = (await readdir(root)).filter(file => file.endsWith('.glb'));
@@ -15,7 +16,7 @@ const expectedExterior = new Set([
 ]);
 const wheelCounts = { archer: 8, centauro2: 8 };
 const expectedReferences = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
-const vx9Revision = '2026-11-vx9-integrated';
+const vx9Revision = '2026-11-vx9-orthographic';
 const rearTurretRevision = '2026-11-rear-turrets';
 
 function checkRearTurret({ nodes, meshes, accessors }, pivot, id, revision = rearTurretRevision) {
@@ -30,37 +31,65 @@ function checkRearTurret({ nodes, meshes, accessors }, pivot, id, revision = rea
   }
 }
 
-function checkRecessedLights(gltf, bytes, mesh, { x, y, z, sweep, pitch, rimHeight, skin }) {
+function firstModelSurface(gltf, bytes, mesh, ray) {
+  let first = { distance: Infinity };
+  const a = new Vector3(), b = new Vector3(), c = new Vector3(), hit = new Vector3();
+  for (const primitive of gltf.meshes[mesh].primitives) {
+    const pos = gltf.accessors[primitive.attributes.POSITION], idx = gltf.accessors[primitive.indices];
+    const vertices = gltf.bufferViews[pos.bufferView].byteOffset + (pos.byteOffset ?? 0);
+    const indices = gltf.bufferViews[idx.bufferView].byteOffset + (idx.byteOffset ?? 0);
+    function vertex(index, out) {
+      const p = vertices + 12 * bytes.readUInt16LE(indices + 2 * index);
+      out.set(bytes.readFloatLE(p), bytes.readFloatLE(p + 4), bytes.readFloatLE(p + 8));
+    }
+    for (let i = 0; i < idx.count; i += 3) {
+      vertex(i, a); vertex(i + 1, b); vertex(i + 2, c);
+      if (!ray.intersectTriangle(a, b, c, false, hit)) continue;
+      const distance = hit.distanceTo(ray.origin);
+      if (distance < first.distance) first = { distance, material: gltf.materials[primitive.material].name };
+    }
+  }
+  return first;
+}
+
+function checkRecessedLights(gltf, bytes, mesh, { point: [x,y,z], sweep, pitch, rimHeight, skin }) {
   for (const side of [-1, 1]) {
     const yaw = side * sweep;
     const direction = new Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
     const vertical = new Vector3(-Math.sin(yaw) * Math.sin(pitch), Math.cos(pitch), -Math.cos(yaw) * Math.sin(pitch));
     const center = new Vector3(side * x, y, z);
     function firstSurface(height) {
-      const ray = new Ray(center.clone().add(direction).addScaledVector(vertical, height), direction.clone().negate());
-      let first = { distance: Infinity };
-      const a = new Vector3(), b = new Vector3(), c = new Vector3(), hit = new Vector3();
-      for (const primitive of gltf.meshes[mesh].primitives) {
-        const pos = gltf.accessors[primitive.attributes.POSITION], idx = gltf.accessors[primitive.indices];
-        const vertices = gltf.bufferViews[pos.bufferView].byteOffset + (pos.byteOffset ?? 0);
-        const indices = gltf.bufferViews[idx.bufferView].byteOffset + (idx.byteOffset ?? 0);
-        function vertex(index, out) {
-          const p = vertices + 12 * bytes.readUInt16LE(indices + 2 * index);
-          out.set(bytes.readFloatLE(p), bytes.readFloatLE(p + 4), bytes.readFloatLE(p + 8));
-        }
-        for (let i = 0; i < idx.count; i += 3) {
-          vertex(i, a); vertex(i + 1, b); vertex(i + 2, c);
-          if (!ray.intersectTriangle(a, b, c, false, hit)) continue;
-          const distance = hit.distanceTo(ray.origin);
-          if (distance < first.distance) first = { distance, material: gltf.materials[primitive.material].name };
-        }
-      }
-      return first;
+      const origin = center.clone().add(direction).addScaledVector(vertical, height);
+      return firstModelSurface(gltf, bytes, mesh, new Ray(origin, direction.clone().negate()));
     }
     const lens = firstSurface(0), lip = firstSurface(rimHeight);
     assert.equal(lens.material, 'VX-9 illuminated strip', 'Headlamp must be visible through the housing');
     assert.equal(lip.material, skin, 'Lamp housing must use the surrounding armor');
     assert.ok(lens.distance > lip.distance + .035, 'Headlamp lens must sit behind the lip');
+  }
+}
+
+function checkVX9Layout(gltf, bytes, body, turret, gun, muzzle, chassis, turretShell) {
+  const clamped = (actual, expected, tolerance = .0001) => assert.ok(Math.abs(actual - expected) <= tolerance,
+    `VX-9 datum differs from the drawing: ${actual} vs ${expected}`);
+  assert.deepEqual(turret.translation, [0,VX9.hullRoof,VX9.turretZ]);
+  assert.deepEqual(gun.translation, [0,VX9.trunnionY,VX9.trunnionZ]);
+  assert.deepEqual(muzzle.translation, [0,0,VX9.barrelLength]);
+  clamped(VX9.hullLength/2+turret.translation[2]+gun.translation[2]+muzzle.translation[2],10.70);
+
+  const skin = gltf.meshes[chassis].primitives.find(p => gltf.materials[p.material].name === 'VX-9 medium gray armor');
+  const bounds = gltf.accessors[skin.attributes.POSITION];
+  clamped(bounds.max[2] - bounds.min[2], VX9.hullLength);
+  clamped(bounds.max[0] - bounds.min[0], VX9.hullWidth, .01);
+  const roof = firstModelSurface(gltf, bytes, turretShell, new Ray(new Vector3(0,2,0), new Vector3(0,-1,0)));
+  clamped(2 - roof.distance + turret.translation[1], VX9.turretRoof, .01);
+  for (const side of [-1,1]) {
+    const track = body.children.map(i => gltf.nodes[i]).find(n => n.name === 'track_' + Number(side > 0));
+    assert.equal(track.extras.poses.length,100);
+    for (const pose of track.extras.poses) clamped(pose[0],side*VX9.trackX);
+    const [x,y,z] = VX9.rearIntake;
+    const grille = firstModelSurface(gltf, bytes, chassis, new Ray(new Vector3(side*(x+1),y,z),new Vector3(-side,0,0)));
+    assert.ok(grille.distance > 1.005 && grille.distance < 1.09, 'Side intake must be recessed inside the armor envelope');
   }
 }
 
@@ -92,22 +121,24 @@ for (const file of files) {
   const child = (node, name) => node?.children?.map(i => nodes[i]).find(n => n.name === name);
   const body = child(model, 'body');
   const turret = child(body, 'turret');
-  if (id === 'aegis140') {
-    checkRearTurret(gltf, turret, id, vx9Revision);
-    assert.ok(child(body, 'VX-9 chassis')?.mesh !== undefined);
-    assert.ok(materials.some(m => m.name === 'VX-9 illuminated strip' && m.emissiveFactor));
-    assert.ok(child(body, 'track_0').extras.poses.length === 100);
-    const bytes = asset.subarray(28 + size);
-    checkRecessedLights(gltf, bytes, child(body, 'VX-9 chassis').mesh, {
-      x: 1.374, y: 1.369, z: 4.268, sweep: .427, pitch: .24, rimHeight: .082, skin: 'VX-9 light gray armor',
-    });
-    checkRecessedLights(gltf, bytes, child(turret, 'VX-9 turret').mesh, {
-      x: 1.100, y: .338, z: 1.997, sweep: .556, pitch: .06, rimHeight: .058, skin: 'VX-9 graphite armor',
-    });
-  }
   const gun = child(turret, 'gun');
   const barrel = child(gun, 'recoiling-barrel');
   const muzzle = child(barrel, 'muzzle');
+  if (id === 'aegis140') {
+    checkRearTurret(gltf, turret, id, vx9Revision);
+    const chassis = child(body, 'VX-9 chassis').mesh;
+    const turretShell = child(turret, 'VX-9 turret').mesh;
+    assert.ok(materials.some(m => m.name === 'VX-9 illuminated strip' && m.emissiveFactor));
+    const bytes = asset.subarray(28 + size);
+    checkVX9Layout(gltf, bytes, body, turret, gun, muzzle, chassis, turretShell);
+    checkRecessedLights(gltf, bytes, chassis, {
+      point: VX9.lamp, sweep: VX9.lampSweep, pitch: VX9.lampTilt, rimHeight: .082, skin: 'VX-9 light gray armor',
+    });
+    checkRecessedLights(gltf, bytes, turretShell, {
+      point: VX9.turretLamp, sweep: VX9.turretLampSweep, pitch: VX9.turretLampTilt,
+      rimHeight: .058, skin: 'VX-9 graphite armor',
+    });
+  }
   assert.ok(muzzle?.translation[2] > 0, id + ' has an invalid recoil or muzzle hierarchy');
   assert.ok(child(gun, 'sight'), id + ' has no sight anchor');
   const muzzles = nodes.filter(n => /^muzzle(?:_\d+)?$/.test(n.name)).length;

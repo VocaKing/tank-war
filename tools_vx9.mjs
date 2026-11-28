@@ -6,15 +6,15 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { CylinderGeometry, LatheGeometry, TorusGeometry, Vector2, Vector3, ShapeUtils, BufferGeometry, Float32BufferAttribute } from 'three';
 import { ModelParts, appendParts, parseGlb, serializeGlb, compactAsset, loft, ring, mirrored, plate, plateOutline } from './tools_rear_turrets.mjs';
 
+import { VX9 as d, HULL_PLAN, HULL_LOWER, HULL_UPPER, SKIRTS, TURRET_PLAN, TURRET_RING,
+  TURRET_ARMOR, WHEEL_STATIONS } from './src/models/vx9Design.js';
+
 const id = 'aegis140';
-const revision = '2026-11-vx9-integrated';
+const revision = '2026-11-vx9-orthographic';
 const file = new URL('public/models/fleet/aegis140.glb', import.meta.url);
 const front = new Vector3(0, 0, 1);
-const hullRoof = 1.76;
-const turretZ = -0.78;
-const trunnionZ = 1.98;
-const muzzleZ = 5.02;
-const trackX = 1.50;
+const { hullRoof, turretZ, trunnionZ, trackX, barrelLength: muzzleZ } = d;
+const loftProfile = (outline, sections) => loft(sections.map(section => ring(outline, ...section)));
 let seed = 91231;
 function random() {
   seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -28,10 +28,11 @@ function bolt(parts, location, direction = front, size = 0.026) {
     size * 0.77, 0.019, { direction, segments: 6, tint: 0.68 + random() * 0.28 });
 }
 
-function sidePlate(parts, s, mat, plan, xInner, xOuter, inset = 0.05) {
-  const outline = plan.map(([z, y]) => [-s * y, z]);
+function sidePlate(parts, s, mat, plan, xInner, xOuter, inset = 0.05, opening) {
+  const toLocal = ([z, y]) => [-s * y, z];
+  const outline = plan.map(toLocal);
   if (s === 1) outline.reverse();
-  parts.add(mat, plate(outline, xInner, xOuter, inset).rotateZ(-s * Math.PI / 2));
+  parts.add(mat, plate(outline, xInner, xOuter, inset, 0, opening?.map(toLocal)).rotateZ(-s * Math.PI / 2));
 }
 
 function graphic(parts, material, plan, place) {
@@ -68,13 +69,17 @@ function frontFrame(x, y, z, yaw = 0, pitch = 0) {
 
 // A single wraparound surround seats below the armour surface. Its opening
 // rolls into a recessed liner, with the lens or grille behind the painted lip.
+function chamferedOutline(width, height, slant = 0) {
+  const x = width * .5, y = height * .5, bevel = Math.min(width * .11, height * .21);
+  return [[-x+bevel,-y],[x-bevel,-y],[x,-y+bevel],[x,y-bevel],
+    [x-bevel,y],[-x+bevel,y],[-x,y-bevel],[-x,-y+bevel]]
+    .map(([u,v]) => [u+v*slant,v]);
+}
+
+// A single wraparound surround seats below the armour surface. Its opening
+// rolls into a recessed liner, with the lens or grille behind the painted lip.
 function recess(parts, place, { width, height, seat, depth, paint = 'graphite', slant = 0 }) {
-  function outline(w, h) {
-    const x = w * .5, y = h * .5, bevel = Math.min(w * .11, h * .21);
-    return [[-x+bevel,-y],[x-bevel,-y],[x,-y+bevel],[x,y-bevel],
-      [x-bevel,y],[-x+bevel,y],[-x,y-bevel],[-x,-y+bevel]]
-      .map(([u,v]) => [u+v*slant,v]);
-  }
+  const outline = (w,h) => chamferedOutline(w,h,slant);
   const rear = outline(width * 1.14, height * 1.23);
   const shoulder = outline(width, height);
   const lip = outline(width * .92, height * .89);
@@ -158,52 +163,44 @@ function chipMarks(parts, side, x, y0, y1, z0, z1, count) {
 
 function chassis() {
   const b = new ModelParts();
-  const plan = mirrored([[0,4.48],[.89,4.48],[1.55,4.20],[1.82,3.79],[1.865,3.25],
-    [1.865,-3.79],[1.77,-4.21],[1.54,-4.48],[0,-4.48]]);
-  b.add('dark', loft([ring(plan,.69,.85,.31,0,.01),ring(plan,.75,.92,.72)]));
-  b.add('gray', loft([
-    ring(plan,.78,.89,.72), ring(plan,1,1,1.25), ring(plan,.988,.96,1.52,-.035,-.037),
-    ring(plan,.84,.80,hullRoof,-.39), 
-  ]));
+  const plan = mirrored(HULL_PLAN);
+  b.add('dark', loftProfile(plan,HULL_LOWER));
+  b.add('gray', loftProfile(plan,HULL_UPPER));
+  const [intakeX,intakeY,intakeZ] = d.rearIntake;
+  const intakeOpening = chamferedOutline(d.rearIntakeWidth*.83,d.rearIntakeHeight*.63)
+    .map(([u,v]) => [intakeZ+u,intakeY+v]);
   const deck = plateOutline(0, 0.45, 2.33, 7.08, .22);
   b.plate('graphite',deck,1.689,1.743,.025);
   b.round('black',[0,1.746,turretZ],1.12,.048,{segments:36});
   b.round('steel',[0,1.765,turretZ],1.04,.044,{segments:42,tint:.67});
 
   for (const s of [-1,1]) {
-    const d = new Vector3(s,0,0);
+    const outward = new Vector3(s,0,0);
     // Seven deep double-rimmed road wheels and two raised end hubs.
-    for (const [i,z] of [-3.52,-2.87,-1.92,-.96,0,.96,1.92,2.87,3.52].entries()) {
+    for (const [i,z] of WHEEL_STATIONS.entries()) {
       const end = i===0 || i===8, y = end ? .56 : .535, r = end ? .43 : .477;
       const offset = end ? .01 : 0, face = s*(trackX+.251+offset);
-      b.round('rubber',[s*trackX,y,z],r,.49,{direction:d,segments:30});
-      b.round('wheel',[s*(trackX+.213),y,z],r*.91,.080,{direction:d,segments:30,top:r*.86});
-      b.round('dark',[face,y,z],r*.68,.038,{direction:d,segments:28,top:r*.65});
-      b.round('wheel',[s*(Math.abs(face)+.026),y,z],r*.48,.076,{direction:d,top:r*.38,segments:22});
-      b.round('steel',[s*(Math.abs(face)+.076),y,z],r*.229,.048,{direction:d,top:r*.84*.229,segments:16});
+      b.round('rubber',[s*trackX,y,z],r,.49,{direction:outward,segments:30});
+      b.round('wheel',[s*(trackX+.213),y,z],r*.91,.080,{direction:outward,segments:30,top:r*.86});
+      b.round('dark',[face,y,z],r*.68,.038,{direction:outward,segments:28,top:r*.65});
+      b.round('wheel',[s*(Math.abs(face)+.026),y,z],r*.48,.076,{direction:outward,top:r*.38,segments:22});
+      b.round('steel',[s*(Math.abs(face)+.076),y,z],r*.229,.048,{direction:outward,top:r*.84*.229,segments:16});
       b.add('steel',new TorusGeometry(r*.778,.012,6,28).rotateY(Math.PI/2).translate(face,y,z),.72);
       for (let k=0;k<10;k++) {
         const a=k*Math.PI/5;
-        bolt(b,[s*(Math.abs(face)+.063),y+Math.sin(a)*r*.35,z+Math.cos(a)*r*.35],d,.016);
+        bolt(b,[s*(Math.abs(face)+.063),y+Math.sin(a)*r*.35,z+Math.cos(a)*r*.35],outward,.016);
         if (end) b.add('dark',new CylinderGeometry(.048,.058,.024,7).rotateZ(Math.PI/2)
           .translate(s*(Math.abs(face)+.022),y+Math.sin(a)*r*.78,z+Math.cos(a)*r*.78));
       }
     }
-    const skirts = [
-      [[3.83,1.28],[3.43,1.58],[2.47,1.70],[2.00,1.65],[1.54,.93],[2.78,.92],[3.64,1.05]],
-      [[2.01,1.65],[.29,1.72],[.18,.91],[1.52,.92]],
-      [[.25,1.72],[-.66,1.71],[-.92,.91],[.19,.91]],
-      [[-.71,1.71],[-1.68,1.71],[-1.99,.92],[-.94,.91]],
-      [[-1.72,1.71],[-3.16,1.70],[-3.42,.93],[-2.01,.92]],
-      [[-3.21,1.69],[-4.43,1.67],[-4.39,1.24],[-4.03,.94],[-3.47,.93]],
-    ];
-    for (const [i, plan] of skirts.entries()) {
+    for (const [i, plan] of SKIRTS.entries()) {
       const base = i > 3 || i===2 ? 'graphite' : (i===1 ? 'silver' : 'gray');
       sidePlate(b,s,'dark',plan,1.715,1.842,.02);
-      sidePlate(b,s,base,plan,1.797,1.888,.024);
+      const opening = i === SKIRTS.length - 1 ? intakeOpening : undefined;
+      sidePlate(b,s,base,plan,1.797,opening ? intakeX - .002 : 1.888,.024,opening);
       const z = plan.reduce((sum, p) => sum + p[0]/plan.length,0);
       const y = plan.reduce((sum, p) => sum + p[1]/plan.length,0);
-      for (const [zz, yy] of plan) bolt(b,[s*1.885,lerp(yy,y,.21),lerp(zz,z,.12)],d,.023);
+      for (const [zz, yy] of plan) bolt(b,[s*1.885,lerp(yy,y,.21),lerp(zz,z,.12)],outward,.023);
       if (i>0 && i<5) {
         b.box('dark',[s*1.877,1.595,z],[.025,.073,.237]);
         b.box('steel',[s*1.892,1.60,z],[.019,.029,.174]);
@@ -216,13 +213,13 @@ function chassis() {
       chipMarks(b,s,1.889,y-.11,y+.11,z-.22,z+.22,31);
     }
     stencil(b,s,1.892,1.11,-2.6);
-    grille(b,[s*1.918,1.405,-3.73],.69,.49,'side',9);
+    grille(b,[s*intakeX,intakeY,intakeZ],d.rearIntakeWidth,d.rearIntakeHeight,'side',9);
     grille(b,[s*1.29,1.789,-3.54],.55,.91,'roof',14);
     grille(b,[s*1.20,1.788,2.66],.49,.50,'roof',9);
     const prow = s>0 ? [[.79,4.04],[1.50,3.91],[1.79,3.55],[1.76,2.65],[1.34,2.47],[.98,2.73]]
       : [[-.98,2.73],[-1.34,2.47],[-1.76,2.65],[-1.79,3.55],[-1.50,3.91],[-.79,4.04]];
     b.plate('silver',prow,1.40,1.567,.038,-.174);
-    lamp(b,[s*1.374,1.369,4.268],.685,.205,s*.427,.24,'silver');
+    lamp(b,[s*d.lamp[0],d.lamp[1],d.lamp[2]],d.lampWidth,d.lampHeight,s*d.lampSweep,d.lampTilt,'silver');
     b.box('chip',[s*1.02,1.39,4.37],[.054,.026,.012]);
     b.round('steel',[s*.88,1.20,4.444],.064,.056,{direction:front});
     for (const z of [1.48,.75,-2.51,-3.92]) {
@@ -250,13 +247,9 @@ function chassis() {
 
 function turretAssembly() {
   const t = new ModelParts();
-  const plan = mirrored([[0,2.18],[.51,2.15],[.84,1.93],[1.31,1.56],[1.58,1.14],[1.64,.43],
-    [1.61,-.75],[1.46,-1.64],[1.48,-2.66],[1.30,-3.02],[0,-3.09]]);
-  t.add('dark',loft([ring(plan,.64,.82,.043,-.05),ring(plan,.82,.95,.14)]));
-  t.add('gray',loft([
-    ring(plan,.83,.91,.14),ring(plan,1,1,.35,0,-.026),ring(plan,.97,.976,.62,-.03,-.040),
-    ring(plan,.78,.83,.853,-.15,-.021),
-  ]));
+  const plan = mirrored(TURRET_PLAN);
+  t.add('dark',loftProfile(plan,TURRET_RING));
+  t.add('gray',loftProfile(plan,TURRET_ARMOR));
   t.plate('graphite',plateOutline(0,-.65,1.43,2.17,.22),.839,.879,.042);
   for (const side of [-1,1]) {
     t.rail('dark',[side*.67,.821,1.41],[side*1.17,.803,.44],.015,5);
@@ -282,15 +275,16 @@ function turretAssembly() {
     t.plate('silver',shape,.413,.68,.14,-.158);
     const rear = [[.68,-.24],[1.52,-.13],[1.50,-1.45],[1.19,-1.91],[.72,-1.54],[.56,-.96]];
     t.plate('gray',s>0 ? rear : rear.map(([x,z])=>[-x,z]).reverse(),.38,.74,.074,.047);
-    const d = new Vector3(s,0,0);
+    const outward = new Vector3(s,0,0);
     const face = [[.72,.30],[.75,.56],[.28,.66],[-1.28,.63],[-1.53,.53],[-1.42,.32],[-.97,.21]];
     sidePlate(t,s,'silver',face,1.47,1.635,.054);
-    for (const [z,y] of face) bolt(t,[s*1.632,lerp(y,.44,.19),lerp(z,-.4,.08)],d,.020);
+    for (const [z,y] of face) bolt(t,[s*1.632,lerp(y,.44,.19),lerp(z,-.4,.08)],outward,.020);
     chipMarks(t,s,1.637,.40,.54,-1.24,.52,44);
     const emblem = [[-.36,.12],[-.18,.12],[0,-.06],[.18,.12],[.36,.12],[.22,.04],[0,-.17],[-.22,.04]];
     for(const shift of [0,.075])
       graphic(t,'ivory',emblem,(z,y)=>[s*1.639,.472+y*.64+shift,-.58+z]);
-    lamp(t,[s*1.100,.338,1.997],.386,.145,s*.556,.06,'graphite');
+    lamp(t,[s*d.turretLamp[0],d.turretLamp[1],d.turretLamp[2]],d.turretLampWidth,d.turretLampHeight,
+      s*d.turretLampSweep,d.turretLampTilt,'graphite');
     visor(t,[s*.459,.807,1.657],.434,.158,s*.18,.37);
     visor(t,[s*1.161,.795,.402],.294,.104,s*.13,.24);
     grille(t,[s*1.486,.484,-2.44],.79,.38,'side',8);
@@ -371,7 +365,7 @@ const node = name => gltf.nodes.find(n => n.name === name);
 const root = node(id), body = node('body'), turret = node('turret'), gun = node('gun'), recoil = node('recoiling-barrel');
 root.extras = { ...root.extras, fleetModelRevision: revision, deckClearance: [[-1.54,1.54,-3.94,3.56,1.77]] };
 turret.translation = [0,hullRoof,turretZ];
-gun.translation = [0,.466,trunnionZ];
+gun.translation = [0,d.trunnionY,trunnionZ];
 node('sight').translation = [.44,.247,.1];
 node('muzzle').translation = [0,0,muzzleZ];
 turret.extras = { turretExteriorRevision: revision };
@@ -481,7 +475,8 @@ function trackAccessor(values, type) {
   return gltf.accessors.push({bufferView:view,componentType:5126,type,count:values.length/(type==='VEC3'?3:4)})-1;
 }
 
-const cap=.521, halfRun=3.52, pitch=(4*halfRun+2*Math.PI*cap)/100, elevation=.579;
+const { trackRadius: cap, trackEnd: halfRun, trackY: elevation } = d;
+const pitch = (4*halfRun+2*Math.PI*cap)/100;
 for(const [side,scale] of [[0,-1],[1,1]]) {
   const track=node('track_'+side);
   track.extras.poses=Array.from({length:100},(_,i)=>{

@@ -1,6 +1,8 @@
 // Ten original concept vehicles from the 2026-11-24 roster.
 // These are fictional designs: dimensions and armour ratings are GAMEPLAY values,
 // not claims about any real-world military equipment.
+import { VX9 } from '../models/vx9Design.js';
+
 const dims = (L,W,hullH,turretL,turretW,turretH,gunLen,extras={}) =>
   ({ L,W,hullH,clearance:0.46,trackW:0.57,turretZ:0,turretL,turretW,turretH,gunLen,...extras });
 const armor = (hf,hs,hr,tf,ts,tr,top=30) => ({
@@ -33,7 +35,10 @@ export const CONCEPT_VEHICLES = [
     crew:['Commander','Gunner','Driver'],autoloader:true,
     mass:79,power:1600,maxSpeed:40,reverseSpeed:19,hullTraverse:28,turretTraverse:30,
     gunDepression:11,gunElevation:20,hp:2400,viewRange:490,reload:9.6,aimTime:1.8,dispersion:0.52, maxDispersion: 1.42,
-    dims:dims(8.96,3.78,1.76,5.27,3.28,0.88,5.02,{turretZ:-0.78,turretBoxZ:-0.455,trackW:0.62,gunForwardL:10.70}),
+    dims:dims(VX9.hullLength,VX9.hullWidth,VX9.hullRoof,5.27,3.28,VX9.turretRoof-VX9.hullRoof,VX9.barrelLength,{
+      turretZ:VX9.turretZ,turretBoxZ:-0.455,trackW:VX9.trackWidth,
+      gunForwardL:VX9.hullLength/2+VX9.turretZ+VX9.trunnionZ+VX9.barrelLength,
+    }),
     armor:armor(480,170,95,520,240,100,38),
     eraLayout:[{part:'hull',face:'front',cols:7,rows:2,heat:280,ke:90},{part:'hull',face:'side',cols:6,rows:2,heat:220,ke:65},{part:'turret',face:'side',cols:5,rows:2,heat:260,ke:78}],
     aps:{charges:1,radius:7,cooldown:8,rechargeSeconds:23},
