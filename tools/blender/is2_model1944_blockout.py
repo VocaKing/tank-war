@@ -221,13 +221,13 @@ add_uv_sphere("Bow_DT_ball_mount", (0.62, 3.16, 1.13), (0.14, 0.10, 0.13), CAST)
 cylinder("Bow_DT_barrel", (0.62, 3.27, 1.13), 0.022, 0.30, STEEL, "Y", 16)
 for side in (-1, 1):
     x = side * 1.35
-    box("Full_length_fender_%s" % side, (x, 0.0, 1.20), (0.30, 5.70, 0.07), PAINT, 0.025)
+    box("Full_length_fender_%s" % side, (x, 0.0, 0.905), (0.30, 5.70, 0.07), PAINT, 0.025)
     # Folded front mudguard and repeated support webs under the fender.
-    box("Front_fender_drop_%s" % side, (side*1.35, 2.91, 1.08),
+    box("Front_fender_drop_%s" % side, (side*1.35, 2.91, 0.785),
         (0.30, 0.36, 0.10), PAINT, 0.018, (math.radians(-16), 0, 0))
     for support_i, support_y in enumerate((-2.55, -1.70, -0.85, 0.0, 0.85, 1.70, 2.55)):
         box("Fender_support_%s_%02d" % (side, support_i),
-            (side*1.42, support_y, 1.075), (0.09, 0.12, 0.20), STEEL, 0.012)
+            (side*1.42, support_y, 0.88), (0.09, 0.12, 0.20), STEEL, 0.012)
     cylinder("Headlight_body_%s" % side, (side*1.18, 2.90, 1.48), 0.095, 0.13, STEEL, "X", 32)
     cylinder("Headlight_lens_%s" % side, (side*1.18, 2.90, 1.48), 0.068, 0.014, GLASS, "X", 32, 0.0)
     # Protective headlight hoops and front towing shackles.
@@ -388,6 +388,17 @@ add_uv_sphere("Turret_rear_DT_ball_mount", (0.57, -1.12, 2.02), (0.135, 0.095, 0
 cylinder("Turret_rear_DT_aperture", (0.57, -1.215, 2.02), 0.041, 0.03, DARK, "Y", 20, 0.0)
 cylinder("Turret_rear_DT_barrel", (0.57, -1.30, 2.02), 0.022, 0.17, STEEL, "Y", 16)
 
+# Track geometry: 86 shoes at the documented 165.1 mm pitch.
+# The path is centered at the road-wheel axle height; its lower run is at z=0,
+# leaving the 0.46 m hull ground clearance intact.
+TRACK_LINKS = 86
+TRACK_WIDTH = 0.65
+TRACK_CENTER_X = 1.21
+TRACK_Z = 0.405
+TRACK_RADIUS = 0.405
+TRACK_PITCH = 0.1651
+TRACK_HALF_STRAIGHT = (TRACK_LINKS*TRACK_PITCH - 2*math.pi*TRACK_RADIUS)/4.0
+
 # Road wheels: six twin stations per side, 550 mm diameter. Each station is a
 # pair of separate cast wheels with dished faces, rims and central hubs.
 wheel_y = [-2.10, -1.26, -0.42, 0.42, 1.26, 2.10]
@@ -396,22 +407,22 @@ for side in (-1, 1):
         for pair, xabs in enumerate((1.04, 1.25)):
             x = side*xabs
             cylinder("Roadwheel_%s_%02d_%d" % (side, i+1, pair+1),
-                     (x, y, 0.70), 0.275, 0.155, PAINT, "X", 48)
+                     (x, y, TRACK_Z), 0.275, 0.155, PAINT, "X", 48)
             torus("Roadwheel_rim_%s_%02d_%d" % (side, i+1, pair+1),
-                  (x + side*0.073, y, 0.70), 0.235, 0.018, STEEL, "X")
+                  (x + side*0.073, y, TRACK_Z), 0.235, 0.018, STEEL, "X")
             cylinder("Roadwheel_hub_%s_%02d_%d" % (side, i+1, pair+1),
-                     (x + side*0.09, y, 0.70), 0.095, 0.045, CAST, "X", 32)
+                     (x + side*0.09, y, TRACK_Z), 0.095, 0.045, CAST, "X", 32)
             cylinder("Roadwheel_hub_cap_%s_%02d_%d" % (side, i+1, pair+1),
-                     (x + side*0.116, y, 0.70), 0.052, 0.022, STEEL, "X", 24)
+                     (x + side*0.116, y, TRACK_Z), 0.052, 0.022, STEEL, "X", 24)
             # Rubber contact band around each cast wheel. The steel dish and
             # retaining lip remain visible on the outer face.
             torus("Roadwheel_rubber_tire_%s_%02d_%d" % (side, i+1, pair+1),
-                  (x + side*0.078, y, 0.70), 0.253, 0.024, RUBBER, "X")
+                  (x + side*0.078, y, TRACK_Z), 0.253, 0.024, RUBBER, "X")
             # Six shallow cast reliefs plus eight small hub fasteners.
             for k in range(6):
                 a = k*math.tau/6
                 yy = y + math.cos(a)*0.17
-                zz = 0.70 + math.sin(a)*0.17
+                zz = TRACK_Z + math.sin(a)*0.17
                 cylinder("Roadwheel_relief_%s_%02d_%d_%d" % (side, i+1, pair+1, k),
                          (x + side*0.083, yy, zz), 0.022, 0.012, DARK, "X", 12, 0.0)
             for k in range(8):
@@ -423,18 +434,7 @@ for side in (-1, 1):
     # Three return rollers per side.
     for i, y in enumerate((-1.48, 0.0, 1.48)):
         cylinder("Return_roller_%s_%d" % (side, i+1),
-                 (side*1.36, y, 1.075), 0.09, 0.18, STEEL, "X", 32)
-
-# Track geometry is locked to the documented 165.1 mm shoe pitch and 86 links.
-# Derive the straight-run half-length from the pitch and end-arc radius, rather
-# than shrinking the shoe pitch to fit an approximate hull length.
-TRACK_LINKS = 86
-TRACK_WIDTH = 0.65
-TRACK_CENTER_X = 1.21
-TRACK_Z = 0.70
-TRACK_RADIUS = 0.405
-TRACK_PITCH = 0.1651
-TRACK_HALF_STRAIGHT = (TRACK_LINKS*TRACK_PITCH - 2*math.pi*TRACK_RADIUS)/4.0
+                 (side*1.36, y, TRACK_Z + 0.36), 0.09, 0.18, STEEL, "X", 32)
 
 # Rear drive sprockets: twin removable 14-tooth rims. Front idlers are plain.
 for side in (-1, 1):
@@ -596,6 +596,8 @@ root["road_wheel_stations_per_side"] = 6
 root["track_links_per_side"] = TRACK_LINKS
 root["track_width_m"] = TRACK_WIDTH
 root["track_pitch_m"] = TRACK_PITCH
+root["track_ground_z_m"] = TRACK_Z - TRACK_RADIUS
+root["hull_ground_clearance_m"] = 0.46
 root["status"] = "FIRST BLENDER ASSET PASS — requires visual review"
 
 # Export only vehicle meshes/empties; render-only ground/cameras/lights are added after.
@@ -615,7 +617,7 @@ FAST_PREVIEW = os.environ.get("IS2_FAST_PREVIEW", "0") == "1"
 
 # Studio preview scene.
 floor_mat = make_mat("Preview_floor", (0.055, 0.06, 0.065), 0.0, 0.94)
-bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0.16))
+bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, 0.0))
 floor = bpy.context.object
 floor.name = "Preview_only_ground"
 floor.data.materials.append(floor_mat)
