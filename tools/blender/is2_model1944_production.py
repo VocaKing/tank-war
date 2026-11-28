@@ -105,7 +105,7 @@ def classify_part(name):
     m = re.match(r"Front_idler(?:_hub)?_(-?1)(?:_|$)", name, re.I)
     if m:
         return "FrontIdler_%s" % ("L" if int(m.group(1)) < 0 else "R")
-    if name.startswith(("D25T_barrel_", "D25T_double_baffle_muzzle_brake", "Muzzle_brake_side_port")):
+    if name.startswith(("D25T_barrel_", "D25T_double_baffle_muzzle_brake", "Muzzle_brake_side_port", "Muzzle_brake_baffle_", "Muzzle_brake_front_lip", "Muzzle_bore_")):
         return "Gun_Recoil"
     if name.startswith(("D25T_cast_mantlet", "Main_gun_recess", "Main_gun_mantlet_", "Coaxial_", "Telescope_")):
         return "Gun_Elevation"
@@ -925,7 +925,7 @@ gun_recoil = create_empty("Gun_Recoil_Pivot", (0.0, 1.78, 2.17), gun_elev)
 gun_recoil["animated_axis"] = "local -Y recoil"
 # Named gameplay anchors: muzzle follows recoil, while the optical sight follows
 # gun elevation. These are consumed by the Three.js firing/aiming adapter.
-muzzle_anchor = create_empty("Muzzle", (0.0, 6.37, 2.17), gun_recoil)
+muzzle_anchor = create_empty("Muzzle", (0.0, 6.38, 2.17), gun_recoil)
 sight_anchor = create_empty("Gun_Sight", (0.43, 1.645, 2.18), gun_elev)
 track_roots = {
     "L": create_empty("Track_L_Root", (0.0, 0.0, 0.0), hull),
