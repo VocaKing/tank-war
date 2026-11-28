@@ -91,7 +91,7 @@ def apply_modifiers(obj):
     obj.select_set(False)
 
 def classify_part(name):
-    m = re.match(r"Roadwheel_(?:hub_cap_|relief_|rim_|hub_)?(-?1)_(\d+)_", name, re.I)
+    m = re.match(r"Roadwheel_(?:hub_cap_|relief_|rim_|hub_|rubber_tire_|hub_bolt_)?(-?1)_(\d+)_", name, re.I)
     if m:
         side = "L" if int(m.group(1)) < 0 else "R"
         return "RoadWheel_%s_%02d" % (side, int(m.group(2)))
@@ -107,7 +107,7 @@ def classify_part(name):
         return "FrontIdler_%s" % ("L" if int(m.group(1)) < 0 else "R")
     if name.startswith(("D25T_barrel_", "D25T_double_baffle_muzzle_brake", "Muzzle_brake_side_port")):
         return "Gun_Recoil"
-    if name.startswith(("D25T_cast_mantlet", "Main_gun_recess", "Main_gun_mantlet_collar", "Coaxial_", "Telescope_")):
+    if name.startswith(("D25T_cast_mantlet", "Main_gun_recess", "Main_gun_mantlet_", "Coaxial_", "Telescope_")):
         return "Gun_Elevation"
     if name.startswith(("Turret_cast_", "Commander_", "Cupola_", "DShK_", "Loader_hatch", "Turret_rear_DT_")):
         return "Turret"
