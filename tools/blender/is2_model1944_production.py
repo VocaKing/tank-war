@@ -284,9 +284,11 @@ def uv_triangles(target):
         points = []
         for loop_index in tri.loops:
             uv = uv_layer.data[loop_index].uv
+            x = int(round(float(uv.x) * (ATLAS_SIZE-1)))
+            y = int(round((1.0-float(uv.y)) * (ATLAS_SIZE-1)))
             points.append((
-                max(0, min(ATLAS_SIZE-1, int(round(float(uv.x) * (ATLAS_SIZE-1))))),
-                max(0, min(ATLAS_SIZE-1, int(round((1.0-float(uv.y)) * (ATLAS_SIZE-1))))
+                max(0, min(ATLAS_SIZE-1, x)),
+                max(0, min(ATLAS_SIZE-1, y))
             ))
         yield polygon.material_index, points
 
