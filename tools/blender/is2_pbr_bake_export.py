@@ -14,6 +14,7 @@ ROOT = os.path.abspath(".")
 ART = os.path.join(ROOT, "artifacts", "is2-model1944")
 OUT = os.path.join(ROOT, "public", "models", "is2_model1944_pbr.glb")
 os.makedirs(ART, exist_ok=True)
+os.makedirs(os.path.join(ART, "PBR_Textures"), exist_ok=True)
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
 RES = int(os.environ.get("IS2_BAKE_RES", "2048"))
 scene = bpy.context.scene
@@ -67,7 +68,7 @@ for mat, entries in pairs.items():
                 old_uv = uv[li].uv.copy()
                 uv[li].uv = (u0 + old_uv.x*usable, v0 + old_uv.y*usable)
     safe = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in mat.name)
-    img = bpy.data.images.new("IS2_BaseColor_" + safe, width=RES, height=RES, alpha=True)
+    img = bpy.data.images.new("IS2_BaseColor_" + safe, width=RES, height=RES, alpha=False)
     img.file_format = "PNG"
     images[mat] = img
 
@@ -99,7 +100,7 @@ bpy.ops.object.bake(type="DIFFUSE")
 ao_images = {}
 for mat in pairs:
     safe = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in mat.name)
-    img = bpy.data.images.new("IS2_AO_" + safe, width=RES, height=RES, alpha=True)
+    img = bpy.data.images.new("IS2_AO_" + safe, width=RES, height=RES, alpha=False)
     img.file_format = "PNG"
     ao_images[mat] = img
     tex = mat.node_tree.nodes.new("ShaderNodeTexImage")
@@ -129,8 +130,8 @@ for mat, base in images.items():
     base.pixels[:] = base_pixels
     base.update()
     safe = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in mat.name)
-    base_path = os.path.join(ART, "BaseColor_" + safe + ".png")
-    ao_path = os.path.join(ART, "AO_" + safe + ".png")
+    base_path = os.path.join(ART, "PBR_Textures", safe + "_BaseColor.png")
+    ao_path = os.path.join(ART, "PBR_Textures", safe + "_AO.png")
     base.filepath_raw = base_path
     base.save()
     ao.filepath_raw = ao_path
@@ -167,6 +168,22 @@ bpy.context.view_layer.objects.active = root
 bpy.ops.export_scene.gltf(filepath=OUT, export_format="GLB", use_selection=True,
     export_apply=True, export_texcoords=True, export_normals=True,
     export_materials="EXPORT", export_image_format="AUTO")
+# Render a PBR preview using the baked materials in the same studio scene.
+bpy.ops.object.camera_add(location=(8.5, 9.0, 5.8))
+cam = bpy.context.object
+cam.name = "PBR_Review_Camera"
+cam.data.type = "ORTHO"
+cam.data.ortho_scale = 11.0
+from mathutils import Vector
+cam.rotation_euler = (Vector((0, 0.4, 1.25))-cam.location).to_track_quat("-Z", "Y").to_euler()
+scene.camera = cam
+scene.render.resolution_x = 1200
+scene.render.resolution_y = 900
+scene.render.resolution_percentage = 100
+scene.render.image_settings.file_format = "PNG"
+scene.render.filepath = os.path.join(ART, "PBR_front_three_quarter.png")
+bpy.ops.render.render(write_still=True)
+
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ART, "is2_model1944_pbr_source.blend"))
 print("PBR GLB:", OUT)
 print("Material atlas count:", len(images))
