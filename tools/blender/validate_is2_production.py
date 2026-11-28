@@ -62,6 +62,8 @@ assert len(left) == 86, "Expected 86 independent left track-link nodes, got %d" 
 assert len(right) == 86, "Expected 86 independent right track-link nodes, got %d" % len(right)
 assert abs(manifest.get("track_pitch_m", 0.0) - 0.1651) < 1e-6, "Track shoe pitch must match 165.1 mm reference"
 assert abs(manifest.get("track_loop_length_m", 0.0) - 86 * 0.1651) < 1e-6, "Track loop length does not match 86 shoes at 165.1 mm pitch"
+assert abs(manifest.get("track_ground_z_m", 99.0)) < 1e-6, "Track lower run must sit at the model ground plane"
+assert abs(manifest.get("hull_ground_clearance_m", 0.0) - 0.46) < 1e-6, "Hull ground clearance must remain 0.46 m"
 
 # Verify every link belongs to the correct track root and has renderable mesh
 # geometry. This also detects accidental joining of the 86 shoes into one mesh.
