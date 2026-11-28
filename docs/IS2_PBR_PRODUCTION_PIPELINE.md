@@ -10,7 +10,7 @@ and not the post-war IS-2M.
 
 ## Implemented automation
 1. Dimensioned Blender source and five-view preview: \`tools/blender/is2_model1944_blockout.py\`.
-2. UV generation, 2K Base Color/AO baking and packed GLB export:
+2. UV generation, tileable per-material Base Color/Roughness/Normal texture authoring, packed GLB export and textured preview renders:
    \`tools/blender/is2_pbr_bake_export.py\`.
 3. Structural QA for named components, UVs and image-backed materials:
    \`tools/blender/validate_is2_asset.py\`.
@@ -26,14 +26,19 @@ blender --background --python tools/blender/validate_is2_asset.py -- public/mode
 - Current geometry is a dimensioned procedural Level-2 foundation, not a sculpted
   multi-million-polygon high-poly asset.
 - UVs are automatically unwrapped. They must be reviewed and seam-packed by an artist.
-- Base Color and AO are baked from the current mesh/materials. This does not create
-  authentic scratches, weld beads, cast texture, or high-to-low normal detail.
+- The initial automated bake emitted empty transparent maps. That defect was found by
+  inspecting the generated PNGs, and the pipeline was changed to author deterministic,
+  tileable per-material Base Color, Roughness and tangent Normal textures instead.
+- These maps are image-backed and embedded in the GLB, but they are procedural material
+  textures, NOT high-poly sculpt bakes. There is no AO map in this iteration.
+- The validator now samples embedded image pixels and fails on empty/transparent maps;
+  image-node presence alone is no longer accepted as proof of valid textures.
 - The next production stage is dedicated high-poly sculpting of the turret casting,
   mantlet, weld seams, cast roadwheel faces, track shoes and fittings, followed by
   retopology and high-to-low tangent normal bake. Do not claim that stage complete
   until the sculpt source and bake maps exist and pass inspection.
-- Roughness/metallic authoring must be tuned per material family; the existing
-  Principled values remain the source values for this first bake iteration.
+- Metallic values remain material constants and the authored Roughness maps are subtle
+  variations around the source material values. They still require visual calibration.
 
 ## Visual and runtime acceptance gates
 1. Front/side/rear/top orthographic comparison against the museum survivor photos and
@@ -42,7 +47,7 @@ blender --background --python tools/blender/validate_is2_asset.py -- public/mode
    sprocket tooth profile, link/grouser proportions and rear fuel tanks.
 3. Validate UV stretch, seams, texel density and map packing.
 4. Validate physically plausible paint/cast steel/rubber/bare steel/optics roughness.
-5. Import GLB in the existing Three.js runtime on a feature branch only; confirm
+5. Inspect the five PBR re-renders and image maps, then import GLB in the existing Three.js runtime on a feature branch only; confirm
    turret yaw, gun elevation/recoil, wheel and track transforms, muzzle origin,
    collision/armor alignment and performance.
 6. Compare screenshots in the actual game lighting. Keep procedural fallback.
