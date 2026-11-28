@@ -53,10 +53,11 @@ jobs:
         run: python3 tools/blender/validate_is2_production.py
 
       - name: Upload review package
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: is2-model1944-production-candidate
-          if-no-files-found: error
+          if-no-files-found: warn
           path: |
             public/models/is2_model1944_production_candidate.glb
             artifacts/is2-model1944/production/is2_model1944_production_candidate.blend
