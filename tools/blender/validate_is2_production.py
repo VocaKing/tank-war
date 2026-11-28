@@ -48,6 +48,8 @@ required_parent_pairs = (
     ("Hull_Body", "Turret_Root"),
     ("Turret_Root", "Gun_Elevation_Pivot"),
     ("Gun_Elevation_Pivot", "Gun_Recoil_Pivot"),
+    ("Gun_Recoil_Pivot", "Muzzle"),
+    ("Gun_Elevation_Pivot", "Gun_Sight"),
     ("Hull_Body", "Track_L_Root"),
     ("Hull_Body", "Track_R_Root"),
 )
