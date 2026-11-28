@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - blender/is2-model1944-production-2026-11-28
+      - blender/is2-model1944-pbr-pipeline-2026-11-28
     paths:
       - "tools/blender/**"
       - ".github/workflows/is2-production-build.yml"
   pull_request:
     branches:
-      - blender/is2-model1944-level2
+      - main
     paths:
       - "tools/blender/**"
       - ".github/workflows/is2-production-build.yml"
@@ -34,7 +35,7 @@ jobs:
             sudo mv "$source" "$source.disabled"
           done
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+          sudo apt-get install -y --no-install-recommends blender python3-numpy python3-pil libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
           blender --version
 
       - name: Validate Python syntax
