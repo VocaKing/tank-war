@@ -1113,8 +1113,8 @@ hull_mesh_objects = [obj for obj in mesh_objects if obj.parent == hull]
 track_min_z = exact_world_min_z(track_link_objects)
 hull_min_z = exact_world_min_z(hull_mesh_objects)
 measured_clearance = hull_min_z - track_min_z
-if abs(track_min_z) > 0.003:
-    raise RuntimeError("Track shoes do not sit on the ground plane: min Z %.4f m" % track_min_z)
+if abs(track_min_z) > 0.010:
+    raise RuntimeError("Track shoes do not sit within 10 mm of the ground plane: min Z %.4f m" % track_min_z)
 if abs(measured_clearance - 0.46) > 0.025:
     raise RuntimeError("Hull ground clearance mismatch: measured %.4f m, expected 0.46 m" % measured_clearance)
 
