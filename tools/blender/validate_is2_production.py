@@ -60,6 +60,8 @@ left = [name for name in names if re.fullmatch(r"TrackLink_L_\d{3}", name)]
 right = [name for name in names if re.fullmatch(r"TrackLink_R_\d{3}", name)]
 assert len(left) == 86, "Expected 86 independent left track-link nodes, got %d" % len(left)
 assert len(right) == 86, "Expected 86 independent right track-link nodes, got %d" % len(right)
+assert abs(manifest.get("track_pitch_m", 0.0) - 0.1651) < 1e-6, "Track shoe pitch must match 165.1 mm reference"
+assert abs(manifest.get("track_loop_length_m", 0.0) - 86 * 0.1651) < 1e-6, "Track loop length does not match 86 shoes at 165.1 mm pitch"
 
 # Verify every link belongs to the correct track root and has renderable mesh
 # geometry. This also detects accidental joining of the 86 shoes into one mesh.
