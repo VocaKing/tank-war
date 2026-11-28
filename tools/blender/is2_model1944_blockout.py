@@ -188,7 +188,16 @@ box("Lower_nose_plate", (0, 3.20, 0.75), (2.72, 0.22, 0.50),
     PAINT, 0.025, (math.radians(-60), 0, 0))
 # Engine deck and rear plate details.
 box("Engine_deck_main", (0, -2.20, 1.64), (2.62, 1.52, 0.13), PAINT, 0.035)
+# Close the rear-deck gap between the main engine deck and rear plate.
+box("Rear_engine_deck_extension", (0, -3.00, 1.535), (2.54, 0.48, 0.11), PAINT, 0.028)
+for side in (-1, 1):
+    box("Rear_deck_service_cover_%s" % side, (side*0.63, -3.00, 1.602),
+        (0.48, 0.30, 0.035), CAST, 0.025)
+    box("Rear_deck_service_handle_%s" % side, (side*0.63, -3.00, 1.625),
+        (0.16, 0.035, 0.025), STEEL, 0.008)
 box("Rear_hull_plate", (0, -3.34, 1.02), (2.70, 0.12, 0.92), PAINT, 0.025)
+box("Rear_tow_mount", (0, -3.43, 0.67), (0.42, 0.18, 0.20), PAINT, 0.025)
+torus("Rear_tow_eye", (0, -3.54, 0.67), 0.15, 0.028, STEEL, "Y")
 for side in (-1, 1):
     x = side * 0.76
     box("Engine_grille_recess_%s" % side, (x, -2.18, 1.715), (0.78, 1.10, 0.025), DARK, 0.01)
@@ -213,6 +222,12 @@ cylinder("Bow_DT_barrel", (0.62, 3.27, 1.13), 0.022, 0.30, STEEL, "Y", 16)
 for side in (-1, 1):
     x = side * 1.35
     box("Full_length_fender_%s" % side, (x, 0.0, 1.20), (0.30, 5.70, 0.07), PAINT, 0.025)
+    # Folded front mudguard and repeated support webs under the fender.
+    box("Front_fender_drop_%s" % side, (side*1.35, 2.91, 1.08),
+        (0.30, 0.36, 0.10), PAINT, 0.018, (math.radians(-16), 0, 0))
+    for support_i, support_y in enumerate((-2.55, -1.70, -0.85, 0.0, 0.85, 1.70, 2.55)):
+        box("Fender_support_%s_%02d" % (side, support_i),
+            (side*1.42, support_y, 1.075), (0.09, 0.12, 0.20), STEEL, 0.012)
     cylinder("Headlight_body_%s" % side, (side*1.18, 2.90, 1.48), 0.095, 0.13, STEEL, "X", 32)
     cylinder("Headlight_lens_%s" % side, (side*1.18, 2.90, 1.48), 0.068, 0.014, GLASS, "X", 32, 0.0)
     # Protective headlight hoops and front towing shackles.
@@ -263,7 +278,7 @@ turret_body = mesh_object("Turret_cast_1944_loft", tv, tf, CAST, True)
 
 # D-25T mantlet: flattened, broad cast shield with a sloping lower edge.
 # The asymmetry and raised shoulders keep it from reading as a spherical knob.
-mantlet = add_uv_sphere("D25T_cast_mantlet", (0.0, 1.31, 2.13), (0.82, 0.235, 0.32), CAST)
+mantlet = add_uv_sphere("D25T_cast_mantlet", (0.0, 1.39, 2.13), (0.68, 0.15, 0.26), CAST)
 mantlet.rotation_euler[0] = math.radians(-7)
 cylinder("Main_gun_recess", (0.0, 1.625, 2.17), 0.19, 0.025, DARK, "Y", 40, 0.0)
 torus("Main_gun_mantlet_collar", (0.0, 1.64, 2.17), 0.19, 0.035, STEEL, "Y")
@@ -309,6 +324,8 @@ cylinder("DShK_pedestal", (-0.36, -0.52, 2.87), 0.055, 0.22, STEEL, "Z", 20)
 box("DShK_receiver", (-0.36, -0.15, 2.94), (0.12, 0.58, 0.13), STEEL, 0.025)
 cylinder("DShK_barrel", (-0.36, 0.22, 2.94), 0.025, 0.36, STEEL, "Y", 20)
 box("DShK_stock", (-0.36, -0.48, 2.94), (0.12, 0.22, 0.10), PAINT, 0.025)
+box("DShK_ammunition_box", (-0.56, -0.18, 2.94), (0.20, 0.30, 0.16), CAST, 0.025)
+box("DShK_ammunition_lid", (-0.56, -0.18, 3.025), (0.19, 0.29, 0.025), PAINT, 0.012)
 
 # Loader hatch on the opposite/rear roof area.
 cylinder("Loader_hatch_ring", (0.56, -0.62, 2.62), 0.29, 0.055, CAST, "Z", 40)
@@ -413,6 +430,20 @@ def append_box(vs, fs, center, dims, angle):
     fs.extend([tuple(base+i for i in face) for face in
                ((0,3,2,1),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7))])
 
+def append_x_cylinder(vs, fs, center, radius, depth, segments=12):
+    """Append one cylinder whose axis is vehicle width (X), for track pin caps."""
+    cx, cy, cz = center
+    base = len(vs)
+    for x in (-depth/2, depth/2):
+        for k in range(segments):
+            a = math.tau*k/segments
+            vs.append((cx+x, cy+math.cos(a)*radius, cz+math.sin(a)*radius))
+    fs.append(tuple(base+k for k in reversed(range(segments))))
+    fs.append(tuple(base+segments+k for k in range(segments)))
+    for k in range(segments):
+        j = (k+1) % segments
+        fs.append((base+k, base+j, base+segments+j, base+segments+k))
+
 for side in (-1, 1):
     tv, tf = [], []
     for i in range(TRACK_LINKS):
@@ -429,7 +460,16 @@ for side in (-1, 1):
         # Inner guide horn points toward the vehicle centerline.
         append_box(tv, tf, (side*(TRACK_CENTER_X-0.22), y, z-0.055),
                    (0.12, TRACK_PITCH*0.38, 0.10), angle)
-    mesh_object("Track_run_86_links_%s" % ("L" if side < 0 else "R"), tv, tf, TRACK)
+    track_label = "L" if side < 0 else "R"
+    track_mesh = mesh_object("Track_run_86_links_%s" % track_label, tv, tf, TRACK)
+    add_bevel(track_mesh, 0.006, 2)
+    # One visible outer pin head per link makes the 86-link pitch legible in profile.
+    pv, pf = [], []
+    for i in range(TRACK_LINKS):
+        y, z = track_point((i+0.5)*TRACK_PITCH)
+        outer_x = side*(TRACK_CENTER_X + TRACK_WIDTH/2 + 0.006)
+        append_x_cylinder(pv, pf, (outer_x, y, z), 0.023, 0.018, 12)
+    mesh_object("Track_link_pin_caps_%s" % track_label, pv, pf, STEEL, True)
 
 # Four rear auxiliary fuel tanks, two per side, on rear-side brackets.
 for side in (-1, 1):
