@@ -221,13 +221,13 @@ add_uv_sphere("Bow_DT_ball_mount", (0.62, 3.16, 1.13), (0.14, 0.10, 0.13), CAST)
 cylinder("Bow_DT_barrel", (0.62, 3.27, 1.13), 0.022, 0.30, STEEL, "Y", 16)
 for side in (-1, 1):
     x = side * 1.35
-    box("Full_length_fender_%s" % side, (x, 0.0, 0.905), (0.30, 5.70, 0.07), PAINT, 0.025)
+    box("Full_length_fender_%s" % side, (x, 0.0, 0.83), (0.30, 5.70, 0.07), PAINT, 0.025)
     # Folded front mudguard and repeated support webs under the fender.
-    box("Front_fender_drop_%s" % side, (side*1.35, 2.91, 0.785),
+    box("Front_fender_drop_%s" % side, (side*1.35, 2.91, 0.72),
         (0.30, 0.36, 0.10), PAINT, 0.018, (math.radians(-16), 0, 0))
     for support_i, support_y in enumerate((-2.55, -1.70, -0.85, 0.0, 0.85, 1.70, 2.55)):
         box("Fender_support_%s_%02d" % (side, support_i),
-            (side*1.42, support_y, 0.88), (0.09, 0.12, 0.20), STEEL, 0.012)
+            (side*1.42, support_y, 0.77), (0.09, 0.12, 0.20), STEEL, 0.012)
     cylinder("Headlight_body_%s" % side, (side*1.18, 2.90, 1.48), 0.095, 0.13, STEEL, "X", 32)
     cylinder("Headlight_lens_%s" % side, (side*1.18, 2.90, 1.48), 0.068, 0.014, GLASS, "X", 32, 0.0)
     # Protective headlight hoops and front towing shackles.
@@ -394,8 +394,8 @@ cylinder("Turret_rear_DT_barrel", (0.57, -1.30, 2.02), 0.022, 0.17, STEEL, "Y", 
 TRACK_LINKS = 86
 TRACK_WIDTH = 0.65
 TRACK_CENTER_X = 1.21
-TRACK_Z = 0.405
-TRACK_RADIUS = 0.405
+TRACK_RADIUS = 0.34
+TRACK_Z = TRACK_RADIUS + 0.0375
 TRACK_PITCH = 0.1651
 TRACK_HALF_STRAIGHT = (TRACK_LINKS*TRACK_PITCH - 2*math.pi*TRACK_RADIUS)/4.0
 
@@ -434,7 +434,7 @@ for side in (-1, 1):
     # Three return rollers per side.
     for i, y in enumerate((-1.48, 0.0, 1.48)):
         cylinder("Return_roller_%s_%d" % (side, i+1),
-                 (side*1.36, y, TRACK_Z + 0.36), 0.09, 0.18, STEEL, "X", 32)
+                 (side*1.36, y, TRACK_Z + TRACK_RADIUS - 0.0375 - 0.09), 0.09, 0.18, STEEL, "X", 32)
 
 # Rear drive sprockets: twin removable 14-tooth rims. Front idlers are plain.
 for side in (-1, 1):
@@ -521,7 +521,7 @@ for side in (-1, 1):
         append_box(tv, tf, (side*TRACK_CENTER_X, y, z+0.047),
                    (TRACK_WIDTH*0.94, 0.035, 0.025), angle)
         # Inner guide horn points toward the vehicle centerline.
-        append_box(tv, tf, (side*(TRACK_CENTER_X-0.22), y, z-0.055),
+        append_box(tv, tf, (side*(TRACK_CENTER_X-0.22), y, z+0.058),
                    (0.12, TRACK_PITCH*0.38, 0.10), angle)
     track_label = "L" if side < 0 else "R"
     track_mesh = mesh_object("Track_run_86_links_%s" % track_label, tv, tf, TRACK)
@@ -557,7 +557,7 @@ for side in (-1, 1):
               0.09, 0.018, STEEL, "X")
     # Rear fender support / brackets.
     for y in (-2.85, -2.35, -1.85):
-        box("Rear_fender_bracket_%s_%s" % (side, y), (side*1.46, y, 1.05),
+        box("Rear_fender_bracket_%s_%s" % (side, y), (side*1.46, y, 0.81),
             (0.10, 0.09, 0.20), STEEL, 0.012)
 
 # Parent hierarchy: preserve world transforms and keep the gun pivot separately
@@ -596,7 +596,7 @@ root["road_wheel_stations_per_side"] = 6
 root["track_links_per_side"] = TRACK_LINKS
 root["track_width_m"] = TRACK_WIDTH
 root["track_pitch_m"] = TRACK_PITCH
-root["track_ground_z_m"] = TRACK_Z - TRACK_RADIUS
+root["track_ground_z_m"] = TRACK_Z - TRACK_RADIUS - 0.0375
 root["hull_ground_clearance_m"] = 0.46
 root["status"] = "FIRST BLENDER ASSET PASS — requires visual review"
 
