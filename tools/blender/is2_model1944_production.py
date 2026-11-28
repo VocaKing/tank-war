@@ -947,14 +947,14 @@ def attach_part(group, obj):
         _, side, index = group.split("_")
         station_y = wheel_y[int(index) - 1]
         side_sign = -1 if side == "L" else 1
-        location = (side_sign * 1.145, station_y, 0.70)
+        location = (side_sign * 1.145, station_y, TRACK_Z)
         parent = create_empty(group + "_Pivot", location, hull)
         parent["animated_axis"] = "Blender X wheel rotation"
     elif group.startswith("ReturnRoller_"):
         _, side, index = group.split("_")
         side_sign = -1 if side == "L" else 1
         roller_y = (-1.48, 0.0, 1.48)[int(index) - 1]
-        location = (side_sign * 1.36, roller_y, 1.075)
+        location = (side_sign * 1.36, roller_y, TRACK_Z + 0.36)
         parent = create_empty(group + "_Pivot", location, hull)
         parent["animated_axis"] = "Blender X roller rotation"
     elif group.startswith("DriveSprocket_"):
@@ -1134,6 +1134,8 @@ manifest = {
     "track_links_per_side": TRACK_LINKS,
     "track_pitch_m": TRACK_PITCH,
     "track_loop_length_m": TRACK_LINKS * TRACK_PITCH,
+    "track_ground_z_m": TRACK_Z - TRACK_RADIUS,
+    "hull_ground_clearance_m": 0.46,
     "track_links_total": len(track_l) + len(track_r),
     "mesh_object_nodes": len(mesh_objects),
     "unique_mesh_datablocks": unique_meshes,
