@@ -1097,6 +1097,27 @@ track_r = [name for name in node_names if re.match(r"TrackLink_R_\d{3}$", name)]
 if len(track_l) != TRACK_LINKS or len(track_r) != TRACK_LINKS:
     raise RuntimeError("Track node count mismatch: L=%d R=%d" % (len(track_l), len(track_r)))
 
+def exact_world_min_z(objects):
+    values = [
+        (obj.matrix_world @ Vector(vertex.co)).z
+        for obj in objects
+        if obj.type == "MESH"
+        for vertex in obj.data.vertices
+    ]
+    if not values:
+        raise RuntimeError("Cannot measure vertical bounds of an empty mesh group")
+    return min(values)
+
+track_link_objects = [bpy.data.objects[name] for name in track_l + track_r]
+hull_mesh_objects = [obj for obj in mesh_objects if obj.parent == hull]
+track_min_z = exact_world_min_z(track_link_objects)
+hull_min_z = exact_world_min_z(hull_mesh_objects)
+measured_clearance = hull_min_z - track_min_z
+if abs(track_min_z) > 0.003:
+    raise RuntimeError("Track shoes do not sit on the ground plane: min Z %.4f m" % track_min_z)
+if abs(measured_clearance - 0.46) > 0.025:
+    raise RuntimeError("Hull ground clearance mismatch: measured %.4f m, expected 0.46 m" % measured_clearance)
+
 manifest = {
     "vehicle": "IS-2 Model 1944",
     "variant": "late-war sloped-glacis",
@@ -1134,8 +1155,9 @@ manifest = {
     "track_links_per_side": TRACK_LINKS,
     "track_pitch_m": TRACK_PITCH,
     "track_loop_length_m": TRACK_LINKS * TRACK_PITCH,
-    "track_ground_z_m": TRACK_Z - TRACK_RADIUS - 0.0375,
-    "hull_ground_clearance_m": 0.46,
+    "track_ground_z_m": track_min_z,
+    "hull_min_z_m": hull_min_z,
+    "hull_ground_clearance_m": measured_clearance,
     "track_links_total": len(track_l) + len(track_r),
     "mesh_object_nodes": len(mesh_objects),
     "unique_mesh_datablocks": unique_meshes,
