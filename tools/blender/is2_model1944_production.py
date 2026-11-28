@@ -306,6 +306,8 @@ def rasterize_material_atlas(target, channel, filepath):
     mode = "RGB" if channel == "BaseColor" else "L"
     image = Image.new(mode, (ATLAS_SIZE, ATLAS_SIZE), (0, 0, 0) if mode == "RGB" else 0)
     draw = ImageDraw.Draw(image)
+    coverage = Image.new("L", (ATLAS_SIZE, ATLAS_SIZE), 0)
+    coverage_draw = ImageDraw.Draw(coverage)
     material_count = len(target.data.materials)
     painted = 0
     for material_index, points in uv_triangles(target):
@@ -321,9 +323,40 @@ def rasterize_material_atlas(target, channel, filepath):
             scalar = float(mat["bake_" + channel.lower()])
             fill = int(round(max(0.0, min(1.0, scalar))*255.0))
         draw.polygon(points, fill=fill)
+        coverage_draw.polygon(points, fill=255)
         painted += 1
     if painted == 0:
         raise RuntimeError("UV material-ID rasterizer found no mapped triangles for " + channel)
+
+    # The source materials are intentionally simple, but a completely flat
+    # albedo/roughness atlas makes the vehicle look like a plastic blockout.
+    # Add restrained, deterministic paint grain and broad tonal variation only
+    # inside UV islands. Keep the variation subtle enough that markings,
+    # camouflage and historical paint layers can be added separately later.
+    mask = np.asarray(coverage, dtype=np.uint8) > 0
+    rng = np.random.default_rng({
+        "BaseColor": 1944,
+        "Roughness": 1945,
+        "Metallic": 1946,
+    }.get(channel, 1947))
+    pixels = np.asarray(image, dtype=np.float32)
+    high = rng.normal(0.0, 1.0, (ATLAS_SIZE, ATLAS_SIZE)).astype(np.float32)
+    low_seed = rng.normal(0.0, 1.0, (96, 96)).astype(np.float32)
+    low_u8 = np.clip(low_seed * 28.0 + 128.0, 0, 255).astype(np.uint8)
+    low_img = Image.fromarray(low_u8, mode="L").resize(
+        (ATLAS_SIZE, ATLAS_SIZE), resample=Image.Resampling.BICUBIC
+    )
+    low = (np.asarray(low_img, dtype=np.float32) - 128.0) / 28.0
+    if channel == "BaseColor":
+        variation = high * 2.0 + low * 2.8
+        pixels[mask] = np.clip(pixels[mask] + variation[mask, None], 0, 255)
+    elif channel == "Roughness":
+        variation = high * 3.0 + low * 3.5
+        pixels[mask] = np.clip(pixels[mask] + variation[mask], 0, 255)
+    elif channel == "Metallic":
+        variation = high * 1.0 + low * 1.0
+        pixels[mask] = np.clip(pixels[mask] + variation[mask], 0, 255)
+    image = Image.fromarray(np.clip(pixels, 0, 255).astype(np.uint8), mode=mode)
     image.save(filepath, format="PNG", optimize=True)
     bpy_image = bpy.data.images.load(filepath, check_existing=False)
     bpy_image.name = "IS2_" + channel + "_Atlas"
