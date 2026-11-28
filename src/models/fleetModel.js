@@ -43,7 +43,7 @@ export function loadFleetModel(spec) {
     import('three/addons/libs/meshopt_decoder.module.js'),
   ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
     const referenceImage = referenceImages.get(id);
-    const revision = id === 'aegis140' ? '2026-11-vx9-reference'
+    const revision = id === 'aegis140' ? '2026-11-vx9-integrated'
       : detailedExteriorIds.has(id) ? exteriorRevision : conceptRevision;
     const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb?v=${revision}`;
     const { scene } = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);

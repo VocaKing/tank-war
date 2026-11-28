@@ -7,7 +7,7 @@ import { CylinderGeometry, LatheGeometry, TorusGeometry, Vector2, Vector3, Shape
 import { ModelParts, appendParts, parseGlb, serializeGlb, compactAsset, loft, ring, mirrored, plate, plateOutline } from './tools_rear_turrets.mjs';
 
 const id = 'aegis140';
-const revision = '2026-11-vx9-reference';
+const revision = '2026-11-vx9-integrated';
 const file = new URL('public/models/fleet/aegis140.glb', import.meta.url);
 const front = new Vector3(0, 0, 1);
 const hullRoof = 1.76;
@@ -60,28 +60,90 @@ function stencil(parts, side, x, y, z) {
   }
 }
 
-function grille(parts, center, width, height, orientation, count = 9) {
-  const [x, y, z] = center;
-  const facingSide = orientation === 'side';
-  const roof = orientation === 'roof';
-  const point = (u, v, d) => facingSide ? [x + Math.sign(x) * d, y + v, z + u]
-    : roof ? [x + u, y + d, z + v] : [x + u, y + v, z - d];
-  const size = (u,v,d) => facingSide ? [d,v,u] : roof ? [u,d,v] : [u,v,d];
-  parts.box('steel', point(0,0,0), size(width, height, .046));
-  parts.box('black', point(0,0,.024), size(width-.051, height-.057, .018));
-  for (let i=0;i<count;i++) {
-    parts.box('steel', point(0, ((i+.5)/count-.5)*(height-.052), .040), size(width-.052,.014,.018), 0, .68 + i%3*.1);
-  }
-  for (let i=1;i<=3;i++) parts.box('dark', point(width*(i/4-.5),0,.053), size(.014,height-.046,.014));
+function frontFrame(x, y, z, yaw = 0, pitch = 0) {
+  const sx = Math.sin(yaw), cz = Math.cos(yaw), tilt = Math.sin(pitch), rise = Math.cos(pitch);
+  return (u, v, d) => [x + u * cz + (d * rise - v * tilt) * sx,
+    y + v * rise + d * tilt, z - u * sx + (d * rise - v * tilt) * cz];
 }
 
-function lamp(parts, x, y, z, width, yaw) {
-  parts.box('dark', [x,y,z], [width+.13,.19,.20], yaw);
-  const face = (dy, dz) => [x+Math.sin(yaw)*dz,y+dy,z+Math.cos(yaw)*dz];
-  parts.box('black', face(0,.105), [width+.034,.108,.024], yaw);
-  parts.box('blue', face(0,.122), [width,.053,.018], yaw);
-  parts.box('light', face(.005,.133), [width*.93,.023,.009], yaw);
-  parts.box('steel', face(.071,.095), [width+.060,.026,.045], yaw);
+// A single wraparound surround seats below the armour surface. Its opening
+// rolls into a recessed liner, with the lens or grille behind the painted lip.
+function recess(parts, place, { width, height, seat, depth, paint = 'graphite', slant = 0 }) {
+  function outline(w, h) {
+    const x = w * .5, y = h * .5, bevel = Math.min(w * .11, h * .21);
+    return [[-x+bevel,-y],[x-bevel,-y],[x,-y+bevel],[x,y-bevel],
+      [x-bevel,y],[-x+bevel,y],[-x,y-bevel],[-x,-y+bevel]]
+      .map(([u,v]) => [u+v*slant,v]);
+  }
+  const rear = outline(width * 1.14, height * 1.23);
+  const shoulder = outline(width, height);
+  const lip = outline(width * .92, height * .89);
+  const opening = outline(width * .82, height * .61);
+  const well = outline(width * .75, height * .49);
+  function band(material, lower, lowerDepth, upper, upperDepth) {
+    const vertices = [...lower.flatMap(([u,v]) => place(u,v,lowerDepth)),
+      ...upper.flatMap(([u,v]) => place(u,v,upperDepth))];
+    const indices = [];
+    for (let i = 0; i < lower.length; i++) {
+      const next = (i + 1) % lower.length;
+      indices.push(i,next,next+lower.length,i,next+lower.length,i+lower.length);
+    }
+    const mesh = new BufferGeometry().setAttribute('position', new Float32BufferAttribute(vertices,3));
+    mesh.setIndex(indices);
+    const flat = mesh.toNonIndexed();
+    flat.computeVertexNormals();
+    parts.add(material,flat);
+  }
+  band(paint,rear,-seat,shoulder,-depth*.29);
+  band(paint,shoulder,-depth*.29,lip,0);
+  band(paint,lip,0,opening,0);
+  band('dark',opening,0,well,-depth);
+  graphic(parts,'black',well,(u,v)=>place(u,v,-depth));
+  return outline;
+}
+
+function grille(parts, [x, y, z], width, height, orientation, count) {
+  const side = Math.sign(x);
+  const onSide = orientation === 'side';
+  const onRoof = orientation === 'roof';
+  const place = (u, v, d) => onSide ? [x + side * d, y + v, z - side * u]
+    : onRoof ? [x + u, y + d, z - v] : [x - u, y + v, z - d];
+  recess(parts, place, { width, height, seat: .125, depth: .028 });
+  const widthOpen = width * .73, heightOpen = height * .47;
+  for (let i = 0; i < count; i++) {
+    const y = ((i + .5) / count - .5) * heightOpen;
+    const half = heightOpen / (count * 5.1);
+    graphic(parts, i % 3 ? 'dark' : 'steel', [[-widthOpen/2,y-half],[widthOpen/2,y-half],
+      [widthOpen/2,y+half],[-widthOpen/2,y+half]], (u,v) => place(u,v,-.017 + (v-y)*.45));
+  }
+  for (const x of [-.255,0,.255]) {
+    graphic(parts, 'graphite', [[x*width-.007,-heightOpen/2],[x*width+.007,-heightOpen/2],
+      [x*width+.007,heightOpen/2],[x*width-.007,heightOpen/2]], (u,v) => place(u,v,-.009));
+  }
+}
+
+function lamp(parts, center, width, height, yaw, pitch, paint) {
+  const place = frontFrame(...center, yaw, pitch);
+  const outline = recess(parts, place, { width, height, seat: .205, depth: .056, paint, slant: .18 });
+  graphic(parts, 'blue', outline(width * .725, height * .31), (u,v) => place(u,v,-.050));
+  graphic(parts, 'light', outline(width * .678, height * .158), (u,v) => place(u,v,-.048));
+}
+
+function visor(parts, center, width, height, yaw = 0, pitch = 0.12) {
+  const place = frontFrame(...center, yaw, pitch);
+  const outline = recess(parts, place, { width, height, seat: .145, depth: .036, slant: .15 });
+  graphic(parts, 'optic', outline(width * .60, height * .41), (u,v) => place(u-.018,v,-.033));
+  graphic(parts, 'dark', outline(width * .044, height * .44), (u,v) => place(u + width*.22,v,-.031));
+}
+
+function towPoint(parts, x, y, z, end) {
+  const lugs = z - end * .068;
+  for (const s of [-1,1]) {
+    const center = [x + s*.067,y+.11,lugs];
+    parts.plate('graphite', plateOutline(center[0],center[2],.09,.27,.037),y+.032,y+.176,.15);
+  }
+  parts.rail('steel',[x-.103,y+.11,z],[x+.103,y+.11,z],.026,10);
+  parts.add('steel',new TorusGeometry(.099,.022,8,18).translate(x,y+.014,z),.71);
 }
 
 function chipMarks(parts, side, x, y0, y1, z0, z1, count) {
@@ -154,34 +216,35 @@ function chassis() {
       chipMarks(b,s,1.889,y-.11,y+.11,z-.22,z+.22,31);
     }
     stencil(b,s,1.892,1.11,-2.6);
-    grille(b,[s*1.889,1.405,-3.73],.69,.34,'side',9);
-    grille(b,[s*1.37,1.65,-3.58],.61,.94,'roof',14);
-    grille(b,[s*1.22,1.633,2.69],.52,.54,'roof',9);
+    grille(b,[s*1.918,1.405,-3.73],.69,.49,'side',9);
+    grille(b,[s*1.29,1.789,-3.54],.55,.91,'roof',14);
+    grille(b,[s*1.20,1.788,2.66],.49,.50,'roof',9);
     const prow = s>0 ? [[.79,4.04],[1.50,3.91],[1.79,3.55],[1.76,2.65],[1.34,2.47],[.98,2.73]]
       : [[-.98,2.73],[-1.34,2.47],[-1.76,2.65],[-1.79,3.55],[-1.50,3.91],[-.79,4.04]];
-    b.plate('silver',prow,1.42,1.605,.041,-.185);
-    b.plate('gray',plateOutline(s*1.55,3.06,.40,.57,.09),1.54,1.666,.06,-.19);
-    lamp(b,s*1.42,1.347,4.19,.56,-s*.30);
+    b.plate('silver',prow,1.40,1.567,.038,-.174);
+    lamp(b,[s*1.374,1.369,4.268],.685,.205,s*.427,.24,'silver');
     b.box('chip',[s*1.02,1.39,4.37],[.054,.026,.012]);
     b.round('steel',[s*.88,1.20,4.444],.064,.056,{direction:front});
     for (const z of [1.48,.75,-2.51,-3.92]) {
-      b.plate('graphite',plateOutline(s*1.08,z,.67,.43,.07),1.696,1.781,.06);
-      b.grip(s*1.08,1.779,z,.18);
+      b.plate('dark',plateOutline(s*1.08,z,.64,.42,.068),1.681,1.764,.06);
+      b.plate('gray',plateOutline(s*1.08,z,.586,.373,.063),1.746,1.777,.042);
+      b.grip(s*1.08,1.775,z,.167);
     }
     for (let i=0;i<6;i++) bolt(b,[s*(.29+i*.21),1.229,4.466]);
-    b.add('steel',new TorusGeometry(.109,.024,7,18).translate(s*.54,.945,4.26),.70);
-    b.add('steel',new TorusGeometry(.108,.025,7,18).translate(s*.59,1.012,-4.43),.71);
+    towPoint(b,s*.54,.945,4.309,1);
+    towPoint(b,s*.59,1.012,-4.449,-1);
     b.box('chip',[s*1.45,1.37,-4.405],[.27,.047,.061]);
   }
-  b.plate('graphite',plateOutline(0,2.20,1.45,1.32,.21),1.712,1.767,.07,-.057);
-  b.optic(0,1.73,2.89,.64,.114,.24);
+  b.plate('dark',plateOutline(0,2.20,1.49,1.33,.21),1.60,1.764,.052,-.013);
+  b.plate('graphite',plateOutline(0,2.20,1.42,1.26,.19),1.648,1.782,.031,-.013);
+  visor(b,[0,1.794,2.847],.613,.115,0,.42);
   b.add('graphite', loft([ring(plan,.73,.96,.83),ring(plan,.76,.93,1.13)]),.92);
   b.plate('graphite',plateOutline(0,3.56,1.72,.72,.19),1.461,1.533,.041,-.158);
   for(const side of [-1,1]) {
     b.rail('steel',[side*.71,1.55,3.37],[side*.75,1.44,4.03],.013,5);
     for(const z of [3.42,3.67,3.88]) bolt(b,[side*.63,1.55-(z-3.40)*.18,z],new Vector3(0,1,0),.017);
   }
-  grille(b,[0,1.423,-4.472],1.78,.46,'rear',8);
+  grille(b,[0,1.397,-4.487],1.78,.45,'rear',8);
   return b;
 }
 
@@ -204,12 +267,13 @@ function turretAssembly() {
   }
   const up = new Vector3(0,1,0);
   // Flush circular hatch with its inner cap and radial hinge plates.
-  t.hatch(.09,-0.04+.88,-.75,.354);
-  t.round('steel',[.09,.951,-.75],.28,.017,{segments:30,tint:.76});
-  t.round('gray',[.09,.964,-.75],.18,.020,{segments:30});
+  t.round('dark',[.09,.868,-.75],.385,.069,{segments:32,top:.376});
+  t.round('gray',[.09,.902,-.75],.359,.052,{segments:32,top:.329});
+  t.round('steel',[.09,.928,-.75],.29,.016,{segments:32,tint:.76});
+  t.round('gray',[.09,.939,-.75],.181,.016,{segments:32});
   for (let i=0;i<8;i++) {
     const a=i*Math.PI/4;
-    bolt(t,[.09+Math.cos(a)*.274,.952,-.75+Math.sin(a)*.274],up,.016);
+    bolt(t,[.09+Math.cos(a)*.274,.934,-.75+Math.sin(a)*.274],up,.016);
   }
   for (const s of [-1,1]) {
     const wing = [[.51,2.13],[.82,2.18],[1.30,1.72],[1.61,1.13],[1.59,.48],[1.10,.45],[.75,1.06]];
@@ -226,30 +290,34 @@ function turretAssembly() {
     const emblem = [[-.36,.12],[-.18,.12],[0,-.06],[.18,.12],[.36,.12],[.22,.04],[0,-.17],[-.22,.04]];
     for(const shift of [0,.075])
       graphic(t,'ivory',emblem,(z,y)=>[s*1.639,.472+y*.64+shift,-.58+z]);
-    lamp(t,s*1.03,.328,1.76,.31,s*.51);
-    t.optic(s*.44,.746,1.48,.40,.169,.35,s*.13);
-    t.optic(s*1.23,.731,.15,.24,.114,.26,s*.14);
-    grille(t,[s*1.493,.49,-2.49],.78,.36,'side',8);
-    grille(t,[s*.73,.568,-3.082],.70,.33,'rear',9);
-    t.plate('gray',plateOutline(s*.61,-2.18,.83,1.12,.15),.694,.818,.082,-.025);
-    t.plate('graphite',plateOutline(s*.60,-1.33,.42,.46,.07),.813,.894,.083);
-    t.grip(s*.60,.895,-1.31,.22);
+    lamp(t,[s*1.100,.338,1.997],.386,.145,s*.556,.06,'graphite');
+    visor(t,[s*.459,.807,1.657],.434,.158,s*.18,.37);
+    visor(t,[s*1.161,.795,.402],.294,.104,s*.13,.24);
+    grille(t,[s*1.486,.484,-2.44],.79,.38,'side',8);
+    grille(t,[s*.73,.495,-3.096],.70,.348,'rear',9);
+    t.plate('dark',plateOutline(s*.61,-2.18,.88,1.15,.15),.700,.834,.05,-.025);
+    t.plate('gray',plateOutline(s*.61,-2.18,.83,1.10,.14),.802,.850,.05,-.025);
+    t.plate('graphite',plateOutline(s*.65,-1.28,.39,.436,.07),.774,.89,.073);
+    t.grip(s*.65,.888,-1.26,.176);
     t.whip(s*.98,.733,-2.32,s>0 ? 1.24 : .94,s*.042);
     for (const offset of [-.4,-.82,-1.76]) bolt(t,[s*.86,.846,offset],up,.019);
   }
   // The optical mast and roof station use distinct silhouettes and lens glazing.
-  t.round('dark',[-.40,.915,-.37],.24,.143,{segments:25});
-  t.plate('gray',plateOutline(-.41,-.18,.55,.62,.095),.96,1.19,.14);
-  t.optic(-.55,1.09,.04,.22,.135,.21);
-  t.box('dark',[-.295,1.08,.218],[.18,.14,.32]);
+  t.round('graphite',[-.40,.919,-.29],.267,.119,{segments:24,top:.22});
+  t.round('steel',[-.40,.975,-.29],.193,.037,{segments:24});
+  t.plate('gray',plateOutline(-.41,-.18,.55,.62,.117),.981,1.171,.125,.057);
+  visor(t,[-.526,1.107,.152],.224,.117,0,.24);
+  t.round('dark',[-.295,1.10,.205],.098,.296,{direction:front,top:.075,segments:15});
   t.rail('steel',[-.29,1.10,.34],[-.29,1.10,1.08],.043,14);
   t.rail('black',[-.29,1.10,1.02],[-.29,1.10,1.25],.028,12);
-  t.round('steel',[.62,.887,-.48],.102,.18,{segments:12});
-  t.box('dark',[.62,1.084,-.48],[.098,.25,.096]);
-  t.plate('gray',plateOutline(.62,-.48,.28,.225,.04),1.15,1.49,.112);
-  for (const [y,r] of [[1.25,.056],[1.402,.073]]) {
-    t.round('black',[.62,y,-.357],r*1.28,.024,{direction:front});
-    t.round('optic',[.62,y,-.342],r,.012,{direction:front});
+  t.round('graphite',[.62,.875,-.48],.166,.126,{segments:22,top:.121});
+  t.round('steel',[.62,.948,-.48],.111,.049,{segments:20,tint:.75});
+  t.plate('gray',plateOutline(.62,-.48,.166,.174,.035),.953,1.242,.19,-.11);
+  t.plate('gray',plateOutline(.62,-.48,.265,.251,.049),1.159,1.494,.103,.035);
+  for (const [y,r] of [[1.255,.055],[1.405,.067]]) {
+    t.round('graphite',[.62,y,-.362],r*1.31,.028,{direction:front});
+    t.round('black',[.62,y,-.346],r*1.10,.012,{direction:front});
+    t.round('optic',[.62,y,-.339],r,.011,{direction:front,top:r*.93});
   }
   return t;
 }

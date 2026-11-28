@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { Ray, Vector3 } from 'three';
 import { hasFleetModel } from './src/models/fleetModel.js';
 
 const root = new URL('./public/models/fleet/', import.meta.url);
@@ -14,7 +15,7 @@ const expectedExterior = new Set([
 ]);
 const wheelCounts = { archer: 8, centauro2: 8 };
 const expectedReferences = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
-const vx9Revision = '2026-11-vx9-reference';
+const vx9Revision = '2026-11-vx9-integrated';
 const rearTurretRevision = '2026-11-rear-turrets';
 
 function checkRearTurret({ nodes, meshes, accessors }, pivot, id, revision = rearTurretRevision) {
@@ -26,6 +27,40 @@ function checkRearTurret({ nodes, meshes, accessors }, pivot, id, revision = rea
     assert.ok(Number.isInteger(count) && count > 0, id);
     for (const index of Object.values(attributes)) assert.equal(accessors[index].count, count, id);
     assert.equal(accessors[indices].count % 3, 0, id);
+  }
+}
+
+function checkRecessedLights(gltf, bytes, mesh, { x, y, z, sweep, pitch, rimHeight, skin }) {
+  for (const side of [-1, 1]) {
+    const yaw = side * sweep;
+    const direction = new Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+    const vertical = new Vector3(-Math.sin(yaw) * Math.sin(pitch), Math.cos(pitch), -Math.cos(yaw) * Math.sin(pitch));
+    const center = new Vector3(side * x, y, z);
+    function firstSurface(height) {
+      const ray = new Ray(center.clone().add(direction).addScaledVector(vertical, height), direction.clone().negate());
+      let first = { distance: Infinity };
+      const a = new Vector3(), b = new Vector3(), c = new Vector3(), hit = new Vector3();
+      for (const primitive of gltf.meshes[mesh].primitives) {
+        const pos = gltf.accessors[primitive.attributes.POSITION], idx = gltf.accessors[primitive.indices];
+        const vertices = gltf.bufferViews[pos.bufferView].byteOffset + (pos.byteOffset ?? 0);
+        const indices = gltf.bufferViews[idx.bufferView].byteOffset + (idx.byteOffset ?? 0);
+        function vertex(index, out) {
+          const p = vertices + 12 * bytes.readUInt16LE(indices + 2 * index);
+          out.set(bytes.readFloatLE(p), bytes.readFloatLE(p + 4), bytes.readFloatLE(p + 8));
+        }
+        for (let i = 0; i < idx.count; i += 3) {
+          vertex(i, a); vertex(i + 1, b); vertex(i + 2, c);
+          if (!ray.intersectTriangle(a, b, c, false, hit)) continue;
+          const distance = hit.distanceTo(ray.origin);
+          if (distance < first.distance) first = { distance, material: gltf.materials[primitive.material].name };
+        }
+      }
+      return first;
+    }
+    const lens = firstSurface(0), lip = firstSurface(rimHeight);
+    assert.equal(lens.material, 'VX-9 illuminated strip', 'Headlamp must be visible through the housing');
+    assert.equal(lip.material, skin, 'Lamp housing must use the surrounding armor');
+    assert.ok(lens.distance > lip.distance + .035, 'Headlamp lens must sit behind the lip');
   }
 }
 
@@ -62,6 +97,13 @@ for (const file of files) {
     assert.ok(child(body, 'VX-9 chassis')?.mesh !== undefined);
     assert.ok(materials.some(m => m.name === 'VX-9 illuminated strip' && m.emissiveFactor));
     assert.ok(child(body, 'track_0').extras.poses.length === 100);
+    const bytes = asset.subarray(28 + size);
+    checkRecessedLights(gltf, bytes, child(body, 'VX-9 chassis').mesh, {
+      x: 1.374, y: 1.369, z: 4.268, sweep: .427, pitch: .24, rimHeight: .082, skin: 'VX-9 light gray armor',
+    });
+    checkRecessedLights(gltf, bytes, child(turret, 'VX-9 turret').mesh, {
+      x: 1.100, y: .338, z: 1.997, sweep: .556, pitch: .06, rimHeight: .058, skin: 'VX-9 graphite armor',
+    });
   }
   const gun = child(turret, 'gun');
   const barrel = child(gun, 'recoiling-barrel');
