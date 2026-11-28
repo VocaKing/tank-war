@@ -357,10 +357,11 @@ def move_final_object(obj):
 # ---- Source inventory and high-poly-only details --------------------------------
 source_objects = [
     obj for obj in ASSET_OBJECTS
-    if obj.type == "MESH" and not obj.name.startswith("Track_run_86_links_")
+    if obj.type == "MESH"
+    and not obj.name.startswith(("Track_run_86_links_", "Track_link_pin_caps_"))
 ]
 for obj in ASSET_OBJECTS:
-    if obj.name.startswith("Track_run_86_links_"):
+    if obj.name.startswith(("Track_run_86_links_", "Track_link_pin_caps_")):
         obj.hide_set(True)
         obj.hide_render = True
         obj["asset_role"] = "legacy_combined_track_fallback"
@@ -599,6 +600,17 @@ if missing_groups:
     raise RuntimeError("Missing separated mesh groups: " + ", ".join(sorted(missing_groups)))
 
 # ---- Runtime node hierarchy -------------------------------------------------------
+# The dimensioned source script already created hidden empties with these names.
+# Rename them before creating the final rig so Blender does not append ".001"
+# to the production node names and break the runtime contract.
+for old_obj, safe_name in (
+    (source_ns.get("root"), "HP_Source_Root"),
+    (source_ns.get("turret_root"), "HP_Source_Turret_Root"),
+    (source_ns.get("gun_pivot"), "HP_Source_Gun_Elevation_Pivot"),
+):
+    if old_obj is not None and old_obj.name in bpy.data.objects:
+        old_obj.name = safe_name
+
 root = create_empty("IS2_Model1944_Root", (0.0, 0.0, 0.0))
 root["variant"] = "IS-2 Model 1944 late-war sloped-glacis"
 root["units"] = "meters"
