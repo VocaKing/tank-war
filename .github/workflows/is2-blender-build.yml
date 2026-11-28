@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - blender/is2-model1944-level2
+      - blender/is2-model1944-pbr-pipeline-2026-11-28
     paths:
       - "tools/blender/**"
       - ".github/workflows/is2-blender-build.yml"
@@ -29,7 +30,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Validate Python script syntax
-        run: python3 -m py_compile tools/blender/is2_model1944_blockout.py
+        run: python3 -m py_compile tools/blender/is2_model1944_blockout.py tools/blender/is2_pbr_bake_export.py tools/blender/validate_is2_asset.py
 
       - name: Install Blender
         run: |
@@ -42,9 +43,15 @@ jobs:
           mkdir -p public/models artifacts
           PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background --python tools/blender/is2_model1944_blockout.py
 
+      - name: Bake PBR textures and export production candidate
+        run: |
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background artifacts/is2-model1944/is2_model1944_first_pass.blend --python tools/blender/is2_pbr_bake_export.py
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background --python tools/blender/validate_is2_asset.py -- public/models/is2_model1944_pbr.glb
+
       - name: Verify exported asset
         run: |
           test -s public/models/is2_model1944_blockout.glb
+          test -s public/models/is2_model1944_pbr.glb
           test -s artifacts/is2-model1944/is2_model1944_first_pass.blend
           test -s artifacts/is2-model1944/01_front_three_quarter.png
           test -s artifacts/is2-model1944/02_left_side.png
@@ -60,7 +67,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/models/is2_model1944_blockout.glb
+          git add public/models/is2_model1944_blockout.glb public/models/is2_model1944_pbr.glb
           if git diff --cached --quiet; then
             echo "Generated GLB is already current."
           else
@@ -76,5 +83,9 @@ jobs:
           if-no-files-found: warn
           path: |
             public/models/is2_model1944_blockout.glb
+            public/models/is2_model1944_pbr.glb
+            artifacts/is2-model1944/IS2_BaseColor_2K.png
+            artifacts/is2-model1944/IS2_AO_2K.png
+            artifacts/is2-model1944/is2_model1944_pbr_source.blend
             artifacts/is2-model1944/is2_model1944_first_pass.blend
             artifacts/is2-model1944/*.png
