@@ -339,7 +339,7 @@ def rasterize_material_atlas(target, channel, filepath):
         "Roughness": 1945,
         "Metallic": 1946,
     }.get(channel, 1947))
-    pixels = np.asarray(image, dtype=np.float32)
+    pixels = np.asarray(image, dtype=np.float32).copy()
     high = rng.normal(0.0, 1.0, (ATLAS_SIZE, ATLAS_SIZE)).astype(np.float32)
     low_seed = rng.normal(0.0, 1.0, (96, 96)).astype(np.float32)
     low_u8 = np.clip(low_seed * 28.0 + 128.0, 0, 255).astype(np.uint8)
