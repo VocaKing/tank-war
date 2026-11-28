@@ -111,15 +111,26 @@ def classify_part(name):
         return "Turret"
     return "Hull"
 
-def make_bake_material(name):
+def make_bake_material(name, source_material):
+    # The atlas is split by assembly AND original source material. This lets us
+    # bake material colour/roughness/metallic directly on the low-poly target
+    # without relying on a fragile high-to-low colour projection.
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     nodes.clear()
-    bsdf = nodes.new("ShaderNodeBsdfPrincipled")
-    bsdf.inputs["Base Color"].default_value = (0.8, 0.8, 0.8, 1.0)
+    color = tuple(float(v) for v in source_material.diffuse_color[:3])
+    roughness = get_scalar_from_material(source_material, "Roughness", 0.78)
+    metallic = get_scalar_from_material(source_material, "Metallic", 0.18)
+    emission = nodes.new("ShaderNodeEmission")
+    emission.name = "IS2_BAKE_EMISSION"
+    emission.inputs["Color"].default_value = (*color, 1.0)
     output = nodes.new("ShaderNodeOutputMaterial")
-    mat.node_tree.links.new(bsdf.outputs["BSDF"], output.inputs["Surface"])
+    mat.node_tree.links.new(emission.outputs["Emission"], output.inputs["Surface"])
+    mat["bake_basecolor"] = list(color)
+    mat["bake_roughness"] = roughness
+    mat["bake_metallic"] = metallic
+    mat["source_material"] = source_material.name
     return mat
 
 def make_emission_material(name, value):
@@ -353,6 +364,70 @@ def bake_scalar_selected_to_active(target, sources, image, socket_name, fallback
             if emission.users == 0:
                 bpy.data.materials.remove(emission)
 
+def image_rgb_stats(image):
+    pixels = image.pixels
+    total = image.size[0] * image.size[1]
+    stride = max(1, total // 4096)
+    values = []
+    for pixel_index in range(0, total, stride):
+        offset = pixel_index * 4
+        values.extend((float(pixels[offset]), float(pixels[offset+1]), float(pixels[offset+2])))
+    return (min(values), max(values), sum(values) / len(values)) if values else (0.0, 0.0, 0.0)
+
+def bake_target_emission(target, image, channel):
+    # Material-ID bake: every low-poly face already has the corresponding
+    # source material's stored value, so no ray projection is needed.
+    set_bake_image_on_materials(target, image)
+    for mat in target.data.materials:
+        if not mat or not mat.use_nodes:
+            continue
+        emission = mat.node_tree.nodes.get("IS2_BAKE_EMISSION")
+        if emission is None:
+            raise RuntimeError("Missing bake emission node on " + mat.name)
+        if channel == "BaseColor":
+            value = tuple(float(v) for v in mat["bake_basecolor"])
+            color = (*value, 1.0)
+        else:
+            scalar = float(mat["bake_" + channel.lower()])
+            color = (scalar, scalar, scalar, 1.0)
+        emission.inputs["Color"].default_value = color
+    deselect_all()
+    target.select_set(True)
+    bpy.context.view_layer.objects.active = target
+    scene.render.bake.use_selected_to_active = False
+    scene.render.bake.use_clear = True
+    scene.render.bake.target = "IMAGE_TEXTURES"
+    bpy.context.view_layer.update()
+    result = bpy.ops.object.bake(type="EMIT", margin=16, use_clear=True)
+    print("BAKE_RESULT", channel, result)
+    if "FINISHED" not in result:
+        raise RuntimeError(channel + " material-ID bake did not finish")
+    save_bake_image(image, image.name.lower() + ".png")
+    stats = image_rgb_stats(image)
+    print("BAKE_PIXEL_STATS", image.name, stats)
+    if stats[1] < 0.01:
+        raise RuntimeError(channel + " material-ID atlas is empty")
+    return stats
+
+def bake_target_normal_fallback(target, image):
+    print("WARNING: selected-to-active normal projection was empty; baking low-poly tangent normals as fallback")
+    set_bake_image_on_materials(target, image)
+    deselect_all()
+    target.select_set(True)
+    bpy.context.view_layer.objects.active = target
+    scene.render.bake.use_selected_to_active = False
+    scene.render.bake.use_clear = True
+    scene.render.bake.target = "IMAGE_TEXTURES"
+    result = bpy.ops.object.bake(type="NORMAL", normal_space="TANGENT", margin=16, use_clear=True)
+    print("BAKE_RESULT NORMAL_FALLBACK", result)
+    if "FINISHED" not in result:
+        raise RuntimeError("Low-poly tangent normal fallback failed")
+    save_bake_image(image, "normal.png")
+    stats = image_rgb_stats(image)
+    print("BAKE_PIXEL_STATS", image.name, stats)
+    if stats[1] < 0.01:
+        raise RuntimeError("Normal map remains empty after fallback")
+
 def set_origin_at_world(obj, location):
     deselect_all()
     obj.select_set(True)
@@ -425,14 +500,30 @@ track_lp = {}
 bake_groups = sorted(set(classify_part(obj.name) for obj in source_objects))
 bake_groups.extend(["TrackLink_L", "TrackLink_R"])
 bake_groups = sorted(set(bake_groups))
-bake_mats = {group: make_bake_material("IS2_BAKE__" + group) for group in bake_groups}
+bake_mats = {}
+for source in source_objects:
+    group = classify_part(source.name)
+    materials = list(source.data.materials) or [PAINT]
+    for source_material in materials:
+        key = (group, source_material.name)
+        if key not in bake_mats:
+            bake_mats[key] = make_bake_material(
+                "IS2_BAKE__%s__%s" % (group, source_material.name), source_material
+            )
+for label in ("L", "R"):
+    key = ("TrackLink_" + label, TRACK.name)
+    if key not in bake_mats:
+        bake_mats[key] = make_bake_material(
+            "IS2_BAKE__%s__%s" % key, TRACK
+        )
 
 for side, label in [(-1, "L"), (1, "R")]:
     track_hp[label] = build_track_link_template(
         side, TRACK, 5, "HP_TrackLink_" + label, HP_COLL
     )
     track_lp[label] = build_track_link_template(
-        side, bake_mats["TrackLink_" + label], 1, "LP_TrackLink_" + label, LP_COLL
+        side, bake_mats[("TrackLink_" + label, TRACK.name)], 1,
+        "LP_TrackLink_" + label, LP_COLL
     )
 
 # ---- Low-poly copies and material-ID grouping -----------------------------------
@@ -446,10 +537,10 @@ for source in source_objects:
     duplicate.parent = None
     duplicate.matrix_world = source.matrix_world.copy()
     apply_modifiers(duplicate)
+    source_materials = list(source.data.materials) or [PAINT]
     duplicate.data.materials.clear()
-    duplicate.data.materials.append(bake_mats[group])
-    for poly in duplicate.data.polygons:
-        poly.material_index = 0
+    for source_material in source_materials:
+        duplicate.data.materials.append(bake_mats[(group, source_material.name)])
     group_duplicates.setdefault(group, []).append(duplicate)
 
 group_objects = []
@@ -506,14 +597,16 @@ rough_img = new_bake_image("IS2_Roughness_Atlas", "Non-Color")
 metal_img = new_bake_image("IS2_Metallic_Atlas", "Non-Color")
 ao_img = new_bake_image("IS2_AO_Atlas", "Non-Color")
 
-print("BAKE: Base Color")
-bake_selected_to_active(target, hp_sources, base_img, "DIFFUSE", {"COLOR"})
-print("BAKE: Tangent-space Normal")
+print("BAKE: Base Color (material-ID emission)")
+bake_target_emission(target, base_img, "BaseColor")
+print("BAKE: Tangent-space Normal (high-poly to low-poly)")
 bake_selected_to_active(target, hp_sources, normal_img, "NORMAL")
-print("BAKE: Roughness")
-bake_scalar_selected_to_active(target, hp_sources, rough_img, "Roughness", 0.78)
-print("BAKE: Metallic")
-bake_scalar_selected_to_active(target, hp_sources, metal_img, "Metallic", 0.18)
+if image_rgb_stats(normal_img)[1] < 0.01:
+    bake_target_normal_fallback(target, normal_img)
+print("BAKE: Roughness (material-ID emission)")
+bake_target_emission(target, rough_img, "Roughness")
+print("BAKE: Metallic (material-ID emission)")
+bake_target_emission(target, metal_img, "Metallic")
 
 print("BAKE: Ambient Occlusion")
 for source in hp_sources:
@@ -602,9 +695,9 @@ separated = [
     if obj.type == "MESH" and obj.name.startswith("LP_AtlasBakeTarget")
 ]
 if len(separated) < 5:
-    raise RuntimeError("Material separation failed; expected multiple animated mesh groups")
+    raise RuntimeError("Material separation failed; expected multiple material pieces")
 
-parts = {}
+pieces_by_group = {}
 for obj in separated:
     used = {}
     for poly in obj.data.polygons:
@@ -615,16 +708,29 @@ for obj in separated:
     source_mat = obj.data.materials[material_index]
     if not source_mat or not source_mat.name.startswith("IS2_BAKE__"):
         raise RuntimeError("Cannot identify separated assembly material for " + obj.name)
-    group = source_mat.name.split("IS2_BAKE__", 1)[1]
-    if group in parts:
-        raise RuntimeError("Duplicate separated assembly group: " + group)
-    obj.name = "LP_" + group
-    obj.data.materials.clear()
-    obj.data.materials.append(final_mat)
-    for poly in obj.data.polygons:
+    encoded = source_mat.name.split("IS2_BAKE__", 1)[1]
+    group = encoded.split("__", 1)[0]
+    pieces_by_group.setdefault(group, []).append(obj)
+
+# Rejoin each assembly after the material-ID atlas has been baked. The shared
+# final PBR material uses the preserved atlas UVs, so the assembly keeps all
+# original sub-material colour/roughness/metallic distinctions.
+parts = {}
+for group, pieces in pieces_by_group.items():
+    deselect_all()
+    for obj in pieces:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = pieces[0]
+    if len(pieces) > 1:
+        bpy.ops.object.join()
+    joined = bpy.context.view_layer.objects.active
+    joined.name = "LP_" + group
+    joined.data.materials.clear()
+    joined.data.materials.append(final_mat)
+    for poly in joined.data.polygons:
         poly.material_index = 0
-    parts[group] = obj
-    move_final_object(obj)
+    parts[group] = joined
+    move_final_object(joined)
 
 required_groups = {"Hull", "Turret", "Gun_Elevation", "Gun_Recoil", "TrackLink_L", "TrackLink_R"}
 missing_groups = required_groups - set(parts)
