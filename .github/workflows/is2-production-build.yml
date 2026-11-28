@@ -15,6 +15,10 @@ on:
       - ".github/workflows/is2-production-build.yml"
   workflow_dispatch:
 
+concurrency:
+  group: is2-production-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
