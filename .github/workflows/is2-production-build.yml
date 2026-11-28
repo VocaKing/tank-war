@@ -1,0 +1,65 @@
+name: IS-2 production asset pipeline
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/blender/**"
+      - ".github/workflows/is2-production-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: is2-production-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-is2-production:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out production branch
+        uses: actions/checkout@v4
+
+      - name: Install Blender and bake dependencies
+        run: |
+          # The hosted runner may include a Microsoft apt source that returns 403.
+          # Blender and its dependencies come from Ubuntu; disable only that failing source.
+          for source in $(grep -rl "packages.microsoft.com" /etc/apt/sources.list.d || true); do
+            sudo mv "$source" "$source.disabled"
+          done
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender python3-numpy python3-pil libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+          blender --version
+
+      - name: Validate Python syntax
+        run: |
+          python3 -m py_compile tools/blender/is2_model1944_blockout.py
+          python3 -m py_compile tools/blender/is2_model1944_production.py
+          python3 -m py_compile tools/blender/validate_is2_production.py
+
+      - name: Build low-poly asset and bake PBR maps
+        run: |
+          mkdir -p public/models artifacts/is2-model1944/production
+          set -o pipefail
+          PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 IS2_FAST_PREVIEW=1 IS2_ATLAS_SIZE=2048 blender --background --python-exit-code 1 --python tools/blender/is2_model1944_production.py 2>&1 | tee artifacts/is2-model1944/production/blender-build.log
+
+      - name: Validate exported GLB and texture package
+        run: python3 tools/blender/validate_is2_production.py
+
+      - name: Upload review package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: is2-model1944-production-candidate
+          if-no-files-found: warn
+          path: |
+            public/models/is2_model1944_production_candidate.glb
+            artifacts/is2-model1944/production/is2_model1944_production_candidate.blend
+            artifacts/is2-model1944/production/asset_manifest.json
+            artifacts/is2-model1944/production/blender-build.log
+            artifacts/is2-model1944/production/*.png
+            artifacts/is2-model1944/production/pbr/*.png
