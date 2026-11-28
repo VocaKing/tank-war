@@ -873,7 +873,11 @@ root = create_empty("IS2_Model1944_Root", (0.0, 0.0, 0.0))
 root["variant"] = "IS-2 Model 1944 late-war sloped-glacis"
 root["units"] = "meters"
 root["source_forward_axis"] = "+Y"
+root["gltf_up_axis"] = "+Y"
+root["gltf_forward_axis"] = "-Z"
 root["runtime_forward_axis"] = "+Z"
+root["runtime_yaw_correction_radians"] = math.pi
+root["runtime_track_side_names_swapped"] = True
 root["asset_status"] = "production candidate; visual review required"
 root["pbr_atlas_resolution"] = ATLAS_SIZE
 
@@ -1064,12 +1068,23 @@ manifest = {
         "high-poly-only weld and track-link details",
         "low-poly duplicate with reduced bevel segments",
         "packed multi-assembly UV atlas",
-        "selected-to-active Base Color, Tangent Normal, Roughness and Metallic baking",
-        "Ambient Occlusion baking",
+        "UV-triangle material-ID rasterization for Base Color, Roughness and Metallic",
+        "selected-to-active high-poly Tangent Normal bake with procedural UV micro-normal fallback",
+        "Ambient Occlusion bake with neutral-white fallback when empty",
         "shared PBR atlas material",
         "articulated GLB export"
     ],
     "atlas_resolution": ATLAS_SIZE,
+    "normal_source": normal_source,
+    "ao_source": ao_source,
+    "axis_convention": {
+        "blender_source_forward": "+Y",
+        "gltf_up": "+Y",
+        "gltf_forward": "-Z",
+        "runtime_forward": "+Z",
+        "runtime_yaw_correction_radians": math.pi,
+        "runtime_track_side_names_swapped": True
+    },
     "texture_maps": {
         "basecolor": "pbr/basecolor.png",
         "normal": "pbr/normal.png",
