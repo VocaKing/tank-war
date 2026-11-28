@@ -960,13 +960,13 @@ def attach_part(group, obj):
     elif group.startswith("DriveSprocket_"):
         side = group.split("_")[-1]
         side_sign = -1 if side == "L" else 1
-        location = (side_sign * 1.21, -2.72, 0.70)
+        location = (side_sign * TRACK_CENTER_X, -TRACK_HALF_STRAIGHT, TRACK_Z)
         parent = create_empty(group + "_Pivot", location, hull)
         parent["animated_axis"] = "Blender X drive rotation"
     elif group.startswith("FrontIdler_"):
         side = group.split("_")[-1]
         side_sign = -1 if side == "L" else 1
-        location = (side_sign * 1.21, 2.72, 0.70)
+        location = (side_sign * TRACK_CENTER_X, TRACK_HALF_STRAIGHT, TRACK_Z)
         parent = create_empty(group + "_Pivot", location, hull)
         parent["animated_axis"] = "Blender X idler rotation"
     else:
@@ -1132,6 +1132,8 @@ manifest = {
         "ao": "pbr/ao.png"
     },
     "track_links_per_side": TRACK_LINKS,
+    "track_pitch_m": TRACK_PITCH,
+    "track_loop_length_m": TRACK_LINKS * TRACK_PITCH,
     "track_links_total": len(track_l) + len(track_r),
     "mesh_object_nodes": len(mesh_objects),
     "unique_mesh_datablocks": unique_meshes,
