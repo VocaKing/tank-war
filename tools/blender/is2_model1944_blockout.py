@@ -348,8 +348,15 @@ brake_world = brake.matrix_world.copy()
 brake.parent = gun_pivot
 brake.matrix_world = brake_world
 for side in (-1, 1):
-    box("Muzzle_brake_side_port_%s" % side, (side*0.145, 6.19, 2.17),
-        (0.035, 0.19, 0.085), DARK, 0.012)
+    for slot, y in enumerate((6.125, 6.255)):
+        box("Muzzle_brake_side_port_%s_%d" % (side, slot),
+            (side*0.145, y, 2.17), (0.035, 0.085, 0.082), DARK, 0.012)
+# Two raised baffle collars and a dark bore make the D-25T muzzle brake read
+# as a double-baffle assembly instead of a capped cylinder.
+torus("Muzzle_brake_baffle_ring_rear", (0.0, 6.075, 2.17), 0.164, 0.014, STEEL, "Y")
+torus("Muzzle_brake_baffle_ring_front", (0.0, 6.305, 2.17), 0.164, 0.014, STEEL, "Y")
+torus("Muzzle_brake_front_lip", (0.0, 6.372, 2.17), 0.132, 0.014, STEEL, "Y")
+cylinder("Muzzle_bore_dark", (0.0, 6.376, 2.17), 0.098, 0.012, DARK, "Y", 40, 0.0)
 
 # Cupola shifted left, characteristic of the revised 1944 turret roof.
 cylinder("Commander_cupola_base", (-0.36, -0.52, 2.60), 0.37, 0.18, CAST, "Z", 48)
