@@ -30,10 +30,59 @@ names = [node.get("name", "") for node in gltf.get("nodes", [])]
 for required in manifest["required_nodes"]:
     assert required in names, "Missing runtime node: " + required
 
+node_by_name = {node.get("name", ""): node for node in gltf.get("nodes", [])}
+node_index = {node.get("name", ""): i for i, node in enumerate(gltf.get("nodes", []))}
+
+def child_names(parent_name):
+    parent = node_by_name[parent_name]
+    return {
+        gltf["nodes"][child].get("name", "")
+        for child in parent.get("children", [])
+    }
+
+# The runtime depends on these exact pivots being nested correctly. A flat list
+# of nodes is not enough: a turret or gun pivot under the wrong parent would
+# rotate the whole hull or fail to animate.
+required_parent_pairs = (
+    ("IS2_Model1944_Root", "Hull_Body"),
+    ("Hull_Body", "Turret_Root"),
+    ("Turret_Root", "Gun_Elevation_Pivot"),
+    ("Gun_Elevation_Pivot", "Gun_Recoil_Pivot"),
+    ("Hull_Body", "Track_L_Root"),
+    ("Hull_Body", "Track_R_Root"),
+)
+for parent, child in required_parent_pairs:
+    assert child in child_names(parent), "%s is not a child of %s" % (child, parent)
+
 left = [name for name in names if re.fullmatch(r"TrackLink_L_\d{3}", name)]
 right = [name for name in names if re.fullmatch(r"TrackLink_R_\d{3}", name)]
 assert len(left) == 86, "Expected 86 independent left track-link nodes, got %d" % len(left)
 assert len(right) == 86, "Expected 86 independent right track-link nodes, got %d" % len(right)
+
+# Verify every link belongs to the correct track root and has renderable mesh
+# geometry. This also detects accidental joining of the 86 shoes into one mesh.
+for label, links, root_name in (
+    ("L", left, "Track_L_Root"),
+    ("R", right, "Track_R_Root"),
+):
+    child_set = child_names(root_name)
+    assert set(links).issubset(child_set), "Track %s links are not parented to %s" % (label, root_name)
+    assert all(node_by_name[name].get("mesh") is not None for name in links), "Track %s contains a link without mesh geometry" % label
+    mesh_ids = {node_by_name[name]["mesh"] for name in links}
+    assert len(mesh_ids) == 1, "Track %s links should share one instancing-ready mesh, got %d" % (label, len(mesh_ids))
+
+# Six paired road-wheel stations and three return rollers per side, plus the
+# rear drive sprocket and front idler. Each must have an independent pivot.
+expected_pivots = (
+    [f"RoadWheel_{side}_{index:02d}_Pivot" for side in ("L", "R") for index in range(1, 7)]
+    + [f"ReturnRoller_{side}_{index:02d}_Pivot" for side in ("L", "R") for index in range(1, 4)]
+    + [f"DriveSprocket_{side}_Pivot" for side in ("L", "R")]
+    + [f"FrontIdler_{side}_Pivot" for side in ("L", "R")]
+)
+missing_pivots = [name for name in expected_pivots if name not in node_by_name]
+assert not missing_pivots, "Missing running-gear pivots: " + ", ".join(missing_pivots)
+for pivot in expected_pivots:
+    assert child_names(pivot), "Running-gear pivot has no mesh child: " + pivot
 
 texture_stats = {}
 for filename in ("basecolor.png", "normal.png", "roughness.png", "metallic.png", "ao.png"):
