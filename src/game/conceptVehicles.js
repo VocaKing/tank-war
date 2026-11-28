@@ -28,18 +28,18 @@ function vehicle(id,name,short,cls,config) {
   };
 }
 export const CONCEPT_VEHICLES = [
-  vehicle('aegis140','Aegis-140 Heavy MBT','Aegis-140','Heavy',{
+  vehicle('aegis140','VX-9 Aegis','VX-9 Aegis','Heavy',{
     tier:4,
     crew:['Commander','Gunner','Driver'],autoloader:true,
     mass:79,power:1600,maxSpeed:40,reverseSpeed:19,hullTraverse:28,turretTraverse:30,
     gunDepression:11,gunElevation:20,hp:2400,viewRange:490,reload:9.6,aimTime:1.8,dispersion:0.52, maxDispersion: 1.42,
-    dims:dims(8.3,4.05,1.72,4.25,3.75,0.82,6.7,{turretZ:-1.12}),
+    dims:dims(8.96,3.78,1.76,5.27,3.28,0.88,5.02,{turretZ:-0.78,turretBoxZ:-0.455,trackW:0.62,gunForwardL:10.70}),
     armor:armor(480,170,95,520,240,100,38),
     eraLayout:[{part:'hull',face:'front',cols:7,rows:2,heat:280,ke:90},{part:'hull',face:'side',cols:6,rows:2,heat:220,ke:65},{part:'turret',face:'side',cols:5,rows:2,heat:260,ke:78}],
     aps:{charges:1,radius:7,cooldown:8,rechargeSeconds:23},
     ammoRack:{zMin:-1.9,zMax:-0.5,yMax:0.9,chance:0.04,turretBustle:true},
     shells:ammo(140,500,470,140,[21,8,6],1590),
-    paint:paint('#59614e','#444a3a',['#383e36','#747660']),systemTag:'REAR TURRET · RECHARGING APS · MODULAR ERA',
+    paint:paint('#90908d','#454849',['#3e4347','#a6a69f']),systemTag:'REAR TURRET · RECHARGING APS · MODULAR ERA',
     desc:'Rear-mounted wedge turret, individually expendable ERA tiles and a one-charge APS that recharges after cooldown.',
   }),
   vehicle('bastion125','Bastion-125 Defensive MBT','Bastion-125','Heavy',{

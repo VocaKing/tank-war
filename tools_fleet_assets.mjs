@@ -14,10 +14,11 @@ const expectedExterior = new Set([
 ]);
 const wheelCounts = { archer: 8, centauro2: 8 };
 const expectedReferences = new Map([['xm8ags', 2], ['sprutsd', 8], ['t14', 10]]);
+const vx9Revision = '2026-11-vx9-reference';
 const rearTurretRevision = '2026-11-rear-turrets';
 
-function checkRearTurret({ nodes, meshes, accessors }, pivot, id) {
-  assert.equal(pivot?.extras?.turretExteriorRevision, rearTurretRevision, id);
+function checkRearTurret({ nodes, meshes, accessors }, pivot, id, revision = rearTurretRevision) {
+  assert.equal(pivot?.extras?.turretExteriorRevision, revision, id);
   const exterior = pivot.children.map(index => nodes[index]).find(node => node.extras?.turretExterior === id);
   assert.ok(exterior?.extras?.turretDetailParts > 30, id + ' is missing its tailored turret');
   for (const { attributes, indices } of meshes[exterior.mesh].primitives) {
@@ -42,7 +43,7 @@ for (const file of files) {
     assert.equal(model.extras.fleetModelRevision, '2026-11-exterior-detail', id + ' is missing the revised model');
     assert.ok(model.extras.exteriorDetailParts > 16, id + ' is missing layered exterior fittings');
   } else {
-    const revision = id === 'aegis140' ? rearTurretRevision : '2026-11-concept-detail-v3';
+    const revision = id === 'aegis140' ? vx9Revision : '2026-11-concept-detail-v3';
     assert.equal(model.extras.fleetModelRevision, revision, id + ' is missing the revised concept model');
     assert.ok(model.extras.exteriorDetailParts > 22, id + ' is missing its new hull and turret fittings');
     for (const suffix of ['track', 'rubber']) {
@@ -56,7 +57,12 @@ for (const file of files) {
   const child = (node, name) => node?.children?.map(i => nodes[i]).find(n => n.name === name);
   const body = child(model, 'body');
   const turret = child(body, 'turret');
-  if (id === 'aegis140') checkRearTurret(gltf, turret, id);
+  if (id === 'aegis140') {
+    checkRearTurret(gltf, turret, id, vx9Revision);
+    assert.ok(child(body, 'VX-9 chassis')?.mesh !== undefined);
+    assert.ok(materials.some(m => m.name === 'VX-9 illuminated strip' && m.emissiveFactor));
+    assert.ok(child(body, 'track_0').extras.poses.length === 100);
+  }
   const gun = child(turret, 'gun');
   const barrel = child(gun, 'recoiling-barrel');
   const muzzle = child(barrel, 'muzzle');

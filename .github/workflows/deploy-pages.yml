@@ -32,6 +32,7 @@ jobs:
       - run: node tools_aim_assist.mjs
       - run: node tools_combat_reticle.mjs
       - run: node tools_wreck_vfx.mjs
+      - run: node tools_muzzle_vfx.mjs
       - run: node tools_balance.mjs
       - run: node tools_battlefield_timing.mjs
       - run: node tools_vehicle_skills.mjs

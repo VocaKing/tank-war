@@ -2,6 +2,7 @@
 // Positions are relative to the turret pivot in metres, with +Z forward.
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { BoxGeometry, BufferGeometry, CatmullRomCurve3, CylinderGeometry, Float32BufferAttribute,
   Quaternion, ShapeUtils, Vector2, Vector3 } from 'three';
 
@@ -236,54 +237,6 @@ function basilisk() {
   return t;
 }
 
-function aegis() {
-  const t = new Turret();
-  const plan = [[-0.60, 1.90], [0.50, 1.89], [1.08, 2.07], [1.68, 1.44], [1.85, 0.52],
-    [1.71, -0.95], [1.52, -1.87], [0.96, -2.15], [-0.79, -2.23], [-1.53, -1.82],
-    [-1.82, -0.78], [-1.79, 0.51], [-1.47, 1.33], [-0.93, 1.88]];
-  t.add('dark', loft([ring(plan, 0.78, 0.96, 0.018), ring(plan, 0.92, 0.99, 0.22, 0.03)]));
-  t.add('paint', loft([
-    ring(plan, 0.91, 0.94, 0.16), ring(plan, 1, 1, 0.37, 0, -0.021),
-    ring(plan, 0.93, 0.92, 0.63, -0.05, -0.038),
-    ring(plan, 0.76, 0.84, 0.79, -0.17, -0.06), ring(plan, 0.71, 0.82, 0.818, -0.18, -0.06),
-  ]));
-  t.plate('paint', [[0.56, 1.96], [1.07, 2.09], [1.54, 1.75], [1.83, 1.07], [1.61, 0.57], [0.80, 0.95]],
-    0.25, 0.69, 0.18, -0.10);
-  t.plate('paint', [[-1.73, 1.00], [-1.47, 1.57], [-0.92, 1.92], [-0.60, 1.91], [-0.78, 0.86], [-1.45, 0.63]],
-    0.28, 0.61, 0.23, -0.085, 0.89);
-  t.optic(-1.08, 0.624, 1.22, 0.56, 0.223, 0.57, -0.18);
-  t.plate('fitting', plateOutline(0.75, -0.20, 0.76, 0.74, 0.14), 0.825, 0.945, 0.18);
-  t.round('dark', [0.75, 1.004, -0.20], 0.23, 0.148, { top: 0.19 });
-  t.optic(0.75, 1.074, -0.10, 0.58, 0.32, 0.52, 0.09);
-  t.plate('paint', plateOutline(0.77, 0.005, 0.63, 0.48, 0.10), 1.325, 1.415, 0.11, -0.12, 0.84);
-  t.hatch(-0.33, 0.817, -0.24, 0.285);
-  t.whip(-1.01, 0.919, -1.24, 0.85, -0.09);
-  t.whip(0.90, 0.932, -1.42, 0.72, 0.07);
-  for (const s of [-1, 1]) {
-    for (let row = 0; row < 2; row++) for (let i = 0; i < 5; i++) {
-      const z = -1.26 + i * 0.430 + row * 0.135;
-      const x = s * (1.68 + 0.125 * Math.max(0, 1 - Math.abs(z - 0.23)) - row * 0.105);
-      t.add('era', plate(plateOutline(0, 0, 0.22, 0.406, 0.035), 0, 0.161, 0.19, -0.105)
-        .rotateZ(s * 0.28).rotateY(s * 0.085).translate(x, 0.23 + row * 0.179, z), row ? 0.99 : 0.86);
-    }
-    for (const z of [-0.78, 0.23]) {
-      t.box('dark', [s * 1.53, 0.686, z], [0.30, 0.181, 0.32], s * 0.13);
-      t.round('steel', [s * 1.565, 0.799, z], 0.112, 0.081, { top: 0.088 });
-      t.round('glass', [s * 1.657, 0.697, z], 0.073, 0.020, { direction: new Vector3(s, 0, 0) });
-    }
-    t.plate('fitting', plateOutline(s * 0.55, -1.55, 1.00, 0.83, 0.16), 0.878, 0.972, 0.18, -0.10);
-    t.grip(s * 0.57, 0.974, -1.60);
-    t.box('dark', [s * 0.55, 0.54, -2.196], [0.90, 0.282, 0.098], -s * 0.1);
-    for (let j = 0; j < 5; j++) t.rail('steel', [s * 0.17, 0.440 + j * 0.049, -2.294],
-      [s * 0.92, 0.440 + j * 0.049, -2.227], 0.017);
-    for (const [x, z] of [[0.15, -2.287], [0.94, -2.228]]) {
-      t.rail('steel', [s * x, 0.409, z], [s * x, 0.681, z], 0.021);
-    }
-    t.box('mark', [s * 1.03, 0.50, -2.143], [0.13, 0.045, 0.065], s * 0.48);
-  }
-  return t;
-}
-
 const expansion = {
   paint: 'Armor · painted plate', fitting: 'Fittings · painted alloy', dark: 'Recess · shadowed steel',
   steel: 'Weld and forged hardware', glass: 'Optics · anti-reflective coating',
@@ -291,8 +244,7 @@ const expansion = {
 const designs = {
   atlas: [atlas, { ...expansion, canvas: 'Canvas · weathered' }],
   basilisk: [basilisk, { ...expansion, mark: 'Hatch release marking' }],
-  aegis140: [aegis, { paint: 'aegis140_Paint', fitting: 'aegis140_Antislip', dark: 'aegis140_DarkMetal',
-    steel: 'aegis140_BareMetal', glass: 'aegis140_Glass', era: 'aegis140_ERA', mark: 'Fluted amber lens' }],
+
 };
 
 function parseGlb(file) {
@@ -384,12 +336,7 @@ function compactAsset(gltf, bytes) {
   return Buffer.concat(chunks, size);
 }
 
-function appendTurret(gltf, existing, id) {
-  const [build, palette] = designs[id];
-  const turret = gltf.nodes.find(n => n.name === (id === 'aegis140' ? 'turret' : 'TURRET_PIVOT'));
-  const gun = turret.children.find(i => /^(gun|GUN_PIVOT)$/.test(gltf.nodes[i].name));
-  assert.notEqual(gun, undefined, id);
-  const parts = build().parts;
+function appendParts(gltf, existing, parts, palette, name) {
   const batches = new Map();
   for (const { material, geometry, tint } of parts) {
     const index = gltf.materials.findIndex(m => m.name === palette[material]);
@@ -459,24 +406,34 @@ function appendTurret(gltf, existing, id) {
     const indices = push(new Uint16Array(batch.indices), 'SCALAR', 5123, 34963);
     primitives.push({ material, attributes, indices });
   }
-  const mesh = gltf.meshes.push({ name: id + ' shaped turret', primitives }) - 1;
+  const mesh = gltf.meshes.push({ name, primitives }) - 1;
+  return { mesh, bytes: Buffer.concat(chunks, offset) };
+}
+
+function appendTurret(gltf, existing, id) {
+  const [build, palette] = designs[id];
+  const turret = gltf.nodes.find(n => n.name === 'TURRET_PIVOT');
+  const gun = turret.children.find(i => /^(gun|GUN_PIVOT)$/.test(gltf.nodes[i].name));
+  assert.notEqual(gun, undefined, id);
+  const parts = build().parts;
+  const { mesh, bytes } = appendParts(gltf, existing, parts, palette, id + ' shaped turret');
   const exterior = gltf.nodes.push({ name: id + ' turret exterior', mesh,
     extras: { turretExterior: id, turretDetailParts: parts.length } }) - 1;
   turret.children = [gun, exterior];
   turret.extras = { ...turret.extras, turretExteriorRevision: revision };
-  if (id === 'aegis140') {
-    const root = gltf.nodes.find(n => n.name === id);
-    root.extras = { ...root.extras, fleetModelRevision: revision };
-  }
-  return compactAsset(gltf, Buffer.concat(chunks, offset));
+  return compactAsset(gltf, bytes);
 }
 
-for (const id of Object.keys(designs)) {
-  const file = new URL(`public/models/${id === 'aegis140' ? 'fleet' : 'armour-expansion'}/${id}.glb`, import.meta.url);
-  const input = await readFile(file);
-  const { gltf, bytes } = parseGlb(input);
-  const output = appendTurret(gltf, bytes, id);
-  const glb = serializeGlb(gltf, output);
-  await writeFile(file, glb);
-  console.log(id, input.length, '→', glb.length, 'bytes');
+export { Turret as ModelParts, appendParts, parseGlb, serializeGlb, compactAsset, loft, ring, mirrored, plate, plateOutline };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  for (const id of ['atlas', 'basilisk']) {
+    const file = new URL(`public/models/armour-expansion/${id}.glb`, import.meta.url);
+    const input = await readFile(file);
+    const { gltf, bytes } = parseGlb(input);
+    const output = appendTurret(gltf, bytes, id);
+    const glb = serializeGlb(gltf, output);
+    await writeFile(file, glb);
+    console.log(id, input.length, '→', glb.length, 'bytes');
+  }
 }

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { softSprite } from '../world/textures.js';
 import { ArtilleryVfx } from './artilleryVfx.js';
 import { TankWreckVfx } from './tankWreckVfx.js';
+import { MuzzleVfx, muzzleProfile } from './muzzleVfx.js';
 
 const VS = `
 attribute float aSize; attribute vec4 aColor; attribute float aRot;
@@ -58,10 +59,12 @@ class Particles {
 }
 
 export class Effects {
-  constructor(scene, renderer, dustColor = [0.55, 0.5, 0.42], quality = 'high') {
+  constructor(scene, renderer, dustColor = [0.55, 0.5, 0.42], quality = 'high', ground) {
     this.scene = scene; this.smoke = new Particles(scene, 5000, false); this.fire = new Particles(scene, 2500, true);
     this.artillery = new ArtilleryVfx(scene, quality, dustColor);
     this.wrecks = new TankWreckVfx(scene, quality, dustColor);
+    this.muzzles = new MuzzleVfx(scene, quality, dustColor, ground);
+    this.muzzleLight = new THREE.Color();
     this.dust = dustColor; this.lights = []; this.burners = []; this.tracers = []; this.debris = [];
     const flashes = quality === 'high' ? 4 : quality === 'medium' ? 2 : 1;
     for (let i = 0; i < flashes; i++) { const l = new THREE.PointLight(0xffaa55, 0, 60, 1.6); scene.add(l); this.lights.push({ l, t: 0, max: 0.1, i0: 0 }); }
@@ -72,7 +75,7 @@ export class Effects {
   }
   setScale(h, fovDeg) { const s = h * this.renderer.getPixelRatio() / (2 * Math.tan((fovDeg * Math.PI) / 360)); this.smoke.mat.uniforms.uScale.value = s; this.fire.mat.uniforms.uScale.value = s; }
   dispose() {
-    this.smoke.dispose(); this.fire.dispose(); this.artillery.dispose(); this.wrecks.dispose();
+    this.smoke.dispose(); this.fire.dispose(); this.artillery.dispose(); this.wrecks.dispose(); this.muzzles.dispose();
     this.tracerGeo.dispose(); this.tracerMat.dispose();
     this.debrisGeo.dispose(); this.debrisMat.dispose();
   }
@@ -80,14 +83,11 @@ export class Effects {
     let best = this.lights[0]; for (const L of this.lights) if (L.t >= L.max) { best = L; break; }
     best.l.position.copy(pos); best.l.color.set(color); best.i0 = intensity; best.t = 0; best.max = dur; best.l.intensity = intensity;
   }
-  muzzle(pos, dir, caliber) {
-    const k = caliber / 100;
-    this.flash(pos, 160 * k, 0.08);
-    for (let i = 0; i < 14; i++) { const s = Math.random(); this.fire.emit({ x: pos.x + dir.x * s * 1.6, y: pos.y + dir.y * s * 1.6, z: pos.z + dir.z * s * 1.6, vx: dir.x * 12 * (1 - s) + (Math.random() - 0.5) * 3, vy: dir.y * 12 + (Math.random() - 0.5) * 3, vz: dir.z * 12 * (1 - s) + (Math.random() - 0.5) * 3, life: 0.08 + Math.random() * 0.06, s0: 1.4 * k + 0.6, s1: 2.6 * k + 1, r: 1, g: 0.75, b: 0.35, a: 1, drag: 0.02 }); }
-    for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, sp = 3 + Math.random() * 6; const side = new THREE.Vector3(Math.cos(a), Math.sin(a) * 0.6, Math.sin(a)).multiplyScalar(sp);
-      this.smoke.emit({ x: pos.x, y: pos.y, z: pos.z, vx: dir.x * (6 + Math.random() * 14) + side.x, vy: dir.y * 8 + side.y + 0.5, vz: dir.z * (6 + Math.random() * 14) + side.z, life: 2.5 + Math.random() * 2, s0: 1.2 * k + 0.5, s1: 6 * k + 3, r: 0.78, g: 0.76, b: 0.72, a: 0.55, drag: 0.25, grav: -0.25 }); }
-    // ground blast dust
-    for (let i = 0; i < 10; i++) { const a = Math.random() * 6.28; this.smoke.emit({ x: pos.x, y: pos.y - 1.4, z: pos.z, vx: Math.cos(a) * 9, vy: 0.6, vz: Math.sin(a) * 9, life: 2.2, s0: 2, s1: 6, r: this.dust[0], g: this.dust[1], b: this.dust[2], a: 0.35, drag: 0.2 }); }
+  muzzle(pos, dir, caliber, vehicle, mode = 'gun') {
+    const profile = muzzleProfile(vehicle, caliber, mode);
+    this.muzzleLight.setRGB(...profile.tint);
+    this.flash(pos, 125 * profile.size, 0.086, this.muzzleLight);
+    this.muzzles.fire(pos, dir, profile);
   }
   impactGround(pos, caliber, he = false) {
     const k = caliber / 100 * (he ? 1.8 : 1);
@@ -189,6 +189,6 @@ export class Effects {
     for (let i = this.debris.length - 1; i >= 0; i--) { const d = this.debris[i]; d.t += dt; d.v.y -= 9.81 * dt; d.m.position.addScaledVector(d.v, dt); d.m.rotation.x += d.w.x * dt; d.m.rotation.y += d.w.y * dt;
       const gy = ground(d.m.position.x, d.m.position.z); if (d.m.position.y < gy + 0.1) { d.m.position.y = gy + 0.1; d.v.multiplyScalar(0.3); d.v.y = Math.abs(d.v.y) * 0.3; d.w.multiplyScalar(0.5); }
       if (d.t > 25) { this.scene.remove(d.m); this.debris.splice(i, 1); } }
-    this.smoke.update(dt); this.fire.update(dt); this.artillery.update(dt, camera); this.wrecks.update(dt, camera);
+    this.smoke.update(dt); this.fire.update(dt); this.artillery.update(dt, camera); this.wrecks.update(dt, camera); this.muzzles.update(dt, camera);
   }
 }

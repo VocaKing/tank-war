@@ -456,7 +456,7 @@ export class Tank {
       }
     }
     g.physics?.recoil(this, this.gunMount.getWorldPosition(_v), dir, sh.caliber);
-    g.effects.muzzle(origin, dir, sh.caliber); g.audio.gun(origin, sh.caliber, this.isPlayer, this.spec.id, {kind:sh.guided?'guided':secondary?'secondary':'gun'});
+    g.effects.muzzle(origin, dir, sh.caliber, this.spec, sh.guided ? 'guided' : secondary ? 'secondary' : 'gun'); g.audio.gun(origin, sh.caliber, this.isPlayer, this.spec.id, {kind:sh.guided?'guided':secondary?'secondary':'gun'});
     if (!secondary && this.spec.artillery?.autoDeploy) {
       this.autoArtilleryShots++;
       if (this.autoArtilleryShots >= this.spec.artillery.fireMissionRounds) {
@@ -573,7 +573,7 @@ export class Tank {
     const offsets = cfg.offsets || [];
     const shot = this.spawnRound(index, offsets.length ? offsets[this.burstOffsetIndex % offsets.length] : null, this.burstOffsetIndex);
     this.burstOffsetIndex++; this.ammo[index]--; this.stats.shots++; this.lastFired = time; this.recoil = 0.35;
-    this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber); this.game.audio.gun(shot.muzzle, shot.caliber, this.isPlayer, this.spec.id, {kind:this.spec.shells[index].guided?'guided':'gun'});
+    this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber, this.spec, this.spec.shells[index].guided ? 'guided' : 'gun'); this.game.audio.gun(shot.muzzle, shot.caliber, this.isPlayer, this.spec.id, {kind:this.spec.shells[index].guided?'guided':'gun'});
     this.game.physics?.recoil(this, shot.muzzle, shot.dir, shot.caliber);
     this.burstLeft--;
     if (this.burstLeft > 0 && this.ammo[index] > 0) {
@@ -596,7 +596,7 @@ export class Tank {
       const shot = this.spawnRound(index, offsets.length ? offsets[i % offsets.length] : null, i);
       if (!first) first = shot;
       this.game.audio.gun(shot.muzzle,shot.caliber,this.isPlayer,this.spec.id,{kind:shell.guided?'guided':'gun',salvoCount:count,offset:i*.009});
-      this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber);
+      this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber, this.spec, shell.guided ? 'guided' : 'gun');
       this.game.physics?.recoil(this, shot.muzzle, shot.dir, shot.caliber);
     }
     this.ammo[index] -= count; this.reloadLeft = this.reloadTime() * (mode.reloadMult || 1);
@@ -626,7 +626,7 @@ export class Tank {
       const shot=this.spawnRound(index,this.spec.multiTube.offsets[i],i);
       first??=shot;
       this.game.audio.gun(shot.muzzle,shot.caliber,this.isPlayer,this.spec.id,{kind:'tube',salvoCount:tubes.length,offset:order*.014});
-      this.game.effects.muzzle(shot.muzzle,shot.dir,shot.caliber);
+      this.game.effects.muzzle(shot.muzzle, shot.dir, shot.caliber, this.spec, 'tube');
       this.game.physics?.recoil(this,shot.muzzle,shot.dir,shot.caliber);
     }
     this.tubeReload.fire(tubes,this.reloadTime()*(mode.reloadMult||1));

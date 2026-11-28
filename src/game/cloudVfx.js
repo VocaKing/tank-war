@@ -6,6 +6,10 @@ const VERTEX = `
 attribute vec3 aCenter;
 attribute vec4 aShape;
 attribute vec4 aTint;
+#ifdef COLORED_FLAME
+attribute vec3 aFlameTint;
+varying vec3 vFlameTint;
+#endif
 varying vec2 vUv;
 varying vec2 vTile;
 varying vec4 vTint;
@@ -19,11 +23,17 @@ void main() {
   vUv = uv;
   vTile = vec2(mod(aShape.z, 2.0), floor(aShape.z * 0.5));
   vTint = aTint;
+  #ifdef COLORED_FLAME
+  vFlameTint = aFlameTint;
+  #endif
   vHeat = aShape.w;
   #include <fog_vertex>
 }`;
 const FRAGMENT = `
 uniform sampler2D uCloud;
+#ifdef COLORED_FLAME
+varying vec3 vFlameTint;
+#endif
 varying vec2 vUv;
 varying vec2 vTile;
 varying vec4 vTint;
@@ -36,6 +46,11 @@ void main() {
   if (alpha < 0.012) discard;
   vec3 soot = vTint.rgb * mix(0.42, 1.86, cloud.r);
   vec3 flame = mix(vec3(0.7, 0.065, 0.004), vec3(3.0, 1.35, 0.26), pow(cloud.g, 1.3));
+  #ifdef COLORED_FLAME
+  float core = pow(cloud.g, 1.2);
+  flame = mix(vFlameTint * 0.54, vFlameTint * 2.4, smoothstep(0.10, 0.78, core));
+  flame = mix(flame, mix(vFlameTint, vec3(1.0), 0.81) * 3.4, smoothstep(0.70, 1.0, core));
+  #endif
   gl_FragColor = vec4(mix(soot, flame * mix(0.38, 1.0, vHeat), vHeat), alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -118,7 +133,7 @@ function cloudSilhouette(texture) {
 }
 
 export class CloudVfx {
-  constructor(scene, capacity) {
+  constructor(scene, capacity, coloredFlame = false) {
     this.puffs = [];
     this.draw = [];
     this.capacity = capacity;
@@ -138,9 +153,11 @@ export class CloudVfx {
     this.center = attribute('aCenter', 3);
     this.shape = attribute('aShape', 4);
     this.tint = attribute('aTint', 4);
+    if (coloredFlame) this.flameTint = attribute('aFlameTint', 3);
     geometry.instanceCount = 0;
     const material = new THREE.ShaderMaterial({
       vertexShader: VERTEX, fragmentShader: FRAGMENT,
+      defines: coloredFlame ? { COLORED_FLAME: 1 } : {},
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uCloud: { value: null } }]),
       transparent: true, depthWrite: false, fog: true,
     });
@@ -148,19 +165,19 @@ export class CloudVfx {
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.visible = false;
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 4;
+    this.mesh.renderOrder = coloredFlame ? 4.1 : 4;
     scene.add(this.mesh);
   }
 
   emit(origin, direction, {
     speed = 0, delay = 0, life, initial, size, tint, alpha = 1, heat = 0,
-    fadeIn, rise = 0, cooling = life, roll = 0,
+    fadeIn, rise = 0, cooling = life, roll = 0, flameTint = [1, 1, 1],
   }) {
     const random = Math.random;
     this.puffs.push({
       x: origin.x, y: origin.y, z: origin.z, vx: direction.x * speed, vy: direction.y * speed,
       vz: direction.z * speed, life, age: -delay, initial, size, tint, alpha, heat, fadeIn,
-      rise, cooling, roll, rot: random() * TAU, spin: (random() - 0.5) * (heat ? 1.35 : 0.63),
+      rise, cooling, roll, flameTint, rot: random() * TAU, spin: (random() - 0.5) * (heat ? 1.35 : 0.63),
       tile: Math.floor(random() * 4), phase: random() * TAU,
     });
   }
@@ -220,9 +237,11 @@ export class CloudVfx {
       const heat = puff.heat * Math.max(0, 1 - puff.age / puff.cooling) ** 0.54;
       this.center.setXYZ(i, puff.cx, puff.cy, puff.cz);
       this.shape.setXYZW(i, puff.diameter, puff.rot + puff.age * puff.spin, puff.tile, heat);
+      this.flameTint?.setXYZ(i, ...puff.flameTint);
       this.tint.setXYZW(i, puff.tint[0], puff.tint[1], puff.tint[2], puff.opacity);
     }
-    for (const attr of [this.center, this.shape, this.tint]) {
+    for (const attr of [this.center, this.shape, this.tint, this.flameTint]) {
+      if (!attr) continue;
       attr.clearUpdateRanges();
       attr.addUpdateRange(0, draw.length * attr.itemSize);
       attr.needsUpdate = true;

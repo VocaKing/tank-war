@@ -47,7 +47,7 @@ export function fireConceptMRSI(t,time) {
   const longFlight=shortFlight+gap;
   const firstV=mrsiVelocity(muzzle,target,longFlight), secondV=mrsiVelocity(muzzle,target,shortFlight);
   g.ballistics.spawn(t,sh,muzzle,firstV);
-  g.effects.muzzle(muzzle,firstV.clone().normalize(),sh.caliber);
+  g.effects.muzzle(muzzle,firstV.clone().normalize(),sh.caliber,t.spec);
   g.audio.gun(muzzle,sh.caliber,t.isPlayer,t.spec.id,{kind:sh.guided?'guided':'gun'});
   t.ammo[index]--; t.stats.shots++;t.lastFired=time;
   t.reloadLeft=t.reloadTime();t.recoil=1;t.stationarySeconds=0;
@@ -66,7 +66,7 @@ export function updateConceptMRSI(t,dt,time) {
   const muzzle=t.model.muzzle.getWorldPosition(new THREE.Vector3());
   const vel=mrsiVelocity(muzzle,q.target,q.flight);
   g.ballistics.spawn(t,sh,muzzle,vel);
-  g.effects.muzzle(muzzle,vel.clone().normalize(),sh.caliber);
+  g.effects.muzzle(muzzle,vel.clone().normalize(),sh.caliber,t.spec);
   g.audio.gun(muzzle,sh.caliber,t.isPlayer,t.spec.id,{kind:sh.guided?'guided':'gun'});
   t.ammo[q.index]--;t.stats.shots++;t.lastFired=time;t.recoil=1;
   g.physics?.recoil(t,muzzle,vel.clone().normalize(),sh.caliber);
