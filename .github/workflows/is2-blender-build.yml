@@ -43,7 +43,7 @@ jobs:
           mkdir -p public/models artifacts
           PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background --python tools/blender/is2_model1944_blockout.py
 
-      - name: Bake PBR textures and export production candidate
+      - name: Author PBR textures and export production candidate
         run: |
           PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background artifacts/is2-model1944/is2_model1944_first_pass.blend --python tools/blender/is2_pbr_bake_export.py
           PYTHONPATH=/usr/lib/python3/dist-packages EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 blender --background --python tools/blender/validate_is2_asset.py -- public/models/is2_model1944_pbr.glb
@@ -58,6 +58,8 @@ jobs:
           test -s artifacts/is2-model1944/03_front.png
           test -s artifacts/is2-model1944/04_rear.png
           test -s artifacts/is2-model1944/05_top.png
+          test -s artifacts/is2-model1944/PBR_front_three_quarter.png
+          test -n "$(find artifacts/is2-model1944/PBR_Textures -type f -name '*_BaseColor.png' -print -quit)"
           ls -lh public/models/is2_model1944_blockout.glb artifacts/is2-model1944/
 
       - name: Commit generated GLB to the feature branch
@@ -84,8 +86,8 @@ jobs:
           path: |
             public/models/is2_model1944_blockout.glb
             public/models/is2_model1944_pbr.glb
-            artifacts/is2-model1944/IS2_BaseColor_2K.png
-            artifacts/is2-model1944/IS2_AO_2K.png
+            artifacts/is2-model1944/PBR_Textures/*.png
+            artifacts/is2-model1944/PBR_*.png
             artifacts/is2-model1944/is2_model1944_pbr_source.blend
             artifacts/is2-model1944/is2_model1944_first_pass.blend
             artifacts/is2-model1944/*.png
