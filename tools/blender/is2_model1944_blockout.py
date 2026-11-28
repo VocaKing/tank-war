@@ -239,18 +239,20 @@ for side in (-1, 1):
 # and the Model 1944 enlarged/bulged forward casting. This replaces the crude
 # polygonal turret silhouette in the original Three.js-only asset.
 turret_sections = [
-    # z, x-radius, y-radius, center-x, center-y, exponent.
-    # The 1944 casting has a broad lower cheek, a distinctly drawn-in roof,
-    # a fuller rear bustle and a steeper front face. Avoid a uniform capsule.
-    (1.62, 1.18, 1.25,  0.00, 0.02, 3.0),
-    (1.78, 1.30, 1.38,  0.00, 0.02, 3.2),
-    (2.04, 1.31, 1.34, -0.01, 0.00, 3.0),
-    (2.24, 1.28, 1.25, -0.03, -0.02, 2.8),
-    (2.40, 1.21, 1.14, -0.06, -0.05, 2.6),
-    (2.50, 1.12, 1.05, -0.08, -0.07, 2.4),
-    (2.55, 1.04, 0.98, -0.08, -0.07, 2.2),
+    # z, x-radius, y-radius, center-x, center-y, superellipse exponent.
+    # The late 1944 cast turret has broad, almost vertical lower side walls,
+    # a relatively level roof, a sloped/flattened frontal casting and a full
+    # rear bustle. The high exponent keeps the side walls from reading as an egg.
+    (1.62, 1.17, 1.22,  0.00,  0.02, 3.7),
+    (1.72, 1.27, 1.34,  0.00,  0.03, 4.0),
+    (1.91, 1.31, 1.37, -0.01,  0.00, 4.0),
+    (2.10, 1.31, 1.34, -0.02, -0.03, 3.8),
+    (2.26, 1.28, 1.27, -0.04, -0.07, 3.5),
+    (2.39, 1.23, 1.17, -0.06, -0.10, 3.2),
+    (2.48, 1.16, 1.08, -0.07, -0.12, 3.0),
+    (2.53, 1.12, 1.02, -0.07, -0.14, 2.8),
 ]
-N = 64
+N = 80
 tv = []
 for z, rx, ry, cx, cy, expn in turret_sections:
     for i in range(N):
@@ -258,15 +260,21 @@ for z, rx, ry, cx, cy, expn in turret_sections:
         ca, sa = math.cos(a), math.sin(a)
         x = cx + rx * math.copysign(abs(ca)**(2/expn), ca)
         y = cy + ry * math.copysign(abs(sa)**(2/expn), sa)
-        # Build the characteristic forward cheek swell only in the lower
-        # casting. The front face then draws inward toward the roof instead
-        # of remaining a symmetric rounded capsule.
-        if sa > 0.55:
-            cheek = max(0.0, 1.0 - abs(z - 1.92) / 0.42)
-            x += 0.075 * cheek * (sa-0.55)/0.45 * (1 if ca >= 0 else -1)
-        # Rear bustle remains fuller than the forward roof transition.
-        if sa < -0.55:
-            y -= 0.045 * max(0.0, 1.0 - abs(z - 2.02) / 0.48)
+        # Flatten the forward arc into a broad cast front face. Its forward
+        # edge recedes as the roof rises, giving the characteristic sloped
+        # front profile instead of a capsule-shaped nose.
+        if sa > 0.62:
+            front_flat = min(1.0, max(0.0, (sa - 0.62) / 0.38))
+            front_flat = front_flat * front_flat * (3.0 - 2.0 * front_flat)
+            y = (1.0 - front_flat) * y + front_flat * (cy + ry * 0.985)
+        # Keep a fuller but slightly flattened rear bustle.
+        if sa < -0.76:
+            rear_flat = min(1.0, max(0.0, (-sa - 0.76) / 0.24))
+            y = (1.0 - rear_flat) * y + rear_flat * (cy - ry * 0.95)
+        # Cast cheeks are strongest below the gun line and taper toward roof.
+        if sa > 0.48:
+            cheek = max(0.0, 1.0 - abs(z - 1.94) / 0.48)
+            x += 0.085 * cheek * (sa - 0.48) / 0.52 * (1 if ca >= 0 else -1)
         tv.append((x, y, z))
 tf = []
 for j in range(len(turret_sections)-1):
@@ -275,13 +283,47 @@ for j in range(len(turret_sections)-1):
         tf.append((a,b,b+N,a+N))
 tf.append(tuple((len(turret_sections)-1)*N+i for i in range(N)))
 turret_body = mesh_object("Turret_cast_1944_loft", tv, tf, CAST, True)
+# Preserve smooth cast cheeks but keep the frontal casting and roof visibly
+# planar. This avoids the uniformly inflated, toy-like shading of a sphere.
+for polygon in turret_body.data.polygons:
+    if abs(polygon.normal.y) > 0.78 or polygon.normal.z > 0.88:
+        polygon.use_smooth = False
+    else:
+        polygon.use_smooth = True
 
-# D-25T mantlet: flattened, broad cast shield with a sloping lower edge.
-# The asymmetry and raised shoulders keep it from reading as a spherical knob.
-mantlet = add_uv_sphere("D25T_cast_mantlet", (0.0, 1.39, 2.13), (0.68, 0.15, 0.26), CAST)
-mantlet.rotation_euler[0] = math.radians(-7)
+# D-25T mantlet: a broad, thick cast shield with a flattened forward face.
+# It is built as a short superelliptic loft rather than a smooth UV sphere.
+mantlet_sections = [
+    # y, half-width, half-height, vertical centre, exponent
+    (1.235, 0.57, 0.225, 2.145, 3.0),
+    (1.345, 0.70, 0.295, 2.155, 3.2),
+    (1.465, 0.745, 0.305, 2.155, 3.2),
+    (1.565, 0.675, 0.270, 2.155, 3.0),
+]
+MN = 64
+mv, mf = [], []
+for y, rx, rz, cz, expn in mantlet_sections:
+    for i in range(MN):
+        a = math.tau * i / MN
+        ca, sa = math.cos(a), math.sin(a)
+        x = rx * math.copysign(abs(ca) ** (2.0 / expn), ca)
+        z = cz + rz * math.copysign(abs(sa) ** (2.0 / expn), sa)
+        mv.append((x, y, z))
+for j in range(len(mantlet_sections) - 1):
+    for i in range(MN):
+        a = j * MN + i
+        b = j * MN + (i + 1) % MN
+        mf.append((a, a + MN, b + MN, b))
+mf.append(tuple(range(MN)))
+mf.append(tuple((len(mantlet_sections) - 1) * MN + i for i in reversed(range(MN))))
+mantlet = mesh_object("D25T_cast_mantlet", mv, mf, CAST, True)
+for polygon in mantlet.data.polygons:
+    if abs(polygon.normal.y) > 0.80:
+        polygon.use_smooth = False
+# Concentric steel seat and recessed aperture around the 122 mm tube.
 cylinder("Main_gun_recess", (0.0, 1.625, 2.17), 0.19, 0.025, DARK, "Y", 40, 0.0)
 torus("Main_gun_mantlet_collar", (0.0, 1.64, 2.17), 0.19, 0.035, STEEL, "Y")
+torus("Main_gun_mantlet_outer_lip", (0.0, 1.605, 2.17), 0.255, 0.022, CAST, "Y")
 cylinder("Coaxial_DT_aperture", (-0.43, 1.62, 2.11), 0.055, 0.03, DARK, "Y", 24, 0.0)
 cylinder("Coaxial_DT_barrel_stub", (-0.43, 1.70, 2.11), 0.025, 0.18, STEEL, "Y", 16)
 cylinder("Telescope_sight_aperture", (0.43, 1.62, 2.18), 0.045, 0.03, DARK, "Y", 24, 0.0)
@@ -354,14 +396,23 @@ for side in (-1, 1):
                      (x + side*0.09, y, 0.70), 0.095, 0.045, CAST, "X", 32)
             cylinder("Roadwheel_hub_cap_%s_%02d_%d" % (side, i+1, pair+1),
                      (x + side*0.116, y, 0.70), 0.052, 0.022, STEEL, "X", 24)
-            # Six shallow circular reliefs on the outer face give the cast wheel
-            # its characteristic scalloped/star-like visual rhythm.
+            # Rubber contact band around each cast wheel. The steel dish and
+            # retaining lip remain visible on the outer face.
+            torus("Roadwheel_rubber_tire_%s_%02d_%d" % (side, i+1, pair+1),
+                  (x + side*0.078, y, 0.70), 0.253, 0.024, RUBBER, "X")
+            # Six shallow cast reliefs plus eight small hub fasteners.
             for k in range(6):
                 a = k*math.tau/6
                 yy = y + math.cos(a)*0.17
                 zz = 0.70 + math.sin(a)*0.17
                 cylinder("Roadwheel_relief_%s_%02d_%d_%d" % (side, i+1, pair+1, k),
                          (x + side*0.083, yy, zz), 0.022, 0.012, DARK, "X", 12, 0.0)
+            for k in range(8):
+                a = k*math.tau/8
+                yy = y + math.cos(a)*0.135
+                zz = 0.70 + math.sin(a)*0.135
+                cylinder("Roadwheel_hub_bolt_%s_%02d_%d_%d" % (side, i+1, pair+1, k),
+                         (x + side*0.087, yy, zz), 0.013, 0.014, STEEL, "X", 10, 0.0)
     # Three return rollers per side.
     for i, y in enumerate((-1.48, 0.0, 1.48)):
         cylinder("Return_roller_%s_%d" % (side, i+1),
