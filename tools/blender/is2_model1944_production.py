@@ -17,6 +17,8 @@ import re
 import json
 import math
 import runpy
+import numpy as np
+from PIL import Image, ImageDraw
 from mathutils import Vector
 
 REPO_ROOT = os.path.abspath(os.getcwd())
@@ -271,6 +273,114 @@ def new_bake_image(name, colorspace):
     image.colorspace_settings.name = colorspace
     image.file_format = "PNG"
     return image
+
+def uv_triangles(target):
+    if not target.data.uv_layers:
+        raise RuntimeError("Cannot rasterize material atlas without UV coordinates")
+    target.data.calc_loop_triangles()
+    uv_layer = target.data.uv_layers.active
+    for tri in target.data.loop_triangles:
+        polygon = target.data.polygons[tri.polygon_index]
+        points = []
+        for loop_index in tri.loops:
+            uv = uv_layer.data[loop_index].uv
+            points.append((
+                max(0, min(ATLAS_SIZE-1, int(round(float(uv.x) * (ATLAS_SIZE-1))))),
+                max(0, min(ATLAS_SIZE-1, int(round((1.0-float(uv.y)) * (ATLAS_SIZE-1))))
+            ))
+        yield polygon.material_index, points
+
+def linear_to_srgb(value):
+    value = max(0.0, min(1.0, float(value)))
+    return 12.92*value if value <= 0.0031308 else 1.055*(value ** (1.0/2.4)) - 0.055
+
+def rasterize_material_atlas(target, channel, filepath):
+    """Rasterize the target's UV triangles and material IDs into a texture atlas.
+
+    This deterministic path is used for Base Color/Roughness/Metallic because
+    Blender's background bake operator returned FINISHED while writing all-zero
+    pixels in this runner. It preserves the original source-material values.
+    """
+    mode = "RGB" if channel == "BaseColor" else "L"
+    image = Image.new(mode, (ATLAS_SIZE, ATLAS_SIZE), (0, 0, 0) if mode == "RGB" else 0)
+    draw = ImageDraw.Draw(image)
+    material_count = len(target.data.materials)
+    painted = 0
+    for material_index, points in uv_triangles(target):
+        if material_index < 0 or material_index >= material_count:
+            continue
+        mat = target.data.materials[material_index]
+        if mat is None:
+            continue
+        if channel == "BaseColor":
+            linear = mat["bake_basecolor"]
+            fill = tuple(int(round(linear_to_srgb(v)*255.0)) for v in linear)
+        else:
+            scalar = float(mat["bake_" + channel.lower()])
+            fill = int(round(max(0.0, min(1.0, scalar))*255.0))
+        draw.polygon(points, fill=fill)
+        painted += 1
+    if painted == 0:
+        raise RuntimeError("UV material-ID rasterizer found no mapped triangles for " + channel)
+    image.save(filepath, format="PNG", optimize=True)
+    bpy_image = bpy.data.images.load(filepath, check_existing=False)
+    bpy_image.name = "IS2_" + channel + "_Atlas"
+    bpy_image.colorspace_settings.name = "sRGB" if channel == "BaseColor" else "Non-Color"
+    bpy_image.pack()
+    print("UV_ATLAS_RASTERIZED", channel, "triangles", painted, "path", filepath)
+    return bpy_image
+
+def create_procedural_normal_atlas(target, filepath):
+    """Create a restrained UV-masked tangent micro-normal fallback."""
+    mask = Image.new("L", (ATLAS_SIZE, ATLAS_SIZE), 0)
+    draw = ImageDraw.Draw(mask)
+    painted = 0
+    for _material_index, points in uv_triangles(target):
+        draw.polygon(points, fill=255)
+        painted += 1
+    if painted == 0:
+        raise RuntimeError("Normal fallback has no UV triangles")
+    mask_array = np.asarray(mask, dtype=np.float32) / 255.0
+    axis = np.arange(ATLAS_SIZE, dtype=np.float32) / float(ATLAS_SIZE)
+    u, v = np.meshgrid(axis, axis, indexing="xy")
+    rng = np.random.default_rng(1944)
+    height = np.zeros((ATLAS_SIZE, ATLAS_SIZE), dtype=np.float32)
+    for max_freq, amplitude in ((4, 1.0), (12, 0.55), (36, 0.25), (96, 0.10)):
+        for _ in range(6):
+            fx = int(rng.integers(1, max_freq+1))
+            fy = int(rng.integers(1, max_freq+1))
+            phase = float(rng.uniform(0.0, math.tau))
+            height += (amplitude/6.0) * np.sin(math.tau*(fx*u+fy*v)+phase)
+    height -= float(height.mean())
+    height /= float(height.std()) + 1e-6
+    height *= 0.00035
+    dy, dx = np.gradient(height)
+    nx = -dx * ATLAS_SIZE * 0.12
+    ny = -dy * ATLAS_SIZE * 0.12
+    nz = np.ones_like(nx)
+    length = np.sqrt(nx*nx + ny*ny + nz*nz)
+    rgb = np.empty((ATLAS_SIZE, ATLAS_SIZE, 3), dtype=np.uint8)
+    rgb[...,0] = np.clip((nx/length+1.0)*127.5, 0, 255).astype(np.uint8)
+    rgb[...,1] = np.clip((ny/length+1.0)*127.5, 0, 255).astype(np.uint8)
+    rgb[...,2] = np.clip((nz/length+1.0)*127.5, 0, 255).astype(np.uint8)
+    rgb[mask_array < 0.5] = (128, 128, 255)
+    Image.fromarray(rgb, mode="RGB").save(filepath, format="PNG", optimize=True)
+    bpy_image = bpy.data.images.load(filepath, check_existing=False)
+    bpy_image.name = "IS2_Procedural_TangentNormal_Fallback"
+    bpy_image.colorspace_settings.name = "Non-Color"
+    bpy_image.pack()
+    print("NORMAL_FALLBACK_CREATED", filepath)
+    return bpy_image
+
+def create_neutral_ao_atlas(filepath):
+    """Neutral white AO multiplier; AO is optional and not wired into the GLB material."""
+    Image.new("L", (ATLAS_SIZE, ATLAS_SIZE), 255).save(filepath, format="PNG", optimize=True)
+    bpy_image = bpy.data.images.load(filepath, check_existing=False)
+    bpy_image.name = "IS2_AO_Neutral_Fallback"
+    bpy_image.colorspace_settings.name = "Non-Color"
+    bpy_image.pack()
+    print("AO_NEUTRAL_FALLBACK_CREATED", filepath)
+    return bpy_image
 
 def save_bake_image(image, filename):
     image.filepath_raw = os.path.join(PBR_DIR, filename)
@@ -597,16 +707,21 @@ rough_img = new_bake_image("IS2_Roughness_Atlas", "Non-Color")
 metal_img = new_bake_image("IS2_Metallic_Atlas", "Non-Color")
 ao_img = new_bake_image("IS2_AO_Atlas", "Non-Color")
 
-print("BAKE: Base Color (material-ID emission)")
-bake_target_emission(target, base_img, "BaseColor")
+print("ATLAS: Base Color from UV triangles and source material IDs")
+base_img = rasterize_material_atlas(target, "BaseColor", os.path.join(PBR_DIR, "basecolor.png"))
+
 print("BAKE: Tangent-space Normal (high-poly to low-poly)")
+normal_img = new_bake_image("IS2_TangentNormal_Atlas", "Non-Color")
 bake_selected_to_active(target, hp_sources, normal_img, "NORMAL")
+normal_source = "high_poly_selected_to_active"
 if image_rgb_stats(normal_img)[1] < 0.01:
-    bake_target_normal_fallback(target, normal_img)
-print("BAKE: Roughness (material-ID emission)")
-bake_target_emission(target, rough_img, "Roughness")
-print("BAKE: Metallic (material-ID emission)")
-bake_target_emission(target, metal_img, "Metallic")
+    normal_img = create_procedural_normal_atlas(target, os.path.join(PBR_DIR, "normal.png"))
+    normal_source = "procedural_uv_micro_normal_fallback"
+
+print("ATLAS: Roughness from UV triangles and source material IDs")
+rough_img = rasterize_material_atlas(target, "Roughness", os.path.join(PBR_DIR, "roughness.png"))
+print("ATLAS: Metallic from UV triangles and source material IDs")
+metal_img = rasterize_material_atlas(target, "Metallic", os.path.join(PBR_DIR, "metallic.png"))
 
 print("BAKE: Ambient Occlusion")
 for source in hp_sources:
@@ -622,6 +737,11 @@ bpy.context.view_layer.update()
 ao_result = bpy.ops.object.bake(type="AO", margin=16, use_clear=True)
 print("BAKE_RESULT AO", ao_result)
 save_bake_image(ao_img, "ao.png")
+ao_source = "ambient_occlusion_bake"
+ao_stats = image_rgb_stats(ao_img)
+if ao_stats[1] < 0.01 or (ao_stats[1] - ao_stats[0]) < 0.001:
+    ao_img = create_neutral_ao_atlas(os.path.join(PBR_DIR, "ao.png"))
+    ao_source = "neutral_white_fallback_not_wired"
 for source in hp_sources:
     source.hide_set(False)
     source.hide_render = False
