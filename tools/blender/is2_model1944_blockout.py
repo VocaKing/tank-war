@@ -428,7 +428,7 @@ for side in (-1, 1):
             for k in range(8):
                 a = k*math.tau/8
                 yy = y + math.cos(a)*0.135
-                zz = 0.70 + math.sin(a)*0.135
+                zz = TRACK_Z + math.sin(a)*0.135
                 cylinder("Roadwheel_hub_bolt_%s_%02d_%d_%d" % (side, i+1, pair+1, k),
                          (x + side*0.087, yy, zz), 0.013, 0.014, STEEL, "X", 10, 0.0)
     # Three return rollers per side.
