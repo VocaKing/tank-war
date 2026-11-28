@@ -17,7 +17,7 @@ export const GUN_VOICES=Object.freeze({
  aegis140:[1.01,1.30,.51,1.24],bastion125:[.78,1.27,.66,1.24],harrier105:[1.33,.83,1.05,.80],
  warden130:[.90,1.22,.53,1.18],lancer120:[1.37,.90,.64,.93],leviathan160:[.68,1.43,1.02,1.42],
  thunderclad155:[.79,1.35,.93,1.50],tempest155:[1.01,1.13,.85,1.32],cerberus135:[1.18,1.19,.60,1.21],
- raptor90:[1.32,.78,1.12,.77],
+ raptor90:[1.32,.78,1.12,.77],vesper48:[1.27,.88,1.05,.89],
 });
 const bound=(v,a,b)=>Math.max(a,Math.min(b,v));
 function hashVoice(s){let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0;}

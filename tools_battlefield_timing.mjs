@@ -9,9 +9,9 @@ try {
   const { createControl, CONTROL_RADIUS, SOLO_CONTROL_CAPTURE_SECONDS, contributionRate } = await vite.ssrLoadModule('/src/game/controlCapture.js');
   const { TANKS } = await vite.ssrLoadModule('/src/game/tankData.js');
   const { MAPS } = await vite.ssrLoadModule('/src/world/maps.js');
-  assert.equal(TANKS.length,47,'Full production roster must not regress');
-  assert.equal(new Set(TANKS.map(t=>t.id)).size,47);
-  for (const id of ['t14','strv103','fv4005s1','m50ontos','centauro2','sprutsd','archer','bmpt','2s38','xm8ags','mauseng','pzh2000','aegis140']) assert.ok(TANKS.some(t=>t.id===id),id+' missing');
+  assert.equal(TANKS.length,48,'Full production roster must not regress');
+  assert.equal(new Set(TANKS.map(t=>t.id)).size,48);
+  for (const id of ['t14','strv103','fv4005s1','m50ontos','centauro2','sprutsd','archer','bmpt','2s38','xm8ags','mauseng','pzh2000','aegis140','vesper48']) assert.ok(TANKS.some(t=>t.id===id),id+' missing');
   assert.ok(MAPS.every(m=>m.controlPoint.r===CONTROL_RADIUS));
   const {STATIONARY_SKILLS}=await vite.ssrLoadModule('/src/game/vehicleSkills.js');
   const stationary=TANKS.filter(t=>STATIONARY_SKILLS.has(t.skill?.id));

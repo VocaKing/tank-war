@@ -16,8 +16,8 @@ function load(published=api.EMPTY()){
 }
 const stock=load().STOCK_TANKS,cfg=api.EMPTY();
 const stockTiger=stock.find(t=>t.id==='tiger');
-assert.equal(stock.length,47);
-assert.equal(new Set(stock.map(t=>t.id)).size,47);
+assert.equal(stock.length,48);
+assert.equal(new Set(stock.map(t=>t.id)).size,48);
 const td=stock.filter(t=>t.cls==='Tank Destroyer');
 const others=stock.filter(t=>t.cls!=='Tank Destroyer');
 assert.equal(td.length,11);
@@ -108,4 +108,4 @@ assert.equal(load().TANK_BY_ID.warden130.maxDispersion,3.5);
 assert.equal(load().TANK_BY_ID.sherman.dispersion,1.2);
 assert.equal(load().TANK_BY_ID.sherman.maxDispersion,5);
 assert.deepEqual(api.diff(stock,load().TANKS),unrestricted);
-console.log('Balance integration checks passed, including all 47 stock dispersion pairs and unrestricted custom ranges.');
+console.log('Balance integration checks passed, including all 48 stock dispersion pairs and unrestricted custom ranges.');

@@ -5,10 +5,10 @@ const vite=await createServer({appType:'custom',server:{middlewareMode:true,ws:f
 try{
  const {TANKS}=await vite.ssrLoadModule('/src/game/tankData.js');
  const {RNG}=await vite.ssrLoadModule('/src/util.js');
- assert.equal(TANKS.length,47);
+ assert.equal(TANKS.length,48);
  const byId=Object.fromEntries(TANKS.map(t=>[t.id,t]));
  const tierCounts=[1,2,3,4].map(tier=>TANKS.filter(t=>t.tier===tier).length);
- assert.deepEqual(tierCounts,[7,11,8,21]);
+ assert.deepEqual(tierCounts,[7,11,9,21]);
  let total=0,strict=0,duplicates=0;
  for(const player of TANKS){
   const lineups=new Set();

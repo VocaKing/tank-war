@@ -19,7 +19,7 @@ const signatures = {
   archer: [0.90, 1.32, 1.18, 1.35, 'gold'], pzh2000: [1.22, 1.01, 0.99, 1.48, 'amber'],
   tempest155: [1.04, 1.16, 1.07, 1.24, 'gold'], thunderclad155: [1.30, 0.96, 0.80, 1.52, 'orange'],
   bmpt: [0.57, 1.29, 0.25, 0.64, 'gold'], '2s38': [0.68, 1.33, 0.38, 0.79, 'amber'],
-  m50ontos: [0.74, 1.13, 0.54, 1.11, 'orange'],
+  m50ontos: [0.74, 1.13, 0.54, 1.11, 'orange'], vesper48: [0.67, 1.44, 0.79, 0.78, 'orange'],
 };
 const profiles = new Map();
 export function muzzleProfile(spec, caliber, mode = 'gun') {

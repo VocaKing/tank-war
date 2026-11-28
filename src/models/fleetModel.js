@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { hullPitchFloor, MAX_RECOIL } from './gunClearance.js';
+import { VESPER } from './vesperDesign.js';
 import { makeTrackBelt } from './trackBelt.js';
 import { refineTankDestroyer } from './destroyerModels.js';
 
@@ -9,6 +10,7 @@ const detailedExteriorIds = new Set([
 const exteriorRevision = '2026-11-exterior-detail';
 const conceptRevision = '2026-11-concept-detail-v3';
 const fleetIds = new Set([
+  VESPER.id,
   ...detailedExteriorIds,
   'aegis140', 'bastion125', 'cerberus135', 'harrier105', 'lancer120', 'leviathan160', 'raptor90',
   'tempest155', 'thunderclad155', 'warden130',
@@ -44,6 +46,7 @@ export function loadFleetModel(spec) {
   ]).then(async ([{ GLTFLoader }, { MeshoptDecoder }]) => {
     const referenceImage = referenceImages.get(id);
     const revision = id === 'aegis140' ? '2026-11-vx9-orthographic'
+      : id === VESPER.id ? VESPER.revision
       : detailedExteriorIds.has(id) ? exteriorRevision : conceptRevision;
     const url = `${import.meta.env.BASE_URL}models/fleet/${id}.glb?v=${revision}`;
     const { scene } = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(url);

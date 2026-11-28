@@ -27,6 +27,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install chromium
       - run: node tools_vx9_views.mjs
+      - run: node tools_vesper_views.mjs
       - run: node tools_fleet_assets.mjs
       - run: node tools_armor_geometry.mjs
       - run: node tools_ballistics_consistency.mjs
@@ -60,7 +61,7 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:4173/tank-war/ >/dev/null || { cat /tmp/tank-war-preview.log; exit 1; }
-          node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "t72,pzh2000,aegis140" "village,forest,desert"
+          node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "t72,pzh2000,aegis140,vesper48" "village,forest,desert"
           node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "strv103,m50ontos,2s38" "village"
           node tools_qa.mjs http://127.0.0.1:4173/tank-war/ "thunderclad155,tempest155,archer" "village"
       - name: Remove QA-only path mapping

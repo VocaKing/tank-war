@@ -1,6 +1,7 @@
-// Ten original concept vehicles from the 2026-11-24 roster.
+// Concept vehicles in the playable roster.
 // These are fictional designs: dimensions and armour ratings are GAMEPLAY values,
 // not claims about any real-world military equipment.
+import { VESPER } from '../models/vesperDesign.js';
 import { VX9 } from '../models/vx9Design.js';
 
 const dims = (L,W,hullH,turretL,turretW,turretH,gunLen,extras={}) =>
@@ -46,6 +47,19 @@ export const CONCEPT_VEHICLES = [
     shells:ammo(140,500,470,140,[21,8,6],1590),
     paint:paint('#90908d','#454849',['#3e4347','#a6a69f']),systemTag:'REAR TURRET · RECHARGING APS · MODULAR ERA',
     desc:'Rear-mounted wedge turret, individually expendable ERA tiles and a one-charge APS that recharges after cooldown.',
+  }),
+  vehicle(VESPER.id,VESPER.name,VESPER.name,'Light',{
+    tier:3, crew:['Commander','Gunner','Driver'], autoloader:true,
+    mass:22.8,power:630,maxSpeed:72,reverseSpeed:23,hullTraverse:51,turretTraverse:49,
+    gunDepression:9,gunElevation:24,gunSpeed:9,hp:980,viewRange:470,reload:5.9,aimTime:1.8,dispersion:.75,maxDispersion:1.81,
+    dims:dims(VESPER.hullLength,VESPER.hullWidth,VESPER.hullRoof,3.0,1.70,VESPER.turretRoof-VESPER.hullRoof,VESPER.barrelLength,{
+      turretZ:VESPER.turretZ,turretBoxZ:-.56,trackW:VESPER.trackWidth,trackGauge:VESPER.trackX*2,clearance:.33,
+      gunForwardL:VESPER.hullLength/2+VESPER.turretZ+VESPER.gunZ+VESPER.barrelLength,
+    }),
+    armor:armor(75,32,22,78,34,25,18),
+    shells:ammo(90,285,310,78,[28,12,9],1370),
+    paint:paint('#34464b','#293439'),systemTag:'LIGHT SCOUT · ELEVATED TURRET',
+    desc:'Fast tracked light tank with a raised turret, narrow gun cradle and exposed lower running gear.',
   }),
   vehicle('bastion125','Bastion-125 Defensive MBT','Bastion-125','Heavy',{
     tier:4,

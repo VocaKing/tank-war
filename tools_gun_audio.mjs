@@ -5,8 +5,8 @@ import {Audio} from './src/game/audio.js';
 const vite=await createServer({appType:'custom',server:{middlewareMode:true,ws:false}});
 try{
  const {TANKS}=await vite.ssrLoadModule('/src/game/tankData.js');
- assert.equal(TANKS.length,47);assert.equal(Object.keys(GUN_VOICES).length,47);
- assert.equal(new Set(Object.values(GUN_VOICES).map(v=>v.join(','))).size,47);
+ assert.equal(TANKS.length,48);assert.equal(Object.keys(GUN_VOICES).length,48);
+ assert.equal(new Set(Object.values(GUN_VOICES).map(v=>v.join(','))).size,48);
  const fingerprints=new Set();
  for(const t of TANKS){
    assert.ok(GUN_VOICES[t.id],t.id+' missing voice');
@@ -19,7 +19,7 @@ try{
    assert.notEqual(sample[1000],synthesizeGun(p,1)[1000]);
    assert.equal(sample[1000],synthesizeGun(p)[1000]);
  }
- assert.equal(fingerprints.size,47);
+ assert.equal(fingerprints.size,48);
  let prev=null;
  for(const mm of [30,37,57,75,76,84,85,88,90,100,105,106,120,122,125,128,130,135,140,155,160,183]){
    const p=gunProfile('generic',mm);if(prev){assert.ok(p.pitch<prev.pitch);assert.ok(p.gain>prev.gain);}prev=p;
@@ -39,5 +39,5 @@ try{
  for(let i=0;i<60;i++)a.gun({x:50,y:0,z:0},57,false,'2s38');
  assert.ok(a.gunVoices.size<=36);
  a.clearGunVoices();assert.equal(a.gunVoices.size,0);
- console.log('47 distinct vehicle audio voices, caliber scaling, sample bounds, distance delay and audio voice limits verified.');
+ console.log('48 distinct vehicle audio voices, caliber scaling, sample bounds, distance delay and audio voice limits verified.');
 }finally{await vite.close();}

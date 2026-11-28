@@ -4,11 +4,12 @@ import { readdir, readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { Ray, Vector3 } from 'three';
 import { hasFleetModel } from './src/models/fleetModel.js';
+import { VESPER } from './src/models/vesperDesign.js';
 import { VX9 } from './src/models/vx9Design.js';
 
 const root = new URL('./public/models/fleet/', import.meta.url);
 const files = (await readdir(root)).filter(file => file.endsWith('.glb'));
-assert.equal(files.length, 20, 'Expected each specialist and concept vehicle to ship its own GLB');
+assert.equal(files.length, 21, 'Expected each specialist and concept vehicle to ship its own GLB');
 const fingerprints = new Set();
 const ids = [];
 const expectedExterior = new Set([
@@ -107,7 +108,7 @@ for (const file of files) {
     assert.equal(model.extras.fleetModelRevision, '2026-11-exterior-detail', id + ' is missing the revised model');
     assert.ok(model.extras.exteriorDetailParts > 16, id + ' is missing layered exterior fittings');
   } else {
-    const revision = id === 'aegis140' ? vx9Revision : '2026-11-concept-detail-v3';
+    const revision = id === 'aegis140' ? vx9Revision : id === VESPER.id ? VESPER.revision : '2026-11-concept-detail-v3';
     assert.equal(model.extras.fleetModelRevision, revision, id + ' is missing the revised concept model');
     assert.ok(model.extras.exteriorDetailParts > 22, id + ' is missing its new hull and turret fittings');
     for (const suffix of ['track', 'rubber']) {
@@ -138,6 +139,29 @@ for (const file of files) {
       point: VX9.turretLamp, sweep: VX9.turretLampSweep, pitch: VX9.turretLampTilt,
       rimHeight: .058, skin: 'VX-9 graphite armor',
     });
+  }
+  if (id === VESPER.id) {
+    assert.equal(model.extras.referenceSource,VESPER.source);
+    assert.deepEqual(turret.translation,[0,VESPER.hullRoof,VESPER.turretZ]);
+    assert.deepEqual(gun.translation,[0,VESPER.gunY,VESPER.gunZ]);
+    assert.deepEqual(muzzle.translation,[0,0,VESPER.barrelLength]);
+    const shell = gltf.meshes[child(body,'Vesper chassis').mesh];
+    const skin = shell.primitives.find(p=>materials[p.material].name==='Vesper-48 slate armor');
+    const {min,max}=gltf.accessors[skin.attributes.POSITION];
+    assert.ok(Math.abs(max[2]-min[2]-VESPER.hullLength)<.001);
+    assert.ok(Math.abs(max[0]-min[0]-VESPER.hullWidth)<.015);
+    for (const side of [0,1]) {
+      const anchors=child(body,'track_'+side).extras.poses;
+      assert.equal(anchors.length,100);
+      assert.ok(anchors.every(p=>p[0]===(side===0?-1:1)*VESPER.trackX));
+    }
+    const data=asset.subarray(28+size), chassis=child(body,'Vesper chassis').mesh;
+    for (const x of VESPER.lightsX) {
+      const origin=new Vector3(x,VESPER.lightsY-.038,VESPER.lightsZ+1);
+      const light=firstModelSurface(gltf,data,chassis,new Ray(origin,new Vector3(0,0,-1)));
+      assert.equal(light.material,'Vesper-48 warm searchlight lens','Front lamp must clear the armor at its lower edge');
+    }
+    assert.ok(materials.some(m=>m.name==='Vesper-48 warm searchlight lens'&&m.emissiveFactor));
   }
   assert.ok(muzzle?.translation[2] > 0, id + ' has an invalid recoil or muzzle hierarchy');
   assert.ok(child(gun, 'sight'), id + ' has no sight anchor');
