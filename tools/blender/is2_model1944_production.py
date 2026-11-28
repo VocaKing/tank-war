@@ -923,6 +923,10 @@ gun_elev = create_empty("Gun_Elevation_Pivot", (0.0, 1.48, 2.17), turret)
 gun_elev["animated_axis"] = "Blender X pitch"
 gun_recoil = create_empty("Gun_Recoil_Pivot", (0.0, 1.78, 2.17), gun_elev)
 gun_recoil["animated_axis"] = "local -Y recoil"
+# Named gameplay anchors: muzzle follows recoil, while the optical sight follows
+# gun elevation. These are consumed by the Three.js firing/aiming adapter.
+muzzle_anchor = create_empty("Muzzle", (0.0, 6.37, 2.17), gun_recoil)
+sight_anchor = create_empty("Gun_Sight", (0.43, 1.645, 2.18), gun_elev)
 track_roots = {
     "L": create_empty("Track_L_Root", (0.0, 0.0, 0.0), hull),
     "R": create_empty("Track_R_Root", (0.0, 0.0, 0.0), hull),
@@ -1135,7 +1139,7 @@ manifest = {
     "node_count": len(FINAL_COLL.objects),
     "required_nodes": [
         "IS2_Model1944_Root", "Hull_Body", "Turret_Root",
-        "Gun_Elevation_Pivot", "Gun_Recoil_Pivot",
+        "Gun_Elevation_Pivot", "Gun_Recoil_Pivot", "Muzzle", "Gun_Sight",
         "Track_L_Root", "Track_R_Root"
     ],
     "visual_review_required": True,
